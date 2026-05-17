@@ -1,0 +1,43 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+.Python
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- IDE / editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Streamlit / app local state ---
+.streamlit/secrets.toml
+state.json
+*.log
+.cache/
+
+# --- OS junk ---
+*.tmp
+*~
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Local data dumps (don't commit market data) ---
+*.duckdb
+*.parquet
+data_cache/

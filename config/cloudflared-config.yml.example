@@ -1,0 +1,35 @@
+# Cloudflare Tunnel config template
+#
+# Copy to ~/.cloudflared/config.yml and fill in:
+#   1. <YOUR-TUNNEL-UUID>  — printed by `cloudflared tunnel create sector-dashboard`
+#   2. <USERNAME>          — your Pi username (e.g. meiri)
+#   3. dashboard.yourdomain.com — the subdomain you routed in step 4
+#
+# Then:
+#   sudo cloudflared service install
+#   sudo systemctl enable --now cloudflared
+
+tunnel: <YOUR-TUNNEL-UUID>
+credentials-file: /home/<USERNAME>/.cloudflared/<YOUR-TUNNEL-UUID>.json
+
+# Lower noise in cloudflared's journal
+loglevel: info
+no-autoupdate: false
+
+ingress:
+  # Main dashboard route
+  - hostname: dashboard.yourdomain.com
+    service: http://localhost:8501
+    originRequest:
+      # Streamlit uses WebSocket for live updates
+      noTLSVerify: true
+      connectTimeout: 30s
+      # Keep the connection open longer so long-running queries don't disconnect
+      tcpKeepAlive: 30s
+
+  # Optional second route — e.g. a Flask API on the same Pi
+  # - hostname: api.yourdomain.com
+  #   service: http://localhost:8000
+
+  # Catch-all (REQUIRED, must be last) — returns 404 for any unmatched hostname
+  - service: http_status:404

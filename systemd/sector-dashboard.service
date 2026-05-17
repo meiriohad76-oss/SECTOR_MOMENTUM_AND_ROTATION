@@ -1,0 +1,39 @@
+# Sector Rotation Dashboard - systemd unit file
+#
+# Install:
+#   sudo cp systemd/sector-dashboard.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now sector-dashboard
+#
+# Adjust User=, WorkingDirectory=, and ExecStart= paths to match
+# your username and where you cloned the repo.
+
+[Unit]
+Description=Sector Rotation Dashboard (Streamlit)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=meiri
+Group=meiri
+WorkingDirectory=/home/meiri/sector-rotation-dashboard
+ExecStart=/home/meiri/sector-rotation-dashboard/.venv/bin/streamlit run app.py \
+    --server.address 127.0.0.1 \
+    --server.port 8501 \
+    --server.headless true \
+    --server.fileWatcherType none \
+    --browser.gatherUsageStats false
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Reasonable defaults
+TimeoutStartSec=120
+TimeoutStopSec=30
+KillMode=mixed
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target
