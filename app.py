@@ -27,6 +27,15 @@ from src.visuals import (
 )
 
 
+def _md(html: str):
+    """Streamlit markdown wrapper that strips leading whitespace so HTML isn't
+    treated as a code block. Indented HTML inside f-strings (>=4 spaces) gets
+    misparsed otherwise."""
+    cleaned = "\n".join(line.lstrip() for line in html.split("\n"))
+    _md(cleaned)
+
+
+
 # =============================== page config =====================================
 
 st.set_page_config(
@@ -63,11 +72,8 @@ if "drill_ticker" not in st.session_state:
 if "table_open" not in st.session_state:
     st.session_state.table_open = True
 
-st.markdown(
-    f'<style>{_CSS}{_EXTRA}</style>'
-    f'<script>document.documentElement.setAttribute("data-theme","{st.session_state.theme}");</script>',
-    unsafe_allow_html=True,
-)
+_md(f'<style>{_CSS}{_EXTRA}</style>'
+    f'<script>document.documentElement.setAttribute("data-theme","{st.session_state.theme}");</script>',)
 
 
 # =============================== data load (cached) ==============================
@@ -201,7 +207,7 @@ def render_header():
         </div>
       </header>
     """
-    st.markdown(html, unsafe_allow_html=True)
+    _md(html)
 
 
 def render_bluf():
@@ -248,7 +254,7 @@ def render_bluf():
         </div>
         """
         cards.append(card_html)
-    st.markdown(head_html + "".join(cards) + "</div></div></section>", unsafe_allow_html=True)
+    _md(head_html + "".join(cards) + "</div></div></section>")
 
 
 def render_status():
@@ -315,7 +321,7 @@ def render_status():
       </div>
     </section>
     """
-    st.markdown(html, unsafe_allow_html=True)
+    _md(html)
 
 
 def render_alerts():
@@ -351,18 +357,15 @@ def render_alerts():
       <div class="alerts">{rows}</div>
     </section>
     """
-    st.markdown(html, unsafe_allow_html=True)
+    _md(html)
 
 
 def render_picks():
     selected_picks = scored[scored["selected"]].sort_values(["class", "rank_in_class"])
     if selected_picks.empty:
-        st.markdown(
-            '<section class="section"><div class="section-head"><h2>Picks <span class="count">0 active</span></h2></div>'
+        _md('<section class="section"><div class="section-head"><h2>Picks <span class="count">0 active</span></h2></div>'
             '<div class="alerts"><div class="alert-row"><span class="t">—</span>'
-            '<span class="change">No picks meet the gates right now. System is defensive.</span></div></div></section>',
-            unsafe_allow_html=True,
-        )
+            '<span class="change">No picks meet the gates right now. System is defensive.</span></div></div></section>',)
         return
 
     cards_html = ""
@@ -412,14 +415,13 @@ def render_picks():
       <div class="picks-grid">{cards_html}</div>
     </section>
     """
-    st.markdown(html, unsafe_allow_html=True)
+    _md(html)
 
 
 def render_rrg():
-    st.markdown('<section class="section"><div class="section-head">'
+    _md('<section class="section"><div class="section-head">'
                 f'<h2>Relative Rotation Graph <span class="count">{st.session_state.klass}</span></h2>'
-                '<div class="right">CLICK DOT → DRILL-DOWN</div></div></section>',
-                unsafe_allow_html=True)
+                '<div class="right">CLICK DOT → DRILL-DOWN</div></div></section>')
 
     # class selector (Streamlit native buttons styled by our CSS)
     cls_list = list(UNIVERSE_BY_CLASS.keys()) + ["ALL"]
@@ -461,14 +463,11 @@ def render_rrg():
             tickers = quads[q]
             count = len(tickers)
             ticks = " · ".join(tickers) if tickers else "—"
-            st.markdown(
-                f'<div class="quad-card {color_cls}">'
+            _md(f'<div class="quad-card {color_cls}">'
                 f'<div class="qlbl">{q}</div>'
                 f'<div class="qcount">{count}</div>'
                 f'<div class="qtick">{ticks}</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
+                f'</div>',)
 
 
 def render_drill():
@@ -530,7 +529,7 @@ def render_drill():
       </div>
     </section>
     """
-    st.markdown(head_html, unsafe_allow_html=True)
+    _md(head_html)
 
     # Charts
     c1, c2 = st.columns(2)
@@ -623,7 +622,7 @@ def render_full_table():
       </div>
     </section>
     """
-    st.markdown(html, unsafe_allow_html=True)
+    _md(html)
 
 
 def render_footer():
@@ -634,7 +633,7 @@ def render_footer():
     </div>
     </div>
     """  # closes <div class="app">
-    st.markdown(html, unsafe_allow_html=True)
+    _md(html)
 
 
 # =============================== compose page ====================================
