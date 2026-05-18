@@ -86,6 +86,106 @@ def _esc(s: str) -> str:
     return (s.replace('&', '&amp;').replace('"', '&quot;')
              .replace('<', '&lt;').replace('>', '&gt;'))
 
+# =============================== system explainer ================================
+
+def _grade_letter(s: float | None) -> str:
+    """Translate composite z-score into a letter grade for at-a-glance reading."""
+    if s is None or pd.isna(s):
+        return "?"
+    if s >= 1.0:  return "A"
+    if s >= 0.0:  return "B"
+    if s >= -1.0: return "C"
+    if s >= -1.5: return "D"
+    return "F"
+
+
+SYSTEM_EXPLAINER_HTML = """
+<div class="explainer">
+
+<p>The Sentiment Board monitors 67 ETFs (US sectors, US industries, international markets, style factors) and applies a layered 7-pillar methodology to flag bullish entries and bearish exits. Every score, state, and signal you see on this page comes from the chain below.</p>
+
+<h3>Data flow</h3>
+<pre class="flow">yfinance daily OHLCV (3y, ~70 tickers)
+        |
+        v
+weekly + monthly resamples for stage / Faber
+        |
+        v
+7 pillars computed per ticker
+        |
+        v
+Cross-sectional z-scores within each asset class
+        |
+        v
+Composite S-score (weighted) + Flow F-score (z-scored)
+        |
+        v
+State machine (6 states, strict gates per the methodology)
+        |
+        v
+state.json (persists across restarts)  -->  BLUF + alerts + cards
+</pre>
+
+<h3>The 7 pillars + weights</h3>
+<p>Weights sum to 1.00. Cross-sectional z-score means a ticker is compared against the other tickers in its asset class, so a +1.0 means "1 standard deviation above the class average."</p>
+<table>
+<thead><tr><th>#</th><th>Pillar</th><th>Source</th><th class="weight">Weight</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>12-1 Cross-sectional Momentum</td><td>Jegadeesh-Titman 1993 (12mo return ex-most-recent month)</td><td class="weight">22%</td></tr>
+<tr><td>2</td><td>Mansfield 52-week Relative Strength</td><td>Weinstein 1988 (RS line ratio vs benchmark)</td><td class="weight">12%</td></tr>
+<tr><td>3</td><td>RRG — RS-Ratio</td><td>de Kempenaer (horizontal axis of Relative Rotation Graph)</td><td class="weight">15%</td></tr>
+<tr><td>4</td><td>RRG — RS-Momentum</td><td>de Kempenaer (vertical axis)</td><td class="weight">8%</td></tr>
+<tr><td>5</td><td>Binary Trend Filters</td><td>Faber 10mo SMA + Weinstein Stage=2 + Antonacci absolute; sum / 3 in [0,1]</td><td class="weight">12%</td></tr>
+<tr><td>6</td><td>Business-Cycle Tilt</td><td>Stovall/Fidelity sector basket nudge (+1 / 0 / -1) based on Faber regime + yield curve</td><td class="weight">8%</td></tr>
+<tr><td>7</td><td>Institutional Flow (F-score)</td><td>CMF + OBV slope + ETF flow + block ratio + RVOL + short interest delta (weighted z-score)</td><td class="weight">23%</td></tr>
+</tbody>
+</table>
+
+<h3>Composite formula</h3>
+<pre class="flow">S = 0.22 * z(MOM_12_1)
+  + 0.12 * z(MANSFIELD_RS)
+  + 0.15 * z(RRG_RS_Ratio)
+  + 0.08 * z(RRG_RS_Momentum)
+  + 0.12 * (FILTERS / 3)
+  + 0.08 * CYCLE_TILT
+  + 0.23 * z(F_score)</pre>
+
+<h3>Hard flow veto</h3>
+<p>A high S-score is overridden if <code>F &lt; -0.5&sigma;</code>. Price-based pillars can't beat a "no real money following" signal. This is what prevents pure-momentum traps.</p>
+
+<h3>Letter grade</h3>
+<p>Translation of S-score for quick reading:</p>
+<table>
+<thead><tr><th>Grade</th><th>S-score range</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><span class="grade A">A</span></td><td><code>S &ge; +1.0</code></td><td>Top decile — active buy candidate</td></tr>
+<tr><td><span class="grade B">B</span></td><td><code>0.0 &le; S &lt; +1.0</code></td><td>Above class average — hold candidates</td></tr>
+<tr><td><span class="grade C">C</span></td><td><code>-1.0 &lt; S &lt; 0.0</code></td><td>Neutral / mediocre — no signal</td></tr>
+<tr><td><span class="grade D">D</span></td><td><code>-1.5 &le; S &le; -1.0</code></td><td>Warning — under-performer, watch for exit</td></tr>
+<tr><td><span class="grade F">F</span></td><td><code>S &lt; -1.5</code></td><td>Bottom — avoid or short candidate</td></tr>
+</tbody>
+</table>
+
+<h3>State machine — 6 states</h3>
+<table>
+<thead><tr><th>State</th><th>Strict gate (all must pass)</th></tr></thead>
+<tbody>
+<tr><td><span class="pill STAGE_2_BULLISH">STAGE 2 BULLISH</span></td><td>Stage=2 + RRG Leading + Breadth &ge; 60% + CMF &gt; +0.05 + ETF flow &ge; 0</td></tr>
+<tr><td><span class="pill HOLD">HOLD</span></td><td>Stage=2 intact but missing one strict-Bullish gate</td></tr>
+<tr><td><span class="pill WARNING">WARNING</span></td><td>RRG &rarr; Weakening 2+ wks OR breadth &lt; 50% OR CMF &lt; 0 sustained OR OBV/price divergence OR 4+ distribution days</td></tr>
+<tr><td><span class="pill EXIT">EXIT</span></td><td>Close &lt; 30wMA OR Mansfield RS &lt; 0 OR Antonacci failed OR RRG &rarr; Lagging OR CMF &lt; -0.10 OR ETF redemptions &gt; 1.5% AUM</td></tr>
+<tr><td><span class="pill BEARISH_STAGE_4">BEARISH STAGE 4</span></td><td>EXIT + 30wMA slope negative + RRG Lagging 3+ wks + CMF confirmed negative</td></tr>
+<tr><td><span class="pill STAGE_1_BASING">STAGE 1 BASING</span></td><td>Recovered from Stage 4; price reclaimed 30wMA but slope flat AND CMF turned positive</td></tr>
+</tbody>
+</table>
+
+<h3>References</h3>
+<p>Full methodology with formulas and academic citations: <code>docs/sector-rotation-methodology.md</code> &middot; PDF version in <code>docs/sector-rotation-methodology.pdf</code>.</p>
+
+</div>
+"""
+
+
 
 # =============================== page config =====================================
 
@@ -122,6 +222,8 @@ if "drill_ticker" not in st.session_state:
     st.session_state.drill_ticker = "XLK"
 if "table_open" not in st.session_state:
     st.session_state.table_open = True
+if "table_sort" not in st.session_state:
+    st.session_state.table_sort = "S_score:desc"
 
 _md(f'<style>{_CSS}{_EXTRA}</style>'
     f'<script>document.documentElement.setAttribute("data-theme","{st.session_state.theme}");</script>',)
@@ -236,6 +338,12 @@ phase_idx = PHASE_IDX.get(regime.phase_hint, -1)
 
 
 # =============================== render helpers ==================================
+
+
+def render_explainer():
+    with st.expander("📖  HOW THIS WORKS — system, data flow, pillars, gates", expanded=False):
+        _md(SYSTEM_EXPLAINER_HTML)
+
 
 def render_header():
     now = datetime.now()
@@ -424,6 +532,7 @@ def render_picks():
         state = p["state"]
         s = p["S_score"]
         f = p["F_score"]
+        grade = _grade_letter(s)
         mom = (p["mom_12_1"] or 0) * 100
         stage = p.get("stage") or "—"
         quad = (p.get("rrg_quadrant") or "—").upper()
@@ -445,7 +554,7 @@ def render_picks():
           </div>
           {spark}
           <div class="pick-metrics">
-            <div class="m"><span class="k tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_S'])}">S</span><span class="v {s_class}">{s:+.2f}</span></div>
+            <div class="m"><span class="k tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_S'])}">S</span><span class="v {s_class}">{s:+.2f}<span class="grade {grade}">{grade}</span></span></div>
             <div class="m"><span class="k tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_F'])}">F</span><span class="v {f_class}">{f:+.2f}</span></div>
             <div class="m"><span class="k tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_MOM'])}">MOM</span><span class="v {mom_class}">{mom:+.1f}%</span></div>
             <div class="m"><span class="k tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_STAGE'])}">STAGE</span><span class="v">{stage}</span></div>
@@ -554,26 +663,30 @@ def render_drill():
 
           <div class="tile">
             <div class="tile-label"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_drill_composite'])}">Composite</span></div>
-            <div class="tile-value {'up' if row['S_score'] >= 0 else 'down'}">{row['S_score']:+.3f}</div>
+            <div class="tile-value {'up' if row['S_score'] >= 0 else 'down'}">{row['S_score']:+.3f}<span class="grade {_grade_letter(row['S_score'])}">{_grade_letter(row['S_score'])}</span></div>
             <div class="tile-sub">rank {int(row.get('rank_in_class') or 0)} in {row['class']}</div>
+            <div class="tile-help">Weighted z-score across the 7 pillars (weights total 1.00). <b>Higher = better.</b> S &ge; +1.0 is grade A, &le; -1.5 is grade F. Hard veto if F &lt; -0.5&sigma;.</div>
           </div>
 
           <div class="tile">
             <div class="tile-label"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_drill_flow'])}">Flow score</span></div>
             <div class="tile-value {'up' if row['F_score'] >= 0 else 'down'}">{row['F_score']:+.3f}</div>
             <div class="tile-sub">{'VETO' if row.get('veto') else 'OK'} · CMF {row.get('cmf21', 0) or 0:+.2f}</div>
+            <div class="tile-help">Institutional money flow z-score: CMF + OBV slope + ETF creations + block ratio + RVOL + short-interest delta. <b>F &gt; 0 = real money entering</b>; F &lt; -0.5&sigma; kills the trade.</div>
           </div>
 
           <div class="tile">
             <div class="tile-label"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_drill_state'])}">State</span></div>
             <div class="tile-value" style="color:{color};font-size:1.1rem;">{state.replace('_', ' ')}</div>
             <div class="tile-sub">Stage {row.get('stage', '—')} · {(row.get('rrg_quadrant') or '—').upper()}</div>
+            <div class="tile-help">State machine output. <b>STAGE 2 BULLISH</b> = active buy. <b>HOLD</b> = position safe. <b>WARNING</b> = tighten stops. <b>EXIT / BEARISH</b> = sell now or short. Hover the pill for the full gate definition.</div>
           </div>
 
           <div class="tile">
             <div class="tile-label"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_drill_momentum'])}">12-1 Momentum</span></div>
             <div class="tile-value {'up' if (row.get('mom_12_1') or 0) >= 0 else 'down'}">{(row.get('mom_12_1') or 0)*100:+.1f}%</div>
             <div class="tile-sub">Mansfield RS {row.get('mansfield_rs', 0) or 0:+.1f}</div>
+            <div class="tile-help">Jegadeesh-Titman classic: 12-month total return excluding the most recent month. The skip-1 removes short-term reversal noise. <b>Top decile is the winner basket.</b></div>
           </div>
 
         </div>
@@ -587,21 +700,68 @@ def render_drill():
     with c1:
         st.plotly_chart(price_chart_with_30wma(ohlcv[sel], sel),
                         use_container_width=True, config={"displayModeBar": False})
+        _md('<div class="chart-help"><b>Weinstein Stage 2 visual check.</b> Want price (solid line) above the dashed <b>30-week SMA</b>, with the MA sloping <b>upward</b>. Stage 2 confirmed when both hold AND Mansfield RS &gt; 0. Price crossing below the MA on a weekly close is the canonical EXIT trigger.</div>')
     with c2:
         st.plotly_chart(cmf_chart(ohlcv[sel], sel),
                         use_container_width=True, config={"displayModeBar": False})
+        _md('<div class="chart-help"><b>Chaikin Money Flow (21d) — volume-weighted accumulation/distribution.</b> Above <span style="color:var(--green)">+0.10</span> = strong accumulation (institutional buying). Below <span style="color:var(--red)">-0.10</span> = strong distribution. Sustained negative CMF during a Stage-2 advance is an early Stage-3 topping warning.</div>')
     st.plotly_chart(obv_chart(ohlcv[sel], sel),
                     use_container_width=True, config={"displayModeBar": False})
+    _md('<div class="chart-help"><b>Price vs OBV — bearish divergence detector.</b> When price (left axis) makes a new high but OBV (right axis) does <b>not</b>, institutional money isn\'t following the rally. One of the cleanest pre-breakdown signals. Bullish divergence (OBV new high, price not) often marks Stage-1 accumulation bottoms.</div>')
 
 
 def render_full_table():
-    if st.button(("▾ HIDE" if st.session_state.table_open else "▸ SHOW") + "  FULL 7-PILLAR MATRIX",
-                 key="table_toggle"):
-        st.session_state.table_open = not st.session_state.table_open
-        st.rerun()
+    toggle_col, sort_col, _ = st.columns([2, 3, 5])
+    with toggle_col:
+        if st.button(("▾ HIDE" if st.session_state.table_open else "▸ SHOW") + "  FULL 7-PILLAR MATRIX",
+                     key="table_toggle"):
+            st.session_state.table_open = not st.session_state.table_open
+            st.rerun()
 
     if not st.session_state.table_open:
         return
+
+    SORT_OPTIONS = {
+        "S_score:desc":     "S (composite) — high to low",
+        "S_score:asc":      "S (composite) — low to high",
+        "F_score:desc":     "F (flow) — high to low",
+        "F_score:asc":      "F (flow) — low to high",
+        "mom_12_1:desc":    "Momentum — high to low",
+        "mom_12_1:asc":     "Momentum — low to high",
+        "state:asc":        "State (BULLISH → BEARISH)",
+        "class:asc":        "Asset class",
+        "ticker:asc":       "Ticker (A → Z)",
+    }
+    with sort_col:
+        choice = st.selectbox(
+            "Sort by",
+            options=list(SORT_OPTIONS.keys()),
+            format_func=lambda k: SORT_OPTIONS[k],
+            index=list(SORT_OPTIONS.keys()).index(st.session_state.table_sort),
+            key="sort_choice",
+            label_visibility="collapsed",
+        )
+        if choice != st.session_state.table_sort:
+            st.session_state.table_sort = choice
+            st.rerun()
+
+    # Sort the scored df according to the chosen column
+    col, direction = st.session_state.table_sort.split(":")
+    ascending = (direction == "asc")
+    if col == "state":
+        # custom order from best to worst
+        state_order = ["STAGE_2_BULLISH", "HOLD", "STAGE_1_BASING", "WARNING", "EXIT", "BEARISH_STAGE_4"]
+        scored_sorted = scored.copy()
+        scored_sorted["_state_rank"] = scored_sorted["state"].map(
+            {s: i for i, s in enumerate(state_order)}
+        ).fillna(99)
+        scored_sorted = scored_sorted.sort_values("_state_rank", ascending=True).drop(columns=["_state_rank"])
+    elif col == "ticker":
+        scored_sorted = scored.sort_index(ascending=ascending)
+    elif col == "class":
+        scored_sorted = scored.sort_values(["class", "S_score"], ascending=[ascending, False])
+    else:
+        scored_sorted = scored.sort_values(col, ascending=ascending, na_position="last")
 
     rows_html = ""
     # 7 pillar booleans:
@@ -613,7 +773,7 @@ def render_full_table():
     # 6. (cycle tilt — derive from class match, approximate)  → just use breadth > 50%
     # 7. F_score > 0 (institutional flow)
 
-    for tkr, r in scored.sort_values("S_score", ascending=False).iterrows():
+    for tkr, r in scored_sorted.iterrows():
         p1 = (r.get("mom_12_1") or 0) > 0
         p2 = (r.get("faber") or 0) == 1
         p3 = (r.get("stage") or 0) == 2
@@ -690,6 +850,7 @@ def render_footer():
 # =============================== compose page ====================================
 
 render_header()
+render_explainer()
 render_bluf()
 render_status()
 render_alerts()

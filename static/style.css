@@ -976,3 +976,113 @@ div[class*="block-container"] {
 .full-table thead tr:first-child th:last-child  { border-top-right-radius: var(--radius); }
 .full-table tbody tr:last-child td:first-child  { border-bottom-left-radius: var(--radius); }
 .full-table tbody tr:last-child td:last-child   { border-bottom-right-radius: var(--radius); }
+
+/* ---------- System explainer ---------- */
+.explainer {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 18px 22px 22px;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--fg-dim);
+}
+.explainer h3 {
+  margin: 18px 0 8px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg);
+}
+.explainer h3:first-child { margin-top: 0; }
+.explainer p { margin: 0 0 10px; }
+.explainer code, .explainer .mono {
+  font-family: var(--font-mono);
+  font-size: 0.84em;
+  color: var(--fg);
+}
+.explainer table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0 12px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+.explainer th, .explainer td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.explainer th {
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  background: var(--panel-2);
+}
+.explainer td.weight {
+  text-align: right;
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.explainer .flow {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--fg);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  white-space: pre;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+/* ---------- Grade pill ---------- */
+.grade {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 1px 7px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: 1px;
+  border: 1px solid currentColor;
+}
+.grade.A { color: var(--green); }
+.grade.B { color: var(--blue); }
+.grade.C { color: var(--muted); }
+.grade.D { color: var(--amber); }
+.grade.F { color: var(--red); }
+
+/* ---------- Chart caption ---------- */
+.chart-help {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--muted);
+  background: var(--panel-2);
+  border-left: 2px solid var(--accent);
+  padding: 8px 12px;
+  margin: 6px 0 14px;
+  border-radius: 3px;
+}
+.chart-help b { color: var(--fg-dim); font-weight: 600; }
+
+/* ---------- Tile help (drill-down) ---------- */
+.tile-help {
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--muted);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.tile-help b { color: var(--fg-dim); font-weight: 500; }
