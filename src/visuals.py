@@ -147,3 +147,89 @@ def obv_chart(df_daily: pd.DataFrame, ticker: str) -> go.Figure:
         legend=dict(orientation="h", yanchor="top", y=-0.1),
     )
     return fig
+
+
+# ---- Bloomberg-terminal style additions -----------------------------------------
+
+# Terminal-style palette tokens (used in app.py via CSS variables too)
+TERM_GREEN  = "#26d65b"
+TERM_RED    = "#ef4f4a"
+TERM_AMBER  = "#e6b450"
+TERM_BLUE   = "#5fa8d3"
+TERM_MUTED  = "#8b8b8b"
+
+
+def sparkline(df_daily: pd.DataFrame, height: int = 60) -> go.Figure:
+    """Mini price line, no axes, no grid - for embedding on cards."""
+    if df_daily is None or df_daily.empty:
+        return go.Figure()
+    p = df_daily["close"].dropna().iloc[-90:]    # last ~90 trading days
+    if len(p) < 5:
+        return go.Figure()
+    color = TERM_GREEN if p.iloc[-1] >= p.iloc[0] else TERM_RED
+    fig = go.Figure(go.Scatter(
+        x=list(range(len(p))),
+        y=p.values,
+        mode="lines",
+        line=dict(color=color, width=1.6),
+        hoverinfo="skip",
+    ))
+    # add a baseline area for that classic terminal-y filled look
+    fig.add_trace(go.Scatter(
+        x=list(range(len(p))),
+        y=p.values,
+        fill="tozeroy",
+        fillcolor=f"rgba({int(color[1:3], 16)}, {int(color[3:5], 16)}, {int(color[5:7], 16)}, 0.10)",
+        line=dict(width=0),
+        showlegend=False,
+        hoverinfo="skip",
+    ))
+    fig.update_layout(
+        height=height,
+        margin=dict(l=0, r=0, t=2, b=2),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        showlegend=False,
+        xaxis=dict(visible=False, fixedrange=True),
+        yaxis=dict(visible=False, fixedrange=True, range=[p.min() * 0.99, p.max() * 1.01]),
+    )
+    return fig
+
+
+def rrg_chart_dark(df: pd.DataFrame, title: str = "Rotation") -> go.Figure:
+    """Dark-theme RRG. Same logic as rrg_chart but tuned for terminal aesthetic."""
+    sub = df.dropna(subset=["rs_ratio", "rs_momentum"]).copy()
+    fig = go.Figure()
+    # quadrant shading - subtle dark tints
+    fig.add_shape(type="rect", x0=100, x1=120, y0=100, y1=120, fillcolor="rgba(38,214,91,0.07)", line=dict(width=0), layer="below")
+    fig.add_shape(type="rect", x0=100, x1=120, y0=80,  y1=100, fillcolor="rgba(230,180,80,0.07)", line=dict(width=0), layer="below")
+    fig.add_shape(type="rect", x0=80,  x1=100, y0=80,  y1=100, fillcolor="rgba(239,79,74,0.07)",  line=dict(width=0), layer="below")
+    fig.add_shape(type="rect", x0=80,  x1=100, y0=100, y1=120, fillcolor="rgba(95,168,211,0.07)", line=dict(width=0), layer="below")
+    fig.add_hline(y=100, line=dict(color="#444", width=1))
+    fig.add_vline(x=100, line=dict(color="#444", width=1))
+    fig.add_trace(go.Scatter(
+        x=sub["rs_ratio"], y=sub["rs_momentum"],
+        mode="markers+text",
+        text=sub.index, textposition="top center",
+        textfont=dict(size=10, color="#ddd", family="JetBrains Mono, monospace"),
+        marker=dict(
+            size=11,
+            color=[color_for_state(s) for s in sub.get("state", pd.Series([""] * len(sub), index=sub.index))],
+            line=dict(width=1, color="#222"),
+        ),
+        hovertemplate="<b>%{text}</b><br>RS-Ratio %{x:.1f}<br>RS-Mom %{y:.1f}<extra></extra>",
+    ))
+    fig.add_annotation(x=119, y=119, text="LEADING",   showarrow=False, font=dict(size=10, color=TERM_GREEN, family="JetBrains Mono, monospace"))
+    fig.add_annotation(x=119, y=81,  text="WEAKENING", showarrow=False, font=dict(size=10, color=TERM_AMBER, family="JetBrains Mono, monospace"))
+    fig.add_annotation(x=81,  y=81,  text="LAGGING",   showarrow=False, font=dict(size=10, color=TERM_RED,   family="JetBrains Mono, monospace"))
+    fig.add_annotation(x=81,  y=119, text="IMPROVING", showarrow=False, font=dict(size=10, color=TERM_BLUE,  family="JetBrains Mono, monospace"))
+    fig.update_layout(
+        title=dict(text=title, font=dict(size=14, color="#ccc", family="JetBrains Mono, monospace")),
+        xaxis=dict(title="RS-RATIO",    range=[80, 120], color="#888", gridcolor="#222", zerolinecolor="#444", showgrid=True, title_font=dict(size=10, family="JetBrains Mono, monospace")),
+        yaxis=dict(title="RS-MOMENTUM", range=[80, 120], color="#888", gridcolor="#222", zerolinecolor="#444", showgrid=True, title_font=dict(size=10, family="JetBrains Mono, monospace")),
+        height=560,
+        margin=dict(l=40, r=40, t=50, b=40),
+        plot_bgcolor="#0a0a0a",
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+    return fig
