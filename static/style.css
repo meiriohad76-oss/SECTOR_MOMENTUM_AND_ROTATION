@@ -916,3 +916,63 @@ body {
   border-bottom: 1px dotted var(--muted-2);
   cursor: help;
 }
+
+/* ---------- Tooltip clipping fix ---------- */
+/* Force overflow:visible on all design + Streamlit containers so tooltips can escape. */
+.app, .section, .section-head,
+.bluf, .bluf-head, .bluf-actions,
+.action-card, .action-head, .action-list,
+.status-row, .tile, .tile-label, .tile-value,
+.alerts, .alert-row,
+.picks-grid, .pick, .pick-top, .pick-metrics, .pick-metrics .m, .pick-foot,
+.rrg-wrap, .rrg-side, .quad-card,
+.full-table, .full-table th, .full-table td, .full-table tr,
+.drill, .drill-head, .drill-title, .drill-metrics, .drill-charts,
+.chart-card, .chart-head,
+.footer {
+  overflow: visible !important;
+}
+
+/* Streamlit container resets - critical for tooltip escape */
+[data-testid="stVerticalBlock"],
+[data-testid="stHorizontalBlock"],
+[data-testid="column"],
+[data-testid="stMarkdownContainer"],
+.element-container,
+.stMarkdown,
+section.main,
+section.main > div.block-container,
+.stApp,
+.main,
+div[class*="block-container"] {
+  overflow: visible !important;
+}
+
+/* Tooltip needs to win every z-index fight */
+[data-tip]::after,
+[data-tip]::before {
+  z-index: 100000 !important;
+}
+
+/* For elements likely to be near the top, push tooltip below */
+.bluf [data-tip]::after,
+.header [data-tip]::after {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+.bluf [data-tip]::before,
+.header [data-tip]::before {
+  bottom: auto;
+  top: calc(100% + 2px);
+  border-top-color: transparent;
+  border-bottom-color: var(--border-strong);
+}
+
+/* Keep the visual rounded-corner effect on .alerts/.full-table by clipping inner rows instead of parent */
+.alerts .alert-row:first-child { border-top-left-radius: var(--radius); border-top-right-radius: var(--radius); }
+.alerts .alert-row:last-child  { border-bottom-left-radius: var(--radius); border-bottom-right-radius: var(--radius); }
+.full-table table { border-radius: var(--radius); }
+.full-table thead tr:first-child th:first-child { border-top-left-radius: var(--radius); }
+.full-table thead tr:first-child th:last-child  { border-top-right-radius: var(--radius); }
+.full-table tbody tr:last-child td:first-child  { border-bottom-left-radius: var(--radius); }
+.full-table tbody tr:last-child td:last-child   { border-bottom-right-radius: var(--radius); }
