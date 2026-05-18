@@ -829,3 +829,90 @@ body {
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted-2); }
+
+/* ---------- Hover tooltips ---------- */
+[data-tip] {
+  position: relative;
+}
+[data-tip]:not(.pill):not(.qlbl):not(.action-label):not(.tile-label *):hover {
+  cursor: help;
+}
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-family: var(--font-prose);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  width: max-content;
+  max-width: 320px;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 150ms ease, visibility 150ms ease;
+  z-index: 9999;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  text-align: left;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+[data-tip]::before {
+  content: "";
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--border-strong);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 150ms ease, visibility 150ms ease;
+  z-index: 9999;
+  pointer-events: none;
+}
+[data-tip]:hover::after,
+[data-tip]:hover::before {
+  opacity: 1;
+  visibility: visible;
+}
+/* Anchor variants so we don't get clipped off-screen */
+[data-tip-pos="right"]::after {
+  bottom: auto;
+  top: 50%;
+  left: calc(100% + 8px);
+  transform: translateY(-50%);
+}
+[data-tip-pos="right"]::before {
+  bottom: auto;
+  top: 50%;
+  left: calc(100% - 3px);
+  transform: translateY(-50%) rotate(90deg);
+}
+[data-tip-pos="below"]::after {
+  bottom: auto;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+[data-tip-pos="below"]::before {
+  bottom: auto;
+  top: calc(100% + 2px);
+  border: 5px solid transparent;
+  border-bottom-color: var(--border-strong);
+  border-top-color: transparent;
+}
+
+/* dotted underline cue on inline tip targets (subtle) */
+.tip-cue {
+  border-bottom: 1px dotted var(--muted-2);
+  cursor: help;
+}

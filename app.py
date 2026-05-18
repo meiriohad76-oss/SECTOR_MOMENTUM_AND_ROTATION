@@ -32,8 +32,59 @@ def _md(html: str):
     treated as a code block. Indented HTML inside f-strings (>=4 spaces) gets
     misparsed otherwise."""
     cleaned = "\n".join(line.lstrip() for line in html.split("\n"))
-    _md(cleaned)
+    st.markdown(cleaned, unsafe_allow_html=True)
 
+
+
+# =============================== tooltip text ====================================
+
+INDICATOR_TIPS = {
+    # BLUF
+    "bluf_exit":     "Tickers requiring action this week. Sell on Monday open. Triggered by close below 30wMA, Mansfield RS negative, Antonacci absolute failed, RRG entered Lagging, CMF below -0.10, or sustained ETF redemptions.",
+    "bluf_warning":  "Tickers showing early bearish signals. Tighten stops, no new adds. Triggered by RRG dropping to Weakening, breadth below 50%, distribution-day cluster, or OBV/price bearish divergence.",
+    "bluf_buy":      "Stage 2 candidates passing every strict gate: price above 30-week SMA with positive slope, Mansfield RS positive, RRG in Leading quadrant, sector breadth ≥ 60%, CMF above +0.05, and positive ETF primary flow.",
+    # Status tiles
+    "tip_regime":    "Faber 10-month SMA on SPY. RISK-ON when SPY trades above the SMA → equity exposure ok. RISK-OFF → defensive rotation (TLT/GLD/BIL). The portfolio-level circuit breaker.",
+    "tip_phase":     "Business-cycle phase per Stovall/Fidelity. Determines which sector basket structurally leads. Currently estimated from Faber risk regime + yield-curve sign. EARLY: XLY, XLF, XLRE, XLI, XLK. MID: XLK, XLC, XLI. LATE: XLE, XLB, XLP, XLV. RECESSION: XLP, XLU, XLV.",
+    "tip_warnings":  "Tickers currently in EXIT or WARNING state. Watch the week-over-week change to gauge market deterioration. Spikes here often precede broader risk-off.",
+    # Pick card metrics
+    "tip_S":         "Composite score (master ranking). Cross-sectional z-score across the 7 pillars within the asset class. >0 = above class average. Top-N per class drive the picks. A hard veto fires if F < -0.5σ.",
+    "tip_F":         "Flow score. Z-scored composite of institutional money-flow signals: CMF, OBV slope, ETF creations/redemptions, block-trade direction, trade-size velocity, short-interest delta. >0 = real money entering; <-0.5σ kills the trade regardless of S.",
+    "tip_MOM":       "12-1 momentum: 12-month total return excluding the most recent month. Jegadeesh-Titman classic momentum. Top decile cross-sectionally is the winner basket. Skip-1 removes short-term reversal.",
+    "tip_STAGE":     "Weinstein Stage: 1=basing (sideways), 2=advance (BUY), 3=topping (tighten), 4=decline (SELL/short). Stage 2 requires price > 30wMA AND positive slope AND Mansfield RS > 0.",
+    "tip_RRG":       "Relative Rotation Graph quadrant vs SPY. Leading = outperforming with rising momentum (buy). Weakening = outperforming but losing momentum (tighten). Lagging = underperforming with negative momentum (exit). Improving = underperforming but momentum turning up (watch).",
+    # Quadrant cards
+    "tip_q_leading":   "Outperforming the benchmark with rising relative momentum. Best buy zone.",
+    "tip_q_weakening": "Still outperforming but momentum decaying. Tighten stops; rotation candidate.",
+    "tip_q_lagging":   "Underperforming with declining momentum. Avoid or short.",
+    "tip_q_improving": "Underperforming but momentum turning up. Watch — early entry zone.",
+    # Full table column headers
+    "tip_col_FABER":   "Time-series momentum filter. 1 if monthly close > 10-month SMA, else 0. Faber 2007. The binary 'is this asset in its own uptrend' switch.",
+    "tip_col_STAGE2":  "1 if Weinstein Stage = 2 (advance), else 0. Requires all three: P > 30wMA, slope > 0, Mansfield RS > 0.",
+    "tip_col_ANT":     "Antonacci absolute momentum. 1 if asset's 12mo return > BIL T-bill return. The catastrophic-loss circuit breaker — kept the system out of 2008.",
+    "tip_col_BREADTH": "Sector breadth proxy. 1 if % of recent 50 sessions above 50dMA ≥ 50%. A clean way to confirm trend internals.",
+    "tip_col_FLOW":    "Pillar-7 flow check. 1 if F > 0 (institutional flow positive). The independent confirmation that price movement is backed by real money.",
+    # Drill-down tiles
+    "tip_drill_composite": "Master S-score for this ticker (this is the ranking metric).",
+    "tip_drill_flow":      "Institutional flow F-score. VETO fires when F < -0.5σ regardless of price-based pillars.",
+    "tip_drill_state":     "Current state machine output. See state pill tooltips for definition.",
+    "tip_drill_momentum":  "12-1 momentum, Mansfield 52-week relative strength shown alongside.",
+}
+
+STATE_TIPS = {
+    "STAGE_2_BULLISH":  "All gates passed: price > 30wMA, slope positive, Mansfield RS > 0, RRG Leading, breadth ≥ 60%, CMF > 0.05, ETF flow non-negative. Active buy candidate.",
+    "HOLD":             "Stage 2 intact but missing the strict-Bullish gate (e.g., RRG not Leading, or breadth slightly low). Position is safe, no new adds.",
+    "WARNING":          "Early bearish signal. Triggered by RRG → Weakening for 2+ wks, OR breadth < 50%, OR M1 rank dropped, OR CMF < 0 sustained, OR OBV/price bearish divergence, OR 4+ distribution days. Tighten stops.",
+    "EXIT":             "Sell on Monday open. Triggered by close < 30wMA, OR Mansfield RS < 0, OR Antonacci failed, OR RRG → Lagging, OR CMF < -0.10, OR ETF redemptions > 1.5% AUM, OR block-tape flipped bearish.",
+    "BEARISH_STAGE_4":  "Avoid; short candidate. Stage 4 confirmed: price < 30wMA, MA sloping down, RRG Lagging 3+ wks, CMF confirmed negative.",
+    "STAGE_1_BASING":   "Recovered from Stage 4. Price reclaimed 30wMA but MA still flat AND CMF turned positive. Watchlist for re-entry on Stage 2 confirmation.",
+}
+
+
+def _esc(s: str) -> str:
+    """HTML-attr-safe escape for tooltip text."""
+    return (s.replace('&', '&amp;').replace('"', '&quot;')
+             .replace('<', '&lt;').replace('>', '&gt;'))
 
 
 # =============================== page config =====================================
@@ -228,11 +279,11 @@ def render_bluf():
           </div>
         </div>
         <div class="bluf-headline">
-          <span class="exit-num">{bluf['exits_count']}</span> EXIT
+          <span class="exit-num tip-cue" data-tip="{_esc(INDICATOR_TIPS['bluf_exit'])}">{bluf['exits_count']}</span> <span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['bluf_exit'])}">EXIT</span>
           <span class="sep">·</span>
-          <span class="warn-num">{bluf['warns_count']}</span> WARNINGS
+          <span class="warn-num tip-cue" data-tip="{_esc(INDICATOR_TIPS['bluf_warning'])}">{bluf['warns_count']}</span> <span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['bluf_warning'])}">WARNINGS</span>
           <span class="sep">·</span>
-          <span class="buy-num">{bluf['buys_count']}</span> NEW BUYS
+          <span class="buy-num tip-cue" data-tip="{_esc(INDICATOR_TIPS['bluf_buy'])}">{bluf['buys_count']}</span> <span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['bluf_buy'])}">NEW BUYS</span>
         </div>
         <div class="bluf-sub">{sub}</div>
         <div class="bluf-actions">
@@ -249,7 +300,7 @@ def render_bluf():
             <div class="action-label">{a['label']}</div>
             <div class="action-eta">{a['eta']}</div>
           </div>
-          <span class="pill {a['state']}">{a['state'].replace('_', ' ')}</span>
+          <span class="pill {a['state']}" data-tip="{_esc(STATE_TIPS.get(a['state'], ""))}">{a['state'].replace('_', ' ')}</span>
           <ul class="action-list">{items_html}</ul>
         </div>
         """
@@ -291,7 +342,7 @@ def render_status():
       <div class="status-row">
 
         <div class="tile">
-          <div class="tile-label"><span>Risk regime</span></div>
+          <div class="tile-label"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_regime'])}">Risk regime</span></div>
           <div class="tile-value {risk_tone}">
             <span class="dot" style="background:{risk_dot}"></span>
             {risk_label}
@@ -300,7 +351,7 @@ def render_status():
         </div>
 
         <div class="tile">
-          <div class="tile-label"><span>Cycle phase</span></div>
+          <div class="tile-label"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_phase'])}">Cycle phase</span></div>
           <div class="tile-value">
             <span class="dot" style="background:var(--amber)"></span>
             {regime.phase_hint}
@@ -310,7 +361,7 @@ def render_status():
         </div>
 
         <div class="tile">
-          <div class="tile-label"><span>Active warnings</span>{delta}</div>
+          <div class="tile-label"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_warnings'])}">Active warnings</span>{delta}</div>
           <div class="tile-value warn">
             <span class="dot" style="background:var(--amber)"></span>
             {n_warn}
@@ -390,17 +441,17 @@ def render_picks():
               <div class="pick-ticker">{tkr}</div>
               <div class="pick-class">{klass_lbl}</div>
             </div>
-            <span class="pill {state}">{state.replace('_', ' ')}</span>
+            <span class="pill {state}" data-tip="{_esc(STATE_TIPS.get(state, ""))}">{state.replace('_', ' ')}</span>
           </div>
           {spark}
           <div class="pick-metrics">
-            <div class="m"><span class="k">S</span><span class="v {s_class}">{s:+.2f}</span></div>
-            <div class="m"><span class="k">F</span><span class="v {f_class}">{f:+.2f}</span></div>
-            <div class="m"><span class="k">MOM</span><span class="v {mom_class}">{mom:+.1f}%</span></div>
-            <div class="m"><span class="k">STAGE</span><span class="v">{stage}</span></div>
+            <div class="m"><span class="k tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_S'])}">S</span><span class="v {s_class}">{s:+.2f}</span></div>
+            <div class="m"><span class="k tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_F'])}">F</span><span class="v {f_class}">{f:+.2f}</span></div>
+            <div class="m"><span class="k tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_MOM'])}">MOM</span><span class="v {mom_class}">{mom:+.1f}%</span></div>
+            <div class="m"><span class="k tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_STAGE'])}">STAGE</span><span class="v">{stage}</span></div>
           </div>
           <div class="pick-foot">
-            <span>RRG</span>
+            <span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_RRG'])}">RRG</span>
             <span class="quad">{quad}</span>
           </div>
         </div>
@@ -464,7 +515,7 @@ def render_rrg():
             count = len(tickers)
             ticks = " · ".join(tickers) if tickers else "—"
             _md(f'<div class="quad-card {color_cls}">'
-                f'<div class="qlbl">{q}</div>'
+                f'<div class="qlbl tip-cue" data-tip="{_esc(INDICATOR_TIPS["tip_q_" + q.lower()])}">{q}</div>'
                 f'<div class="qcount">{count}</div>'
                 f'<div class="qtick">{ticks}</div>'
                 f'</div>',)
@@ -502,25 +553,25 @@ def render_drill():
         <div class="drill-metrics">
 
           <div class="tile">
-            <div class="tile-label"><span>Composite</span></div>
+            <div class="tile-label"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_drill_composite'])}">Composite</span></div>
             <div class="tile-value {'up' if row['S_score'] >= 0 else 'down'}">{row['S_score']:+.3f}</div>
             <div class="tile-sub">rank {int(row.get('rank_in_class') or 0)} in {row['class']}</div>
           </div>
 
           <div class="tile">
-            <div class="tile-label"><span>Flow score</span></div>
+            <div class="tile-label"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_drill_flow'])}">Flow score</span></div>
             <div class="tile-value {'up' if row['F_score'] >= 0 else 'down'}">{row['F_score']:+.3f}</div>
             <div class="tile-sub">{'VETO' if row.get('veto') else 'OK'} · CMF {row.get('cmf21', 0) or 0:+.2f}</div>
           </div>
 
           <div class="tile">
-            <div class="tile-label"><span>State</span></div>
+            <div class="tile-label"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_drill_state'])}">State</span></div>
             <div class="tile-value" style="color:{color};font-size:1.1rem;">{state.replace('_', ' ')}</div>
             <div class="tile-sub">Stage {row.get('stage', '—')} · {(row.get('rrg_quadrant') or '—').upper()}</div>
           </div>
 
           <div class="tile">
-            <div class="tile-label"><span>12-1 Momentum</span></div>
+            <div class="tile-label"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_drill_momentum'])}">12-1 Momentum</span></div>
             <div class="tile-value {'up' if (row.get('mom_12_1') or 0) >= 0 else 'down'}">{(row.get('mom_12_1') or 0)*100:+.1f}%</div>
             <div class="tile-sub">Mansfield RS {row.get('mansfield_rs', 0) or 0:+.1f}</div>
           </div>
@@ -586,7 +637,7 @@ def render_full_table():
         <tr>
           <td class="t">{tkr}</td>
           <td style="color:var(--muted)">{r['class']}</td>
-          <td><span class="pill {state}">{state.replace('_', ' ')}</span></td>
+          <td><span class="pill {state}" data-tip="{_esc(STATE_TIPS.get(state, ""))}">{state.replace('_', ' ')}</span></td>
           {p_tds}
           <td class="num {'pos' if s >= 0 else 'neg'}">{s:+.2f}</td>
           <td class="num {'pos' if f >= 0 else 'neg'}">{f:+.2f}</td>
@@ -595,8 +646,8 @@ def render_full_table():
         """
 
     pillars_th = "".join(
-        f'<th class="num">{p}</th>' for p in
-        ["MOM", "FABER", "STAGE2", "ANT", "RRG", "BREADTH", "FLOW"]
+        f'<th class="num"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS[k])}">{p}</span></th>' for p, k in
+        [("MOM","tip_MOM"),("FABER","tip_col_FABER"),("STAGE2","tip_col_STAGE2"),("ANT","tip_col_ANT"),("RRG","tip_RRG"),("BREADTH","tip_col_BREADTH"),("FLOW","tip_col_FLOW")]
     )
 
     html = f"""
@@ -612,9 +663,9 @@ def render_full_table():
               <th>Class</th>
               <th>State</th>
               {pillars_th}
-              <th class="num">S</th>
-              <th class="num">F</th>
-              <th class="num">MOM</th>
+              <th class="num"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_S'])}">S</span></th>
+              <th class="num"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_F'])}">F</span></th>
+              <th class="num"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_MOM'])}">MOM</span></th>
             </tr>
           </thead>
           <tbody>{rows_html}</tbody>
