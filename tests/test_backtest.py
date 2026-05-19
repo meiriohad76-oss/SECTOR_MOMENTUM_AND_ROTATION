@@ -368,3 +368,17 @@ def test_weekly_rebalance_dates_uses_last_actual_trading_day_when_friday_missing
     out = backtest.weekly_rebalance_dates(prices)
 
     assert out.tolist() == [pd.Timestamp("2024-03-28")]
+
+
+def test_format_gate_report_includes_pass_fail_lines():
+    gates = {
+        "oos_sharpe": {"name": "Out-of-sample Sharpe", "value": 0.8, "threshold": 0.7, "passed": True},
+        "max_drawdown": {"name": "Max drawdown", "value": 0.2, "threshold": 0.225, "passed": True},
+        "all_passed": True,
+    }
+
+    text = backtest.format_gate_report(gates)
+
+    assert "Out-of-sample Sharpe: PASS" in text
+    assert "Max drawdown: PASS" in text
+    assert "Overall: PASS" in text

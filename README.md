@@ -17,6 +17,18 @@ A Streamlit dashboard that monitors **67+ ETFs across US sectors, US industries,
 - A **bearish alert system** with three severity levels (WARNING → EXIT → BEARISH) plus three flow-only early warnings (distribution day, dark-pool sell, OBV/price divergence).
 - **No paid feeds required for v1** — runs entirely on free Yahoo Finance data. Institutional-flow stubs ship pre-wired so you can drop in iShares SHO, Polygon, FINRA, or SEC EDGAR feeds when ready.
 
+## Backtest harness
+
+B-011 adds a pure pandas/numpy backtest accounting core in `src/backtest.py`. The core is deterministic and covered by offline pytest cases for weight timing, drift, turnover, cost scenarios, benchmarks, and acceptance gates.
+
+Manual yfinance smoke run:
+
+```powershell
+python scripts/run_backtest.py
+```
+
+The runner writes `docs/backtest_report.md` when market data downloads successfully. Treat that report as manual evidence, not a replacement for the deterministic test suite.
+
 ## Quick start
 
 ### Windows (local)

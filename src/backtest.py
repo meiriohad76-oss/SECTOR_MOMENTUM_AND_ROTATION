@@ -394,3 +394,18 @@ def weekly_rebalance_dates(prices: pd.DataFrame) -> pd.DatetimeIndex:
     ordered = prices.sort_index().dropna(how="all")
     weekly = ordered.groupby(pd.Grouper(freq="W-FRI")).tail(1)
     return pd.DatetimeIndex(weekly.index)
+
+
+def format_gate_report(gates: dict[str, dict | bool]) -> str:
+    lines = ["# Backtest Acceptance Gates", ""]
+    for key, gate in gates.items():
+        if key == "all_passed" or not isinstance(gate, dict):
+            continue
+        status = "PASS" if gate["passed"] else "FAIL"
+        lines.append(
+            f"- {gate['name']}: {status} "
+            f"(value {gate['value']:.4f}, threshold {gate['threshold']:.4f})"
+        )
+    lines.append("")
+    lines.append(f"Overall: {'PASS' if gates.get('all_passed') else 'FAIL'}")
+    return "\n".join(lines) + "\n"
