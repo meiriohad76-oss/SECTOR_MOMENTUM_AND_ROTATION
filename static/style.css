@@ -691,6 +691,39 @@ body {
 .full-table .dot.ok { color: var(--green); }
 .full-table .dot.bad { color: var(--red); }
 
+/* ---------- Portfolio analyzer ---------- */
+.portfolio-actions {
+  display: grid;
+  gap: 8px;
+}
+.portfolio-actions .pa-row {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--st-hold);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 9px 11px;
+  font-family: var(--font-mono);
+  display: grid;
+  grid-template-columns: 82px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  min-height: 38px;
+}
+.portfolio-actions .pa-row span {
+  color: var(--muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+}
+.portfolio-actions .pa-row b {
+  color: var(--fg);
+  font-size: 0.78rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.portfolio-actions .pa-row.exit { border-left-color: var(--st-exit); }
+.portfolio-actions .pa-row.warn { border-left-color: var(--st-warn); }
+.portfolio-actions .pa-row.buy { border-left-color: var(--st-stage2); }
+
 .collapsible-toggle {
   width: 100%;
   background: transparent;

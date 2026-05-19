@@ -15,6 +15,14 @@ from src.data import fetch_ohlcv
 from src.indicators import compute_all_indicators
 from src.flow import compute_flow_signals, flow_composite_z, STUB_MODE
 from src.macro import assess_regime
+from src.portfolio import (
+    analyze_holdings,
+    analysis_rows_frame,
+    exposure_frame,
+    parse_holdings_csv,
+    parse_holdings_excel,
+    parse_single_ticker,
+)
 from src.scoring import compute_composite, apply_state_machine, recent_transitions
 from src.visuals import (
     rrg_chart_dark,
@@ -234,6 +242,10 @@ if "klass" not in st.session_state:
     st.session_state.klass = "US Sectors"
 if "drill_ticker" not in st.session_state:
     st.session_state.drill_ticker = "XLK"
+if "portfolio_single_ticker" not in st.session_state:
+    st.session_state.portfolio_single_ticker = st.session_state.drill_ticker
+if "portfolio_single_source" not in st.session_state:
+    st.session_state.portfolio_single_source = st.session_state.drill_ticker
 if "table_open" not in st.session_state:
     st.session_state.table_open = True
 if "table_sort" not in st.session_state:
@@ -883,6 +895,97 @@ def render_full_table():
     _md(html)
 
 
+def _portfolio_result_from_upload(uploaded_file):
+    payload = uploaded_file.getvalue()
+    filename = (uploaded_file.name or "").lower()
+    if filename.endswith(".csv"):
+        return parse_holdings_csv(payload)
+    if filename.endswith((".xlsx", ".xls")):
+        return parse_holdings_excel(payload)
+    return parse_holdings_csv(payload)
+
+
+def _render_portfolio_analysis(result):
+    for error in result.errors:
+        prefix = f"Row {error.row_number}: " if error.row_number is not None else ""
+        suffix = f" ({error.column})" if error.column else ""
+        st.warning(f"{prefix}{error.message}{suffix}")
+
+    if not result.holdings:
+        return
+
+    try:
+        analysis = analyze_holdings(result.holdings, scored)
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+
+    if analysis.missing_tickers:
+        st.warning("Missing from scored universe: " + ", ".join(analysis.missing_tickers))
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.dataframe(exposure_frame(analysis.state_exposure, "State"), hide_index=True, use_container_width=True)
+    with c2:
+        st.dataframe(exposure_frame(analysis.class_exposure, "Class"), hide_index=True, use_container_width=True)
+    with c3:
+        actions = analysis.action_tickers
+        _md(
+            f"""
+            <div class="portfolio-actions">
+              <div class="pa-row exit"><span>EXIT</span><b>{_esc(', '.join(actions['exit']) or '-')}</b></div>
+              <div class="pa-row warn"><span>WARNING</span><b>{_esc(', '.join(actions['warning']) or '-')}</b></div>
+              <div class="pa-row buy"><span>BULLISH</span><b>{_esc(', '.join(actions['bullish']) or '-')}</b></div>
+            </div>
+            """
+        )
+
+    st.dataframe(analysis_rows_frame(analysis), hide_index=True, use_container_width=True)
+
+
+def render_portfolio_analyzer():
+    if st.session_state.portfolio_single_source != st.session_state.drill_ticker:
+        st.session_state.portfolio_single_ticker = st.session_state.drill_ticker
+        st.session_state.portfolio_single_source = st.session_state.drill_ticker
+
+    _md(
+        f"""
+        <section class="section" id="portfolio-analyzer">
+          <div class="section-head">
+            <h2>Portfolio analyzer <span class="count">B-130 · read-only</span></h2>
+            <div class="right">{len(scored)} scored tickers</div>
+          </div>
+        </section>
+        """
+    )
+
+    mode = st.radio(
+        "Analyzer input",
+        ["Ticker", "Portfolio"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="portfolio_analyzer_mode",
+    )
+
+    if mode == "Ticker":
+        ticker = st.text_input(
+            "Ticker",
+            key="portfolio_single_ticker",
+            placeholder="XLK",
+        )
+        if ticker:
+            _render_portfolio_analysis(parse_single_ticker(ticker))
+        return
+
+    uploaded = st.file_uploader(
+        "Portfolio file",
+        type=["csv", "xlsx", "xls"],
+        key="portfolio_upload",
+    )
+    if uploaded is not None:
+        _render_portfolio_analysis(_portfolio_result_from_upload(uploaded))
+
+
 def render_footer():
     html = f"""
     <div class="footer">
@@ -904,6 +1007,7 @@ render_alerts()
 render_picks()
 render_rrg()
 render_drill()
+render_portfolio_analyzer()
 render_full_table()
 render_footer()
 

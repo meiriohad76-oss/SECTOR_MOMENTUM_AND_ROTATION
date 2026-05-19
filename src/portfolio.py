@@ -150,6 +150,38 @@ def analyze_holdings(holdings: list[HoldingInput], scored_df: pd.DataFrame) -> P
     )
 
 
+def analysis_rows_frame(analysis: PortfolioAnalysis) -> pd.DataFrame:
+    rows = []
+    for row in analysis.rows:
+        state = "MISSING" if row.missing else _display_label(row.state)
+        asset_class = "MISSING" if row.missing else _display_label(row.asset_class)
+        rows.append(
+            {
+                "Ticker": row.ticker,
+                "Weight": _format_percent(row.analysis_weight),
+                "State": state,
+                "Class": asset_class,
+                "S": _format_number(row.s_score),
+                "F": _format_number(row.f_score),
+                "Rank": _format_rank(row.rank_in_class),
+                "Selected": _format_bool(row.selected),
+                "Veto": _format_bool(row.veto),
+            }
+        )
+    return pd.DataFrame(
+        rows,
+        columns=["Ticker", "Weight", "State", "Class", "S", "F", "Rank", "Selected", "Veto"],
+    )
+
+
+def exposure_frame(exposures: dict[str, float], label: str) -> pd.DataFrame:
+    rows = [
+        {label: _display_label(key), "Weight": _format_percent(weight)}
+        for key, weight in sorted(exposures.items(), key=lambda item: item[1], reverse=True)
+    ]
+    return pd.DataFrame(rows, columns=[label, "Weight"])
+
+
 def parse_holdings_csv(payload: str | bytes) -> PortfolioInputResult:
     try:
         text = payload.decode("utf-8-sig") if isinstance(payload, bytes) else payload
@@ -166,7 +198,7 @@ def parse_holdings_csv(payload: str | bytes) -> PortfolioInputResult:
 def parse_holdings_excel(payload: bytes) -> PortfolioInputResult:
     try:
         frame = pd.read_excel(io.BytesIO(payload), dtype=str, keep_default_na=False)
-    except ValueError as exc:
+    except (ImportError, OSError, ValueError, pd.errors.ParserError) as exc:
         return PortfolioInputResult([], [PortfolioInputError(f"could not read Excel file: {exc}")])
     return parse_holdings_frame(frame)
 
@@ -310,9 +342,12 @@ def _optional_float(value) -> float | None:
     if value is None or pd.isna(value):
         return None
     try:
-        return float(value)
+        parsed = float(value)
     except (TypeError, ValueError):
         return None
+    if pd.isna(parsed):
+        return None
+    return parsed
 
 
 def _optional_bool(value) -> bool | None:
@@ -344,6 +379,36 @@ def _add_action_ticker(action_tickers: dict[str, list[str]], ticker: str, state:
         action_tickers["warning"].append(ticker)
     elif state == "STAGE_2_BULLISH":
         action_tickers["bullish"].append(ticker)
+
+
+def _display_label(value: str | None) -> str:
+    if value is None:
+        return "-"
+    return value.replace("_", " ")
+
+
+def _format_percent(value: float | None) -> str:
+    if value is None:
+        return "-"
+    return f"{value * 100:.1f}%"
+
+
+def _format_number(value: float | None) -> str:
+    if value is None:
+        return "-"
+    return f"{value:.2f}"
+
+
+def _format_rank(value: float | None) -> str:
+    if value is None or pd.isna(value):
+        return "-"
+    return str(int(value))
+
+
+def _format_bool(value: bool | None) -> str:
+    if value is None:
+        return "-"
+    return "YES" if value else "NO"
 
 
 def _parse_text(value) -> str | None:

@@ -117,6 +117,14 @@ def test_parse_holdings_excel_accepts_xlsx_bytes():
     assert [holding.weight for holding in result.holdings] == pytest.approx([0.6, 0.4])
 
 
+def test_parse_holdings_excel_reports_unreadable_workbook_bytes():
+    result = portfolio.parse_holdings_excel(b"not an excel file")
+
+    assert result.holdings == []
+    assert len(result.errors) == 1
+    assert "could not read Excel file" in result.errors[0].message
+
+
 def _scored_fixture() -> pd.DataFrame:
     return pd.DataFrame(
         {
@@ -255,3 +263,64 @@ def test_analyze_holdings_rejects_duplicate_scored_ticker_index():
 
     with pytest.raises(ValueError, match="scored_df index must contain unique tickers"):
         portfolio.analyze_holdings([portfolio.HoldingInput(ticker="XLK")], scored)
+
+
+def test_analysis_rows_frame_formats_display_columns_and_missing_rows():
+    analysis = portfolio.analyze_holdings(
+        [
+            portfolio.HoldingInput(ticker="XLK", weight=0.25),
+            portfolio.HoldingInput(ticker="ZZZZ", weight=0.75),
+        ],
+        _scored_fixture(),
+    )
+
+    frame = portfolio.analysis_rows_frame(analysis)
+
+    assert frame.to_dict("records") == [
+        {
+            "Ticker": "XLK",
+            "Weight": "25.0%",
+            "State": "STAGE 2 BULLISH",
+            "Class": "US Sectors",
+            "S": "1.25",
+            "F": "0.80",
+            "Rank": "1",
+            "Selected": "YES",
+            "Veto": "NO",
+        },
+        {
+            "Ticker": "ZZZZ",
+            "Weight": "75.0%",
+            "State": "MISSING",
+            "Class": "MISSING",
+            "S": "-",
+            "F": "-",
+            "Rank": "-",
+            "Selected": "-",
+            "Veto": "-",
+        },
+    ]
+
+
+def test_analysis_rows_frame_formats_nan_rank_as_blank():
+    scored = _scored_fixture()
+    scored["rank_in_class"] = scored["rank_in_class"].astype(object)
+    scored.loc["XLK", "rank_in_class"] = "nan"
+    analysis = portfolio.analyze_holdings([portfolio.HoldingInput(ticker="XLK")], scored)
+
+    frame = portfolio.analysis_rows_frame(analysis)
+
+    assert frame.loc[0, "Rank"] == "-"
+
+
+def test_exposure_frame_sorts_by_weight_descending():
+    frame = portfolio.exposure_frame(
+        {"WARNING": 0.15, "STAGE_2_BULLISH": 0.80, "MISSING": 0.05},
+        label="State",
+    )
+
+    assert frame.to_dict("records") == [
+        {"State": "STAGE 2 BULLISH", "Weight": "80.0%"},
+        {"State": "WARNING", "Weight": "15.0%"},
+        {"State": "MISSING", "Weight": "5.0%"},
+    ]
