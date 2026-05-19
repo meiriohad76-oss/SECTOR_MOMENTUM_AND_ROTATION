@@ -21,14 +21,17 @@ Status legend:
 
 ---
 
-## 🎯 Next-session priorities
+## Completed in `backlog-stepwise-qa`
 
-### B-010 · Wire Massive AI to ETF primary-flow source (Pillar 7 stub #1)
+### B-010 · Wire Massive AI to ETF primary-flow source (Pillar 7 stub #1) - IMPLEMENTED
 **Status:** provider seam implemented in `backlog-stepwise-qa`; production default remains neutral until `FLOW_STUB_MODE=false`, `MASSIVE_API_KEY`, and per-ticker source URLs are configured.
-**File:** `src/flow.py` — replace `etf_primary_flow_5d_pct()` stub.
-**Approach:** Massive browser-content API → issuer holdings/SHO source URL per ticker. Compute daily Δshares × current NAV over the latest 5 observations, divided by latest AUM.
-**Effort:** half a day with the Massive API docs in hand.
-**Why first:** biggest signal-quality jump per hour of work. Also de-risks the integration pattern for the other 4 stubs (block trades, dark pool, short interest, 13F).
+**Files:** `src/flow.py`, `tests/test_flow.py`, `README.md`, `.streamlit/secrets.toml.example`.
+**Activation:** configure `ETF_PRIMARY_FLOW_URL_<TICKER>` values and set `FLOW_STUB_MODE=false`.
+**Notes:** ETF primary flow computes daily delta shares times current NAV over the latest 5 dated observations, divided by latest AUM. Other Pillar 7 provider stubs remain neutral until B-020.
+
+---
+
+## 🎯 Next-session priorities
 
 ### B-011 · Build backtest harness (academic-rigorous, 2–3 days)
 **Tooling:** `vectorbt` engine, 2003–today data, walk-forward optimization.

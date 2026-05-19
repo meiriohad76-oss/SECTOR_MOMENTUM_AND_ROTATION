@@ -7,6 +7,19 @@ import pytest
 
 from src import flow
 
+_REAL_FETCH_PRIMARY_FLOW_PAYLOAD = flow._fetch_primary_flow_payload
+
+
+@pytest.fixture(autouse=True)
+def neutral_primary_flow_provider(monkeypatch):
+    # Keep this suite hermetic even when the host environment enables live flow.
+    monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", True)
+
+    def blocked_fetch(ticker):
+        raise AssertionError("tests must opt in before fetching primary-flow payloads")
+
+    monkeypatch.setattr(flow, "_fetch_primary_flow_payload", blocked_fetch)
+
 
 def test_chaikin_money_flow_is_positive_when_closes_near_high():
     idx = pd.bdate_range("2024-01-01", periods=30)
@@ -54,6 +67,16 @@ def test_compute_flow_signals_excludes_index_tickers_and_uses_stub_values(
     assert out.loc["XLK", "dark_pool_pct"] == 0.40
     assert out.loc["XLK", "si_delta_15d"] == 0.0
     assert out.loc["XLK", "thirteen_f_q"] == 0.0
+
+
+def test_compute_flow_signals_blocks_unexpected_primary_flow_fetch(
+    monkeypatch,
+    ohlcv_frame_factory,
+):
+    monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", False)
+
+    with pytest.raises(AssertionError, match="tests must opt in"):
+        flow.compute_flow_signals({"XLK": ohlcv_frame_factory(days=80)})
 
 
 def test_flow_composite_z_handles_constant_inputs_without_nan():
@@ -159,6 +182,7 @@ def test_parse_float_accepts_scientific_notation_strings():
 
 def test_etf_primary_flow_returns_neutral_when_live_mode_has_no_source(monkeypatch):
     monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", False)
+    monkeypatch.setattr(flow, "_fetch_primary_flow_payload", _REAL_FETCH_PRIMARY_FLOW_PAYLOAD)
     monkeypatch.setattr(flow, "_primary_flow_source_url", lambda ticker: None)
 
     def fail_fetch(source_url):
