@@ -1,0 +1,209 @@
+from __future__ import annotations
+
+import pandas as pd
+import pytest
+
+from src import backtest
+
+
+def test_run_weight_backtest_uses_prior_weights_and_charges_turnover_costs():
+    dates = pd.bdate_range("2024-01-01", periods=4)
+    prices = pd.DataFrame(
+        {
+            "AAA": [100.0, 110.0, 121.0, 121.0],
+            "BBB": [100.0, 100.0, 100.0, 110.0],
+        },
+        index=dates,
+    )
+    target_weights = pd.DataFrame(
+        {
+            "AAA": [1.0, 0.0],
+            "BBB": [0.0, 1.0],
+        },
+        index=[dates[0], dates[2]],
+    )
+
+    result = backtest.run_weight_backtest(
+        prices,
+        target_weights,
+        transaction_cost_bps=10.0,
+        initial_capital=100.0,
+    )
+
+    assert result.gross_returns.tolist() == pytest.approx([0.10, 0.10, 0.10])
+    assert result.turnover.tolist() == pytest.approx([1.0, 0.0, 2.0])
+    assert result.costs.tolist() == pytest.approx([0.001, 0.0, 0.002])
+    assert result.net_returns.tolist() == pytest.approx([0.0989, 0.10, 0.0978])
+    assert result.equity.iloc[0] == pytest.approx(100.0)
+    assert result.equity.iloc[-1] == pytest.approx(132.7009662)
+
+
+def test_performance_metrics_reports_drawdown_and_turnover():
+    dates = pd.bdate_range("2024-01-01", periods=5)
+    returns = pd.Series([0.10, -0.25, 0.10, 0.00], index=dates[1:])
+    equity = pd.Series([100.0, 110.0, 82.5, 90.75, 90.75], index=dates)
+    turnover = pd.Series([1.0, 0.0, 0.5, 0.0], index=dates[1:])
+
+    metrics = backtest.performance_metrics(
+        returns,
+        equity=equity,
+        turnover=turnover,
+        periods_per_year=4,
+    )
+
+    assert metrics["total_return"] == pytest.approx(-0.0925)
+    assert metrics["max_drawdown"] == pytest.approx(-0.25)
+    assert metrics["calmar"] < 0
+    assert metrics["average_turnover"] == pytest.approx(0.375)
+    assert metrics["annualized_turnover"] == pytest.approx(1.5)
+
+
+def test_performance_metrics_builds_equity_from_initial_capital_when_missing():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+    returns = pd.Series([0.10, 0.10], index=dates[1:])
+
+    metrics = backtest.performance_metrics(returns, periods_per_year=2)
+
+    assert metrics["total_return"] == pytest.approx(0.21)
+
+
+def test_multi_asset_weights_drift_between_rebalance_dates():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+    prices = pd.DataFrame(
+        {
+            "AAA": [100.0, 200.0, 200.0],
+            "BBB": [100.0, 100.0, 200.0],
+        },
+        index=dates,
+    )
+    target_weights = pd.DataFrame({"AAA": [0.5], "BBB": [0.5]}, index=[dates[0]])
+
+    result = backtest.run_weight_backtest(prices, target_weights)
+
+    assert result.gross_returns.tolist() == pytest.approx([0.5, 1 / 3])
+    assert result.period_weights.loc[dates[1], "AAA"] == pytest.approx(0.5)
+    assert result.period_weights.loc[dates[2], "AAA"] == pytest.approx(2 / 3)
+    assert result.equity.iloc[-1] == pytest.approx(2.0)
+
+
+def test_target_weights_with_off_calendar_dates_raise_clear_error():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+    prices = pd.DataFrame({"AAA": [100.0, 101.0, 102.0]}, index=dates)
+    target_weights = pd.DataFrame({"AAA": [1.0]}, index=[pd.Timestamp("2024-01-06")])
+
+    with pytest.raises(ValueError, match="Target weight dates must exist in prices index"):
+        backtest.run_weight_backtest(prices, target_weights)
+
+
+def test_performance_metrics_uses_downside_semideviation_for_sortino():
+    dates = pd.bdate_range("2024-01-01", periods=5)
+    returns = pd.Series([0.10, -0.10, 0.00, 0.20], index=dates[1:])
+
+    metrics = backtest.performance_metrics(returns, periods_per_year=4)
+
+    assert metrics["sortino"] == pytest.approx(2.0)
+
+
+def test_run_weight_backtest_rejects_empty_prices_and_negative_costs():
+    dates = pd.bdate_range("2024-01-01", periods=2)
+    prices = pd.DataFrame({"AAA": [100.0, 101.0]}, index=dates)
+    target_weights = pd.DataFrame({"AAA": [1.0]}, index=[dates[0]])
+
+    with pytest.raises(ValueError, match="prices must contain at least two rows"):
+        backtest.run_weight_backtest(pd.DataFrame(), target_weights)
+
+    with pytest.raises(ValueError, match="transaction_cost_bps must be non-negative"):
+        backtest.run_weight_backtest(prices, target_weights, transaction_cost_bps=-1.0)
+
+
+def test_run_weight_backtest_rejects_non_positive_or_non_finite_prices():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+    target_weights = pd.DataFrame({"AAA": [1.0]}, index=[dates[0]])
+
+    zero_prices = pd.DataFrame({"AAA": [0.0, 101.0, 102.0]}, index=dates)
+    infinite_prices = pd.DataFrame({"AAA": [100.0, float("inf"), 102.0]}, index=dates)
+
+    with pytest.raises(ValueError, match="prices must be finite and strictly positive"):
+        backtest.run_weight_backtest(zero_prices, target_weights)
+
+    with pytest.raises(ValueError, match="prices must be finite and strictly positive"):
+        backtest.run_weight_backtest(infinite_prices, target_weights)
+
+
+def test_run_weight_backtest_rejects_duplicate_price_columns():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+    prices = pd.DataFrame(
+        [[100.0, 101.0], [101.0, 102.0], [102.0, 103.0]],
+        index=dates,
+        columns=["AAA", "AAA"],
+    )
+    target_weights = pd.DataFrame({"AAA": [1.0]}, index=[dates[0]])
+
+    with pytest.raises(ValueError, match="prices columns must be unique"):
+        backtest.run_weight_backtest(prices, target_weights)
+
+
+def test_run_weight_backtest_rejects_non_finite_target_weights():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+    prices = pd.DataFrame({"AAA": [100.0, 101.0, 102.0]}, index=dates)
+    target_weights = pd.DataFrame({"AAA": [float("inf")]}, index=[dates[0]])
+
+    with pytest.raises(ValueError, match="target_weights must be finite"):
+        backtest.run_weight_backtest(prices, target_weights)
+
+
+def test_run_weight_backtest_rejects_target_tickers_missing_from_prices():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+    prices = pd.DataFrame({"AAA": [100.0, 101.0, 102.0]}, index=dates)
+    target_weights = pd.DataFrame({"AAA": [0.5], "MISSING": [0.5]}, index=[dates[0]])
+
+    with pytest.raises(ValueError, match="target_weights columns missing from prices"):
+        backtest.run_weight_backtest(prices, target_weights)
+
+
+def test_run_weight_backtest_rejects_duplicate_price_or_target_dates():
+    price_dates = pd.to_datetime(["2024-01-01", "2024-01-01", "2024-01-02"])
+    duplicate_prices = pd.DataFrame({"AAA": [100.0, 101.0, 102.0]}, index=price_dates)
+    target_weights = pd.DataFrame({"AAA": [1.0]}, index=[pd.Timestamp("2024-01-01")])
+
+    with pytest.raises(ValueError, match="prices index must be unique"):
+        backtest.run_weight_backtest(duplicate_prices, target_weights)
+
+    dates = pd.bdate_range("2024-01-01", periods=3)
+    prices = pd.DataFrame({"AAA": [100.0, 101.0, 102.0]}, index=dates)
+    duplicate_targets = pd.DataFrame({"AAA": [1.0, 0.0]}, index=[dates[0], dates[0]])
+
+    with pytest.raises(ValueError, match="target_weights index must be unique"):
+        backtest.run_weight_backtest(prices, duplicate_targets)
+
+
+def test_performance_metrics_rejects_invalid_periods_per_year():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+    returns = pd.Series([0.10, 0.10], index=dates[1:])
+
+    with pytest.raises(ValueError, match="periods_per_year must be positive"):
+        backtest.performance_metrics(returns, periods_per_year=0)
+
+
+def test_performance_metrics_accepts_plain_integer_index_returns():
+    returns = pd.Series([0.10, 0.10])
+
+    metrics = backtest.performance_metrics(returns, periods_per_year=2)
+
+    assert metrics["total_return"] == pytest.approx(0.21)
+
+
+def test_public_helpers_reject_non_finite_scalar_inputs():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+    prices = pd.DataFrame({"AAA": [100.0, 101.0, 102.0]}, index=dates)
+    target_weights = pd.DataFrame({"AAA": [1.0]}, index=[dates[0]])
+    returns = pd.Series([0.10, 0.10], index=dates[1:])
+
+    with pytest.raises(ValueError, match="transaction_cost_bps must be finite"):
+        backtest.run_weight_backtest(prices, target_weights, transaction_cost_bps=float("nan"))
+
+    with pytest.raises(ValueError, match="initial_capital must be finite"):
+        backtest.run_weight_backtest(prices, target_weights, initial_capital=float("inf"))
+
+    with pytest.raises(ValueError, match="risk_free_rate must be finite"):
+        backtest.performance_metrics(returns, risk_free_rate=float("nan"))
