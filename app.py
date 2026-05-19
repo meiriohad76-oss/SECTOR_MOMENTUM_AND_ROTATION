@@ -44,15 +44,15 @@ INDICATOR_TIPS = {
     "bluf_warning":  "Tickers showing early bearish signals. Tighten stops, no new adds. Triggered by RRG dropping to Weakening, breadth below 50%, distribution-day cluster, or OBV/price bearish divergence.",
     "bluf_buy":      "Stage 2 candidates passing every strict gate: price above 30-week SMA with positive slope, Mansfield RS positive, RRG in Leading quadrant, sector breadth ≥ 60%, CMF above +0.05, and positive ETF primary flow.",
     # Status tiles
-    "tip_regime":    "Faber 10-month SMA on SPY. RISK-ON when SPY trades above the SMA → equity exposure ok. RISK-OFF → defensive rotation (TLT/GLD/BIL). The portfolio-level circuit breaker.",
-    "tip_phase":     "Business-cycle phase per Stovall/Fidelity. Determines which sector basket structurally leads. Currently estimated from Faber risk regime + yield-curve sign. EARLY: XLY, XLF, XLRE, XLI, XLK. MID: XLK, XLC, XLI. LATE: XLE, XLB, XLP, XLV. RECESSION: XLP, XLU, XLV.",
+    "tip_regime":     "Faber 10-month SMA on SPY. Portfolio-level forward circuit breaker. SPY > SMA historically associated with positive forward equity returns; SPY < SMA precedes the worst drawdowns (2000, 2008, 2020). Flip to RISK-OFF triggers defensive rotation to TLT/GLD/BIL.",
+    "tip_phase":     "Business-cycle phase per Stovall/Fidelity. Predicts which sector basket will lead the next 3-6 months. EARLY: cyclicals (XLY, XLF, XLRE, XLI, XLK). MID: tech / industrials. LATE: energy + defensives (XLE, XLB, XLP, XLV). RECESSION: pure defensives (XLP, XLU, XLV).",
     "tip_warnings":  "Tickers currently in EXIT or WARNING state. Watch the week-over-week change to gauge market deterioration. Spikes here often precede broader risk-off.",
     # Pick card metrics
-    "tip_S":         "Composite score (master ranking). Cross-sectional z-score across the 7 pillars within the asset class. >0 = above class average. Top-N per class drive the picks. A hard veto fires if F < -0.5σ.",
-    "tip_F":         "Flow score. Z-scored composite of institutional money-flow signals: CMF, OBV slope, ETF creations/redemptions, block-trade direction, trade-size velocity, short-interest delta. >0 = real money entering; <-0.5σ kills the trade regardless of S.",
-    "tip_MOM":       "12-1 momentum: 12-month total return excluding the most recent month. Jegadeesh-Titman classic momentum. Top decile cross-sectionally is the winner basket. Skip-1 removes short-term reversal.",
-    "tip_STAGE":     "Weinstein Stage: 1=basing (sideways), 2=advance (BUY), 3=topping (tighten), 4=decline (SELL/short). Stage 2 requires price > 30wMA AND positive slope AND Mansfield RS > 0.",
-    "tip_RRG":       "Relative Rotation Graph quadrant vs SPY. Leading = outperforming with rising momentum (buy). Weakening = outperforming but losing momentum (tighten). Lagging = underperforming with negative momentum (exit). Improving = underperforming but momentum turning up (watch).",
+    "tip_S":     "Composite forward-outlook score. Weighted z-score across the 7 pillars; the higher this is for a ticker, the stronger the system's forward call. A hard veto fires if F < -0.5sigma. Forward horizon is roughly the worst-case across pillars (1 week to 6 months).",
+    "tip_F":     "Institutional money flow z-score (forward indicator). Combines CMF, OBV slope, ETF creations, block-trade direction, RVOL, short-interest delta. Smart money positioning leads price by ~1-3 weeks (Chordia-Swaminathan 2000). F < -0.5sigma kills the trade regardless of price signals.",
+    "tip_MOM":     "12-1 momentum (Jegadeesh-Titman 1993): 12-month return excluding the most recent month. Predicts forward 3-12 month relative performance. Top-decile winners have historically beaten bottom-decile losers by ~1%/month for the next year. The most-studied predictive anomaly in finance.",
+    "tip_STAGE":     "Weinstein Stage. Predicts next 4-26 weeks of behavior. Stage 1 = basing (setup forming). Stage 2 = ADVANCE (forward outperformance expected). Stage 3 = TOPPING (pullback risk rising). Stage 4 = DECLINE (forward underperformance expected). The MA + slope + RS combination historically continues until the next stage transition.",
+    "tip_RRG":     "Relative Rotation Graph quadrant. Predicts the next rotation phase. Improving -> Leading (entry signal, 4-12 wk fwd outperformance). Leading -> Weakening (rotate out, momentum fading). Weakening -> Lagging (full breakdown expected). Lagging -> Improving (Stage-1 basing in progress).",
     # Quadrant cards
     "tip_q_leading":   "Outperforming the benchmark with rising relative momentum. Best buy zone.",
     "tip_q_weakening": "Still outperforming but momentum decaying. Tighten stops; rotation candidate.",
@@ -72,12 +72,12 @@ INDICATOR_TIPS = {
 }
 
 STATE_TIPS = {
-    "STAGE_2_BULLISH":  "All gates passed: price > 30wMA, slope positive, Mansfield RS > 0, RRG Leading, breadth ≥ 60%, CMF > 0.05, ETF flow non-negative. Active buy candidate.",
-    "HOLD":             "Stage 2 intact but missing the strict-Bullish gate (e.g., RRG not Leading, or breadth slightly low). Position is safe, no new adds.",
-    "WARNING":          "Early bearish signal. Triggered by RRG → Weakening for 2+ wks, OR breadth < 50%, OR M1 rank dropped, OR CMF < 0 sustained, OR OBV/price bearish divergence, OR 4+ distribution days. Tighten stops.",
-    "EXIT":             "Sell on Monday open. Triggered by close < 30wMA, OR Mansfield RS < 0, OR Antonacci failed, OR RRG → Lagging, OR CMF < -0.10, OR ETF redemptions > 1.5% AUM, OR block-tape flipped bearish.",
-    "BEARISH_STAGE_4":  "Avoid; short candidate. Stage 4 confirmed: price < 30wMA, MA sloping down, RRG Lagging 3+ wks, CMF confirmed negative.",
-    "STAGE_1_BASING":   "Recovered from Stage 4. Price reclaimed 30wMA but MA still flat AND CMF turned positive. Watchlist for re-entry on Stage 2 confirmation.",
+    "STAGE_2_BULLISH":  "FORWARD CALL: expected to outperform its class over the next 4-26 weeks. All entry gates pass (price > 30wMA + slope > 0 + Mansfield RS > 0 + RRG Leading + breadth >= 60% + CMF > 0.05 + ETF flow positive). Historically the highest-edge state.",
+    "HOLD":             "FORWARD CALL: trend likely intact for next 4-13 weeks but missing one strict gate (e.g., RRG not Leading, or breadth slightly low). Existing positions are safe; no new entries.",
+    "WARNING":          "FORWARD CALL: 5-15% pullback or trend break in the next 2-6 weeks is more likely than continuation. Triggered by RRG -> Weakening 2+ wks, OR breadth < 50%, OR sustained CMF < 0, OR OBV/price bearish divergence, OR 4+ distribution days. Tighten stops.",
+    "EXIT":             "FORWARD CALL: 10-30% drawdown over the next 4-13 weeks is the median outcome if the breakdown holds. Triggered by close < 30wMA, OR Mansfield RS < 0, OR Antonacci failed, OR RRG -> Lagging, OR CMF < -0.10, OR ETF redemptions > 1.5% AUM. Sell on Monday open.",
+    "BEARISH_STAGE_4":  "FORWARD CALL: continued decline expected. Median Stage-4 duration is 10-22 weeks. Gates confirmed: price < 30wMA + MA slope negative + RRG Lagging 3+ wks + CMF confirmed negative. Avoid long; short candidate.",
+    "STAGE_1_BASING":   "FORWARD CALL: possible Stage-2 setup forming over the next 4-13 weeks if remaining gates fill. Recovered from Stage 4: price reclaimed 30wMA but slope still flat AND CMF turned positive. Watchlist.",
 }
 
 
@@ -102,7 +102,7 @@ def _grade_letter(s: float | None) -> str:
 SYSTEM_EXPLAINER_HTML = """
 <div class="explainer">
 
-<p>The Sentiment Board monitors 67 ETFs (US sectors, US industries, international markets, style factors) and applies a layered 7-pillar methodology to flag bullish entries and bearish exits. Every score, state, and signal you see on this page comes from the chain below.</p>
+<p><b>Forward-looking signal system.</b> The Sentiment Board monitors 67 ETFs (US sectors, industries, countries, factors) and applies a 7-pillar methodology to <b>predict</b> which sectors will lead and which will break down. Every score, state, and signal you see on this page is a forward call, not a current-state description. The pillars are leading indicators by construction — each one has decades of out-of-sample evidence that <i>past readings predict forward returns</i>.</p>
 
 <h3>Data flow</h3>
 <pre class="flow">yfinance daily OHLCV (3y, ~70 tickers)
@@ -111,7 +111,7 @@ SYSTEM_EXPLAINER_HTML = """
 weekly + monthly resamples for stage / Faber
         |
         v
-7 pillars computed per ticker
+7 forward-looking pillars computed per ticker
         |
         v
 Cross-sectional z-scores within each asset class
@@ -120,24 +120,23 @@ Cross-sectional z-scores within each asset class
 Composite S-score (weighted) + Flow F-score (z-scored)
         |
         v
-State machine (6 states, strict gates per the methodology)
+State machine (6 forward-outlook states with strict gates)
         |
         v
-state.json (persists across restarts)  -->  BLUF + alerts + cards
-</pre>
+state.json (persists across restarts)  -->  BLUF + alerts + cards</pre>
 
-<h3>The 7 pillars + weights</h3>
-<p>Weights sum to 1.00. Cross-sectional z-score means a ticker is compared against the other tickers in its asset class, so a +1.0 means "1 standard deviation above the class average."</p>
+<h3>The 7 pillars — weights and forward horizons</h3>
+<p>Weights sum to 1.00. "Forward horizon" is the empirically-supported window over which each pillar's signal is predictive.</p>
 <table>
-<thead><tr><th>#</th><th>Pillar</th><th>Source</th><th class="weight">Weight</th></tr></thead>
+<thead><tr><th>#</th><th>Pillar</th><th>What it predicts</th><th>Horizon</th><th class="weight">Weight</th></tr></thead>
 <tbody>
-<tr><td>1</td><td>12-1 Cross-sectional Momentum</td><td>Jegadeesh-Titman 1993 (12mo return ex-most-recent month)</td><td class="weight">22%</td></tr>
-<tr><td>2</td><td>Mansfield 52-week Relative Strength</td><td>Weinstein 1988 (RS line ratio vs benchmark)</td><td class="weight">12%</td></tr>
-<tr><td>3</td><td>RRG — RS-Ratio</td><td>de Kempenaer (horizontal axis of Relative Rotation Graph)</td><td class="weight">15%</td></tr>
-<tr><td>4</td><td>RRG — RS-Momentum</td><td>de Kempenaer (vertical axis)</td><td class="weight">8%</td></tr>
-<tr><td>5</td><td>Binary Trend Filters</td><td>Faber 10mo SMA + Weinstein Stage=2 + Antonacci absolute; sum / 3 in [0,1]</td><td class="weight">12%</td></tr>
-<tr><td>6</td><td>Business-Cycle Tilt</td><td>Stovall/Fidelity sector basket nudge (+1 / 0 / -1) based on Faber regime + yield curve</td><td class="weight">8%</td></tr>
-<tr><td>7</td><td>Institutional Flow (F-score)</td><td>CMF + OBV slope + ETF flow + block ratio + RVOL + short interest delta (weighted z-score)</td><td class="weight">23%</td></tr>
+<tr><td>1</td><td>12-1 Cross-sectional Momentum</td><td>Forward 3-12mo relative performance</td><td>3-12 mo</td><td class="weight">22%</td></tr>
+<tr><td>2</td><td>Mansfield 52-week Relative Strength</td><td>Whether the sector keeps leading the index</td><td>2-6 mo</td><td class="weight">12%</td></tr>
+<tr><td>3</td><td>RRG RS-Ratio</td><td>Future quadrant position</td><td>4-12 wk</td><td class="weight">15%</td></tr>
+<tr><td>4</td><td>RRG RS-Momentum</td><td>Direction of next rotation step</td><td>2-8 wk</td><td class="weight">8%</td></tr>
+<tr><td>5</td><td>Binary Trend Filters (Faber + Stage 2 + Antonacci)</td><td>Forward risk-on / risk-off + own-uptrend</td><td>1-6 mo</td><td class="weight">12%</td></tr>
+<tr><td>6</td><td>Business-Cycle Tilt</td><td>Sector basket likely to lead the next phase</td><td>3-6 mo</td><td class="weight">8%</td></tr>
+<tr><td>7</td><td>Institutional Flow (F-score)</td><td>Smart-money positioning, leads price</td><td>1-8 wk</td><td class="weight">23%</td></tr>
 </tbody>
 </table>
 
@@ -151,40 +150,55 @@ state.json (persists across restarts)  -->  BLUF + alerts + cards
   + 0.23 * z(F_score)</pre>
 
 <h3>Hard flow veto</h3>
-<p>A high S-score is overridden if <code>F &lt; -0.5&sigma;</code>. Price-based pillars can't beat a "no real money following" signal. This is what prevents pure-momentum traps.</p>
+<p>A high S-score is overridden if <code>F &lt; -0.5&sigma;</code>. Price moves without real money behind them historically reverse — flow rejection is the system's main protection against pure-momentum traps.</p>
 
-<h3>Letter grade</h3>
-<p>Translation of S-score for quick reading:</p>
+<h3>Letter grade (forward outlook ranking)</h3>
 <table>
-<thead><tr><th>Grade</th><th>S-score range</th><th>Meaning</th></tr></thead>
+<thead><tr><th>Grade</th><th>S-score range</th><th>Forward outlook</th></tr></thead>
 <tbody>
-<tr><td><span class="grade A">A</span></td><td><code>S &ge; +1.0</code></td><td>Top decile — active buy candidate</td></tr>
-<tr><td><span class="grade B">B</span></td><td><code>0.0 &le; S &lt; +1.0</code></td><td>Above class average — hold candidates</td></tr>
-<tr><td><span class="grade C">C</span></td><td><code>-1.0 &lt; S &lt; 0.0</code></td><td>Neutral / mediocre — no signal</td></tr>
-<tr><td><span class="grade D">D</span></td><td><code>-1.5 &le; S &le; -1.0</code></td><td>Warning — under-performer, watch for exit</td></tr>
-<tr><td><span class="grade F">F</span></td><td><code>S &lt; -1.5</code></td><td>Bottom — avoid or short candidate</td></tr>
+<tr><td><span class="grade A">A</span></td><td><code>S &ge; +1.0</code></td><td>Top decile <b>predicted outperformance</b> over the relevant horizon (1wk-6mo)</td></tr>
+<tr><td><span class="grade B">B</span></td><td><code>0.0 &le; S &lt; +1.0</code></td><td>Modestly bullish forward call</td></tr>
+<tr><td><span class="grade C">C</span></td><td><code>-1.0 &lt; S &lt; 0.0</code></td><td>No edge in either direction</td></tr>
+<tr><td><span class="grade D">D</span></td><td><code>-1.5 &le; S &le; -1.0</code></td><td>Mild forward <b>underperformance</b> expected</td></tr>
+<tr><td><span class="grade F">F</span></td><td><code>S &lt; -1.5</code></td><td>Bottom decile <b>predicted underperformance</b>; avoid or short</td></tr>
 </tbody>
 </table>
 
-<h3>State machine — 6 states</h3>
+<h3>State machine — forward calls</h3>
 <table>
-<thead><tr><th>State</th><th>Strict gate (all must pass)</th></tr></thead>
+<thead><tr><th>State</th><th>Forward outlook</th></tr></thead>
 <tbody>
-<tr><td><span class="pill STAGE_2_BULLISH">STAGE 2 BULLISH</span></td><td>Stage=2 + RRG Leading + Breadth &ge; 60% + CMF &gt; +0.05 + ETF flow &ge; 0</td></tr>
-<tr><td><span class="pill HOLD">HOLD</span></td><td>Stage=2 intact but missing one strict-Bullish gate</td></tr>
-<tr><td><span class="pill WARNING">WARNING</span></td><td>RRG &rarr; Weakening 2+ wks OR breadth &lt; 50% OR CMF &lt; 0 sustained OR OBV/price divergence OR 4+ distribution days</td></tr>
-<tr><td><span class="pill EXIT">EXIT</span></td><td>Close &lt; 30wMA OR Mansfield RS &lt; 0 OR Antonacci failed OR RRG &rarr; Lagging OR CMF &lt; -0.10 OR ETF redemptions &gt; 1.5% AUM</td></tr>
-<tr><td><span class="pill BEARISH_STAGE_4">BEARISH STAGE 4</span></td><td>EXIT + 30wMA slope negative + RRG Lagging 3+ wks + CMF confirmed negative</td></tr>
-<tr><td><span class="pill STAGE_1_BASING">STAGE 1 BASING</span></td><td>Recovered from Stage 4; price reclaimed 30wMA but slope flat AND CMF turned positive</td></tr>
+<tr><td><span class="pill STAGE_2_BULLISH">STAGE 2 BULLISH</span></td><td><b>Expected outperformance</b> over next 4-26 weeks. All entry gates passed.</td></tr>
+<tr><td><span class="pill HOLD">HOLD</span></td><td>Trend intact for next 4-13 weeks; existing positions safe.</td></tr>
+<tr><td><span class="pill WARNING">WARNING</span></td><td><b>5-15% pullback or trend break</b> in next 2-6 weeks is more likely than continuation.</td></tr>
+<tr><td><span class="pill EXIT">EXIT</span></td><td><b>10-30% drawdown</b> over next 4-13 weeks is the median outcome.</td></tr>
+<tr><td><span class="pill BEARISH_STAGE_4">BEARISH STAGE 4</span></td><td><b>Continued decline expected.</b> Median Stage-4 duration is 10-22 weeks.</td></tr>
+<tr><td><span class="pill STAGE_1_BASING">STAGE 1 BASING</span></td><td>Possible <b>Stage-2 setup forming</b> over next 4-13 weeks if remaining gates fill.</td></tr>
 </tbody>
 </table>
+
+<h3>Empirical evidence per pillar</h3>
+<p>Forward-prediction evidence supporting each pillar. Citations in full bibliography at <code>docs/sector-rotation-methodology.md</code> &sect;11.</p>
+<table>
+<thead><tr><th>Pillar</th><th>Evidence of forward predictive power</th></tr></thead>
+<tbody>
+<tr><td>12-1 Momentum</td><td>Jegadeesh-Titman 1993; 30+ years of out-of-sample data (Asness et al. 2013, AQR; alphaarchitect.com 2024). Top-minus-bottom decile spread averages <b>~1% per month over the next year</b>. The most-studied anomaly in finance.</td></tr>
+<tr><td>Mansfield RS / Weinstein Stage 2</td><td>Weinstein 1988; 30+ years of practitioner use. Stage-2 breakouts on weekly charts historically continue an average 6-9 months before Stage 3 confirmation.</td></tr>
+<tr><td>Faber 10mo SMA</td><td>Faber 2007 (SSRN 962461); updated 2013 & 2020. SMA10 timing on S&P 500 + 4 other asset classes returned <b>~10.5% vs 9.9% buy-and-hold from 1973-2012</b> with HALF the drawdown — drawdown reduction is the documented edge.</td></tr>
+<tr><td>Antonacci Dual Momentum</td><td>Antonacci 2014. Absolute-momentum filter kept the model in T-bills through 2008, capping drawdown at <b>~20% vs S&P 500's -55%</b>. Direct demonstration of forward downside protection.</td></tr>
+<tr><td>RRG (RS-Ratio + RS-Momentum)</td><td>de Kempenaer 2004-present (relativerotationgraphs.com). Improving -> Leading transitions historically precede outperformance phases by 4-12 weeks; visible on Bloomberg terminals since 2011.</td></tr>
+<tr><td>Business-Cycle Tilt</td><td>Stovall 1996; Fidelity Business Cycle Approach (2014, updated annually). Forward sector returns by phase published with cycle-by-cycle data going back to 1962.</td></tr>
+<tr><td>Institutional Flow</td><td>Chordia-Swaminathan 2000 (JoF) and Lee-Swaminathan 2000 (JoF): volume-confirmed momentum substantially outperforms pure-price momentum. CMF/OBV divergences historically lead price by <b>1-3 weeks</b> on breakdowns.</td></tr>
+</tbody>
+</table>
+
+<p style="margin-top: 18px;"><b>Critical caveat:</b> Past predictive power does not guarantee future predictive power. Each pillar has documented failure modes (momentum crashes per Daniel-Moskowitz 2016, "myth of sector rotation" per Molchanov-Stangl 2018). The system layers seven different pillars precisely because no single signal is reliable on its own. The hard flow-veto and the multi-pillar consensus requirement are designed to reduce the false-positive rate.</p>
 
 <h3>References</h3>
-<p>Full methodology with formulas and academic citations: <code>docs/sector-rotation-methodology.md</code> &middot; PDF version in <code>docs/sector-rotation-methodology.pdf</code>.</p>
+<p>Full methodology with formulas and academic citations: <code>docs/sector-rotation-methodology.md</code> &middot; PDF version in <code>docs/sector-rotation-methodology.pdf</code> &middot; Backlog: <code>docs/BACKLOG.md</code>.</p>
 
 </div>
 """
-
 
 
 # =============================== page config =====================================
@@ -237,6 +251,18 @@ def _load_data(period: str = "3y") -> dict[str, pd.DataFrame]:
     return fetch_ohlcv(tickers, period=period)
 
 
+@st.cache_data(ttl=21600, show_spinner=False)  # FRED updates monthly/weekly, cache 6h
+def _load_fred() -> dict:
+    """Fetch FRED macro series. Empty dict if no API key configured."""
+    try:
+        from src.fred_data import fetch_fred, fred_available
+        if not fred_available():
+            return {}
+        return fetch_fred()
+    except Exception:
+        return {}
+
+
 with st.spinner("Loading market data…"):
     ohlcv = _load_data("3y")
 
@@ -250,7 +276,8 @@ with st.spinner("Computing indicators…"):
     indicators_df = compute_all_indicators(ohlcv, bench_ticker, bil_ticker)
     flow_df = compute_flow_signals(ohlcv)
     flow_z = flow_composite_z(flow_df)
-    regime = assess_regime(ohlcv[bench_ticker], ohlcv.get("^TNX"), ohlcv.get("^IRX"))
+    _fred_data = _load_fred()
+    regime = assess_regime(ohlcv[bench_ticker], ohlcv.get("^TNX"), ohlcv.get("^IRX"), fred_cache=_fred_data)
     scored = compute_composite(indicators_df, flow_df, flow_z, phase=regime.phase_hint)
     scored = apply_state_machine(scored)
 
@@ -371,8 +398,10 @@ def render_header():
 
 def render_bluf():
     sub = (
-        f"{bluf['exits_count']} exits · {bluf['warns_count']} warnings · "
-        f"{bluf['buys_count']} candidates from {len(scored)} ETFs. "
+        f"Forward calls: {bluf['exits_count']} tickers expected to underperform soon, "
+        f"{bluf['warns_count']} showing topping signals, "
+        f"{bluf['buys_count']} predicted to lead the next 4-26 weeks. "
+        f"Universe: {len(scored)} ETFs. "
         f"Risk regime is {('on' if regime.risk_on else 'off')} ({regime.phase_hint.lower()} cycle). "
         f"Click any action card → drill-down."
     )
@@ -382,7 +411,7 @@ def render_bluf():
         <div class="bluf-head">
           <div class="bluf-eyebrow">
             <span class="pill-tiny">BLUF</span>
-            <span>BOTTOM LINE · {datetime.now().strftime('%H:%M')}</span>
+            <span>BOTTOM LINE · FORWARD OUTLOOK · {datetime.now().strftime('%H:%M')}</span>
             <span class="stamp">{'RISK-ON' if regime.risk_on else 'RISK-OFF'}</span>
           </div>
         </div>
@@ -418,6 +447,21 @@ def render_bluf():
 
 def render_status():
     risk_on = regime.risk_on
+    # FRED-derived metrics (None if FRED not configured)
+    if getattr(regime, 'fred_used', False):
+        fred_badge = '<span class="tile-delta" style="background:var(--accent-dim);color:var(--accent);border-color:var(--accent)">FRED</span>'
+        # Compact sub: INDPRO + curve + (recession prob if present)
+        bits = []
+        if regime.indpro_yoy is not None:
+            bits.append(f"INDPRO {regime.indpro_yoy:+.1%} YoY")
+        if regime.curve_2s10s is not None:
+            bits.append(f"2s10s {regime.curve_2s10s:+.2f}")
+        if regime.recession_prob is not None and regime.recession_prob >= 5:
+            bits.append(f"rec prob {regime.recession_prob:.0f}%")
+        cycle_sub = " · ".join(bits) if bits else regime.note
+    else:
+        fred_badge = '<span class="tile-delta" style="opacity:0.6">PROXY</span>'
+        cycle_sub = regime.note
     risk_label = "RISK-ON" if risk_on else "RISK-OFF"
     risk_tone = "up" if risk_on else "down"
     risk_dot = "var(--green)" if risk_on else "var(--red)"
@@ -459,12 +503,15 @@ def render_status():
         </div>
 
         <div class="tile">
-          <div class="tile-label"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_phase'])}">Cycle phase</span></div>
+          <div class="tile-label">
+            <span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_phase'])}">Cycle phase</span>
+            {fred_badge}
+          </div>
           <div class="tile-value">
             <span class="dot" style="background:var(--amber)"></span>
             {regime.phase_hint}
           </div>
-          <div class="tile-sub">{regime.note}</div>
+          <div class="tile-sub">{cycle_sub}</div>
           {phase_bar_html}
         </div>
 

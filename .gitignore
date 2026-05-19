@@ -41,3 +41,6 @@ state.json
 *.duckdb
 *.parquet
 data_cache/
+
+# --- Streamlit secrets (API keys etc.) ---
+.streamlit/secrets.toml
