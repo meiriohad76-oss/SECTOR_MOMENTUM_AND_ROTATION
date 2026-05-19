@@ -376,3 +376,21 @@ def evaluate_acceptance_gates(
     }
     gates["all_passed"] = all(item["passed"] for item in gates.values() if isinstance(item, dict))
     return gates
+
+
+def target_weights_from_scores(scored_df: pd.DataFrame) -> pd.Series:
+    if scored_df.empty or "selected" not in scored_df.columns:
+        return pd.Series(dtype=float)
+    selected = scored_df[scored_df["selected"]].copy()
+    if selected.empty:
+        return pd.Series(dtype=float)
+    weight = 1.0 / len(selected)
+    return pd.Series(weight, index=selected.index, dtype=float).sort_index()
+
+
+def weekly_rebalance_dates(prices: pd.DataFrame) -> pd.DatetimeIndex:
+    if prices.empty:
+        return pd.DatetimeIndex([])
+    ordered = prices.sort_index().dropna(how="all")
+    weekly = ordered.groupby(pd.Grouper(freq="W-FRI")).tail(1)
+    return pd.DatetimeIndex(weekly.index)

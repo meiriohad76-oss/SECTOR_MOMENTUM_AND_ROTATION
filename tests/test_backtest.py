@@ -335,3 +335,36 @@ def test_run_cost_scenarios_rejects_empty_cost_list():
 
     with pytest.raises(ValueError, match="cost_bps_values must contain at least one value"):
         backtest.run_cost_scenarios(prices, weights, cost_bps_values=[])
+
+
+def test_target_weights_from_scores_uses_selected_tickers_only():
+    scores = pd.DataFrame(
+        {
+            "selected": [True, True, False],
+            "S_score_after_veto": [2.0, 1.0, -9.99],
+        },
+        index=["XLK", "XLF", "XLE"],
+    )
+
+    weights = backtest.target_weights_from_scores(scores)
+
+    assert weights.to_dict() == pytest.approx({"XLF": 0.5, "XLK": 0.5})
+    assert "XLE" not in weights
+
+
+def test_weekly_rebalance_dates_returns_friday_index():
+    dates = pd.bdate_range("2024-01-01", periods=10)
+    prices = pd.DataFrame({"AAA": range(10, 20)}, index=dates)
+
+    out = backtest.weekly_rebalance_dates(prices)
+
+    assert out.tolist() == [pd.Timestamp("2024-01-05"), pd.Timestamp("2024-01-12")]
+
+
+def test_weekly_rebalance_dates_uses_last_actual_trading_day_when_friday_missing():
+    dates = pd.bdate_range("2024-03-25", "2024-03-28")
+    prices = pd.DataFrame({"AAA": range(10, 14)}, index=dates)
+
+    out = backtest.weekly_rebalance_dates(prices)
+
+    assert out.tolist() == [pd.Timestamp("2024-03-28")]
