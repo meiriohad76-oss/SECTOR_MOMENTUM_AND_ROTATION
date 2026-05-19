@@ -5,7 +5,7 @@ Formulas track §5 and §6 of sector-rotation-methodology.md exactly.
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -149,7 +149,7 @@ def apply_state_machine(scored_df: pd.DataFrame) -> pd.DataFrame:
     """Add a 'state' column. Reads + writes state.json so transitions persist."""
     prior = _load_state()
     df = scored_df.copy()
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     new_states = []
     transitions = []
     for tkr, row in df.iterrows():
@@ -175,7 +175,7 @@ def _load_state() -> dict:
 
 
 def _save_state(by_ticker: dict, transitions: list[dict]) -> None:
-    payload = {"updated": datetime.utcnow().isoformat(), "by_ticker": by_ticker}
+    payload = {"updated": datetime.now(timezone.utc).isoformat(), "by_ticker": by_ticker}
     # keep a small rolling alert log
     log = []
     if STATE_FILE.exists():
