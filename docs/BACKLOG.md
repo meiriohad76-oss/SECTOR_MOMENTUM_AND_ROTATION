@@ -131,7 +131,12 @@ Each is ~2–4 hours after the integration pattern is set. Flip `STUB_MODE = Fal
 - **B-123** Discord / Mattermost webhook in addition to Telegram/Slack
 
 ### Portfolio features
-- **B-130** Portfolio overlay — paste CSV of holdings, see which are in WARNING / EXIT
+- **B-130** Portfolio / single-stock analyzer — user enters one ticker or uploads an Excel/CSV holdings file, then runs the existing methodology and flow analysis against the input.
+  - **Single ticker mode:** accept a ticker symbol, calculate the current methodology score/state, pillar breakdown, WARNING/EXIT gates, flow signals, and the same charts used in the dashboard drill-down.
+  - **Portfolio upload mode:** accept `.xlsx`, `.xls`, or `.csv` with at minimum a ticker column; optional columns include shares, cost basis, market value, weight, sector, account, and notes.
+  - **Outputs:** per-holding methodology state, score, pillar contribution, warning/exit status, missing-data flags, weighted portfolio exposure by state/sector, concentration risks, and prioritized action list.
+  - **Safety / UX:** show validation errors for unknown tickers or malformed files, keep analysis read-only by default, and only persist uploaded portfolios if the user explicitly chooses to save.
+  - **QA:** fixture portfolio upload, malformed-file test, unknown-ticker test, single-ticker smoke test, and regression check that the analyzer uses the same scoring/state-machine modules as the main dashboard.
 - **B-131** P&L tracker (broker API integration — alpaca, IBKR)
 - **B-132** Backtest "your trades" — run the methodology against a personal trade history
 

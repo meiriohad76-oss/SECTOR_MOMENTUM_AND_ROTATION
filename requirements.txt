@@ -7,3 +7,4 @@ fredapi>=0.5.1
 requests>=2.31
 python-dateutil>=2.9
 pytest>=8.3
+openpyxl>=3.1
