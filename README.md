@@ -86,13 +86,13 @@ sector-rotation-dashboard/
 | 4 | Antonacci dual momentum | **LIVE** | vs BIL T-bill ETF |
 | 5 | RRG (RS-Ratio + RS-Momentum) | **LIVE** | approximation of JdK formulas |
 | 6 | Business-cycle phase | **PARTIAL** | Faber 10mo on SPY + ^TNX/^IRX curve sign; full ISM PMI requires FRED API key |
-| 7 | Volume & institutional flow | **LIVE** for CMF, OBV, MFI, RVOL, distribution days, OBV/price divergence · **STUBBED** for ETF SHO, block trades, dark pool, short interest, 13F |
+| 7 | Volume & institutional flow | **LIVE** for CMF, OBV, MFI, RVOL, distribution days, OBV/price divergence · **PROVIDER-READY** for ETF primary flow · **STUBBED** for block trades, dark pool, short interest, 13F |
 
 ## Wiring real institutional-flow feeds
 
-Each stubbed signal has a `get_<signal>()` hook in `src/flow.py`. After wiring, flip `STUB_MODE = False` at the top of that file.
+Each provider-backed signal has a hook in `src/flow.py`. ETF primary flow now has a provider seam: leave `FLOW_STUB_MODE=true` or unset for neutral behavior, or set `FLOW_STUB_MODE=false` plus `MASSIVE_API_KEY` and `ETF_PRIMARY_FLOW_URL_<TICKER>` values in Streamlit secrets or environment variables. The other provider-backed flow signals remain neutral until they are wired separately.
 
-- `etf_primary_flow_5d_pct()` → iShares / SSGA daily SHO CSV (free)
+- `etf_primary_flow_5d_pct()` → Massive-rendered issuer SHO/source URL per ticker
 - `block_trade_upside_ratio()` → Polygon `/v3/trades` or NYSE TAQ
 - `dark_pool_pct()` → FINRA ATS Transparency (free, T+1)
 - `short_interest_delta_15d()` → FINRA Reg SHO bi-monthly (free)

@@ -24,8 +24,9 @@ Status legend:
 ## 🎯 Next-session priorities
 
 ### B-010 · Wire Massive AI to ETF primary-flow source (Pillar 7 stub #1)
+**Status:** provider seam implemented in `backlog-stepwise-qa`; production default remains neutral until `FLOW_STUB_MODE=false`, `MASSIVE_API_KEY`, and per-ticker source URLs are configured.
 **File:** `src/flow.py` — replace `etf_primary_flow_5d_pct()` stub.
-**Approach:** Massive AI structured Web Data API → iShares ETF holdings/SHO daily JSON (e.g., for XLK use the BlackRock holdings endpoint). Compute Δshares × NAV / AUM over 5 days.
+**Approach:** Massive browser-content API → issuer holdings/SHO source URL per ticker. Compute daily Δshares × current NAV over the latest 5 observations, divided by latest AUM.
 **Effort:** half a day with the Massive API docs in hand.
 **Why first:** biggest signal-quality jump per hour of work. Also de-risks the integration pattern for the other 4 stubs (block trades, dark pool, short interest, 13F).
 
