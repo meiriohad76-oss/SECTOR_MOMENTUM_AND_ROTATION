@@ -115,3 +115,143 @@ def test_parse_holdings_excel_accepts_xlsx_bytes():
     assert result.errors == []
     assert [holding.ticker for holding in result.holdings] == ["XLK", "XLF"]
     assert [holding.weight for holding in result.holdings] == pytest.approx([0.6, 0.4])
+
+
+def _scored_fixture() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "state": ["STAGE_2_BULLISH", "WARNING", "EXIT"],
+            "class": ["US Sectors", "US Sectors", "US Industries"],
+            "S_score": [1.25, -0.35, -2.0],
+            "F_score": [0.80, -0.20, -1.10],
+            "rank_in_class": [1, 5, 12],
+            "selected": [True, False, False],
+            "veto": [False, False, True],
+        },
+        index=["XLK", "XLF", "SOXX"],
+    )
+
+
+def test_analyze_holdings_joins_scored_rows_and_state_exposure():
+    holdings = [
+        portfolio.HoldingInput(ticker="XLK", weight=0.60),
+        portfolio.HoldingInput(ticker="XLF", weight=0.40),
+    ]
+
+    analysis = portfolio.analyze_holdings(holdings, _scored_fixture())
+
+    assert analysis.missing_tickers == []
+    assert [row.ticker for row in analysis.rows] == ["XLK", "XLF"]
+    assert analysis.rows[0].state == "STAGE_2_BULLISH"
+    assert analysis.rows[0].asset_class == "US Sectors"
+    assert analysis.rows[0].s_score == pytest.approx(1.25)
+    assert analysis.rows[0].f_score == pytest.approx(0.80)
+    assert analysis.rows[0].selected is True
+    assert analysis.rows[0].veto is False
+    assert analysis.state_exposure == pytest.approx(
+        {"STAGE_2_BULLISH": 0.60, "WARNING": 0.40}
+    )
+    assert analysis.class_exposure == pytest.approx({"US Sectors": 1.0})
+    assert analysis.action_tickers == {
+        "exit": [],
+        "warning": ["XLF"],
+        "bullish": ["XLK"],
+    }
+
+
+def test_analyze_holdings_reports_unknown_tickers_and_keeps_missing_exposure():
+    holdings = [
+        portfolio.HoldingInput(ticker="XLK", weight=0.25),
+        portfolio.HoldingInput(ticker="ZZZZ", weight=0.75),
+    ]
+
+    analysis = portfolio.analyze_holdings(holdings, _scored_fixture())
+
+    assert analysis.missing_tickers == ["ZZZZ"]
+    assert analysis.rows[1].missing is True
+    assert analysis.rows[1].missing_reason == "ticker not found in scored universe"
+    assert analysis.rows[1].state is None
+    assert analysis.rows[1].analysis_weight == pytest.approx(0.75)
+    assert analysis.state_exposure == pytest.approx(
+        {"STAGE_2_BULLISH": 0.25, "MISSING": 0.75}
+    )
+    assert analysis.class_exposure == pytest.approx(
+        {"US Sectors": 0.25, "MISSING": 0.75}
+    )
+
+
+def test_analyze_holdings_infers_weights_from_market_value_when_weights_missing():
+    holdings = [
+        portfolio.HoldingInput(ticker="XLK", market_value=2500.0),
+        portfolio.HoldingInput(ticker="XLF", market_value=7500.0),
+    ]
+
+    analysis = portfolio.analyze_holdings(holdings, _scored_fixture())
+
+    assert [row.analysis_weight for row in analysis.rows] == pytest.approx([0.25, 0.75])
+    assert analysis.state_exposure == pytest.approx(
+        {"STAGE_2_BULLISH": 0.25, "WARNING": 0.75}
+    )
+
+
+def test_analyze_holdings_preserves_zero_explicit_weights():
+    holdings = [
+        portfolio.HoldingInput(ticker="XLK", weight=0.0),
+        portfolio.HoldingInput(ticker="XLF", weight=0.5),
+    ]
+
+    analysis = portfolio.analyze_holdings(holdings, _scored_fixture())
+
+    assert [row.analysis_weight for row in analysis.rows] == pytest.approx([0.0, 1.0])
+    assert analysis.state_exposure == pytest.approx({"STAGE_2_BULLISH": 0.0, "WARNING": 1.0})
+
+
+def test_analyze_holdings_equal_weights_when_no_weight_or_market_value_exists():
+    holdings = [
+        portfolio.HoldingInput(ticker="XLK"),
+        portfolio.HoldingInput(ticker="XLF"),
+        portfolio.HoldingInput(ticker="SOXX"),
+    ]
+
+    analysis = portfolio.analyze_holdings(holdings, _scored_fixture())
+
+    assert [row.analysis_weight for row in analysis.rows] == pytest.approx(
+        [1 / 3, 1 / 3, 1 / 3]
+    )
+    assert analysis.action_tickers["exit"] == ["SOXX"]
+    assert analysis.action_tickers["warning"] == ["XLF"]
+    assert analysis.action_tickers["bullish"] == ["XLK"]
+
+
+def test_analyze_holdings_does_not_mutate_scored_dataframe():
+    scored = _scored_fixture()
+    original = scored.copy(deep=True)
+
+    portfolio.analyze_holdings([portfolio.HoldingInput(ticker="XLK")], scored)
+
+    pd.testing.assert_frame_equal(scored, original)
+
+
+def test_analyze_holdings_parses_string_booleans_from_scored_dataframe():
+    scored = _scored_fixture()
+    scored["selected"] = pd.Series(["False", "true", "0"], index=scored.index, dtype=object)
+    scored["veto"] = pd.Series(["0", "1", "no"], index=scored.index, dtype=object)
+
+    analysis = portfolio.analyze_holdings(
+        [
+            portfolio.HoldingInput(ticker="XLK"),
+            portfolio.HoldingInput(ticker="XLF"),
+            portfolio.HoldingInput(ticker="SOXX"),
+        ],
+        scored,
+    )
+
+    assert [row.selected for row in analysis.rows] == [False, True, False]
+    assert [row.veto for row in analysis.rows] == [False, True, False]
+
+
+def test_analyze_holdings_rejects_duplicate_scored_ticker_index():
+    scored = pd.concat([_scored_fixture(), _scored_fixture().loc[["XLK"]]])
+
+    with pytest.raises(ValueError, match="scored_df index must contain unique tickers"):
+        portfolio.analyze_holdings([portfolio.HoldingInput(ticker="XLK")], scored)

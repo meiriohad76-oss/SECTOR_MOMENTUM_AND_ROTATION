@@ -34,6 +34,32 @@ class PortfolioInputResult:
     errors: list[PortfolioInputError]
 
 
+@dataclass(frozen=True)
+class HoldingAnalysisRow:
+    ticker: str
+    analysis_weight: float
+    input_weight: float | None
+    market_value: float | None
+    state: str | None
+    asset_class: str | None
+    s_score: float | None
+    f_score: float | None
+    rank_in_class: float | None
+    selected: bool | None
+    veto: bool | None
+    missing: bool = False
+    missing_reason: str | None = None
+
+
+@dataclass(frozen=True)
+class PortfolioAnalysis:
+    rows: list[HoldingAnalysisRow]
+    missing_tickers: list[str]
+    state_exposure: dict[str, float]
+    class_exposure: dict[str, float]
+    action_tickers: dict[str, list[str]]
+
+
 TICKER_COLUMNS = ("ticker", "symbol", "holding", "asset")
 COLUMN_ALIASES = {
     "ticker": TICKER_COLUMNS,
@@ -57,6 +83,71 @@ def parse_single_ticker(value: str) -> PortfolioInputResult:
             errors=[PortfolioInputError(message)],
         )
     return PortfolioInputResult(holdings=[HoldingInput(ticker=ticker, weight=1.0)], errors=[])
+
+
+def analyze_holdings(holdings: list[HoldingInput], scored_df: pd.DataFrame) -> PortfolioAnalysis:
+    if not scored_df.index.is_unique:
+        raise ValueError("scored_df index must contain unique tickers")
+
+    weights = _analysis_weights(holdings)
+    rows: list[HoldingAnalysisRow] = []
+    missing_tickers: list[str] = []
+    state_exposure: dict[str, float] = {}
+    class_exposure: dict[str, float] = {}
+    action_tickers = {"exit": [], "warning": [], "bullish": []}
+
+    for holding, weight in zip(holdings, weights):
+        if holding.ticker not in scored_df.index:
+            rows.append(
+                HoldingAnalysisRow(
+                    ticker=holding.ticker,
+                    analysis_weight=weight,
+                    input_weight=holding.weight,
+                    market_value=holding.market_value,
+                    state=None,
+                    asset_class=None,
+                    s_score=None,
+                    f_score=None,
+                    rank_in_class=None,
+                    selected=None,
+                    veto=None,
+                    missing=True,
+                    missing_reason="ticker not found in scored universe",
+                )
+            )
+            missing_tickers.append(holding.ticker)
+            _add_exposure(state_exposure, "MISSING", weight)
+            _add_exposure(class_exposure, "MISSING", weight)
+            continue
+
+        scored = scored_df.loc[holding.ticker]
+        state = _optional_text(scored.get("state"))
+        asset_class = _optional_text(scored.get("class"))
+        row = HoldingAnalysisRow(
+            ticker=holding.ticker,
+            analysis_weight=weight,
+            input_weight=holding.weight,
+            market_value=holding.market_value,
+            state=state,
+            asset_class=asset_class,
+            s_score=_optional_float(scored.get("S_score")),
+            f_score=_optional_float(scored.get("F_score")),
+            rank_in_class=_optional_float(scored.get("rank_in_class")),
+            selected=_optional_bool(scored.get("selected")),
+            veto=_optional_bool(scored.get("veto")),
+        )
+        rows.append(row)
+        _add_exposure(state_exposure, state or "UNKNOWN", weight)
+        _add_exposure(class_exposure, asset_class or "UNKNOWN", weight)
+        _add_action_ticker(action_tickers, holding.ticker, state)
+
+    return PortfolioAnalysis(
+        rows=rows,
+        missing_tickers=missing_tickers,
+        state_exposure=state_exposure,
+        class_exposure=class_exposure,
+        action_tickers=action_tickers,
+    )
 
 
 def parse_holdings_csv(payload: str | bytes) -> PortfolioInputResult:
@@ -189,6 +280,70 @@ def _parse_weight_field(
     if value is None:
         errors.append(PortfolioInputError("weight must be numeric", row_number=row_number, column=column))
     return value
+
+
+def _analysis_weights(holdings: list[HoldingInput]) -> list[float]:
+    if not holdings:
+        return []
+
+    explicit = [holding.weight for holding in holdings]
+    if all(weight is not None and weight >= 0 for weight in explicit):
+        total = float(sum(weight for weight in explicit if weight is not None))
+        if total > 0:
+            return [float(weight or 0.0) / total for weight in explicit]
+
+    values = [holding.market_value for holding in holdings]
+    if all(value is not None and value > 0 for value in values):
+        total = float(sum(value for value in values if value is not None))
+        if total > 0:
+            return [float(value or 0.0) / total for value in values]
+
+    equal_weight = 1.0 / len(holdings)
+    return [equal_weight for _ in holdings]
+
+
+def _optional_text(value) -> str | None:
+    return _parse_text(value)
+
+
+def _optional_float(value) -> float | None:
+    if value is None or pd.isna(value):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_bool(value) -> bool | None:
+    if value is None or pd.isna(value):
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return bool(value)
+    text = _parse_text(value)
+    if text is None:
+        return None
+    normalized = text.strip().lower()
+    if normalized in {"true", "t", "yes", "y", "1"}:
+        return True
+    if normalized in {"false", "f", "no", "n", "0"}:
+        return False
+    return None
+
+
+def _add_exposure(exposures: dict[str, float], key: str, weight: float) -> None:
+    exposures[key] = exposures.get(key, 0.0) + float(weight)
+
+
+def _add_action_ticker(action_tickers: dict[str, list[str]], ticker: str, state: str | None) -> None:
+    if state in {"EXIT", "BEARISH_STAGE_4"}:
+        action_tickers["exit"].append(ticker)
+    elif state == "WARNING":
+        action_tickers["warning"].append(ticker)
+    elif state == "STAGE_2_BULLISH":
+        action_tickers["bullish"].append(ticker)
 
 
 def _parse_text(value) -> str | None:
