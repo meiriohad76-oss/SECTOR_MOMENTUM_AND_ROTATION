@@ -6,13 +6,149 @@ short interest, 13F. Toggle STUB_MODE = False after wiring providers.
 """
 from __future__ import annotations
 
-from typing import Optional
+import csv
+from datetime import datetime
+import io
+import json
+import re
+from dataclasses import dataclass
+from typing import Iterable, Optional
 
 import numpy as np
 import pandas as pd
 
 
 STUB_MODE = True
+
+
+@dataclass(frozen=True)
+class PrimaryFlowSnapshot:
+    as_of: str
+    shares_outstanding: float
+    nav: float
+    aum: float
+
+
+def _date_sort_key(value: str):
+    text = str(value).strip()
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y"):
+        try:
+            return (0, datetime.strptime(text, fmt).date())
+        except ValueError:
+            continue
+    try:
+        parsed = pd.to_datetime(text, errors="raise")
+        return (0, parsed.date())
+    except Exception:
+        return (1, text)
+
+
+def _has_parseable_date(value: str) -> bool:
+    return _date_sort_key(value)[0] == 0
+
+
+def _parse_float(value) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return None
+    multiplier = 1.0
+    suffix = text[-1:].upper()
+    if suffix in {"K", "M", "B", "T"}:
+        multiplier = {
+            "K": 1_000.0,
+            "M": 1_000_000.0,
+            "B": 1_000_000_000.0,
+            "T": 1_000_000_000_000.0,
+        }[suffix]
+        text = text[:-1]
+    try:
+        return float(text.replace(",", "").replace("$", "")) * multiplier
+    except ValueError:
+        pass
+    text = re.sub(r"[^0-9.\-]", "", text)
+    if not text:
+        return None
+    try:
+        return float(text) * multiplier
+    except ValueError:
+        return None
+
+
+def _pick(record: dict, names: Iterable[str]):
+    normalized = {str(k).strip().lower().replace(" ", "_"): v for k, v in record.items()}
+    for name in names:
+        key = name.lower().replace(" ", "_")
+        if key in normalized:
+            return normalized[key]
+    return None
+
+
+def _snapshot_from_record(record: dict) -> Optional[PrimaryFlowSnapshot]:
+    as_of = _pick(record, ["as_of", "as of", "date", "trade_date", "holdings_date"])
+    shares = _parse_float(_pick(record, ["shares_outstanding", "shares outstanding", "sho", "sharesOutstanding"]))
+    nav = _parse_float(_pick(record, ["nav", "net_asset_value", "net asset value"]))
+    aum = _parse_float(_pick(record, ["aum", "net_assets", "net assets", "total_net_assets", "total net assets"]))
+    if as_of is None or shares is None or nav is None or aum is None or aum == 0:
+        return None
+    return PrimaryFlowSnapshot(str(as_of).strip(), shares, nav, aum)
+
+
+def _records_from_json(payload: str) -> list[dict]:
+    parsed = json.loads(payload)
+    if isinstance(parsed, list):
+        return [item for item in parsed if isinstance(item, dict)]
+    if isinstance(parsed, dict):
+        for key in ("records", "data", "snapshots", "rows"):
+            rows = parsed.get(key)
+            if isinstance(rows, list):
+                return [item for item in rows if isinstance(item, dict)]
+    return []
+
+
+def _records_from_csv(payload: str) -> list[dict]:
+    lines = [line for line in payload.splitlines() if line.strip()]
+    for idx, line in enumerate(lines):
+        lowered = line.lower()
+        if ("shares" in lowered or "sho" in lowered) and ("nav" in lowered or "net asset" in lowered):
+            reader = csv.DictReader(io.StringIO("\n".join(lines[idx:])))
+            return [row for row in reader]
+    reader = csv.DictReader(io.StringIO(payload))
+    return [row for row in reader] if reader.fieldnames else []
+
+
+def parse_primary_flow_snapshots(payload: str) -> list[PrimaryFlowSnapshot]:
+    if not payload or not payload.strip():
+        return []
+    records: list[dict]
+    try:
+        records = _records_from_json(payload)
+    except json.JSONDecodeError:
+        records = _records_from_csv(payload)
+    snapshots = [_snapshot_from_record(record) for record in records]
+    return sorted([snapshot for snapshot in snapshots if snapshot is not None], key=lambda item: _date_sort_key(item.as_of))
+
+
+def primary_flow_5d_pct_from_snapshots(
+    snapshots: list[PrimaryFlowSnapshot],
+    lookback_observations: int = 5,
+) -> Optional[float]:
+    dated_snapshots = [snapshot for snapshot in snapshots if _has_parseable_date(snapshot.as_of)]
+    if len(dated_snapshots) <= lookback_observations:
+        return None
+    ordered = sorted(dated_snapshots, key=lambda item: _date_sort_key(item.as_of))
+    latest = ordered[-1]
+    if latest.aum == 0:
+        return None
+    window = ordered[-lookback_observations - 1:]
+    estimated_net_flow = sum(
+        (current.shares_outstanding - prior.shares_outstanding) * current.nav
+        for prior, current in zip(window, window[1:])
+    )
+    return float(estimated_net_flow / latest.aum * 100.0)
 
 
 def chaikin_money_flow(df, period=21):
