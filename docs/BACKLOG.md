@@ -133,7 +133,7 @@ Each is ~2–4 hours after the integration pattern is set. Flip `STUB_MODE = Fal
 ### Engineering & ops
 - **B-140** Move from manual git commits to GitHub Actions auto-deploy to Pi
 - **B-141** Add docker-compose for easier local development
-- **B-142** Unit tests for indicators (pytest, snapshot tests for known dates)
+- **B-142** Unit tests for data/indicators/flow/scoring — DONE in `backlog-stepwise-qa`; pytest harness covers pure modules before provider integration.
 - **B-143** Parallelize indicator computations (currently sequential per-ticker)
 - **B-144** Local DuckDB store for OHLC (skip yfinance refetch on Pi reboot)
 - **B-145** Structured logging (JSON logs) + log shipping to a free Logflare/Grafana endpoint
