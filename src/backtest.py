@@ -292,3 +292,87 @@ def equal_weight_targets(index: pd.DatetimeIndex, tickers: list[str]) -> pd.Data
         raise ValueError("tickers must be unique")
     weight = 1.0 / len(tickers)
     return static_weight_targets(index, {ticker: weight for ticker in tickers})
+
+
+def run_cost_scenarios(
+    prices: pd.DataFrame,
+    target_weights: pd.DataFrame,
+    cost_bps_values: Optional[list[int | float]] = None,
+    initial_capital: float = 1.0,
+    periods_per_year: int = TRADING_DAYS_PER_YEAR,
+) -> pd.DataFrame:
+    if cost_bps_values is None:
+        cost_bps_values = [3, 5, 10]
+    if not cost_bps_values:
+        raise ValueError("cost_bps_values must contain at least one value")
+    rows = []
+    for cost_bps in cost_bps_values:
+        result = run_weight_backtest(
+            prices,
+            target_weights,
+            transaction_cost_bps=float(cost_bps),
+            initial_capital=initial_capital,
+            periods_per_year=periods_per_year,
+        )
+        row = {"cost_bps": float(cost_bps), **result.metrics}
+        rows.append(row)
+    return pd.DataFrame(rows).set_index("cost_bps")
+
+
+def _required_metric(metrics: dict[str, float], key: str, label: str) -> float:
+    if key not in metrics:
+        raise ValueError(f"{label} missing required key: {key}")
+    return _finite_scalar(f"{label} {key}", metrics[key])
+
+
+def _gate(name: str, value: float, threshold: float, passed: bool) -> dict[str, float | bool | str]:
+    return {
+        "name": name,
+        "value": float(value),
+        "threshold": float(threshold),
+        "passed": bool(passed),
+    }
+
+
+def evaluate_acceptance_gates(
+    strategy_metrics: dict[str, float],
+    equal_weight_metrics: dict[str, float],
+    min_oos_sharpe: float = 0.70,
+    max_drawdown_ratio: float = 0.75,
+    max_annualized_turnover: float = 3.0,
+    max_state_transitions_per_ticker_year: float = 4.0,
+) -> dict[str, dict | bool]:
+    sharpe = _required_metric(strategy_metrics, "sharpe", "strategy_metrics")
+    strategy_dd = abs(_required_metric(strategy_metrics, "max_drawdown", "strategy_metrics"))
+    annualized_turnover = _required_metric(strategy_metrics, "annualized_turnover", "strategy_metrics")
+    transitions = _required_metric(strategy_metrics, "state_transitions_per_ticker_year", "strategy_metrics")
+    benchmark_dd = abs(_required_metric(equal_weight_metrics, "max_drawdown", "equal_weight_metrics"))
+    max_allowed_dd = benchmark_dd * max_drawdown_ratio
+    gates = {
+        "oos_sharpe": _gate(
+            "Out-of-sample Sharpe",
+            sharpe,
+            min_oos_sharpe,
+            sharpe >= min_oos_sharpe,
+        ),
+        "max_drawdown": _gate(
+            "Max drawdown",
+            strategy_dd,
+            max_allowed_dd,
+            strategy_dd <= max_allowed_dd,
+        ),
+        "annualized_turnover": _gate(
+            "Annualized turnover",
+            annualized_turnover,
+            max_annualized_turnover,
+            annualized_turnover <= max_annualized_turnover,
+        ),
+        "state_transitions": _gate(
+            "State transitions per ticker-year",
+            transitions,
+            max_state_transitions_per_ticker_year,
+            transitions <= max_state_transitions_per_ticker_year,
+        ),
+    }
+    gates["all_passed"] = all(item["passed"] for item in gates.values() if isinstance(item, dict))
+    return gates

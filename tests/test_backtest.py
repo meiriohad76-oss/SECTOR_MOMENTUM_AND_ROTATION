@@ -269,3 +269,69 @@ def test_sixty_forty_targets_rejects_duplicate_tickers():
 
     with pytest.raises(ValueError, match="equity_ticker and bond_ticker must differ"):
         backtest.sixty_forty_targets(dates, equity_ticker="SPY", bond_ticker="SPY")
+
+
+def test_run_cost_scenarios_returns_metrics_by_bps():
+    dates = pd.bdate_range("2024-01-01", periods=4)
+    prices = pd.DataFrame({"AAA": [100.0, 110.0, 121.0, 133.1]}, index=dates)
+    weights = pd.DataFrame({"AAA": [1.0]}, index=[dates[0]])
+
+    scenarios = backtest.run_cost_scenarios(
+        prices,
+        weights,
+        cost_bps_values=[0, 10],
+        initial_capital=100.0,
+    )
+
+    assert list(scenarios.index) == [0.0, 10.0]
+    assert scenarios.loc[0.0, "total_return"] > scenarios.loc[10.0, "total_return"]
+
+
+def test_evaluate_acceptance_gates_compares_oos_to_equal_weight_benchmark():
+    report = backtest.evaluate_acceptance_gates(
+        strategy_metrics={
+            "sharpe": 0.80,
+            "max_drawdown": -0.20,
+            "annualized_turnover": 2.50,
+            "state_transitions_per_ticker_year": 3.0,
+        },
+        equal_weight_metrics={"max_drawdown": -0.30},
+    )
+
+    assert report["oos_sharpe"]["passed"] is True
+    assert report["max_drawdown"]["passed"] is True
+    assert report["annualized_turnover"]["passed"] is True
+    assert report["state_transitions"]["passed"] is True
+    assert report["all_passed"] is True
+
+
+def test_evaluate_acceptance_gates_requires_explicit_metrics():
+    with pytest.raises(ValueError, match="strategy_metrics missing required key"):
+        backtest.evaluate_acceptance_gates(
+            strategy_metrics={
+                "sharpe": 0.80,
+                "max_drawdown": -0.20,
+                "annualized_turnover": 2.50,
+            },
+            equal_weight_metrics={"max_drawdown": -0.30},
+        )
+
+    with pytest.raises(ValueError, match="equal_weight_metrics missing required key"):
+        backtest.evaluate_acceptance_gates(
+            strategy_metrics={
+                "sharpe": 0.80,
+                "max_drawdown": -0.20,
+                "annualized_turnover": 2.50,
+                "state_transitions_per_ticker_year": 3.0,
+            },
+            equal_weight_metrics={},
+        )
+
+
+def test_run_cost_scenarios_rejects_empty_cost_list():
+    dates = pd.bdate_range("2024-01-01", periods=4)
+    prices = pd.DataFrame({"AAA": [100.0, 110.0, 121.0, 133.1]}, index=dates)
+    weights = pd.DataFrame({"AAA": [1.0]}, index=[dates[0]])
+
+    with pytest.raises(ValueError, match="cost_bps_values must contain at least one value"):
+        backtest.run_cost_scenarios(prices, weights, cost_bps_values=[])
