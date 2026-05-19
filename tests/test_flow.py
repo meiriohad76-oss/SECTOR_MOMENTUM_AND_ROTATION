@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 import pytest
 
@@ -153,3 +155,124 @@ def test_primary_flow_5d_pct_ignores_unparseable_dates():
 
 def test_parse_float_accepts_scientific_notation_strings():
     assert flow._parse_float("1e8") == 100_000_000
+
+
+def test_etf_primary_flow_returns_neutral_when_live_mode_has_no_source(monkeypatch):
+    monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", False)
+    monkeypatch.setattr(flow, "_primary_flow_source_url", lambda ticker: None)
+
+    def fail_fetch(source_url):
+        raise AssertionError("missing source URL should not call Massive")
+
+    monkeypatch.setattr(flow, "_fetch_massive_browser_content", fail_fetch)
+
+    assert flow.etf_primary_flow_5d_pct("XLK") == 0.0
+
+
+def test_etf_primary_flow_does_not_fetch_when_stub_mode_enabled(monkeypatch):
+    monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", True)
+
+    def fail_fetch(ticker):
+        raise AssertionError("stub mode should not fetch primary-flow payloads")
+
+    monkeypatch.setattr(flow, "_fetch_primary_flow_payload", fail_fetch)
+
+    assert flow.etf_primary_flow_5d_pct("XLK") == 0.0
+
+
+def test_etf_primary_flow_uses_provider_payload_when_configured(monkeypatch):
+    payload = {
+        "records": [
+            {"as_of": "2026-05-12", "shares_outstanding": 100_000_000, "nav": 50.0, "aum": 5_000_000_000},
+            {"as_of": "2026-05-13", "shares_outstanding": 100_000_000, "nav": 50.0, "aum": 5_000_000_000},
+            {"as_of": "2026-05-14", "shares_outstanding": 100_000_000, "nav": 50.0, "aum": 5_000_000_000},
+            {"as_of": "2026-05-15", "shares_outstanding": 100_000_000, "nav": 50.0, "aum": 5_000_000_000},
+            {"as_of": "2026-05-18", "shares_outstanding": 101_000_000, "nav": 50.0, "aum": 5_050_000_000},
+            {"as_of": "2026-05-19", "shares_outstanding": 102_000_000, "nav": 50.0, "aum": 5_100_000_000},
+        ]
+    }
+    monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", False)
+    monkeypatch.setattr(flow, "_fetch_primary_flow_payload", lambda ticker: json.dumps(payload))
+
+    assert flow.etf_primary_flow_5d_pct("XLK") == pytest.approx(1.9607843137)
+
+
+def test_compute_flow_signals_keeps_unwired_stubs_neutral_when_etf_flow_live(
+    monkeypatch,
+    ohlcv_frame_factory,
+):
+    payload = {
+        "records": [
+            {"as_of": "2026-05-12", "shares_outstanding": 100_000_000, "nav": 50.0, "aum": 5_000_000_000},
+            {"as_of": "2026-05-13", "shares_outstanding": 100_000_000, "nav": 50.0, "aum": 5_000_000_000},
+            {"as_of": "2026-05-14", "shares_outstanding": 100_000_000, "nav": 50.0, "aum": 5_000_000_000},
+            {"as_of": "2026-05-15", "shares_outstanding": 100_000_000, "nav": 50.0, "aum": 5_000_000_000},
+            {"as_of": "2026-05-18", "shares_outstanding": 101_000_000, "nav": 50.0, "aum": 5_050_000_000},
+            {"as_of": "2026-05-19", "shares_outstanding": 102_000_000, "nav": 50.0, "aum": 5_100_000_000},
+        ]
+    }
+    monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", False)
+    monkeypatch.setattr(flow, "_fetch_primary_flow_payload", lambda ticker: json.dumps(payload))
+
+    out = flow.compute_flow_signals({"XLK": ohlcv_frame_factory(days=80)})
+
+    assert out.loc["XLK", "etf_flow_5d_pct"] == pytest.approx(1.9607843137)
+    assert out.loc["XLK", "block_up_ratio"] == 1.0
+    assert out.loc["XLK", "dark_pool_pct"] == 0.40
+    assert out.loc["XLK", "si_delta_15d"] == 0.0
+    assert out.loc["XLK", "thirteen_f_q"] == 0.0
+
+
+def test_etf_primary_flow_returns_neutral_on_provider_request_error(monkeypatch):
+    monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", False)
+    monkeypatch.setattr(
+        flow,
+        "_fetch_primary_flow_payload",
+        lambda ticker: (_ for _ in ()).throw(flow.requests.Timeout("provider timed out")),
+    )
+
+    assert flow.etf_primary_flow_5d_pct("XLK") == 0.0
+
+
+def test_etf_primary_flow_does_not_hide_unexpected_parser_errors(monkeypatch):
+    monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", False)
+    monkeypatch.setattr(flow, "_fetch_primary_flow_payload", lambda ticker: '{"records": []}')
+
+    def broken_parser(payload):
+        raise RuntimeError("programming bug")
+
+    monkeypatch.setattr(flow, "parse_primary_flow_snapshots", broken_parser)
+
+    with pytest.raises(RuntimeError, match="programming bug"):
+        flow.etf_primary_flow_5d_pct("XLK")
+
+
+def test_fetch_massive_browser_content_sends_bearer_token_and_browser_params(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        status_code = 200
+        text = "content"
+
+        def raise_for_status(self):
+            return None
+
+    def fake_get(url, **kwargs):
+        calls.append((url, kwargs))
+        return FakeResponse()
+
+    monkeypatch.setattr(flow.requests, "get", fake_get)
+
+    content = flow._fetch_massive_browser_content(
+        "https://issuer.example/flow.csv",
+        api_key="secret",
+        timeout=7,
+    )
+
+    assert content == "content"
+    assert calls[0][0] == flow.MASSIVE_BROWSER_URL
+    assert calls[0][1]["headers"]["Authorization"] == "Bearer secret"
+    assert calls[0][1]["params"]["url"] == "https://issuer.example/flow.csv"
+    assert calls[0][1]["params"]["format"] == "raw"
+    assert calls[0][1]["params"]["expiration"] == 0
+    assert calls[0][1]["timeout"] == 7

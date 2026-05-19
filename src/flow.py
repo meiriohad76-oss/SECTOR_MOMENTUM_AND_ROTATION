@@ -1,8 +1,8 @@
 """Pillar 7 - volume & institutional money flow.
 
 LIVE from OHLCV: CMF, OBV slope, MFI, RVOL, distribution days, OBV divergence.
-STUBBED (return neutral until wired): ETF SHO, block trades, dark pool,
-short interest, 13F. Toggle STUB_MODE = False after wiring providers.
+ETF primary flow can be enabled with FLOW_STUB_MODE=false plus Massive/source
+configuration. Other provider-backed signals stay neutral until wired.
 """
 from __future__ import annotations
 
@@ -10,15 +10,45 @@ import csv
 from datetime import datetime
 import io
 import json
+import os
 import re
 from dataclasses import dataclass
 from typing import Iterable, Optional
 
 import numpy as np
 import pandas as pd
+import requests
+
+
+def _resolve_secret(name: str) -> Optional[str]:
+    try:
+        import streamlit as st  # type: ignore
+        from streamlit.errors import StreamlitSecretNotFoundError  # type: ignore
+
+        if hasattr(st, "secrets"):
+            try:
+                value = st.secrets.get(name)
+                if value:
+                    return str(value).strip()
+            except (KeyError, StreamlitSecretNotFoundError):
+                pass
+    except ImportError:
+        pass
+    value = os.environ.get(name)
+    return value.strip() if value else None
+
+
+def _config_flag(name: str, default: bool) -> bool:
+    value = _resolve_secret(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off"}
 
 
 STUB_MODE = True
+ETF_PRIMARY_FLOW_STUB_MODE = _config_flag("FLOW_STUB_MODE", True)
+MASSIVE_BROWSER_URL = "https://render.joinmassive.com/browser"
+PRIMARY_FLOW_SOURCE_ENV_PREFIX = "ETF_PRIMARY_FLOW_URL_"
 
 
 @dataclass(frozen=True)
@@ -228,10 +258,55 @@ def obv_price_divergence(df, lookback=20):
     return bool(price_new_high and not obv_new_high)
 
 
+def _primary_flow_source_url(ticker: str) -> Optional[str]:
+    key = f"{PRIMARY_FLOW_SOURCE_ENV_PREFIX}{ticker.upper().replace('-', '_')}"
+    return _resolve_secret(key)
+
+
+def _fetch_massive_browser_content(
+    source_url: str,
+    api_key: Optional[str] = None,
+    timeout: int = 20,
+) -> Optional[str]:
+    token = api_key or _resolve_secret("MASSIVE_API_KEY")
+    if not token:
+        return None
+    try:
+        response = requests.get(
+            MASSIVE_BROWSER_URL,
+            params={
+                "url": source_url,
+                "format": "raw",
+                "expiration": 0,
+            },
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        return response.text
+    except requests.RequestException:
+        return None
+
+
+def _fetch_primary_flow_payload(ticker: str) -> Optional[str]:
+    source_url = _primary_flow_source_url(ticker)
+    if not source_url:
+        return None
+    return _fetch_massive_browser_content(source_url)
+
+
 def etf_primary_flow_5d_pct(ticker):
-    if STUB_MODE:
+    if ETF_PRIMARY_FLOW_STUB_MODE:
         return 0.0
-    raise NotImplementedError("Wire iShares/SSGA SHO CSV here.")
+    try:
+        payload = _fetch_primary_flow_payload(ticker)
+    except requests.RequestException:
+        return 0.0
+    if not payload:
+        return 0.0
+    snapshots = parse_primary_flow_snapshots(payload)
+    value = primary_flow_5d_pct_from_snapshots(snapshots)
+    return float(value) if value is not None else 0.0
 
 
 def block_trade_upside_ratio(ticker):
