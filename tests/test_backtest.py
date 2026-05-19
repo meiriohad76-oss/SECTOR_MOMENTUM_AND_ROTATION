@@ -207,3 +207,65 @@ def test_public_helpers_reject_non_finite_scalar_inputs():
 
     with pytest.raises(ValueError, match="risk_free_rate must be finite"):
         backtest.performance_metrics(returns, risk_free_rate=float("nan"))
+
+
+def test_close_matrix_prefers_adjusted_close_and_aligns_tickers(ohlcv_frame_factory):
+    aaa = ohlcv_frame_factory(days=5, start_price=100.0)
+    bbb = ohlcv_frame_factory(days=5, start_price=50.0).drop(columns=["adj_close"])
+
+    out = backtest.close_matrix_from_ohlcv({"BBB": bbb, "AAA": aaa})
+
+    assert list(out.columns) == ["AAA", "BBB"]
+    assert out.index.is_monotonic_increasing
+    assert out["AAA"].iloc[0] == pytest.approx(aaa["adj_close"].iloc[0])
+    assert out["BBB"].iloc[0] == pytest.approx(bbb["close"].iloc[0])
+
+
+def test_close_matrix_drops_leading_partial_rows_after_alignment(ohlcv_frame_factory):
+    aaa = ohlcv_frame_factory(days=5, start="2024-01-01", start_price=100.0)
+    bbb = ohlcv_frame_factory(days=5, start="2024-01-03", start_price=50.0)
+
+    out = backtest.close_matrix_from_ohlcv({"AAA": aaa, "BBB": bbb})
+
+    assert out.index[0] == pd.Timestamp("2024-01-03")
+    assert not out.isna().any().any()
+
+
+def test_close_matrix_rejects_duplicate_dates_after_conversion():
+    frame = pd.DataFrame(
+        {
+            "close": [100.0, 101.0],
+        },
+        index=pd.to_datetime(["2024-01-01 10:00", "2024-01-01 10:00"]),
+    )
+
+    with pytest.raises(ValueError, match="OHLCV index must be unique"):
+        backtest.close_matrix_from_ohlcv({"AAA": frame})
+
+
+def test_static_weight_benchmark_rebalances_to_requested_weights():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+
+    weights = backtest.static_weight_targets(
+        dates,
+        {"SPY": 0.60, "AGG": 0.40},
+    )
+
+    assert list(weights.columns) == ["AGG", "SPY"]
+    assert weights.loc[dates[0], "SPY"] == pytest.approx(0.60)
+    assert weights.loc[dates[-1], "AGG"] == pytest.approx(0.40)
+    assert weights.sum(axis=1).tolist() == pytest.approx([1.0, 1.0, 1.0])
+
+
+def test_equal_weight_targets_rejects_duplicate_tickers():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+
+    with pytest.raises(ValueError, match="tickers must be unique"):
+        backtest.equal_weight_targets(dates, ["AAA", "AAA", "BBB"])
+
+
+def test_sixty_forty_targets_rejects_duplicate_tickers():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+
+    with pytest.raises(ValueError, match="equity_ticker and bond_ticker must differ"):
+        backtest.sixty_forty_targets(dates, equity_ticker="SPY", bond_ticker="SPY")

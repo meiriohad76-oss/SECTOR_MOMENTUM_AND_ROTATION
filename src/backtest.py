@@ -236,3 +236,59 @@ def run_weight_backtest(
         equity=equity,
         metrics=metrics,
     )
+
+
+def close_matrix_from_ohlcv(ohlcv: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    series = {}
+    for ticker in sorted(ohlcv):
+        frame = ohlcv[ticker]
+        if frame.empty:
+            continue
+        column = "adj_close" if "adj_close" in frame.columns else "close"
+        if column not in frame.columns:
+            continue
+        values = pd.to_numeric(frame[column], errors="coerce")
+        values.index = pd.to_datetime(values.index)
+        if not values.index.is_unique:
+            raise ValueError("OHLCV index must be unique")
+        series[ticker] = values.sort_index()
+    if not series:
+        return pd.DataFrame()
+    return pd.DataFrame(series).sort_index().ffill().dropna(how="any")
+
+
+def static_weight_targets(index: pd.DatetimeIndex, weights: dict[str, float]) -> pd.DataFrame:
+    columns = sorted(weights)
+    frame = pd.DataFrame(index=pd.to_datetime(index), columns=columns, dtype=float)
+    for ticker in columns:
+        frame[ticker] = _finite_scalar(f"weight for {ticker}", weights[ticker])
+    if not frame.index.is_unique:
+        raise ValueError("target index must be unique")
+    if not np.isfinite(frame.to_numpy(dtype=float)).all():
+        raise ValueError("weights must be finite")
+    if (frame < 0).any().any():
+        raise ValueError("weights must be non-negative")
+    row_sum = frame.abs().sum(axis=1)
+    over_allocated = row_sum > 1.0
+    if over_allocated.any():
+        frame.loc[over_allocated] = frame.loc[over_allocated].div(row_sum.loc[over_allocated], axis=0)
+    return frame.fillna(0.0)
+
+
+def sixty_forty_targets(
+    index: pd.DatetimeIndex,
+    equity_ticker: str = "SPY",
+    bond_ticker: str = "AGG",
+) -> pd.DataFrame:
+    if equity_ticker == bond_ticker:
+        raise ValueError("equity_ticker and bond_ticker must differ")
+    return static_weight_targets(index, {equity_ticker: 0.60, bond_ticker: 0.40})
+
+
+def equal_weight_targets(index: pd.DatetimeIndex, tickers: list[str]) -> pd.DataFrame:
+    if not tickers:
+        return pd.DataFrame(index=pd.to_datetime(index))
+    if len(set(tickers)) != len(tickers):
+        raise ValueError("tickers must be unique")
+    weight = 1.0 / len(tickers)
+    return static_weight_targets(index, {ticker: weight for ticker in tickers})
