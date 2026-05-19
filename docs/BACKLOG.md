@@ -29,6 +29,14 @@ Status legend:
 **Activation:** configure `ETF_PRIMARY_FLOW_URL_<TICKER>` values and set `FLOW_STUB_MODE=false`.
 **Notes:** ETF primary flow computes daily delta shares times current NAV over the latest 5 dated observations, divided by latest AUM. Other Pillar 7 provider stubs remain neutral until B-020.
 
+### B-130 · Portfolio / single-stock analyzer - IMPLEMENTED
+**Status:** parser, read-only holding analysis, and Streamlit UI implemented in `backlog-stepwise-qa`.
+**Files:** `src/portfolio.py`, `tests/test_portfolio.py`, `app.py`, `static/style.css`, `requirements.txt`, `README.md`.
+**Inputs:** single ticker text input; `.csv`, `.xlsx`, or `.xls` holdings upload with ticker/symbol aliases and optional shares, market value, weight, sector, account, and notes columns.
+**Outputs:** validation errors, missing tickers, state/class exposure tables, action lists, and per-holding methodology rows using the existing scored dashboard snapshot.
+**Safety:** read-only/in-memory only; no broker API, no portfolio persistence, no scoring recomputation, and no analyzer state writes.
+**QA:** parser/analyzer tests cover malformed files, Excel read errors, missing/invalid tickers, numeric validation, weight inference, zero-weight handling, duplicate scored indexes, string booleans, and display formatting.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -131,14 +139,9 @@ Each is ~2–4 hours after the integration pattern is set. Flip `STUB_MODE = Fal
 - **B-123** Discord / Mattermost webhook in addition to Telegram/Slack
 
 ### Portfolio features
-- **B-130** Portfolio / single-stock analyzer — user enters one ticker or uploads an Excel/CSV holdings file, then runs the existing methodology and flow analysis against the input.
-  - **Single ticker mode:** accept a ticker symbol, calculate the current methodology score/state, pillar breakdown, WARNING/EXIT gates, flow signals, and the same charts used in the dashboard drill-down.
-  - **Portfolio upload mode:** accept `.xlsx`, `.xls`, or `.csv` with at minimum a ticker column; optional columns include shares, cost basis, market value, weight, sector, account, and notes.
-  - **Outputs:** per-holding methodology state, score, pillar contribution, warning/exit status, missing-data flags, weighted portfolio exposure by state/sector, concentration risks, and prioritized action list.
-  - **Safety / UX:** show validation errors for unknown tickers or malformed files, keep analysis read-only by default, and only persist uploaded portfolios if the user explicitly chooses to save.
-  - **QA:** fixture portfolio upload, malformed-file test, unknown-ticker test, single-ticker smoke test, and regression check that the analyzer uses the same scoring/state-machine modules as the main dashboard.
 - **B-131** P&L tracker (broker API integration — alpaca, IBKR)
 - **B-132** Backtest "your trades" — run the methodology against a personal trade history
+- **B-133** Save named watchlists / portfolios locally after B-130 read-only analyzer proves useful
 
 ### Engineering & ops
 - **B-140** Move from manual git commits to GitHub Actions auto-deploy to Pi
@@ -165,7 +168,7 @@ These need a design decision before building:
 1. Should sparklines on cards include a horizontal 30-week MA reference line? (B-116)
 2. State pill — color-only or also icon-tagged? (Linear-style vs Bloomberg)
 3. On mobile, drop the RRG entirely or render with a "fullscreen" toggle?
-4. Add a portfolio overlay feature? (B-130)
+4. Portfolio overlay feature? Resolved by B-130 read-only analyzer in `backlog-stepwise-qa`; future persistence/broker integration belongs in B-131/B-133.
 
 ---
 

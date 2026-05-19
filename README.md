@@ -10,6 +10,7 @@ A Streamlit dashboard that monitors **67+ ETFs across US sectors, US industries,
 
 ## What you get
 
+- A **read-only portfolio / single-stock analyzer** that accepts one ticker or a CSV/XLS/XLSX holdings file and maps the input to the current methodology snapshot.
 - A **single-page Streamlit app** (`app.py`) with two sections:
   - **Top:** 7-pillar heatmap — every ticker scored on every pillar, color-coded, with composite score and current state (`STAGE_2_BULLISH` / `HOLD` / `WARNING` / `EXIT` / `BEARISH_STAGE_4` / `STAGE_1_BASING`).
   - **Below:** drill-down tabs — RRG quadrant chart, cross-sectional momentum bar, institutional flow detail, state-machine transition log, per-ticker deep dive with price/CMF/OBV charts.
@@ -28,6 +29,16 @@ python scripts/run_backtest.py
 ```
 
 The runner writes `docs/backtest_report.md` when market data downloads successfully. Treat that report as manual evidence, not a replacement for the deterministic test suite.
+
+## Portfolio analyzer
+
+B-130 adds a read-only analyzer section inside the Streamlit app:
+
+- **Ticker mode:** enter one ticker and see its current state, score, flow, class, selection flag, and portfolio-weighted exposure as a one-position analysis.
+- **Portfolio mode:** upload `.csv`, `.xlsx`, or `.xls` holdings. The file needs a ticker-like column: `ticker`, `symbol`, `holding`, or `asset`.
+- Optional upload columns include `shares`, `quantity`, `qty`, `cost_basis`, `cost`, `market_value`, `value`, `weight`, `sector`, `account`, and `notes`.
+- Weights can be decimals (`0.25`) or percents (`25%` or `25`). If no valid weights are present, analysis falls back to market value weights, then equal weights.
+- Unknown tickers are reported as missing instead of crashing. Uploaded files are analyzed in memory only; the app does not save portfolios or connect to broker accounts.
 
 ## Quick start
 
@@ -74,6 +85,7 @@ sector-rotation-dashboard/
 │   ├── indicators.py               <- Pillars 1-5 + breadth
 │   ├── flow.py                     <- Pillar 7: CMF/OBV/MFI/RVOL + 5 stubs
 │   ├── macro.py                    <- Pillar 6: Faber + yield curve
+│   ├── portfolio.py                <- Read-only ticker/portfolio parsing and analysis
 │   ├── scoring.py                  <- Composite + state machine
 │   └── visuals.py                  <- Plotly RRG/momentum/price charts
 ├── docs/

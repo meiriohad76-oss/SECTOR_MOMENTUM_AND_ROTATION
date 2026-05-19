@@ -413,7 +413,7 @@ Use this realistic mock data set when populating mockups:
 1. Should the **sparklines** on cards include a horizontal "30-week MA" line so the Weinstein context is visible in a glance? Or keep cards pure-price for cleanliness?
 2. The **state pill** — do we double-encode (color + emoji icon), or keep it text-only? Text-only is more "Bloomberg," icon-tagged is more "Linear."
 3. For **mobile**, do we ditch the RRG chart entirely (too small to read on a phone) or render it with a "fullscreen" expand button?
-4. Do we want a **portfolio overlay** — let the user paste in current positions, and the dashboard color-codes which ones are in WARNING / EXIT state? (Lightweight CSV upload, no broker API.)
+4. **Resolved in B-130:** add a read-only portfolio / single-stock analyzer. It accepts one ticker or CSV/XLS/XLSX holdings upload, maps positions to the existing methodology snapshot, flags WARNING / EXIT / BULLISH action lists, and does not save portfolios or connect to broker APIs.
 
 ---
 
