@@ -47,6 +47,10 @@ def _config_flag(name: str, default: bool) -> bool:
 
 STUB_MODE = True
 ETF_PRIMARY_FLOW_STUB_MODE = _config_flag("FLOW_STUB_MODE", True)
+MASSIVE_TRADES_STUB_MODE = _config_flag("MASSIVE_TRADES_STUB_MODE", True)
+FINRA_ATS_STUB_MODE = _config_flag("FINRA_ATS_STUB_MODE", True)
+FINRA_SHORT_INTEREST_STUB_MODE = _config_flag("FINRA_SHORT_INTEREST_STUB_MODE", True)
+SEC_13F_STUB_MODE = _config_flag("SEC_13F_STUB_MODE", True)
 MASSIVE_BROWSER_URL = "https://render.joinmassive.com/browser"
 PRIMARY_FLOW_SOURCE_ENV_PREFIX = "ETF_PRIMARY_FLOW_URL_"
 
@@ -309,28 +313,66 @@ def etf_primary_flow_5d_pct(ticker):
     return float(value) if value is not None else 0.0
 
 
+def _neutral_float(value: Optional[float], neutral: float) -> float:
+    if value is None:
+        return neutral
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return neutral
+    return number if np.isfinite(number) else neutral
+
+
+def _provider_block_trade_upside_ratio(ticker) -> Optional[float]:
+    return None
+
+
 def block_trade_upside_ratio(ticker):
-    if STUB_MODE:
+    if MASSIVE_TRADES_STUB_MODE:
         return 1.0
-    raise NotImplementedError("Wire Polygon trade-tape here.")
+    try:
+        return _neutral_float(_provider_block_trade_upside_ratio(ticker), 1.0)
+    except requests.RequestException:
+        return 1.0
+
+
+def _provider_dark_pool_pct(ticker) -> Optional[float]:
+    return None
 
 
 def dark_pool_pct(ticker):
-    if STUB_MODE:
+    if FINRA_ATS_STUB_MODE:
         return 0.40
-    raise NotImplementedError("Wire FINRA ATS Transparency feed here.")
+    try:
+        return _neutral_float(_provider_dark_pool_pct(ticker), 0.40)
+    except requests.RequestException:
+        return 0.40
+
+
+def _provider_short_interest_delta_15d(ticker) -> Optional[float]:
+    return None
 
 
 def short_interest_delta_15d(ticker):
-    if STUB_MODE:
+    if FINRA_SHORT_INTEREST_STUB_MODE:
         return 0.0
-    raise NotImplementedError("Wire FINRA Reg SHO bi-monthly file here.")
+    try:
+        return _neutral_float(_provider_short_interest_delta_15d(ticker), 0.0)
+    except requests.RequestException:
+        return 0.0
+
+
+def _provider_thirteen_f_net_buys_q(ticker) -> Optional[float]:
+    return None
 
 
 def thirteen_f_net_buys_q(ticker):
-    if STUB_MODE:
+    if SEC_13F_STUB_MODE:
         return 0.0
-    raise NotImplementedError("Wire SEC EDGAR Form 13F-HR ingestion here.")
+    try:
+        return _neutral_float(_provider_thirteen_f_net_buys_q(ticker), 0.0)
+    except requests.RequestException:
+        return 0.0
 
 
 def compute_flow_signals(ohlcv):

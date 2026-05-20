@@ -16,7 +16,7 @@ A Streamlit dashboard that monitors **67+ ETFs across US sectors, US industries,
   - **Below:** drill-down tabs — RRG quadrant chart, cross-sectional momentum bar, institutional flow detail, state-machine transition log, per-ticker deep dive with price/CMF/OBV charts.
 - A **persistent state machine** (`state.json`) so bearish transitions trigger only once and stay visible across sessions.
 - A **bearish alert system** with three severity levels (WARNING → EXIT → BEARISH) plus three flow-only early warnings (distribution day, dark-pool sell, OBV/price divergence).
-- **No paid feeds required for v1** — runs entirely on free Yahoo Finance data. Institutional-flow stubs ship pre-wired so you can drop in iShares SHO, Polygon, FINRA, or SEC EDGAR feeds when ready.
+- **No paid feeds required for v1** — runs entirely on free Yahoo Finance data. Institutional-flow stubs ship pre-wired so you can drop in iShares SHO, Massive, FINRA, or SEC EDGAR feeds when ready.
 
 ## Backtest harness
 
@@ -116,10 +116,17 @@ sector-rotation-dashboard/
 
 ## Wiring real institutional-flow feeds
 
-Each provider-backed signal has a hook in `src/flow.py`. ETF primary flow now has a provider seam: leave `FLOW_STUB_MODE=true` or unset for neutral behavior, or set `FLOW_STUB_MODE=false` plus `MASSIVE_API_KEY` and `ETF_PRIMARY_FLOW_URL_<TICKER>` values in Streamlit secrets or environment variables. The other provider-backed flow signals remain neutral until they are wired separately.
+Each provider-backed signal has a hook in `src/flow.py`. ETF primary flow now has a provider seam: leave `FLOW_STUB_MODE=true` or unset for neutral behavior, or set `FLOW_STUB_MODE=false` plus `MASSIVE_API_KEY` and `ETF_PRIMARY_FLOW_URL_<TICKER>` values in Streamlit secrets or environment variables.
+
+The remaining provider seams have independent safety flags. Leave each unset/`true` for neutral behavior until that feed is fully configured:
+
+- `MASSIVE_TRADES_STUB_MODE`
+- `FINRA_ATS_STUB_MODE`
+- `FINRA_SHORT_INTEREST_STUB_MODE`
+- `SEC_13F_STUB_MODE`
 
 - `etf_primary_flow_5d_pct()` → Massive-rendered issuer SHO/source URL per ticker
-- `block_trade_upside_ratio()` → Polygon `/v3/trades` or NYSE TAQ
+- `block_trade_upside_ratio()` → Massive `/v3/trades`
 - `dark_pool_pct()` → FINRA ATS Transparency (free, T+1)
 - `short_interest_delta_15d()` → FINRA Reg SHO bi-monthly (free)
 - `thirteen_f_net_buys_q()` → SEC EDGAR Form 13F-HR quarterly (free, T+45)

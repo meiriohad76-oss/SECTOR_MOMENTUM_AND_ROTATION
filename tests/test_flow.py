@@ -247,6 +247,45 @@ def test_compute_flow_signals_keeps_unwired_stubs_neutral_when_etf_flow_live(
     assert out.loc["XLK", "thirteen_f_q"] == 0.0
 
 
+def test_remaining_provider_flags_are_independent_from_legacy_stub_mode(
+    monkeypatch,
+    ohlcv_frame_factory,
+):
+    monkeypatch.setattr(flow, "STUB_MODE", False)
+    monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", True, raising=False)
+    monkeypatch.setattr(flow, "FINRA_ATS_STUB_MODE", True, raising=False)
+    monkeypatch.setattr(flow, "FINRA_SHORT_INTEREST_STUB_MODE", True, raising=False)
+    monkeypatch.setattr(flow, "SEC_13F_STUB_MODE", True, raising=False)
+
+    out = flow.compute_flow_signals({"XLK": ohlcv_frame_factory(days=80)})
+
+    assert out.loc["XLK", "block_up_ratio"] == 1.0
+    assert out.loc["XLK", "dark_pool_pct"] == 0.40
+    assert out.loc["XLK", "si_delta_15d"] == 0.0
+    assert out.loc["XLK", "thirteen_f_q"] == 0.0
+
+
+def test_provider_seams_fail_closed_to_neutral_values(monkeypatch):
+    monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", False, raising=False)
+    monkeypatch.setattr(flow, "FINRA_ATS_STUB_MODE", False, raising=False)
+    monkeypatch.setattr(flow, "FINRA_SHORT_INTEREST_STUB_MODE", False, raising=False)
+    monkeypatch.setattr(flow, "SEC_13F_STUB_MODE", False, raising=False)
+
+    monkeypatch.setattr(flow, "_provider_block_trade_upside_ratio", lambda ticker: None)
+    monkeypatch.setattr(flow, "_provider_dark_pool_pct", lambda ticker: None)
+    monkeypatch.setattr(
+        flow,
+        "_provider_short_interest_delta_15d",
+        lambda ticker: (_ for _ in ()).throw(flow.requests.Timeout("finra timed out")),
+    )
+    monkeypatch.setattr(flow, "_provider_thirteen_f_net_buys_q", lambda ticker: None)
+
+    assert flow.block_trade_upside_ratio("XLK") == 1.0
+    assert flow.dark_pool_pct("XLK") == 0.40
+    assert flow.short_interest_delta_15d("XLK") == 0.0
+    assert flow.thirteen_f_net_buys_q("XLK") == 0.0
+
+
 def test_etf_primary_flow_returns_neutral_on_provider_request_error(monkeypatch):
     monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", False)
     monkeypatch.setattr(
