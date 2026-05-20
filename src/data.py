@@ -181,15 +181,18 @@ def _fetch_yfinance_ohlcv(
     period: str = "3y",
     interval: str = "1d",
 ) -> dict[str, pd.DataFrame]:
-    raw = yf.download(
-        tickers=tickers,
-        period=period,
-        interval=interval,
-        auto_adjust=False,
-        progress=False,
-        threads=True,
-        group_by="column",
-    )
+    try:
+        raw = yf.download(
+            tickers=tickers,
+            period=period,
+            interval=interval,
+            auto_adjust=False,
+            progress=False,
+            threads=True,
+            group_by="column",
+        )
+    except Exception:
+        return {}
     out: dict[str, pd.DataFrame] = {}
     for t in tickers:
         try:

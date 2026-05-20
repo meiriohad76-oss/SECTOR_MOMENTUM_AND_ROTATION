@@ -78,7 +78,7 @@ def test_fetch_ohlcv_flattens_mocked_yfinance_response(monkeypatch):
 
     monkeypatch.setattr(data.yf, "download", fake_download)
 
-    out = data.fetch_ohlcv(["XLK", "XLK"], period="1y")
+    out = data.fetch_ohlcv(["XLK", "XLK"], period="1y", provider="yfinance")
 
     assert list(out.keys()) == ["XLK"]
     assert list(out["XLK"].columns) == ["open", "high", "low", "close", "volume", "adj_close"]
@@ -156,7 +156,7 @@ def test_fetch_ohlcv_auto_falls_back_to_yfinance_without_massive_key(monkeypatch
 
     monkeypatch.setattr(data.yf, "download", fake_download)
 
-    out = data.fetch_ohlcv(["XLK"], period="1y")
+    out = data.fetch_ohlcv(["XLK"], period="1y", provider="yfinance")
 
     assert list(out.keys()) == ["XLK"]
     assert calls[0]["tickers"] == ["XLK"]
@@ -177,3 +177,38 @@ def test_fetch_ohlcv_massive_returns_empty_on_provider_error(monkeypatch):
     )
 
     assert data.fetch_ohlcv(["XLK"], provider="massive") == {}
+
+
+def test_fetch_ohlcv_yfinance_returns_empty_on_download_error(monkeypatch):
+    def fail_download(**kwargs):
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(data.yf, "download", fail_download)
+
+    assert data.fetch_ohlcv(["XLK"], provider="yfinance") == {}
+
+
+def test_fetch_ohlcv_explicit_yfinance_ignores_massive_environment(monkeypatch):
+    monkeypatch.setenv("OHLCV_PROVIDER", "massive")
+    monkeypatch.setenv("MASSIVE_API_KEY", "secret")
+    dates = pd.bdate_range("2024-01-01", periods=40)
+    columns = pd.MultiIndex.from_product(
+        [["Open", "High", "Low", "Close", "Adj Close", "Volume"], ["XLK"]]
+    )
+    raw = pd.DataFrame(1.0, index=dates, columns=columns)
+
+    def fake_download(**kwargs):
+        return raw
+
+    def fail_get(url, params, headers, timeout):
+        raise AssertionError("explicit yfinance should not call Massive")
+
+    monkeypatch.setattr(data.yf, "download", fake_download)
+    monkeypatch.setattr(
+        data,
+        "requests",
+        SimpleNamespace(get=fail_get, RequestException=RuntimeError),
+        raising=False,
+    )
+
+    assert list(data.fetch_ohlcv(["XLK"], provider="yfinance")) == ["XLK"]

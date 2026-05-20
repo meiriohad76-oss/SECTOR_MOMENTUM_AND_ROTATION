@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -31,6 +32,7 @@ SECTOR_BENCHMARK_TICKERS = [
     "XLC",
 ]
 REQUIRED_TICKERS = sorted({"AGG", "BIL", "SPY", *SECTOR_BENCHMARK_TICKERS})
+DEFAULT_OHLCV_PROVIDER = "auto"
 
 
 def _sha256_bytes(payload: bytes) -> str:
@@ -67,7 +69,8 @@ def _write_artifacts(report: str, equity, required_tickers: list[str]) -> None:
 
 def main() -> int:
     try:
-        ohlcv = fetch_ohlcv(REQUIRED_TICKERS, period="max", provider="auto")
+        provider = os.environ.get("OHLCV_PROVIDER", DEFAULT_OHLCV_PROVIDER)
+        ohlcv = fetch_ohlcv(REQUIRED_TICKERS, period="max", provider=provider)
         prices = backtest.close_matrix_from_ohlcv(ohlcv).loc["2003-01-01":]
     except Exception as exc:
         print(f"Manual backtest data download failed: {exc}")

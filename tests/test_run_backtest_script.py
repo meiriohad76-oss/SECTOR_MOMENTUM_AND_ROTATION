@@ -18,6 +18,7 @@ def test_run_backtest_returns_manual_data_error_when_required_prices_missing(mon
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
+    monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", lambda tickers, period, provider: {})
 
     assert run_backtest.main() == 2
@@ -30,6 +31,7 @@ def test_run_backtest_returns_manual_data_error_when_fetch_raises(monkeypatch, t
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
+    monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
 
     def fail_fetch(tickers, period, provider):
         raise RuntimeError("download failed")
@@ -99,6 +101,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
+    monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
     monkeypatch.setattr(
         run_backtest.backtest,
@@ -164,6 +167,7 @@ def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
+    monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
 
     assert run_backtest.main() == 2
@@ -171,3 +175,20 @@ def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
     assert not run_backtest.REPORT_PATH.exists()
     assert not run_backtest.EQUITY_PATH.exists()
     assert not run_backtest.METADATA_PATH.exists()
+
+
+def test_run_backtest_honors_configured_ohlcv_provider(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_fetch(tickers, period, provider):
+        calls.append(provider)
+        return {}
+
+    monkeypatch.setenv("OHLCV_PROVIDER", "massive")
+    monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
+    monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
+    monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
+
+    assert run_backtest.main() == 2
+    assert calls == ["massive"]
