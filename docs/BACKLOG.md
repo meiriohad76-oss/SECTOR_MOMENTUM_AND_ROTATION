@@ -102,11 +102,12 @@ Each is ~2–4 hours after the integration pattern is set. Flip `STUB_MODE = Fal
 **Controls:** BLUF mode (`Verdict`, `Compact`, `Hidden`), density (`Comfortable`, `Compact`), and sparkline style (`Filled`, `Line`, `Off`).
 **Deferred:** custom floating React-style panel, persisted user profiles, and additional palettes remain future preference work.
 
-### B-026 · Empty + loading state design
-**Spec:** PRODUCT_DESIGN.md §11 mockup priorities 6 and 7.
-**Empty state:** "no picks meet gates — risk-off basket" view, lists which defensive ETFs (TLT/GLD/BIL) the system would rotate to.
-**Loading state:** skeleton bars where cards will appear, no spinning text-spinner.
-**Effort:** ~1 hour each.
+### B-026 · Empty + loading state design — IMPLEMENTED
+**Status:** dashboard-native empty and loading states are implemented in `backlog-stepwise-qa`.
+**Files:** `src/ui_states.py`, `app.py`, `static/style.css`, `tests/test_ui_states.py`, `tests/test_empty_loading_states_static.py`.
+**Empty state:** when no picks meet gates, the `Picks` section shows a risk-off basket focused on `TLT / GLD / BIL`, using scored state/S/F values when available and `DATA PENDING` fallbacks when not.
+**Loading state:** first-page market-data fetch and indicator computation use a temporary inline skeleton placeholder; the old `st.spinner()` wrappers are removed.
+**Deferred:** async fetching, stale-cache banners, provider retry UX, and custom frontend shimmer components remain future reliability/polish work.
 
 ---
 
