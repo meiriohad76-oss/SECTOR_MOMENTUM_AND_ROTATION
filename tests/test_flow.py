@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import io
+import zipfile
 
 import pandas as pd
 import pytest
@@ -477,6 +479,80 @@ def test_dark_pool_pct_uses_finra_provider_when_enabled(monkeypatch):
     )
 
     assert flow.dark_pool_pct("XLK") == pytest.approx(0.25)
+
+
+def test_thirteen_f_net_buys_from_sec_records_uses_cusip_mapping():
+    records = [
+        {"CUSIP": "81369Y100", "REPORTCALENDARORQUARTER": "2025-06-30", "SSHPRNAMT": "1,000"},
+        {"CUSIP": "81369Y100", "REPORTCALENDARORQUARTER": "2025-09-30", "SSHPRNAMT": "1,500"},
+        {"CUSIP": "999999999", "REPORTCALENDARORQUARTER": "2025-09-30", "SSHPRNAMT": "9,999"},
+    ]
+
+    assert flow.thirteen_f_net_buys_from_sec_records(records, ["81369Y100"]) == pytest.approx(50.0)
+
+
+def test_fetch_sec_13f_records_reads_configured_zip(monkeypatch):
+    calls = []
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr(
+            "INFOTABLE.tsv",
+            "ACCESSION_NUMBER\tCUSIP\tREPORTCALENDARORQUARTER\tSSHPRNAMT\n"
+            "0001\t81369Y100\t2025-09-30\t1500\n",
+        )
+
+    class FakeResponse:
+        content = buffer.getvalue()
+
+        def raise_for_status(self):
+            return None
+
+    def fake_get(url, **kwargs):
+        calls.append((url, kwargs))
+        return FakeResponse()
+
+    monkeypatch.setattr(flow.requests, "get", fake_get)
+
+    records = flow._fetch_sec_13f_records(
+        data_url="https://www.sec.gov/files/structureddata/data/form-13f-data-sets/example.zip",
+        user_agent="sector-dashboard test@example.com",
+        timeout=7,
+    )
+
+    assert records == [
+        {
+            "ACCESSION_NUMBER": "0001",
+            "CUSIP": "81369Y100",
+            "REPORTCALENDARORQUARTER": "2025-09-30",
+            "SSHPRNAMT": "1500",
+        }
+    ]
+    assert calls[0][1]["headers"]["User-Agent"] == "sector-dashboard test@example.com"
+    assert calls[0][1]["timeout"] == 7
+
+
+def test_thirteen_f_net_buys_uses_sec_provider_when_enabled(monkeypatch):
+    monkeypatch.setattr(flow, "SEC_13F_STUB_MODE", False, raising=False)
+
+    def fake_secret(name):
+        values = {
+            "SEC_13F_CUSIP_XLK": "81369Y100",
+            "SEC_13F_DATA_URL": "https://example.test/form13f.zip",
+            "SEC_USER_AGENT": "sector-dashboard test@example.com",
+        }
+        return values.get(name)
+
+    monkeypatch.setattr(flow, "_resolve_secret", fake_secret)
+    monkeypatch.setattr(
+        flow,
+        "_fetch_sec_13f_records",
+        lambda data_url=None, user_agent=None, timeout=20: [
+            {"CUSIP": "81369Y100", "REPORTCALENDARORQUARTER": "2025-06-30", "SSHPRNAMT": "1,000"},
+            {"CUSIP": "81369Y100", "REPORTCALENDARORQUARTER": "2025-09-30", "SSHPRNAMT": "1,250"},
+        ],
+    )
+
+    assert flow.thirteen_f_net_buys_q("XLK") == pytest.approx(25.0)
 
 
 def test_etf_primary_flow_returns_neutral_on_provider_request_error(monkeypatch):

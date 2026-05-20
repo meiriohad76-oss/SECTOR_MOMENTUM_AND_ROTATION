@@ -67,7 +67,7 @@ After B-010 establishes the pattern, wire the rest:
 - **B-020a** `block_trade_upside_ratio()` — IMPLEMENTED in `backlog-stepwise-qa`; Massive `/v3/trades`, enabled with `MASSIVE_TRADES_STUB_MODE=false`, neutral on missing key/data/provider errors.
 - **B-020b** `dark_pool_pct()` — IMPLEMENTED in `backlog-stepwise-qa`; FINRA ATS weekly summary, enabled with `FINRA_ATS_STUB_MODE=false`, neutral on missing data/provider errors.
 - **B-020c** `short_interest_delta_15d()` — IMPLEMENTED in `backlog-stepwise-qa`; FINRA consolidated short-interest dataset, enabled with `FINRA_SHORT_INTEREST_STUB_MODE=false`, neutral on missing data/provider errors.
-- **B-020d** `thirteen_f_net_buys_q()` — SEC EDGAR Form 13F-HR (XBRL parsing)
+- **B-020d** `thirteen_f_net_buys_q()` — IMPLEMENTED in `backlog-stepwise-qa`; configured SEC 13F data-set zip plus `SEC_13F_CUSIP_<TICKER>` mapping, enabled with `SEC_13F_STUB_MODE=false`, neutral on missing config/data/provider errors.
 
 Each is ~2–4 hours after the integration pattern is set. Flip `STUB_MODE = False` in `flow.py` when done.
 

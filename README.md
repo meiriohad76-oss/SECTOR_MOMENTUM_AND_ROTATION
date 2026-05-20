@@ -129,7 +129,7 @@ The remaining provider seams have independent safety flags. Leave each unset/`tr
 - `block_trade_upside_ratio()` → Massive `/v3/trades`; enable with `MASSIVE_TRADES_STUB_MODE=false`
 - `dark_pool_pct()` → FINRA ATS weekly summary; enable with `FINRA_ATS_STUB_MODE=false`
 - `short_interest_delta_15d()` → FINRA consolidated short interest; enable with `FINRA_SHORT_INTEREST_STUB_MODE=false`
-- `thirteen_f_net_buys_q()` → SEC EDGAR Form 13F-HR quarterly (free, T+45)
+- `thirteen_f_net_buys_q()` → configured SEC Form 13F data-set zip plus `SEC_13F_CUSIP_<TICKER>` mapping; enable with `SEC_13F_STUB_MODE=false`
 
 ## Methodology references
 

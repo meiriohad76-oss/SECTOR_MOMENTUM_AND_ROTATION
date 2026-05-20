@@ -12,6 +12,7 @@ import io
 import json
 import os
 import re
+import zipfile
 from dataclasses import dataclass
 from typing import Iterable, Optional
 
@@ -565,7 +566,78 @@ def short_interest_delta_15d(ticker):
 
 
 def _provider_thirteen_f_net_buys_q(ticker) -> Optional[float]:
-    return None
+    cusips = _sec_13f_cusips_for_ticker(ticker)
+    if not cusips:
+        return None
+    return thirteen_f_net_buys_from_sec_records(_fetch_sec_13f_records(), cusips)
+
+
+def _sec_13f_cusips_for_ticker(ticker: str) -> list[str]:
+    value = _resolve_secret(f"SEC_13F_CUSIP_{str(ticker).upper().replace('-', '_')}")
+    if not value:
+        return []
+    return [item.strip().upper() for item in str(value).split(",") if item.strip()]
+
+
+def _sec_record_period_key(record: dict):
+    return _date_sort_key(
+        str(_pick(record, ["REPORTCALENDARORQUARTER", "reportCalendarOrQuarter", "periodOfReport", "period"]) or "")
+    )
+
+
+def thirteen_f_net_buys_from_sec_records(records: list[dict], cusips: list[str]) -> Optional[float]:
+    wanted = {cusip.upper().replace(" ", "") for cusip in cusips}
+    rows = []
+    for record in records:
+        cusip = str(_pick(record, ["CUSIP", "cusip"]) or "").upper().replace(" ", "")
+        if cusip not in wanted:
+            continue
+        shares = _parse_float(_pick(record, ["SSHPRNAMT", "sshPrnamt", "shares", "value"]))
+        if shares is None:
+            continue
+        rows.append((_sec_record_period_key(record), shares))
+    if len(rows) < 2:
+        return None
+    totals: dict[tuple, float] = {}
+    for period_key, shares in rows:
+        totals[period_key] = totals.get(period_key, 0.0) + shares
+    if len(totals) < 2:
+        return None
+    ordered_periods = sorted(totals)
+    previous = totals[ordered_periods[-2]]
+    latest = totals[ordered_periods[-1]]
+    if previous == 0:
+        return None
+    return (latest - previous) / previous * 100.0
+
+
+def _records_from_tsv(payload: str) -> list[dict]:
+    reader = csv.DictReader(io.StringIO(payload), delimiter="\t")
+    return [row for row in reader] if reader.fieldnames else []
+
+
+def _fetch_sec_13f_records(
+    data_url: Optional[str] = None,
+    user_agent: Optional[str] = None,
+    timeout: int = 20,
+) -> list[dict]:
+    url = data_url or _resolve_secret("SEC_13F_DATA_URL")
+    agent = user_agent or _resolve_secret("SEC_USER_AGENT")
+    if not url or not agent:
+        return []
+    response = requests.get(url, headers={"User-Agent": agent}, timeout=timeout)
+    response.raise_for_status()
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        for name in archive.namelist():
+            upper = name.upper()
+            if "INFOTABLE" not in upper or not upper.endswith((".TSV", ".TXT", ".CSV")):
+                continue
+            raw = archive.read(name).decode("utf-8-sig")
+            if upper.endswith(".CSV"):
+                reader = csv.DictReader(io.StringIO(raw))
+                return [row for row in reader] if reader.fieldnames else []
+            return _records_from_tsv(raw)
+    return []
 
 
 def thirteen_f_net_buys_q(ticker):
