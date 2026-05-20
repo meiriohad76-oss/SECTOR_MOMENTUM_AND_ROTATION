@@ -30,7 +30,7 @@ Manual backtest smoke run:
 python scripts/run_backtest.py
 ```
 
-The manual runner uses `OHLCV_PROVIDER=auto`: it prefers Massive aggregate bars when `MASSIVE_API_KEY` is configured and falls back to yfinance otherwise. Set `OHLCV_PROVIDER=massive` to force Massive historical bars, or `OHLCV_PROVIDER=yfinance` to force the free default.
+The manual runner uses `OHLCV_PROVIDER=auto`: it prefers Massive aggregate bars when `MASSIVE_API_KEY` is configured and falls back to yfinance otherwise. Set `OHLCV_PROVIDER=massive` to force Massive historical bars, or `OHLCV_PROVIDER=yfinance` to force the free default. Keep `MASSIVE_VERIFY_SSL=true` unless a local certificate store blocks manual smoke testing; `MASSIVE_VERIFY_SSL=false` is an explicit troubleshooting override, not a production setting.
 
 The runner writes `docs/backtest_report.md` when market data downloads successfully. Treat that report as manual evidence, not a replacement for the deterministic test suite.
 The report uses the historical methodology target builder as the strategy path, then compares it with 60/40 and equal-weight sector benchmarks. It includes strategy metrics, benchmark comparison, 3/5/10 bps cost sensitivity, in-sample / out-of-sample metrics, and acceptance-gate status with the evidence/rule behind each gate. Acceptance gates use out-of-sample metrics by default, with 2015-01-01 as the current OOS boundary. The runner also writes `docs/backtest_equity.csv` plus `docs/backtest_metadata.json`; the dashboard's Backtest Lab section displays the report and plots that equity artifact only when the metadata hashes match the artifact files. It is still a manual smoke artifact until the full historical methodology simulation is completed.

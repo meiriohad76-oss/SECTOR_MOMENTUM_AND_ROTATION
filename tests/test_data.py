@@ -90,6 +90,7 @@ def test_fetch_ohlcv_flattens_mocked_yfinance_response(monkeypatch):
 def test_fetch_ohlcv_can_use_massive_aggregate_bars(monkeypatch):
     monkeypatch.setenv("OHLCV_PROVIDER", "massive")
     monkeypatch.setenv("MASSIVE_API_KEY", "secret")
+    monkeypatch.setenv("MASSIVE_VERIFY_SSL", "true")
     calls = []
     base = pd.Timestamp("2024-01-01", tz="UTC")
     results = [
@@ -111,13 +112,14 @@ def test_fetch_ohlcv_can_use_massive_aggregate_bars(monkeypatch):
         def json(self):
             return {"results": results}
 
-    def fake_get(url, params, headers, timeout):
+    def fake_get(url, params, headers, timeout, verify=None):
         calls.append(
             {
                 "url": url,
                 "params": params,
                 "headers": headers,
                 "timeout": timeout,
+                "verify": verify,
             }
         )
         return FakeResponse()
@@ -135,9 +137,51 @@ def test_fetch_ohlcv_can_use_massive_aggregate_bars(monkeypatch):
     assert calls[0]["url"].startswith("https://api.massive.com/v2/aggs/ticker/XLK/range/1/day/")
     assert calls[0]["params"] == {"adjusted": "true", "sort": "asc", "limit": 50000}
     assert calls[0]["headers"] == {"Authorization": "Bearer secret"}
+    assert calls[0]["verify"] is True
     assert list(out["XLK"].columns) == ["open", "high", "low", "close", "volume", "adj_close"]
     assert len(out["XLK"]) == 40
     assert out["XLK"]["adj_close"].iloc[0] == 100.5
+
+
+def test_fetch_ohlcv_massive_can_disable_ssl_verification(monkeypatch):
+    monkeypatch.setenv("MASSIVE_API_KEY", "secret")
+    monkeypatch.setenv("MASSIVE_VERIFY_SSL", "false")
+    calls = []
+    base = pd.Timestamp("2024-01-01", tz="UTC")
+    results = [
+        {
+            "t": int((base + pd.Timedelta(days=idx)).timestamp() * 1000),
+            "o": 100.0 + idx,
+            "h": 101.0 + idx,
+            "l": 99.0 + idx,
+            "c": 100.5 + idx,
+            "v": 1_000_000 + idx,
+        }
+        for idx in range(40)
+    ]
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"results": results}
+
+    def fake_get(url, params, headers, timeout, verify=None):
+        calls.append({"verify": verify})
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        data,
+        "requests",
+        SimpleNamespace(get=fake_get, RequestException=RuntimeError),
+        raising=False,
+    )
+
+    out = data.fetch_ohlcv(["XLK"], provider="massive")
+
+    assert list(out) == ["XLK"]
+    assert calls[0]["verify"] is False
 
 
 def test_fetch_ohlcv_auto_falls_back_to_yfinance_without_massive_key(monkeypatch):
@@ -165,8 +209,9 @@ def test_fetch_ohlcv_auto_falls_back_to_yfinance_without_massive_key(monkeypatch
 
 def test_fetch_ohlcv_massive_returns_empty_on_provider_error(monkeypatch):
     monkeypatch.setenv("MASSIVE_API_KEY", "secret")
+    monkeypatch.setenv("MASSIVE_VERIFY_SSL", "true")
 
-    def fail_get(url, params, headers, timeout):
+    def fail_get(url, params, headers, timeout, verify=None):
         raise RuntimeError("provider unavailable")
 
     monkeypatch.setattr(

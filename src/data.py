@@ -33,8 +33,10 @@ def _resolve_secret(name: str) -> str | None:
         if hasattr(st, "secrets"):
             try:
                 secret = st.secrets.get(name)
-                if secret:
-                    return str(secret).strip()
+                if secret is not None:
+                    text = str(secret).strip()
+                    if text:
+                        return text
             except (KeyError, StreamlitSecretNotFoundError):
                 pass
     except ImportError:
@@ -77,6 +79,24 @@ def _massive_interval(interval: str) -> tuple[int, str]:
     if normalized in {"1d", "1day", "day"}:
         return 1, "day"
     raise ValueError(f"Unsupported Massive OHLCV interval: {interval}")
+
+
+def _massive_ssl_verify_setting() -> bool | None:
+    configured = _resolve_secret("MASSIVE_VERIFY_SSL")
+    if configured is None:
+        return None
+    normalized = configured.strip().lower()
+    if normalized in {"0", "false", "no", "off"}:
+        try:
+            import urllib3
+
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        except ImportError:
+            pass
+        return False
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    return None
 
 
 def _flatten(df: pd.DataFrame, ticker: str) -> pd.DataFrame:
@@ -158,12 +178,15 @@ def _fetch_massive_ohlcv(
             to_date=to_date,
         )
         try:
-            response = requests.get(
-                url,
-                params={"adjusted": "true", "sort": "asc", "limit": 50000},
-                headers={"Authorization": f"Bearer {token}"},
-                timeout=30,
-            )
+            request_options = {
+                "params": {"adjusted": "true", "sort": "asc", "limit": 50000},
+                "headers": {"Authorization": f"Bearer {token}"},
+                "timeout": 30,
+            }
+            verify = _massive_ssl_verify_setting()
+            if verify is not None:
+                request_options["verify"] = verify
+            response = requests.get(url, **request_options)
             response.raise_for_status()
             payload = response.json()
         except (requests.RequestException, ValueError):
