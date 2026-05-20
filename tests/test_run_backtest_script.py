@@ -18,7 +18,7 @@ def test_run_backtest_returns_manual_data_error_when_required_prices_missing(mon
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
-    monkeypatch.setattr(run_backtest, "fetch_ohlcv", lambda tickers, period: {})
+    monkeypatch.setattr(run_backtest, "fetch_ohlcv", lambda tickers, period, provider: {})
 
     assert run_backtest.main() == 2
     assert not run_backtest.REPORT_PATH.exists()
@@ -31,7 +31,7 @@ def test_run_backtest_returns_manual_data_error_when_fetch_raises(monkeypatch, t
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
 
-    def fail_fetch(tickers, period):
+    def fail_fetch(tickers, period, provider):
         raise RuntimeError("download failed")
 
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fail_fetch)
@@ -62,8 +62,8 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     ]
     target_builder_calls = []
 
-    def fake_fetch(tickers, period):
-        calls.append((tickers, period))
+    def fake_fetch(tickers, period, provider):
+        calls.append((tickers, period, provider))
         return {
             "AGG": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0002),
             "BIL": ohlcv_frame_factory(days=40, start_price=90.0, daily_return=0.0001),
@@ -107,7 +107,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     )
 
     assert run_backtest.main() == 0
-    assert calls == [(expected_tickers, "max")]
+    assert calls == [(expected_tickers, "max", "auto")]
     assert target_builder_calls
     assert target_builder_calls[0]["tickers"] == expected_tickers
     assert target_builder_calls[0]["phase"] == "MID"
@@ -154,8 +154,8 @@ def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
         "XLY",
     ]
 
-    def fake_fetch(tickers, period):
-        calls.append((tickers, period))
+    def fake_fetch(tickers, period, provider):
+        calls.append((tickers, period, provider))
         return {
             "AGG": ohlcv_frame_factory(days=1, start_price=100.0, daily_return=0.0002),
             "SPY": ohlcv_frame_factory(days=1, start_price=100.0, daily_return=0.001),
@@ -167,7 +167,7 @@ def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
 
     assert run_backtest.main() == 2
-    assert calls == [(expected_tickers, "max")]
+    assert calls == [(expected_tickers, "max", "auto")]
     assert not run_backtest.REPORT_PATH.exists()
     assert not run_backtest.EQUITY_PATH.exists()
     assert not run_backtest.METADATA_PATH.exists()

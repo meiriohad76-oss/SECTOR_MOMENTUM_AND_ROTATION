@@ -67,7 +67,7 @@ def _write_artifacts(report: str, equity, required_tickers: list[str]) -> None:
 
 def main() -> int:
     try:
-        ohlcv = fetch_ohlcv(REQUIRED_TICKERS, period="max")
+        ohlcv = fetch_ohlcv(REQUIRED_TICKERS, period="max", provider="auto")
         prices = backtest.close_matrix_from_ohlcv(ohlcv).loc["2003-01-01":]
     except Exception as exc:
         print(f"Manual backtest data download failed: {exc}")

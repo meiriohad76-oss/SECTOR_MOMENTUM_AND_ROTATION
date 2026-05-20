@@ -16,7 +16,7 @@ A Streamlit dashboard that monitors **67+ ETFs across US sectors, US industries,
   - **Below:** drill-down tabs — RRG quadrant chart, cross-sectional momentum bar, institutional flow detail, state-machine transition log, per-ticker deep dive with price/CMF/OBV charts.
 - A **persistent state machine** (`state.json`) so bearish transitions trigger only once and stay visible across sessions.
 - A **bearish alert system** with three severity levels (WARNING → EXIT → BEARISH) plus three flow-only early warnings (distribution day, dark-pool sell, OBV/price divergence).
-- **No paid feeds required for v1** — runs entirely on free Yahoo Finance data. Institutional-flow stubs ship pre-wired so you can drop in iShares SHO, Massive, FINRA, or SEC EDGAR feeds when ready.
+- **No paid feeds required for v1** — defaults to free Yahoo Finance data. Historical OHLCV can use Massive when `MASSIVE_API_KEY` is configured, and institutional-flow stubs ship pre-wired so you can drop in iShares SHO, Massive, FINRA, or SEC EDGAR feeds when ready.
 
 ## Backtest harness
 
@@ -24,11 +24,13 @@ B-011 adds a pure pandas/numpy backtest accounting core in `src/backtest.py`. Th
 
 The historical target builder accepts preloaded OHLCV, slices each rebalance snapshot through the rebalance date, scores it with pure `src/` modules, converts selected tickers into equal target weights, and records per-ticker states via `decide_state()` without calling `apply_state_machine()` or writing `state.json`. Provider-backed ETF flow is forced neutral in this historical path until as-of provider snapshots exist, so the builder stays OHLCV-only and avoids current-data leakage.
 
-Manual yfinance smoke run:
+Manual backtest smoke run:
 
 ```powershell
 python scripts/run_backtest.py
 ```
+
+The manual runner uses `OHLCV_PROVIDER=auto`: it prefers Massive aggregate bars when `MASSIVE_API_KEY` is configured and falls back to yfinance otherwise. Set `OHLCV_PROVIDER=massive` to force Massive historical bars, or `OHLCV_PROVIDER=yfinance` to force the free default.
 
 The runner writes `docs/backtest_report.md` when market data downloads successfully. Treat that report as manual evidence, not a replacement for the deterministic test suite.
 The report uses the historical methodology target builder as the strategy path, then compares it with 60/40 and equal-weight sector benchmarks. It includes strategy metrics, benchmark comparison, 3/5/10 bps cost sensitivity, and acceptance-gate status. The runner also writes `docs/backtest_equity.csv` plus `docs/backtest_metadata.json`; the dashboard's Backtest Lab section displays the report and plots that equity artifact only when the metadata hashes match the artifact files. It is still a manual smoke artifact until the full historical methodology simulation is completed.
@@ -84,7 +86,7 @@ sector-rotation-dashboard/
 ├── run-diagnostic.bat              <- Windows verbose launcher
 ├── src/
 │   ├── universe.py                 <- 67+ tickers grouped by class
-│   ├── data.py                     <- yfinance ingestion (daily/weekly/monthly resample)
+│   ├── data.py                     <- OHLCV ingestion: yfinance default, Massive optional
 │   ├── indicators.py               <- Pillars 1-5 + breadth
 │   ├── flow.py                     <- Pillar 7: CMF/OBV/MFI/RVOL + 5 stubs
 │   ├── macro.py                    <- Pillar 6: Faber + yield curve
@@ -107,7 +109,7 @@ sector-rotation-dashboard/
 
 | # | Pillar | Status | Notes |
 |---|--------|--------|-------|
-| 1 | Cross-sectional 12-1 momentum | **LIVE** | yfinance daily bars |
+| 1 | Cross-sectional 12-1 momentum | **LIVE** | yfinance daily bars by default; Massive aggregate bars optional |
 | 2 | Faber 10-month SMA | **LIVE** | monthly resample |
 | 3 | Weinstein Stage 2 (30wMA + Mansfield RS) | **LIVE** | weekly resample |
 | 4 | Antonacci dual momentum | **LIVE** | vs BIL T-bill ETF |
