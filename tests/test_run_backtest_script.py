@@ -1,21 +1,32 @@
 from __future__ import annotations
 
+import json
+
 from scripts import run_backtest
+
+
+def test_run_backtest_artifact_paths_are_repo_root_anchored():
+    assert run_backtest.REPORT_PATH == run_backtest.ROOT / "docs" / "backtest_report.md"
+    assert run_backtest.EQUITY_PATH == run_backtest.ROOT / "docs" / "backtest_equity.csv"
+    assert run_backtest.METADATA_PATH == run_backtest.ROOT / "docs" / "backtest_metadata.json"
 
 
 def test_run_backtest_returns_manual_data_error_when_required_prices_missing(monkeypatch, tmp_path):
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", lambda tickers, period: {})
 
     assert run_backtest.main() == 2
     assert not run_backtest.REPORT_PATH.exists()
     assert not run_backtest.EQUITY_PATH.exists()
+    assert not run_backtest.METADATA_PATH.exists()
 
 
 def test_run_backtest_returns_manual_data_error_when_fetch_raises(monkeypatch, tmp_path):
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
 
     def fail_fetch(tickers, period):
         raise RuntimeError("download failed")
@@ -25,6 +36,7 @@ def test_run_backtest_returns_manual_data_error_when_fetch_raises(monkeypatch, t
     assert run_backtest.main() == 2
     assert not run_backtest.REPORT_PATH.exists()
     assert not run_backtest.EQUITY_PATH.exists()
+    assert not run_backtest.METADATA_PATH.exists()
 
 
 def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp_path, ohlcv_frame_factory):
@@ -65,6 +77,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
 
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
 
     assert run_backtest.main() == 0
@@ -79,6 +92,11 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     equity = run_backtest.EQUITY_PATH.read_text(encoding="utf-8")
     assert "60/40 SPY/AGG" in equity
     assert "Equal-weight sectors" in equity
+    assert run_backtest.METADATA_PATH.exists()
+    metadata = json.loads(run_backtest.METADATA_PATH.read_text(encoding="utf-8"))
+    assert metadata["report_sha256"] == run_backtest._sha256_bytes(run_backtest.REPORT_PATH.read_bytes())
+    assert metadata["equity_sha256"] == run_backtest._sha256_bytes(run_backtest.EQUITY_PATH.read_bytes())
+    assert metadata["required_tickers"] == expected_tickers
 
 
 def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
@@ -112,9 +130,11 @@ def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
 
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
 
     assert run_backtest.main() == 2
     assert calls == [(expected_tickers, "max")]
     assert not run_backtest.REPORT_PATH.exists()
     assert not run_backtest.EQUITY_PATH.exists()
+    assert not run_backtest.METADATA_PATH.exists()

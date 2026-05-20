@@ -4,6 +4,8 @@ Run with: streamlit run app.py
 """
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -261,10 +263,12 @@ st.set_page_config(
 
 # =============================== load css ========================================
 
-_STATIC = Path(__file__).resolve().parent / "static"
+APP_ROOT = Path(__file__).resolve().parent
+_STATIC = APP_ROOT / "static"
 _CSS = (_STATIC / "style.css").read_text(encoding="utf-8")
-BACKTEST_REPORT_PATH = Path("docs/backtest_report.md")
-BACKTEST_EQUITY_PATH = Path("docs/backtest_equity.csv")
+BACKTEST_REPORT_PATH = APP_ROOT / "docs" / "backtest_report.md"
+BACKTEST_EQUITY_PATH = APP_ROOT / "docs" / "backtest_equity.csv"
+BACKTEST_METADATA_PATH = APP_ROOT / "docs" / "backtest_metadata.json"
 
 # Streamlit-specific overrides on top of the design CSS
 _EXTRA = """
@@ -1168,6 +1172,22 @@ def render_portfolio_analyzer():
         _render_portfolio_analysis(_portfolio_result_from_upload(uploaded))
 
 
+def _load_backtest_metadata():
+    if not BACKTEST_METADATA_PATH.exists():
+        return None
+    try:
+        return json.loads(BACKTEST_METADATA_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _artifact_hash_matches(path: Path, expected_hash: str | None) -> bool:
+    if not path.exists() or not expected_hash:
+        return False
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    return digest == expected_hash
+
+
 def render_backtest_lab():
     _md(
         """
@@ -1180,7 +1200,21 @@ def render_backtest_lab():
         """
     )
 
-    if BACKTEST_REPORT_PATH.exists():
+    metadata = _load_backtest_metadata()
+    report_ready = bool(
+        metadata
+        and _artifact_hash_matches(BACKTEST_REPORT_PATH, metadata.get("report_sha256"))
+    )
+    equity_ready = bool(
+        metadata
+        and _artifact_hash_matches(BACKTEST_EQUITY_PATH, metadata.get("equity_sha256"))
+    )
+
+    if metadata:
+        generated_at = metadata.get("generated_at_utc", "unknown")
+        _md(f'<div class="chart-help"><b>Artifact set:</b> generated at <code>{_esc(str(generated_at))}</code>.</div>')
+
+    if report_ready:
         with st.expander("Manual backtest report", expanded=False):
             st.markdown(BACKTEST_REPORT_PATH.read_text(encoding="utf-8"))
     else:
@@ -1195,7 +1229,7 @@ def render_backtest_lab():
             """
         )
 
-    if BACKTEST_EQUITY_PATH.exists():
+    if equity_ready:
         try:
             equity = pd.read_csv(BACKTEST_EQUITY_PATH, index_col="date", parse_dates=True)
         except Exception as exc:

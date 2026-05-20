@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+import json
 from pathlib import Path
 import sys
 
@@ -12,8 +14,9 @@ from src import backtest
 from src.data import fetch_ohlcv
 
 
-REPORT_PATH = Path("docs/backtest_report.md")
-EQUITY_PATH = Path("docs/backtest_equity.csv")
+REPORT_PATH = ROOT / "docs" / "backtest_report.md"
+EQUITY_PATH = ROOT / "docs" / "backtest_equity.csv"
+METADATA_PATH = ROOT / "docs" / "backtest_metadata.json"
 SECTOR_BENCHMARK_TICKERS = [
     "XLK",
     "XLF",
@@ -28,6 +31,38 @@ SECTOR_BENCHMARK_TICKERS = [
     "XLC",
 ]
 REQUIRED_TICKERS = sorted({"AGG", "SPY", *SECTOR_BENCHMARK_TICKERS})
+
+
+def _sha256_bytes(payload: bytes) -> str:
+    import hashlib
+
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _replace_bytes(path: Path, payload: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(path.name + ".tmp")
+    tmp_path.write_bytes(payload)
+    tmp_path.replace(path)
+
+
+def _write_artifacts(report: str, equity, required_tickers: list[str]) -> None:
+    report_bytes = report.encode("utf-8")
+    equity_csv = equity.to_csv()
+    equity_bytes = equity_csv.encode("utf-8")
+    metadata = {
+        "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "report_sha256": _sha256_bytes(report_bytes),
+        "equity_sha256": _sha256_bytes(equity_bytes),
+        "required_tickers": required_tickers,
+        "equity_rows": int(len(equity)),
+        "equity_columns": list(equity.columns),
+    }
+
+    metadata_bytes = (json.dumps(metadata, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    _replace_bytes(REPORT_PATH, report_bytes)
+    _replace_bytes(EQUITY_PATH, equity_bytes)
+    _replace_bytes(METADATA_PATH, metadata_bytes)
 
 
 def main() -> int:
@@ -80,8 +115,7 @@ def main() -> int:
                 "Equal-weight sectors": sector_result,
             }
         )
-        REPORT_PATH.write_text(report, encoding="utf-8")
-        equity.to_csv(EQUITY_PATH)
+        _write_artifacts(report, equity, REQUIRED_TICKERS)
     except Exception as exc:
         print(f"Manual backtest data validation failed: {exc}")
         return 2
