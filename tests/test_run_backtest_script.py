@@ -23,22 +23,53 @@ def test_run_backtest_returns_manual_data_error_when_fetch_raises(monkeypatch, t
     assert not run_backtest.REPORT_PATH.exists()
 
 
-def test_run_backtest_fetches_required_smoke_tickers_only(monkeypatch, tmp_path, ohlcv_frame_factory):
+def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp_path, ohlcv_frame_factory):
     calls = []
+    expected_tickers = [
+        "AGG",
+        "SPY",
+        "XLB",
+        "XLC",
+        "XLE",
+        "XLF",
+        "XLI",
+        "XLK",
+        "XLP",
+        "XLRE",
+        "XLU",
+        "XLV",
+        "XLY",
+    ]
 
     def fake_fetch(tickers, period):
         calls.append((tickers, period))
         return {
             "AGG": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0002),
             "SPY": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.001),
+            "XLB": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0004),
+            "XLC": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0005),
+            "XLE": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0006),
+            "XLF": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0007),
+            "XLI": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0008),
+            "XLK": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0009),
+            "XLP": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0003),
+            "XLRE": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0002),
+            "XLU": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0001),
+            "XLV": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0005),
+            "XLY": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0006),
         }
 
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
 
     assert run_backtest.main() == 0
-    assert calls == [(["AGG", "SPY"], "max")]
+    assert calls == [(expected_tickers, "max")]
     assert run_backtest.REPORT_PATH.exists()
+    report = run_backtest.REPORT_PATH.read_text(encoding="utf-8")
+    assert "## Benchmark Comparison" in report
+    assert "60/40 SPY/AGG" in report
+    assert "Equal-weight sectors" in report
+    assert "## Cost Sensitivity" in report
 
 
 def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
@@ -47,6 +78,21 @@ def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
     ohlcv_frame_factory,
 ):
     calls = []
+    expected_tickers = [
+        "AGG",
+        "SPY",
+        "XLB",
+        "XLC",
+        "XLE",
+        "XLF",
+        "XLI",
+        "XLK",
+        "XLP",
+        "XLRE",
+        "XLU",
+        "XLV",
+        "XLY",
+    ]
 
     def fake_fetch(tickers, period):
         calls.append((tickers, period))
@@ -59,5 +105,5 @@ def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
 
     assert run_backtest.main() == 2
-    assert calls == [(["AGG", "SPY"], "max")]
+    assert calls == [(expected_tickers, "max")]
     assert not run_backtest.REPORT_PATH.exists()
