@@ -382,3 +382,100 @@ def test_format_gate_report_includes_pass_fail_lines():
     assert "Out-of-sample Sharpe: PASS" in text
     assert "Max drawdown: PASS" in text
     assert "Overall: PASS" in text
+
+
+def test_build_historical_methodology_targets_slices_inputs_without_lookahead():
+    dates = pd.bdate_range("2024-01-01", periods=8)
+    ohlcv = {
+        "AAA": pd.DataFrame({"close": range(100, 108)}, index=dates),
+        "BBB": pd.DataFrame({"close": range(200, 208)}, index=dates),
+        "SPY": pd.DataFrame({"close": range(300, 308)}, index=dates),
+        "BIL": pd.DataFrame({"close": range(400, 408)}, index=dates),
+    }
+    rebalance_dates = pd.DatetimeIndex([dates[4], dates[7]])
+    observed_max_dates = []
+
+    def fake_score_snapshot(snapshot_ohlcv, phase, bench_ticker, bil_ticker):
+        del phase, bench_ticker, bil_ticker
+        max_date = max(frame.index.max() for frame in snapshot_ohlcv.values())
+        observed_max_dates.append(max_date)
+        select_aaa = max_date == dates[4]
+        return pd.DataFrame(
+            {
+                "selected": [select_aaa, not select_aaa],
+                "stage": [2, 4],
+                "above_30wma": [True, False],
+                "ma_slope_pos": [True, False],
+                "mansfield_rs": [1.0, -1.0],
+                "antonacci": [1, 0],
+                "rrg_quadrant": ["Leading", "Lagging"],
+                "breadth_50d": [0.70, 0.30],
+                "cmf21": [0.10, -0.20],
+                "rvol": [1.2, 1.1],
+                "etf_flow_5d_pct": [0.2, -2.0],
+                "block_up_ratio": [1.1, 0.6],
+                "obv_divergence": [False, True],
+                "dist_days_25": [0, 5],
+            },
+            index=["AAA", "BBB"],
+        )
+
+    result = backtest.build_historical_methodology_targets(
+        ohlcv,
+        rebalance_dates=rebalance_dates,
+        score_snapshot_fn=fake_score_snapshot,
+        phase="MID",
+    )
+
+    assert observed_max_dates == [dates[4], dates[7]]
+    assert result.target_weights.loc[dates[4]].to_dict() == pytest.approx({"AAA": 1.0, "BBB": 0.0})
+    assert result.target_weights.loc[dates[7]].to_dict() == pytest.approx({"AAA": 0.0, "BBB": 1.0})
+    assert result.states.loc[dates[4], "AAA"] == "STAGE_2_BULLISH"
+    assert result.states.loc[dates[4], "BBB"] == "BEARISH_STAGE_4"
+
+
+def test_build_historical_methodology_targets_uses_pure_scoring_without_state_writes(
+    monkeypatch,
+    market_ohlcv,
+):
+    from src import scoring
+
+    def fail_apply_state_machine(scored_df):
+        raise AssertionError("historical backtest must not write state.json")
+
+    monkeypatch.setattr(scoring, "apply_state_machine", fail_apply_state_machine)
+    last_date = market_ohlcv["SPY"].index[-1]
+
+    result = backtest.build_historical_methodology_targets(
+        market_ohlcv,
+        rebalance_dates=[last_date],
+        phase="MID",
+    )
+
+    assert result.target_weights.index.tolist() == [last_date]
+    assert "SPY" not in result.target_weights.columns
+    assert set(result.states.index) == {last_date}
+
+
+def test_historical_methodology_targets_do_not_fetch_provider_flow(
+    monkeypatch,
+    market_ohlcv,
+):
+    from src import flow
+
+    monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", False)
+
+    def fail_fetch(ticker):
+        raise AssertionError("historical target building must stay OHLCV-only")
+
+    monkeypatch.setattr(flow, "_fetch_primary_flow_payload", fail_fetch)
+    last_date = market_ohlcv["SPY"].index[-1]
+
+    result = backtest.build_historical_methodology_targets(
+        market_ohlcv,
+        rebalance_dates=[last_date],
+        phase="MID",
+    )
+
+    assert result.target_weights.index.tolist() == [last_date]
+    assert flow.ETF_PRIMARY_FLOW_STUB_MODE is False

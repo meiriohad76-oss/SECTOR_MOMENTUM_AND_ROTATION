@@ -6,7 +6,7 @@ writes. It accepts already-loaded prices and target weights.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
 import pandas as pd
@@ -26,6 +26,16 @@ class BacktestResult:
     net_returns: pd.Series
     equity: pd.Series
     metrics: dict[str, float]
+
+
+@dataclass(frozen=True)
+class HistoricalSignalTargets:
+    target_weights: pd.DataFrame
+    states: pd.DataFrame
+    snapshots: dict[pd.Timestamp, pd.DataFrame]
+
+
+ScoreSnapshotFn = Callable[[dict[str, pd.DataFrame], str, str, str], pd.DataFrame]
 
 
 def _finite_scalar(name: str, value) -> float:
@@ -386,6 +396,94 @@ def target_weights_from_scores(scored_df: pd.DataFrame) -> pd.Series:
         return pd.Series(dtype=float)
     weight = 1.0 / len(selected)
     return pd.Series(weight, index=selected.index, dtype=float).sort_index()
+
+
+def methodology_score_snapshot(
+    ohlcv: dict[str, pd.DataFrame],
+    phase: str = "MID",
+    bench_ticker: str = "SPY",
+    bil_ticker: str = "BIL",
+) -> pd.DataFrame:
+    """Score one historical snapshot without importing app.py or writing state."""
+    from . import flow, indicators, scoring
+
+    indicators_df = indicators.compute_all_indicators(
+        ohlcv,
+        bench_ticker=bench_ticker,
+        bil_ticker=bil_ticker,
+    )
+    prior_primary_flow_mode = flow.ETF_PRIMARY_FLOW_STUB_MODE
+    flow.ETF_PRIMARY_FLOW_STUB_MODE = True
+    try:
+        flow_df = flow.compute_flow_signals(ohlcv).reindex(indicators_df.index)
+    finally:
+        flow.ETF_PRIMARY_FLOW_STUB_MODE = prior_primary_flow_mode
+    flow_z = flow.flow_composite_z(flow_df)
+    return scoring.compute_composite(indicators_df, flow_df, flow_z, phase)
+
+
+def _slice_ohlcv_through_date(
+    ohlcv: dict[str, pd.DataFrame],
+    as_of: pd.Timestamp,
+) -> dict[str, pd.DataFrame]:
+    snapshot = {}
+    for ticker, frame in ohlcv.items():
+        sliced = frame.copy()
+        sliced.index = pd.to_datetime(sliced.index)
+        sliced = sliced.sort_index()
+        snapshot[ticker] = sliced.loc[sliced.index <= as_of].copy()
+    return snapshot
+
+
+def build_historical_methodology_targets(
+    ohlcv: dict[str, pd.DataFrame],
+    rebalance_dates: Optional[list[pd.Timestamp] | pd.DatetimeIndex] = None,
+    score_snapshot_fn: Optional[ScoreSnapshotFn] = None,
+    phase: str = "MID",
+    bench_ticker: str = "SPY",
+    bil_ticker: str = "BIL",
+) -> HistoricalSignalTargets:
+    prices = close_matrix_from_ohlcv(ohlcv)
+    if prices.empty:
+        raise ValueError("ohlcv must contain at least one close price series")
+    if rebalance_dates is None:
+        rebalance_index = weekly_rebalance_dates(prices)
+    else:
+        rebalance_index = pd.DatetimeIndex(pd.to_datetime(rebalance_dates))
+    rebalance_index = pd.DatetimeIndex(sorted(rebalance_index.unique()))
+    missing_dates = rebalance_index.difference(prices.index)
+    if len(missing_dates):
+        raise ValueError("rebalance_dates must exist in close prices")
+
+    scorer = score_snapshot_fn or methodology_score_snapshot
+    from . import scoring
+
+    weight_rows = []
+    state_rows = []
+    snapshots: dict[pd.Timestamp, pd.DataFrame] = {}
+    for as_of in rebalance_index:
+        snapshot_ohlcv = _slice_ohlcv_through_date(ohlcv, as_of)
+        scored = scorer(snapshot_ohlcv, phase, bench_ticker, bil_ticker).copy()
+        snapshots[pd.Timestamp(as_of)] = scored.copy()
+
+        weights = target_weights_from_scores(scored)
+        weights.name = as_of
+        weight_rows.append(weights)
+
+        states = pd.Series(
+            {ticker: scoring.decide_state(row) for ticker, row in scored.iterrows()},
+            name=as_of,
+            dtype=object,
+        )
+        state_rows.append(states)
+
+    target_weights = pd.DataFrame(weight_rows, index=rebalance_index).fillna(0.0)
+    states = pd.DataFrame(state_rows, index=rebalance_index)
+    return HistoricalSignalTargets(
+        target_weights=target_weights.sort_index(axis=1),
+        states=states.sort_index(axis=1),
+        snapshots=snapshots,
+    )
 
 
 def weekly_rebalance_dates(prices: pd.DataFrame) -> pd.DatetimeIndex:

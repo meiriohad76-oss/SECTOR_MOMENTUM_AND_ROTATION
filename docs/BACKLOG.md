@@ -42,8 +42,9 @@ Status legend:
 ## 🎯 Next-session priorities
 
 ### B-011 · Build backtest harness (academic-rigorous, 2–3 days)
-**Status:** deterministic pandas/numpy accounting core implemented in `backlog-stepwise-qa`; manual yfinance runner available via `python scripts/run_backtest.py`. Historical methodology simulation, notebook/report polish, and dashboard `/backtest` charts remain follow-up work.
+**Status:** deterministic pandas/numpy accounting core and first historical methodology target-builder slice implemented in `backlog-stepwise-qa`; manual yfinance runner available via `python scripts/run_backtest.py`. Full historical methodology simulation, notebook/report polish, and dashboard `/backtest` charts remain follow-up work.
 **Tooling:** pandas/numpy core now; optional `vectorbt` adapter remains a future parity layer after deterministic accounting stays green.
+**Latest slice:** `build_historical_methodology_targets()` accepts preloaded OHLCV, slices each rebalance snapshot without lookahead, uses pure scoring modules, converts selected tickers to target weights, records states via `decide_state()`, avoids `apply_state_machine()` / `state.json` writes, and forces provider-backed ETF flow neutral to avoid current-data leakage.
 **Deliverables per §8 of methodology:**
 - CAGR, Sharpe, Sortino, max drawdown, Calmar
 - Turnover, transaction cost sensitivity (3/5/10 bps)
