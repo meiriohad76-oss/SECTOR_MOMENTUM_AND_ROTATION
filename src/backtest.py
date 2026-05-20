@@ -507,3 +507,80 @@ def format_gate_report(gates: dict[str, dict | bool]) -> str:
     lines.append("")
     lines.append(f"Overall: {'PASS' if gates.get('all_passed') else 'FAIL'}")
     return "\n".join(lines) + "\n"
+
+
+def _percent(value: float) -> str:
+    return f"{float(value) * 100:.2f}%"
+
+
+def _number(value: float) -> str:
+    return f"{float(value):.2f}"
+
+
+def _metric_value(metrics: dict[str, float], key: str) -> float:
+    if key not in metrics:
+        raise ValueError(f"metrics missing required key: {key}")
+    return _finite_scalar(f"metrics {key}", metrics[key])
+
+
+def _strategy_metrics_table(metrics: dict[str, float]) -> list[str]:
+    rows = [
+        ("Total return", _percent(_metric_value(metrics, "total_return"))),
+        ("CAGR", _percent(_metric_value(metrics, "cagr"))),
+        ("Sharpe", _number(_metric_value(metrics, "sharpe"))),
+        ("Sortino", _number(_metric_value(metrics, "sortino"))),
+        ("Max drawdown", _percent(_metric_value(metrics, "max_drawdown"))),
+        ("Calmar", _number(_metric_value(metrics, "calmar"))),
+        ("Annualized turnover", _percent(_metric_value(metrics, "annualized_turnover"))),
+    ]
+    lines = ["| Metric | Value |", "|---|---:|"]
+    lines.extend(f"| {label} | {value} |" for label, value in rows)
+    return lines
+
+
+def _benchmark_table(benchmark_metrics: dict[str, dict[str, float]]) -> list[str]:
+    lines = ["| Benchmark | CAGR | Sharpe | Max Drawdown |", "|---|---:|---:|---:|"]
+    for name, metrics in benchmark_metrics.items():
+        lines.append(
+            f"| {name} | "
+            f"{_percent(_metric_value(metrics, 'cagr'))} | "
+            f"{_number(_metric_value(metrics, 'sharpe'))} | "
+            f"{_percent(_metric_value(metrics, 'max_drawdown'))} |"
+        )
+    return lines
+
+
+def _cost_sensitivity_table(cost_scenarios: pd.DataFrame) -> list[str]:
+    required = {"cagr", "sharpe", "max_drawdown"}
+    missing = required.difference(cost_scenarios.columns)
+    if missing:
+        raise ValueError("cost_scenarios missing required columns: " + ", ".join(sorted(missing)))
+    lines = ["| Cost | CAGR | Sharpe | Max Drawdown |", "|---|---:|---:|---:|"]
+    for cost_bps, row in cost_scenarios.sort_index().iterrows():
+        label = f"{float(cost_bps):g} bps"
+        lines.append(
+            f"| {label} | "
+            f"{_percent(_finite_scalar('cost_scenarios cagr', row['cagr']))} | "
+            f"{_number(_finite_scalar('cost_scenarios sharpe', row['sharpe']))} | "
+            f"{_percent(_finite_scalar('cost_scenarios max_drawdown', row['max_drawdown']))} |"
+        )
+    return lines
+
+
+def format_backtest_report(
+    strategy_metrics: dict[str, float],
+    benchmark_metrics: dict[str, dict[str, float]],
+    cost_scenarios: pd.DataFrame,
+    gates: dict[str, dict | bool],
+    title: str = "Backtest Report",
+) -> str:
+    lines = [f"# {title}", ""]
+    lines.extend(["## Strategy Metrics", ""])
+    lines.extend(_strategy_metrics_table(strategy_metrics))
+    lines.extend(["", "## Benchmark Comparison", ""])
+    lines.extend(_benchmark_table(benchmark_metrics))
+    lines.extend(["", "## Cost Sensitivity", ""])
+    lines.extend(_cost_sensitivity_table(cost_scenarios))
+    lines.extend(["", "## Acceptance Gates", ""])
+    lines.extend(format_gate_report(gates).splitlines()[2:])
+    return "\n".join(lines).rstrip() + "\n"

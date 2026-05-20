@@ -384,6 +384,52 @@ def test_format_gate_report_includes_pass_fail_lines():
     assert "Overall: PASS" in text
 
 
+def test_format_backtest_report_includes_benchmarks_costs_and_gates():
+    strategy_metrics = {
+        "total_return": 0.24,
+        "cagr": 0.12,
+        "sharpe": 0.91,
+        "sortino": 1.30,
+        "max_drawdown": -0.18,
+        "calmar": 0.67,
+        "annualized_turnover": 1.20,
+    }
+    benchmark_metrics = {
+        "60/40 SPY/AGG": {"cagr": 0.08, "sharpe": 0.70, "max_drawdown": -0.22},
+        "Equal-weight sectors": {"cagr": 0.10, "sharpe": 0.74, "max_drawdown": -0.25},
+    }
+    cost_scenarios = pd.DataFrame(
+        {
+            "cagr": [0.121, 0.118],
+            "sharpe": [0.91, 0.89],
+            "max_drawdown": [-0.18, -0.181],
+        },
+        index=pd.Index([3.0, 10.0], name="cost_bps"),
+    )
+    gates = backtest.evaluate_acceptance_gates(
+        strategy_metrics={**strategy_metrics, "state_transitions_per_ticker_year": 2.0},
+        equal_weight_metrics=benchmark_metrics["Equal-weight sectors"],
+    )
+
+    text = backtest.format_backtest_report(
+        strategy_metrics=strategy_metrics,
+        benchmark_metrics=benchmark_metrics,
+        cost_scenarios=cost_scenarios,
+        gates=gates,
+        title="Manual Backtest Smoke Report",
+    )
+
+    assert "# Manual Backtest Smoke Report" in text
+    assert "## Strategy Metrics" in text
+    assert "| CAGR | 12.00% |" in text
+    assert "## Benchmark Comparison" in text
+    assert "| 60/40 SPY/AGG |" in text
+    assert "## Cost Sensitivity" in text
+    assert "| 10 bps |" in text
+    assert "## Acceptance Gates" in text
+    assert "Out-of-sample Sharpe: PASS" in text
+
+
 def test_build_historical_methodology_targets_slices_inputs_without_lookahead():
     dates = pd.bdate_range("2024-01-01", periods=8)
     ohlcv = {
