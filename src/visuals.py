@@ -237,8 +237,11 @@ def rrg_chart_dark(df: pd.DataFrame, title: str = "Rotation") -> go.Figure:
 
 # ---- Inline SVG sparkline (for HTML-rendered cards) -----------------------------
 
-def svg_sparkline(df_daily, color: str, width: int = 240, height: int = 50) -> str:
+def svg_sparkline(df_daily, color: str, width: int = 240, height: int = 50, style: str = "filled") -> str:
     """Return raw SVG markup for an inline sparkline. Matches Claude Design output."""
+    mode = str(style).strip().lower()
+    if mode == "off":
+        return ""
     if df_daily is None or df_daily.empty:
         return ""
     try:
@@ -255,13 +258,18 @@ def svg_sparkline(df_daily, color: str, width: int = 240, height: int = 50) -> s
     area = f"{path} L{width},{height} L0,{height} Z"
     grad_id = f"sg-{abs(hash(color + str(len(p)))) % 100000}"
     last_x, last_y = pts[-1]
+    fill = ""
+    if mode == "filled":
+        fill = (
+            f'<defs><linearGradient id="{grad_id}" x1="0" x2="0" y1="0" y2="1">'
+            f'<stop offset="0%" stop-color="{color}" stop-opacity="0.32"/>'
+            f'<stop offset="100%" stop-color="{color}" stop-opacity="0"/></linearGradient></defs>'
+            f'<path d="{area}" fill="url(#{grad_id})"/>'
+        )
     return (
         f'<svg class="pick-spark" viewBox="0 0 {width} {height}" preserveAspectRatio="none" '
         f'xmlns="http://www.w3.org/2000/svg">'
-        f'<defs><linearGradient id="{grad_id}" x1="0" x2="0" y1="0" y2="1">'
-        f'<stop offset="0%" stop-color="{color}" stop-opacity="0.32"/>'
-        f'<stop offset="100%" stop-color="{color}" stop-opacity="0"/></linearGradient></defs>'
-        f'<path d="{area}" fill="url(#{grad_id})"/>'
+        f'{fill}'
         f'<path d="{path}" fill="none" stroke="{color}" stroke-width="1.5"/>'
         f'<circle cx="{last_x:.2f}" cy="{last_y:.2f}" r="2.2" fill="{color}"/>'
         f'</svg>'
