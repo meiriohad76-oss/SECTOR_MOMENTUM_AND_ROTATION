@@ -36,6 +36,7 @@ from src.preferences import (
     should_render_bluf,
     sparkline_mode,
 )
+from src.ui_states import defensive_basket_rows, loading_skeleton_slots
 from src.visuals import (
     rrg_chart_dark,
     price_chart_with_30wma,
@@ -53,6 +54,33 @@ def _md(html: str):
     misparsed otherwise."""
     cleaned = "\n".join(line.lstrip() for line in html.split("\n"))
     st.markdown(cleaned, unsafe_allow_html=True)
+
+
+def render_loading_state(placeholder, label: str, card_count: int = 4) -> None:
+    cards = ""
+    for _ in loading_skeleton_slots(card_count):
+        cards += """
+        <div class="skeleton-card">
+          <div class="skeleton-line short"></div>
+          <div class="skeleton-line wide"></div>
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line tiny"></div>
+        </div>
+        """
+    html = f"""
+    <div class="app loading-app">
+      <section class="section loading-state" aria-live="polite">
+        <div class="section-head">
+          <h2>{label}</h2>
+          <div class="right">FETCHING</div>
+        </div>
+        <div class="loading-copy">Preparing dashboard data without blocking the page chrome.</div>
+        <div class="picks-grid skeleton-grid">{cards}</div>
+      </section>
+    </div>
+    """
+    cleaned = "\n".join(line.lstrip() for line in html.split("\n"))
+    placeholder.markdown(cleaned, unsafe_allow_html=True)
 
 
 
@@ -295,16 +323,18 @@ def _load_fred() -> dict:
         return {}
 
 
-with st.spinner("Loading market data…"):
+loading_placeholder = st.empty()
+render_loading_state(loading_placeholder, "Loading market data", card_count=4)
+try:
     ohlcv = _load_data("3y")
 
-bench_ticker = BENCH["US"]
-bil_ticker = BENCH["TBILL"]
-if bench_ticker not in ohlcv or bil_ticker not in ohlcv:
-    st.error("Missing benchmark/T-bill data. Try the refresh button.")
-    st.stop()
+    bench_ticker = BENCH["US"]
+    bil_ticker = BENCH["TBILL"]
+    if bench_ticker not in ohlcv or bil_ticker not in ohlcv:
+        st.error("Missing benchmark/T-bill data. Try the refresh button.")
+        st.stop()
 
-with st.spinner("Computing indicators…"):
+    render_loading_state(loading_placeholder, "Computing indicators", card_count=4)
     indicators_df = compute_all_indicators(ohlcv, bench_ticker, bil_ticker)
     flow_df = compute_flow_signals(ohlcv)
     flow_z = flow_composite_z(flow_df)
@@ -312,6 +342,8 @@ with st.spinner("Computing indicators…"):
     regime = assess_regime(ohlcv[bench_ticker], ohlcv.get("^TNX"), ohlcv.get("^IRX"), fred_cache=_fred_data)
     scored = compute_composite(indicators_df, flow_df, flow_z, phase=regime.phase_hint)
     scored = apply_state_machine(scored)
+finally:
+    loading_placeholder.empty()
 
 AVAILABLE_TICKERS = sorted(scored.index.tolist())
 initialize_drill_ticker(st.session_state, st.query_params, AVAILABLE_TICKERS)
@@ -675,9 +707,58 @@ def render_alerts():
 def render_picks():
     selected_picks = scored[scored["selected"]].sort_values(["class", "rank_in_class"])
     if selected_picks.empty:
-        _md('<section class="section"><div class="section-head"><h2>Picks <span class="count">0 active</span></h2></div>'
-            '<div class="alerts"><div class="alert-row"><span class="t">—</span>'
-            '<span class="change">No picks meet the gates right now. System is defensive.</span></div></div></section>',)
+        basket_rows = defensive_basket_rows(scored)
+        cards_html = ""
+        for row in basket_rows:
+            ticker = str(row["ticker"])
+            state = str(row["state"])
+            available = bool(row["available"])
+            pill_class = state if available and state in STATE_TIPS else "HOLD"
+            pill_label = state.replace("_", " ") if available else "DATA PENDING"
+            unavailable_class = "" if available else " unavailable"
+            s_score = row["s_score"]
+            f_score = row["f_score"]
+            s_text = "--" if s_score is None else f"{float(s_score):+.2f}"
+            f_text = "--" if f_score is None else f"{float(f_score):+.2f}"
+            s_class = "" if s_score is None else ("pos" if float(s_score) >= 0 else "neg")
+            f_class = "" if f_score is None else ("pos" if float(f_score) >= 0 else "neg")
+            cards_html += f"""
+            <div class="pick defensive-card {pill_class}{unavailable_class}">
+              <div class="pick-top">
+                <div>
+                  <div class="pick-ticker">{ticker}</div>
+                  <div class="pick-class">{_esc(str(row["role"]))}</div>
+                </div>
+                <span class="pill {pill_class}" data-tip="{_esc(STATE_TIPS.get(state, "Awaiting defensive data."))}">{pill_label}</span>
+              </div>
+              <div class="defensive-note">{_esc(str(row["note"]))}</div>
+              <div class="pick-metrics">
+                <div class="m"><span class="k">S</span><span class="v {s_class}">{s_text}</span></div>
+                <div class="m"><span class="k">F</span><span class="v {f_class}">{f_text}</span></div>
+              </div>
+              <div class="pick-foot">
+                <span>ROTATION</span>
+                <span class="quad">DEFENSIVE</span>
+              </div>
+            </div>
+            """
+        _md(f"""
+        <section class="section">
+          <div class="section-head">
+            <h2>Picks <span class="count">0 active</span></h2>
+            <div class="right">NO PICKS MEET GATES</div>
+          </div>
+          <div class="empty-state">
+            <div class="empty-state-copy">
+              <div class="empty-kicker">RISK-OFF BASKET</div>
+              <h3>No picks meet the gates</h3>
+              <p>Momentum leadership is not passing all entry filters right now. Until a fresh leader clears the gates, the defensive rotation view focuses on TLT / GLD / BIL.</p>
+            </div>
+            <div class="picks-grid defensive-grid">{cards_html}</div>
+          </div>
+        </section>
+        """)
+        _render_drill_buttons("defensive_drill", [str(row["ticker"]) for row in basket_rows if row["available"]])
         return
 
     cards_html = ""
