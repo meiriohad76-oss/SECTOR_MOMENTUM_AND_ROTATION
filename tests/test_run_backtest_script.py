@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import pandas as pd
+import pytest
 
 from src import backtest
 from scripts import run_backtest
@@ -63,6 +64,8 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
         "XLY",
     ]
     target_builder_calls = []
+    gate_calls = []
+    split_calls = []
 
     def fake_fetch(tickers, period, provider):
         calls.append((tickers, period, provider))
@@ -98,6 +101,63 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
             snapshots={},
         )
 
+    def fake_evaluate_acceptance_gates(strategy_metrics, equal_weight_metrics, **kwargs):
+        gate_calls.append(
+            {
+                "strategy_metrics": dict(strategy_metrics),
+                "equal_weight_metrics": dict(equal_weight_metrics),
+                "kwargs": kwargs,
+            }
+        )
+        return {
+            "oos_sharpe": {
+                "name": "Out-of-sample Sharpe",
+                "value": strategy_metrics["sharpe"],
+                "threshold": 0.7,
+                "passed": True,
+            },
+            "max_drawdown": {
+                "name": "Max drawdown",
+                "value": abs(strategy_metrics["max_drawdown"]),
+                "threshold": abs(equal_weight_metrics["max_drawdown"]) * 0.75,
+                "passed": True,
+            },
+            "all_passed": True,
+        }
+
+    def metric(total_return, sharpe, max_drawdown):
+        return {
+            "total_return": total_return,
+            "cagr": total_return,
+            "sharpe": sharpe,
+            "sortino": sharpe,
+            "max_drawdown": max_drawdown,
+            "calmar": 1.0,
+            "annualized_turnover": 0.5,
+        }
+
+    split_results = [
+        {
+            "Full period": metric(0.10, 1.10, -0.10),
+            "In-sample": metric(0.05, 0.55, -0.08),
+            "Out-of-sample": metric(0.03, 7.77, -0.06),
+        },
+        {
+            "Full period": metric(0.08, 0.80, -0.09),
+            "In-sample": metric(0.03, 0.30, -0.07),
+            "Out-of-sample": metric(0.02, 0.22, -0.05),
+        },
+        {
+            "Full period": metric(0.09, 0.90, -0.20),
+            "In-sample": metric(0.04, 0.40, -0.12),
+            "Out-of-sample": metric(0.01, 0.11, -0.44),
+        },
+    ]
+
+    def fake_split_backtest_metrics(result):
+        split_calls.append(result)
+        return split_results[len(split_calls) - 1]
+
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
@@ -108,12 +168,27 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
         "build_historical_methodology_targets",
         fake_build_historical_methodology_targets,
     )
+    monkeypatch.setattr(
+        run_backtest.backtest,
+        "evaluate_acceptance_gates",
+        fake_evaluate_acceptance_gates,
+    )
+    monkeypatch.setattr(
+        run_backtest.backtest,
+        "split_backtest_metrics",
+        fake_split_backtest_metrics,
+    )
 
     assert run_backtest.main() == 0
     assert calls == [(expected_tickers, "max", "auto")]
     assert target_builder_calls
     assert target_builder_calls[0]["tickers"] == expected_tickers
     assert target_builder_calls[0]["phase"] == "MID"
+    assert gate_calls
+    assert len(split_calls) == 3
+    assert gate_calls[0]["strategy_metrics"]["sharpe"] == pytest.approx(7.77)
+    assert gate_calls[0]["strategy_metrics"]["state_transitions_per_ticker_year"] == pytest.approx(0.0)
+    assert gate_calls[0]["equal_weight_metrics"]["max_drawdown"] == pytest.approx(-0.44)
     assert run_backtest.REPORT_PATH.exists()
     report = run_backtest.REPORT_PATH.read_text(encoding="utf-8")
     assert "Methodology" in report
@@ -121,6 +196,8 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     assert "60/40 SPY/AGG" in report
     assert "Equal-weight sectors" in report
     assert "## Cost Sensitivity" in report
+    assert "## In-Sample / Out-of-Sample" in report
+    assert "Out-of-sample" in report
     assert run_backtest.EQUITY_PATH.exists()
     equity = run_backtest.EQUITY_PATH.read_text(encoding="utf-8")
     assert "Methodology" in equity

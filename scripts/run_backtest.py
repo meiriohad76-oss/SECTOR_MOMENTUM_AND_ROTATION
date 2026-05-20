@@ -106,14 +106,19 @@ def main() -> int:
             sector_targets,
             transaction_cost_bps=5.0,
         )
+        methodology_windows = backtest.split_backtest_metrics(methodology_result)
+        sixty_forty_windows = backtest.split_backtest_metrics(sixty_forty_result)
+        sector_windows = backtest.split_backtest_metrics(sector_result)
         cost_scenarios = backtest.run_cost_scenarios(
             prices[strategy_columns],
             methodology_targets.target_weights,
             cost_bps_values=[3, 5, 10],
         )
+        methodology_oos_metrics = methodology_windows["Out-of-sample"]
+        sector_oos_metrics = sector_windows["Out-of-sample"]
         gates = backtest.evaluate_acceptance_gates(
-            strategy_metrics={**methodology_result.metrics, "state_transitions_per_ticker_year": 0.0},
-            equal_weight_metrics=sector_result.metrics,
+            strategy_metrics={**methodology_oos_metrics, "state_transitions_per_ticker_year": 0.0},
+            equal_weight_metrics=sector_oos_metrics,
         )
         report = backtest.format_backtest_report(
             strategy_metrics=methodology_result.metrics,
@@ -124,6 +129,13 @@ def main() -> int:
             },
             cost_scenarios=cost_scenarios,
             gates=gates,
+            window_metrics={
+                "Methodology full period": methodology_windows["Full period"],
+                "Methodology in-sample": methodology_windows["In-sample"],
+                "Methodology out-of-sample": methodology_oos_metrics,
+                "60/40 out-of-sample": sixty_forty_windows["Out-of-sample"],
+                "Equal-weight sectors out-of-sample": sector_oos_metrics,
+            },
             title="Manual Backtest Smoke Report",
         )
         equity = backtest.equity_frame(

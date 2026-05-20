@@ -67,6 +67,35 @@ def test_performance_metrics_builds_equity_from_initial_capital_when_missing():
     assert metrics["total_return"] == pytest.approx(0.21)
 
 
+def test_split_backtest_metrics_uses_2015_boundary_for_oos():
+    dates = pd.to_datetime(["2014-12-30", "2014-12-31", "2015-01-02", "2015-01-05"])
+    prices = pd.DataFrame({"AAA": [100.0, 110.0, 99.0, 118.8]}, index=dates)
+    weights = pd.DataFrame({"AAA": [1.0]}, index=[dates[0]])
+    result = backtest.run_weight_backtest(prices, weights, periods_per_year=252)
+
+    windows = backtest.split_backtest_metrics(result, oos_start="2015-01-01", periods_per_year=252)
+
+    assert list(windows) == ["Full period", "In-sample", "Out-of-sample"]
+    assert windows["Full period"]["total_return"] == pytest.approx(0.188)
+    assert windows["In-sample"]["total_return"] == pytest.approx(0.10)
+    assert windows["Out-of-sample"]["total_return"] == pytest.approx(0.08)
+    assert windows["In-sample"]["annualized_turnover"] == pytest.approx(252.0)
+    assert windows["Out-of-sample"]["annualized_turnover"] == pytest.approx(0.0)
+
+
+def test_split_backtest_metrics_returns_finite_zeroes_for_empty_windows():
+    dates = pd.bdate_range("2020-01-01", periods=3)
+    prices = pd.DataFrame({"AAA": [100.0, 101.0, 102.0]}, index=dates)
+    weights = pd.DataFrame({"AAA": [1.0]}, index=[dates[0]])
+    result = backtest.run_weight_backtest(prices, weights)
+
+    windows = backtest.split_backtest_metrics(result, oos_start="2015-01-01")
+
+    assert windows["In-sample"]["total_return"] == 0.0
+    assert windows["In-sample"]["sharpe"] == 0.0
+    assert windows["In-sample"]["max_drawdown"] == 0.0
+
+
 def test_multi_asset_weights_drift_between_rebalance_dates():
     dates = pd.bdate_range("2024-01-01", periods=3)
     prices = pd.DataFrame(
@@ -416,6 +445,10 @@ def test_format_backtest_report_includes_benchmarks_costs_and_gates():
         benchmark_metrics=benchmark_metrics,
         cost_scenarios=cost_scenarios,
         gates=gates,
+        window_metrics={
+            "In-sample": {**strategy_metrics, "total_return": 0.30},
+            "Out-of-sample": {**strategy_metrics, "total_return": 0.12, "sharpe": 0.82},
+        },
         title="Manual Backtest Smoke Report",
     )
 
@@ -426,6 +459,9 @@ def test_format_backtest_report_includes_benchmarks_costs_and_gates():
     assert "| 60/40 SPY/AGG |" in text
     assert "## Cost Sensitivity" in text
     assert "| 10 bps |" in text
+    assert "## In-Sample / Out-of-Sample" in text
+    assert "OOS starts: 2015-01-01" in text
+    assert "| Out-of-sample | 12.00% |" in text
     assert "## Acceptance Gates" in text
     assert "Out-of-sample Sharpe: PASS" in text
 

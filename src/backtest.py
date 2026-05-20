@@ -169,6 +169,18 @@ def performance_metrics(
         raise ValueError("periods_per_year must be positive")
     risk_free = _finite_scalar("risk_free_rate", risk_free_rate)
     returns = returns.astype(float).dropna()
+    if returns.empty:
+        return {
+            "total_return": 0.0,
+            "cagr": 0.0,
+            "volatility": 0.0,
+            "sharpe": 0.0,
+            "sortino": 0.0,
+            "max_drawdown": 0.0,
+            "calmar": 0.0,
+            "average_turnover": 0.0,
+            "annualized_turnover": 0.0,
+        }
     if equity is None:
         equity = equity_curve(returns)
     total_return = float(equity.iloc[-1] / equity.iloc[0] - 1.0) if len(equity) else 0.0
@@ -194,6 +206,32 @@ def performance_metrics(
         "calmar": calmar,
         "average_turnover": average_turnover,
         "annualized_turnover": average_turnover * periods,
+    }
+
+
+def split_backtest_metrics(
+    result: BacktestResult,
+    oos_start: str | pd.Timestamp = "2015-01-01",
+    periods_per_year: int = TRADING_DAYS_PER_YEAR,
+) -> dict[str, dict[str, float]]:
+    start = pd.Timestamp(oos_start)
+
+    def metrics_for(mask: pd.Series) -> dict[str, float]:
+        returns = result.net_returns.loc[mask].astype(float)
+        turnover = result.turnover.reindex(returns.index).fillna(0.0)
+        return performance_metrics(
+            returns,
+            turnover=turnover,
+            periods_per_year=periods_per_year,
+        )
+
+    full_mask = pd.Series(True, index=result.net_returns.index)
+    in_sample_mask = pd.Series(result.net_returns.index < start, index=result.net_returns.index)
+    oos_mask = pd.Series(result.net_returns.index >= start, index=result.net_returns.index)
+    return {
+        "Full period": metrics_for(full_mask),
+        "In-sample": metrics_for(in_sample_mask),
+        "Out-of-sample": metrics_for(oos_mask),
     }
 
 
@@ -567,11 +605,28 @@ def _cost_sensitivity_table(cost_scenarios: pd.DataFrame) -> list[str]:
     return lines
 
 
+def _window_metrics_table(window_metrics: dict[str, dict[str, float]]) -> list[str]:
+    lines = ["| Window | Total Return | CAGR | Sharpe | Max Drawdown | Annualized Turnover |"]
+    lines.append("|---|---:|---:|---:|---:|---:|")
+    for name, metrics in window_metrics.items():
+        lines.append(
+            f"| {name} | "
+            f"{_percent(_metric_value(metrics, 'total_return'))} | "
+            f"{_percent(_metric_value(metrics, 'cagr'))} | "
+            f"{_number(_metric_value(metrics, 'sharpe'))} | "
+            f"{_percent(_metric_value(metrics, 'max_drawdown'))} | "
+            f"{_percent(_metric_value(metrics, 'annualized_turnover'))} |"
+        )
+    return lines
+
+
 def format_backtest_report(
     strategy_metrics: dict[str, float],
     benchmark_metrics: dict[str, dict[str, float]],
     cost_scenarios: pd.DataFrame,
     gates: dict[str, dict | bool],
+    window_metrics: Optional[dict[str, dict[str, float]]] = None,
+    oos_start: str | pd.Timestamp = "2015-01-01",
     title: str = "Backtest Report",
 ) -> str:
     lines = [f"# {title}", ""]
@@ -581,6 +636,11 @@ def format_backtest_report(
     lines.extend(_benchmark_table(benchmark_metrics))
     lines.extend(["", "## Cost Sensitivity", ""])
     lines.extend(_cost_sensitivity_table(cost_scenarios))
+    if window_metrics:
+        lines.extend(["", "## In-Sample / Out-of-Sample", ""])
+        lines.append(f"OOS starts: {pd.Timestamp(oos_start).date().isoformat()}")
+        lines.append("")
+        lines.extend(_window_metrics_table(window_metrics))
     lines.extend(["", "## Acceptance Gates", ""])
     lines.extend(format_gate_report(gates).splitlines()[2:])
     return "\n".join(lines).rstrip() + "\n"
