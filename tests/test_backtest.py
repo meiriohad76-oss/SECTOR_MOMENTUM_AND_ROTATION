@@ -328,9 +328,13 @@ def test_evaluate_acceptance_gates_compares_oos_to_equal_weight_benchmark():
     )
 
     assert report["oos_sharpe"]["passed"] is True
+    assert "strategy OOS Sharpe >= 0.70" in report["oos_sharpe"]["evidence"]
     assert report["max_drawdown"]["passed"] is True
+    assert "75% of equal-weight OOS drawdown" in report["max_drawdown"]["evidence"]
     assert report["annualized_turnover"]["passed"] is True
+    assert "strategy OOS annualized turnover <= 300%" in report["annualized_turnover"]["evidence"]
     assert report["state_transitions"]["passed"] is True
+    assert "historical state transitions per ticker-year <= 4.0" in report["state_transitions"]["evidence"]
     assert report["all_passed"] is True
 
 
@@ -401,7 +405,13 @@ def test_weekly_rebalance_dates_uses_last_actual_trading_day_when_friday_missing
 
 def test_format_gate_report_includes_pass_fail_lines():
     gates = {
-        "oos_sharpe": {"name": "Out-of-sample Sharpe", "value": 0.8, "threshold": 0.7, "passed": True},
+        "oos_sharpe": {
+            "name": "Out-of-sample Sharpe",
+            "value": 0.8,
+            "threshold": 0.7,
+            "passed": True,
+            "evidence": "strategy OOS Sharpe >= 0.70",
+        },
         "max_drawdown": {"name": "Max drawdown", "value": 0.2, "threshold": 0.225, "passed": True},
         "all_passed": True,
     }
@@ -410,6 +420,7 @@ def test_format_gate_report_includes_pass_fail_lines():
 
     assert "Out-of-sample Sharpe: PASS" in text
     assert "Max drawdown: PASS" in text
+    assert "Evidence: strategy OOS Sharpe >= 0.70" in text
     assert "Overall: PASS" in text
 
 

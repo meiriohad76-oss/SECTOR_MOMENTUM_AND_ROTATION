@@ -373,12 +373,19 @@ def _required_metric(metrics: dict[str, float], key: str, label: str) -> float:
     return _finite_scalar(f"{label} {key}", metrics[key])
 
 
-def _gate(name: str, value: float, threshold: float, passed: bool) -> dict[str, float | bool | str]:
+def _gate(
+    name: str,
+    value: float,
+    threshold: float,
+    passed: bool,
+    evidence: str = "",
+) -> dict[str, float | bool | str]:
     return {
         "name": name,
         "value": float(value),
         "threshold": float(threshold),
         "passed": bool(passed),
+        "evidence": str(evidence),
     }
 
 
@@ -402,24 +409,35 @@ def evaluate_acceptance_gates(
             sharpe,
             min_oos_sharpe,
             sharpe >= min_oos_sharpe,
+            f"strategy OOS Sharpe >= {min_oos_sharpe:.2f}",
         ),
         "max_drawdown": _gate(
             "Max drawdown",
             strategy_dd,
             max_allowed_dd,
             strategy_dd <= max_allowed_dd,
+            (
+                "absolute strategy OOS drawdown <= "
+                f"{max_drawdown_ratio * 100:.0f}% of equal-weight OOS drawdown "
+                f"({benchmark_dd:.4f})"
+            ),
         ),
         "annualized_turnover": _gate(
             "Annualized turnover",
             annualized_turnover,
             max_annualized_turnover,
             annualized_turnover <= max_annualized_turnover,
+            f"strategy OOS annualized turnover <= {max_annualized_turnover * 100:.0f}%",
         ),
         "state_transitions": _gate(
             "State transitions per ticker-year",
             transitions,
             max_state_transitions_per_ticker_year,
             transitions <= max_state_transitions_per_ticker_year,
+            (
+                "historical state transitions per ticker-year <= "
+                f"{max_state_transitions_per_ticker_year:.1f}"
+            ),
         ),
     }
     gates["all_passed"] = all(item["passed"] for item in gates.values() if isinstance(item, dict))
@@ -542,6 +560,9 @@ def format_gate_report(gates: dict[str, dict | bool]) -> str:
             f"- {gate['name']}: {status} "
             f"(value {gate['value']:.4f}, threshold {gate['threshold']:.4f})"
         )
+        evidence = str(gate.get("evidence", "")).strip()
+        if evidence:
+            lines.append(f"  Evidence: {evidence}")
     lines.append("")
     lines.append(f"Overall: {'PASS' if gates.get('all_passed') else 'FAIL'}")
     return "\n".join(lines) + "\n"
