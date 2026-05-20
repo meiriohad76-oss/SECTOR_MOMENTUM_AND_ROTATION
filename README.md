@@ -135,6 +135,8 @@ The remaining provider seams have independent safety flags. Leave each unset/`tr
 
 `apply_state_machine()` writes `state.json` first, then sends optional transition alerts through Telegram and/or Slack. Leave alert secrets unset to disable network calls. To enable alerts, configure `TELEGRAM_BOT_TOKEN` plus `TELEGRAM_CHAT_ID`, and/or `SLACK_WEBHOOK_URL`, in Streamlit secrets or environment variables.
 
+Dashboard deep links support `?ticker=XLK`; the app opens with that ticker selected in the per-ticker drill-down.
+
 ## Methodology references
 
 - Jegadeesh & Titman (1993). *Returns to Buying Winners and Selling Losers.* JoF.

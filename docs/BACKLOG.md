@@ -84,11 +84,11 @@ Each is ~2–4 hours after the integration pattern is set. Flip `STUB_MODE = Fal
 **Series:** `INDPRO`, `T10Y2Y`, `T10Y3M`, `UNRATE`, `NFCI`, `RECPROUSM156N`, `BAMLH0A0HYM2`.
 **Impact:** upgrades cycle phase from coarse 2-signal fallback to a tested FRED-backed Stovall/Fidelity-style 4-phase classifier once the free key is configured.
 
-### B-023 · Click-through from cards/alerts/RRG → drill-down
-**Limitation:** Streamlit's native `st.markdown` can't dispatch a `st.rerun()` from a click inside the HTML.
-**Fix:** use `streamlit-extras` `stx.tabs` or a custom Streamlit component (a few JS lines) to bridge a `data-ticker` click → session_state update.
-**Effort:** ~1 hour.
-**Why useful:** matches the Claude Design mockup behavior; reduces friction.
+### B-023 · Click-through from cards/alerts/RRG → drill-down — IMPLEMENTED
+**Status:** Native Streamlit drill buttons and `?ticker=...` deep links are implemented in `backlog-stepwise-qa`.
+**Files:** `src/navigation.py`, `app.py`, `tests/test_navigation.py`, `README.md`.
+**Behavior:** alert, pick, and RRG context controls update `st.session_state.drill_ticker` plus the URL query param, then rerun into the existing per-ticker drill-down.
+**Deferred:** whole-card HTML clicks and Plotly dot-click capture still need a custom component or event bridge.
 
 ### B-024 · Floating refresh / theme buttons in the header
 **Current state:** buttons at bottom of page (DOM order limitation).

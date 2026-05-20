@@ -24,6 +24,7 @@ from src.portfolio import (
     parse_single_ticker,
 )
 from src.scoring import compute_composite, apply_state_machine, recent_transitions
+from src.navigation import initialize_drill_ticker, select_drill_ticker
 from src.visuals import (
     rrg_chart_dark,
     price_chart_with_30wma,
@@ -293,6 +294,9 @@ with st.spinner("Computing indicators…"):
     scored = compute_composite(indicators_df, flow_df, flow_z, phase=regime.phase_hint)
     scored = apply_state_machine(scored)
 
+AVAILABLE_TICKERS = sorted(scored.index.tolist())
+initialize_drill_ticker(st.session_state, st.query_params, AVAILABLE_TICKERS)
+
 
 # =============================== derive view-model ===============================
 
@@ -377,6 +381,22 @@ phase_idx = PHASE_IDX.get(regime.phase_hint, -1)
 
 
 # =============================== render helpers ==================================
+
+
+def _go_to_drill(ticker: str) -> None:
+    if select_drill_ticker(st.session_state, st.query_params, ticker, AVAILABLE_TICKERS):
+        st.rerun()
+
+
+def _render_drill_buttons(prefix: str, tickers: list[str], max_columns: int = 4) -> None:
+    drill_tickers = [ticker for ticker in dict.fromkeys(tickers) if ticker in scored.index]
+    if not drill_tickers:
+        return
+    cols = st.columns(min(len(drill_tickers), max_columns))
+    for idx, ticker in enumerate(drill_tickers):
+        with cols[idx % len(cols)]:
+            if st.button(f"DRILL {ticker}", key=f"{prefix}_{idx}_{ticker}", use_container_width=True):
+                _go_to_drill(ticker)
 
 
 def render_explainer():
@@ -576,6 +596,10 @@ def render_alerts():
     </section>
     """
     _md(html)
+    _render_drill_buttons(
+        "alert_drill",
+        [str(r.get("ticker", "")).upper() for r in transitions[:8]],
+    )
 
 
 def render_picks():
@@ -635,12 +659,13 @@ def render_picks():
     </section>
     """
     _md(html)
+    _render_drill_buttons("pick_drill", selected_picks.index.tolist())
 
 
 def render_rrg():
     _md('<section class="section"><div class="section-head">'
                 f'<h2>Relative Rotation Graph <span class="count">{st.session_state.klass}</span></h2>'
-                '<div class="right">CLICK DOT → DRILL-DOWN</div></div></section>')
+                '<div class="right">DRILL BUTTONS → TICKER DETAIL</div></div></section>')
 
     # class selector (Streamlit native buttons styled by our CSS)
     cls_list = list(UNIVERSE_BY_CLASS.keys()) + ["ALL"]
@@ -687,6 +712,7 @@ def render_rrg():
                 f'<div class="qcount">{count}</div>'
                 f'<div class="qtick">{ticks}</div>'
                 f'</div>',)
+            _render_drill_buttons(f"rrg_drill_{q.lower()}", tickers[:8], max_columns=2)
 
 
 def render_drill():
@@ -707,8 +733,7 @@ def render_drill():
                            index=pick_options.index(sel) if sel in pick_options else 0,
                            label_visibility="visible")
     if new_sel != sel:
-        st.session_state.drill_ticker = new_sel
-        st.rerun()
+        _go_to_drill(new_sel)
 
     # header tiles
     head_html = f"""
