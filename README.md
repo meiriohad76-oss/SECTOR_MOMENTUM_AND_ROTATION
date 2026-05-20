@@ -31,7 +31,7 @@ python scripts/run_backtest.py
 ```
 
 The runner writes `docs/backtest_report.md` when market data downloads successfully. Treat that report as manual evidence, not a replacement for the deterministic test suite.
-The report includes strategy metrics, 60/40 and equal-weight sector benchmark comparison, 3/5/10 bps cost sensitivity, and acceptance-gate status. It is still a manual smoke artifact until the full historical methodology simulation and dashboard charts are completed.
+The report includes strategy metrics, 60/40 and equal-weight sector benchmark comparison, 3/5/10 bps cost sensitivity, and acceptance-gate status. The runner also writes `docs/backtest_equity.csv`; the dashboard's Backtest Lab section displays the report and plots that equity artifact when present. It is still a manual smoke artifact until the full historical methodology simulation is completed.
 
 ## Portfolio analyzer
 

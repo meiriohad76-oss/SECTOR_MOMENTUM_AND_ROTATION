@@ -263,6 +263,8 @@ st.set_page_config(
 
 _STATIC = Path(__file__).resolve().parent / "static"
 _CSS = (_STATIC / "style.css").read_text(encoding="utf-8")
+BACKTEST_REPORT_PATH = Path("docs/backtest_report.md")
+BACKTEST_EQUITY_PATH = Path("docs/backtest_equity.csv")
 
 # Streamlit-specific overrides on top of the design CSS
 _EXTRA = """
@@ -1166,6 +1168,53 @@ def render_portfolio_analyzer():
         _render_portfolio_analysis(_portfolio_result_from_upload(uploaded))
 
 
+def render_backtest_lab():
+    _md(
+        """
+        <section class="section" id="backtest-lab">
+          <div class="section-head">
+            <h2>Backtest lab <span class="count">B-011 · manual artifacts</span></h2>
+            <div class="right">OFFLINE REPORT VIEWER</div>
+          </div>
+        </section>
+        """
+    )
+
+    if BACKTEST_REPORT_PATH.exists():
+        with st.expander("Manual backtest report", expanded=False):
+            st.markdown(BACKTEST_REPORT_PATH.read_text(encoding="utf-8"))
+    else:
+        _md(
+            """
+            <div class="chart-help">
+              <b>No backtest report artifact found.</b>
+              Run <code>python scripts/run_backtest.py</code> from the repo root to generate
+              <code>docs/backtest_report.md</code> and <code>docs/backtest_equity.csv</code>.
+              The app never runs the backtest automatically on page load.
+            </div>
+            """
+        )
+
+    if BACKTEST_EQUITY_PATH.exists():
+        try:
+            equity = pd.read_csv(BACKTEST_EQUITY_PATH, index_col="date", parse_dates=True)
+        except Exception as exc:
+            st.warning(f"Could not read backtest equity artifact: {exc}")
+            return
+        if equity.empty:
+            st.warning("Backtest equity artifact is empty.")
+            return
+        st.line_chart(equity, use_container_width=True)
+    else:
+        _md(
+            """
+            <div class="chart-help">
+              Equity chart unavailable until <code>docs/backtest_equity.csv</code> is generated.
+            </div>
+            """
+        )
+
+
 def render_footer():
     html = f"""
     <div class="footer">
@@ -1190,5 +1239,6 @@ render_picks()
 render_rrg()
 render_drill()
 render_portfolio_analyzer()
+render_backtest_lab()
 render_full_table()
 render_footer()
