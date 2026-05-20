@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pandas as pd
 
 from src import data
@@ -83,3 +85,95 @@ def test_fetch_ohlcv_flattens_mocked_yfinance_response(monkeypatch):
     assert len(out["XLK"]) == 40
     assert calls[0]["tickers"] == ["XLK"]
     assert calls[0]["period"] == "1y"
+
+
+def test_fetch_ohlcv_can_use_massive_aggregate_bars(monkeypatch):
+    monkeypatch.setenv("OHLCV_PROVIDER", "massive")
+    monkeypatch.setenv("MASSIVE_API_KEY", "secret")
+    calls = []
+    base = pd.Timestamp("2024-01-01", tz="UTC")
+    results = [
+        {
+            "t": int((base + pd.Timedelta(days=idx)).timestamp() * 1000),
+            "o": 100.0 + idx,
+            "h": 101.0 + idx,
+            "l": 99.0 + idx,
+            "c": 100.5 + idx,
+            "v": 1_000_000 + idx,
+        }
+        for idx in range(40)
+    ]
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"results": results}
+
+    def fake_get(url, params, headers, timeout):
+        calls.append(
+            {
+                "url": url,
+                "params": params,
+                "headers": headers,
+                "timeout": timeout,
+            }
+        )
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        data,
+        "requests",
+        SimpleNamespace(get=fake_get, RequestException=RuntimeError),
+        raising=False,
+    )
+
+    out = data.fetch_ohlcv(["XLK"], period="2mo")
+
+    assert list(out.keys()) == ["XLK"]
+    assert calls[0]["url"].startswith("https://api.massive.com/v2/aggs/ticker/XLK/range/1/day/")
+    assert calls[0]["params"] == {"adjusted": "true", "sort": "asc", "limit": 50000}
+    assert calls[0]["headers"] == {"Authorization": "Bearer secret"}
+    assert list(out["XLK"].columns) == ["open", "high", "low", "close", "volume", "adj_close"]
+    assert len(out["XLK"]) == 40
+    assert out["XLK"]["adj_close"].iloc[0] == 100.5
+
+
+def test_fetch_ohlcv_auto_falls_back_to_yfinance_without_massive_key(monkeypatch):
+    monkeypatch.setenv("OHLCV_PROVIDER", "auto")
+    monkeypatch.delenv("MASSIVE_API_KEY", raising=False)
+    dates = pd.bdate_range("2024-01-01", periods=40)
+    columns = pd.MultiIndex.from_product(
+        [["Open", "High", "Low", "Close", "Adj Close", "Volume"], ["XLK"]]
+    )
+    raw = pd.DataFrame(1.0, index=dates, columns=columns)
+    calls = []
+
+    def fake_download(**kwargs):
+        calls.append(kwargs)
+        return raw
+
+    monkeypatch.setattr(data.yf, "download", fake_download)
+
+    out = data.fetch_ohlcv(["XLK"], period="1y")
+
+    assert list(out.keys()) == ["XLK"]
+    assert calls[0]["tickers"] == ["XLK"]
+    assert calls[0]["period"] == "1y"
+
+
+def test_fetch_ohlcv_massive_returns_empty_on_provider_error(monkeypatch):
+    monkeypatch.setenv("MASSIVE_API_KEY", "secret")
+
+    def fail_get(url, params, headers, timeout):
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(
+        data,
+        "requests",
+        SimpleNamespace(get=fail_get, RequestException=RuntimeError),
+        raising=False,
+    )
+
+    assert data.fetch_ohlcv(["XLK"], provider="massive") == {}

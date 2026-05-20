@@ -1,4 +1,4 @@
-"""Data ingestion layer — yfinance-backed, cached.
+"""Data ingestion layer - yfinance by default, Massive when configured.
 
 Public API:
     fetch_ohlcv(tickers, period="3y") -> dict[ticker -> DataFrame]
@@ -7,10 +7,76 @@ Public API:
 """
 from __future__ import annotations
 
+from datetime import date, timedelta
+import os
 from typing import Iterable
 
 import pandas as pd
+import requests
 import yfinance as yf
+
+
+MASSIVE_AGGS_URL_TEMPLATE = (
+    "https://api.massive.com/v2/aggs/ticker/{ticker}/range/"
+    "{multiplier}/{timespan}/{from_date}/{to_date}"
+)
+
+
+def _resolve_secret(name: str) -> str | None:
+    value = os.environ.get(name)
+    if value:
+        return value.strip()
+    try:
+        import streamlit as st  # type: ignore
+        from streamlit.errors import StreamlitSecretNotFoundError  # type: ignore
+
+        if hasattr(st, "secrets"):
+            try:
+                secret = st.secrets.get(name)
+                if secret:
+                    return str(secret).strip()
+            except (KeyError, StreamlitSecretNotFoundError):
+                pass
+    except ImportError:
+        pass
+    return None
+
+
+def _select_ohlcv_provider(provider: str | None) -> str:
+    configured = provider or _resolve_secret("OHLCV_PROVIDER") or "yfinance"
+    normalized = str(configured).strip().lower()
+    if normalized == "auto":
+        return "massive" if _resolve_secret("MASSIVE_API_KEY") else "yfinance"
+    if normalized in {"massive", "polygon"}:
+        return "massive"
+    return "yfinance"
+
+
+def _period_to_date_range(period: str, today: date | None = None) -> tuple[str, str]:
+    end = today or date.today()
+    text = str(period).strip().lower()
+    if text == "max":
+        return "2003-01-01", end.isoformat()
+    try:
+        if text.endswith("mo"):
+            months = int(text[:-2])
+            return (end - timedelta(days=months * 31)).isoformat(), end.isoformat()
+        if text.endswith("y"):
+            years = int(text[:-1])
+            return (end - timedelta(days=years * 365 + years // 4)).isoformat(), end.isoformat()
+        if text.endswith("d"):
+            days = int(text[:-1])
+            return (end - timedelta(days=days)).isoformat(), end.isoformat()
+    except ValueError:
+        pass
+    return "2003-01-01", end.isoformat()
+
+
+def _massive_interval(interval: str) -> tuple[int, str]:
+    normalized = str(interval).strip().lower()
+    if normalized in {"1d", "1day", "day"}:
+        return 1, "day"
+    raise ValueError(f"Unsupported Massive OHLCV interval: {interval}")
 
 
 def _flatten(df: pd.DataFrame, ticker: str) -> pd.DataFrame:
@@ -33,25 +99,88 @@ def _flatten(df: pd.DataFrame, ticker: str) -> pd.DataFrame:
     return sub.dropna(how="all")
 
 
-def fetch_ohlcv(
-    tickers: Iterable[str],
+def _frame_from_massive_results(results) -> pd.DataFrame:
+    rows = []
+    if not isinstance(results, list):
+        return pd.DataFrame()
+    for bar in results:
+        if not isinstance(bar, dict):
+            continue
+        timestamp = bar.get("t")
+        try:
+            close = float(bar["c"])
+            rows.append(
+                {
+                    "date": pd.to_datetime(timestamp, unit="ms", utc=True).tz_convert(None),
+                    "open": float(bar["o"]),
+                    "high": float(bar["h"]),
+                    "low": float(bar["l"]),
+                    "close": close,
+                    "volume": float(bar["v"]),
+                    "adj_close": close,
+                }
+            )
+        except (KeyError, TypeError, ValueError):
+            continue
+    if not rows:
+        return pd.DataFrame()
+    return (
+        pd.DataFrame(rows)
+        .set_index("date")
+        .sort_index()[["open", "high", "low", "close", "volume", "adj_close"]]
+        .dropna(how="all")
+    )
+
+
+def _fetch_massive_ohlcv(
+    tickers: list[str],
+    period: str = "3y",
+    interval: str = "1d",
+    api_key: str | None = None,
+) -> dict[str, pd.DataFrame]:
+    token = api_key or _resolve_secret("MASSIVE_API_KEY")
+    if not token:
+        return {}
+    try:
+        multiplier, timespan = _massive_interval(interval)
+        from_date, to_date = _period_to_date_range(period)
+    except ValueError:
+        return {}
+
+    out: dict[str, pd.DataFrame] = {}
+    for ticker in tickers:
+        symbol = str(ticker).upper()
+        url = MASSIVE_AGGS_URL_TEMPLATE.format(
+            ticker=symbol,
+            multiplier=multiplier,
+            timespan=timespan,
+            from_date=from_date,
+            to_date=to_date,
+        )
+        try:
+            response = requests.get(
+                url,
+                params={"adjusted": "true", "sort": "asc", "limit": 50000},
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=30,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except (requests.RequestException, ValueError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        df = _frame_from_massive_results(payload.get("results", []))
+        if not df.empty and len(df) > 30:
+            out[symbol] = df
+    return out
+
+
+def _fetch_yfinance_ohlcv(
+    tickers: list[str],
     period: str = "3y",
     interval: str = "1d",
 ) -> dict[str, pd.DataFrame]:
-    """Fetch OHLCV for a list of tickers from yfinance.
-
-    Parameters
-    ----------
-    tickers : iterable of ticker strings
-    period  : yfinance period string (e.g. '3y', 'max')
-    interval: '1d' for daily
-
-    Returns
-    -------
-    dict mapping ticker -> DataFrame indexed by date with columns
-    [open, high, low, close, adj_close, volume].
-    """
-    tickers = list(dict.fromkeys(tickers))  # de-dup preserving order
     raw = yf.download(
         tickers=tickers,
         period=period,
@@ -70,6 +199,32 @@ def fetch_ohlcv(
         except Exception:
             continue
     return out
+
+
+def fetch_ohlcv(
+    tickers: Iterable[str],
+    period: str = "3y",
+    interval: str = "1d",
+    provider: str | None = None,
+) -> dict[str, pd.DataFrame]:
+    """Fetch OHLCV for a list of tickers from the configured provider.
+
+    Parameters
+    ----------
+    tickers : iterable of ticker strings
+    period  : provider period string (e.g. '3y', 'max')
+    interval: '1d' for daily
+    provider: 'yfinance', 'massive', or 'auto' (defaults to OHLCV_PROVIDER or yfinance)
+
+    Returns
+    -------
+    dict mapping ticker -> DataFrame indexed by date with columns
+    [open, high, low, close, adj_close, volume].
+    """
+    tickers = list(dict.fromkeys(tickers))  # de-dup preserving order
+    if _select_ohlcv_provider(provider) == "massive":
+        return _fetch_massive_ohlcv(tickers, period=period, interval=interval)
+    return _fetch_yfinance_ohlcv(tickers, period=period, interval=interval)
 
 
 def to_weekly(df: pd.DataFrame) -> pd.DataFrame:
