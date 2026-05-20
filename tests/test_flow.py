@@ -403,6 +403,82 @@ def test_short_interest_delta_uses_finra_provider_when_enabled(monkeypatch):
     assert flow.short_interest_delta_15d("XLK") == pytest.approx(-8.25)
 
 
+def test_dark_pool_pct_from_finra_ats_records_uses_latest_week():
+    records = [
+        {
+            "issueSymbolIdentifier": "XLK",
+            "weekStartDate": "2026-05-04",
+            "summaryTypeCode": "ATS_W_SMBL",
+            "totalWeeklyShareQuantity": "100",
+        },
+        {
+            "issueSymbolIdentifier": "XLK",
+            "weekStartDate": "2026-05-11",
+            "summaryTypeCode": "ATS_W_SMBL",
+            "totalWeeklyShareQuantity": "400",
+        },
+        {
+            "issueSymbolIdentifier": "XLK",
+            "weekStartDate": "2026-05-11",
+            "summaryTypeCode": "OTC_W_SMBL",
+            "totalWeeklyShareQuantity": "600",
+        },
+    ]
+
+    assert flow.dark_pool_pct_from_finra_ats_records(records) == pytest.approx(0.40)
+
+
+def test_fetch_finra_ats_weekly_summary_posts_symbol_filter(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [{"issueSymbolIdentifier": "XLK"}]
+
+    def fake_post(url, **kwargs):
+        calls.append((url, kwargs))
+        return FakeResponse()
+
+    monkeypatch.setattr(flow.requests, "post", fake_post)
+
+    records = flow._fetch_finra_ats_weekly_summary("xlk", limit=20, timeout=7)
+
+    assert records == [{"issueSymbolIdentifier": "XLK"}]
+    assert calls[0][0] == "https://api.finra.org/data/group/otcMarket/name/weeklySummary"
+    assert calls[0][1]["json"]["limit"] == 20
+    assert calls[0][1]["json"]["compareFilters"][0]["fieldName"] == "issueSymbolIdentifier"
+    assert calls[0][1]["json"]["compareFilters"][0]["fieldValue"] == "XLK"
+    assert "summaryTypeCode" in calls[0][1]["json"]["fields"]
+    assert calls[0][1]["timeout"] == 7
+
+
+def test_dark_pool_pct_uses_finra_provider_when_enabled(monkeypatch):
+    monkeypatch.setattr(flow, "FINRA_ATS_STUB_MODE", False, raising=False)
+    monkeypatch.setattr(
+        flow,
+        "_fetch_finra_ats_weekly_summary",
+        lambda ticker: [
+            {
+                "issueSymbolIdentifier": "XLK",
+                "weekStartDate": "2026-05-11",
+                "summaryTypeCode": "ATS_W_SMBL",
+                "totalWeeklyShareQuantity": "250",
+            },
+            {
+                "issueSymbolIdentifier": "XLK",
+                "weekStartDate": "2026-05-11",
+                "summaryTypeCode": "OTC_W_SMBL",
+                "totalWeeklyShareQuantity": "750",
+            },
+        ],
+    )
+
+    assert flow.dark_pool_pct("XLK") == pytest.approx(0.25)
+
+
 def test_etf_primary_flow_returns_neutral_on_provider_request_error(monkeypatch):
     monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", False)
     monkeypatch.setattr(

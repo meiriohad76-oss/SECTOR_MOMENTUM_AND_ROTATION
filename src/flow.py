@@ -53,6 +53,7 @@ FINRA_SHORT_INTEREST_STUB_MODE = _config_flag("FINRA_SHORT_INTEREST_STUB_MODE", 
 SEC_13F_STUB_MODE = _config_flag("SEC_13F_STUB_MODE", True)
 MASSIVE_BROWSER_URL = "https://render.joinmassive.com/browser"
 MASSIVE_STOCK_TRADES_URL_TEMPLATE = "https://api.massive.com/v3/trades/{ticker}"
+FINRA_ATS_WEEKLY_SUMMARY_URL = "https://api.finra.org/data/group/otcMarket/name/weeklySummary"
 FINRA_SHORT_INTEREST_URL = "https://api.finra.org/data/group/otcmarket/name/consolidatedShortInterest"
 PRIMARY_FLOW_SOURCE_ENV_PREFIX = "ETF_PRIMARY_FLOW_URL_"
 BLOCK_TRADE_MIN_SHARES = 10_000
@@ -416,7 +417,62 @@ def block_trade_upside_ratio(ticker):
 
 
 def _provider_dark_pool_pct(ticker) -> Optional[float]:
-    return None
+    return dark_pool_pct_from_finra_ats_records(_fetch_finra_ats_weekly_summary(ticker))
+
+
+def dark_pool_pct_from_finra_ats_records(records: list[dict]) -> Optional[float]:
+    rows = [record for record in records if isinstance(record, dict)]
+    if not rows:
+        return None
+    latest_key = max(_record_date_key(record) for record in rows)
+    latest_rows = [record for record in rows if _record_date_key(record) == latest_key]
+    ats_shares = 0.0
+    total_shares = 0.0
+    for record in latest_rows:
+        shares = _parse_float(_pick(record, ["totalWeeklyShareQuantity", "totalWeeklyShares", "shares"]))
+        if shares is None or shares < 0:
+            continue
+        total_shares += shares
+        summary_type = str(_pick(record, ["summaryTypeCode", "summary_type"]) or "").upper()
+        if "ATS" in summary_type:
+            ats_shares += shares
+    if total_shares <= 0:
+        return None
+    return ats_shares / total_shares
+
+
+def _fetch_finra_ats_weekly_summary(ticker: str, limit: int = 40, timeout: int = 20) -> list[dict]:
+    payload = {
+        "fields": [
+            "issueSymbolIdentifier",
+            "weekStartDate",
+            "summaryTypeCode",
+            "totalWeeklyShareQuantity",
+            "totalWeeklyTradeCount",
+        ],
+        "compareFilters": [
+            {
+                "compareType": "EQUAL",
+                "fieldName": "issueSymbolIdentifier",
+                "fieldValue": str(ticker).upper(),
+            }
+        ],
+        "limit": int(limit),
+    }
+    response = requests.post(
+        FINRA_ATS_WEEKLY_SUMMARY_URL,
+        json=payload,
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    data = response.json()
+    if isinstance(data, list):
+        return [item for item in data if isinstance(item, dict)]
+    if isinstance(data, dict):
+        records = data.get("data") or data.get("results") or data.get("rows") or []
+        return [item for item in records if isinstance(item, dict)] if isinstance(records, list) else []
+    return []
 
 
 def dark_pool_pct(ticker):
@@ -433,7 +489,9 @@ def _provider_short_interest_delta_15d(ticker) -> Optional[float]:
 
 
 def _record_date_key(record: dict):
-    return _date_sort_key(str(_pick(record, ["settlementDate", "settlement_date", "date"]) or ""))
+    return _date_sort_key(
+        str(_pick(record, ["settlementDate", "settlement_date", "weekStartDate", "week_start_date", "date"]) or "")
+    )
 
 
 def short_interest_delta_from_finra_records(records: list[dict]) -> Optional[float]:
