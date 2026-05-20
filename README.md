@@ -111,7 +111,7 @@ sector-rotation-dashboard/
 | 3 | Weinstein Stage 2 (30wMA + Mansfield RS) | **LIVE** | weekly resample |
 | 4 | Antonacci dual momentum | **LIVE** | vs BIL T-bill ETF |
 | 5 | RRG (RS-Ratio + RS-Momentum) | **LIVE** | approximation of JdK formulas |
-| 6 | Business-cycle phase | **PARTIAL** | Faber 10mo on SPY + ^TNX/^IRX curve sign; full ISM PMI requires FRED API key |
+| 6 | Business-cycle phase | **PROVIDER-READY** | Fallback: Faber 10mo on SPY + ^TNX/^IRX curve sign. With `FRED_API_KEY`: INDPRO, yield curves, NFCI, recession probability, unemployment, and HY spread. |
 | 7 | Volume & institutional flow | **LIVE** for CMF, OBV, MFI, RVOL, distribution days, OBV/price divergence · **PROVIDER-READY** for ETF primary flow · **STUBBED** for block trades, dark pool, short interest, 13F |
 
 ## Wiring real institutional-flow feeds

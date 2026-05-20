@@ -21,7 +21,7 @@ FRED series used:
 from __future__ import annotations
 
 import os
-from typing import Optional
+from typing import Callable, Optional
 
 import pandas as pd
 
@@ -67,7 +67,10 @@ def fred_available() -> bool:
         return False
 
 
-def fetch_fred(start_date: str = "2018-01-01") -> dict[str, pd.Series]:
+def fetch_fred(
+    start_date: str = "2018-01-01",
+    client_factory: Optional[Callable[[str], object]] = None,
+) -> dict[str, pd.Series]:
     """Fetch all configured FRED series. Returns {series_id: Series} or {} on failure.
 
     Caches via Streamlit if available.
@@ -76,12 +79,14 @@ def fetch_fred(start_date: str = "2018-01-01") -> dict[str, pd.Series]:
     if key is None:
         return {}
 
-    try:
-        from fredapi import Fred  # type: ignore
-    except ImportError:
-        return {}
+    if client_factory is None:
+        try:
+            from fredapi import Fred  # type: ignore
+        except ImportError:
+            return {}
+        client_factory = Fred
 
-    fred = Fred(api_key=key)
+    fred = client_factory(key)
     out: dict[str, pd.Series] = {}
     for series_id in FRED_SERIES:
         try:

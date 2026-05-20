@@ -80,12 +80,11 @@ Each is ~2–4 hours after the integration pattern is set. Flip `STUB_MODE = Fal
 - MACRO (separate channel): Faber 10mo flip on SPY
 **Effort:** ~1 hour for one channel, ~2 hours if templating + retry + dedup.
 
-### B-022 · FRED macro overlay — full ISM PMI + business cycle
-**File:** `src/macro.py` — `business_cycle_phase_full()` stub already commented in.
-**API:** https://fred.stlouisfed.org/docs/api/api_key.html (free key, no rate limit issues).
-**Series:** `MANEMP` (ISM PMI), `T10Y2Y` (yield curve), `INDPRO` (industrial production).
-**Effort:** ~30 lines + FRED_API_KEY env var.
-**Impact:** sharpens cycle phase from coarse 2-signal to proper Stovall/Fidelity 4-phase.
+### B-022 · FRED macro overlay — IMPLEMENTED / KEY PENDING
+**Status:** FRED-backed macro classifier and deterministic tests implemented in `backlog-stepwise-qa`; live validation awaits `FRED_API_KEY`.
+**Files:** `src/fred_data.py`, `src/macro.py`, `tests/test_fred_data.py`, `tests/test_macro.py`.
+**Series:** `INDPRO`, `T10Y2Y`, `T10Y3M`, `UNRATE`, `NFCI`, `RECPROUSM156N`, `BAMLH0A0HYM2`.
+**Impact:** upgrades cycle phase from coarse 2-signal fallback to a tested FRED-backed Stovall/Fidelity-style 4-phase classifier once the free key is configured.
 
 ### B-023 · Click-through from cards/alerts/RRG → drill-down
 **Limitation:** Streamlit's native `st.markdown` can't dispatch a `st.rerun()` from a click inside the HTML.
