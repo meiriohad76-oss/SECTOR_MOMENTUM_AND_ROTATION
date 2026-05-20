@@ -131,6 +131,10 @@ The remaining provider seams have independent safety flags. Leave each unset/`tr
 - `short_interest_delta_15d()` → FINRA consolidated short interest; enable with `FINRA_SHORT_INTEREST_STUB_MODE=false`
 - `thirteen_f_net_buys_q()` → configured SEC Form 13F data-set zip plus `SEC_13F_CUSIP_<TICKER>` mapping; enable with `SEC_13F_STUB_MODE=false`
 
+## State transition alerts
+
+`apply_state_machine()` writes `state.json` first, then sends optional transition alerts through Telegram and/or Slack. Leave alert secrets unset to disable network calls. To enable alerts, configure `TELEGRAM_BOT_TOKEN` plus `TELEGRAM_CHAT_ID`, and/or `SLACK_WEBHOOK_URL`, in Streamlit secrets or environment variables.
+
 ## Methodology references
 
 - Jegadeesh & Titman (1993). *Returns to Buying Winners and Selling Losers.* JoF.

@@ -84,6 +84,7 @@ def test_apply_state_machine_persists_transitions_to_patched_state_file(tmp_path
         )
     )
     monkeypatch.setattr(scoring, "STATE_FILE", state_file)
+    monkeypatch.setattr(scoring, "_send_transition_alerts", lambda transitions: None)
     df = pd.DataFrame([_row(rrg_quadrant="Weakening", cmf21=0.02)], index=["XLK"])
 
     out = scoring.apply_state_machine(df)
@@ -95,3 +96,34 @@ def test_apply_state_machine_persists_transitions_to_patched_state_file(tmp_path
     assert saved["transitions"][-1]["ticker"] == "XLK"
     assert saved["transitions"][-1]["from"] == "HOLD"
     assert saved["transitions"][-1]["to"] == "WARNING"
+
+
+def test_apply_state_machine_notifies_after_persisting_transitions(tmp_path, monkeypatch):
+    state_file = tmp_path / "state.json"
+    state_file.write_text(
+        json.dumps(
+            {
+                "updated": "2026-05-18T00:00:00",
+                "by_ticker": {"XLK": {"state": "HOLD", "date": "2026-05-18"}},
+                "transitions": [],
+            }
+        )
+    )
+    monkeypatch.setattr(scoring, "STATE_FILE", state_file)
+    sent = []
+
+    def fake_send_transition_alerts(transitions):
+        saved = json.loads(state_file.read_text())
+        assert saved["transitions"][-1]["ticker"] == "XLK"
+        assert saved["transitions"][-1]["to"] == "WARNING"
+        sent.extend(transitions)
+
+    monkeypatch.setattr(scoring, "_send_transition_alerts", fake_send_transition_alerts)
+    df = pd.DataFrame([_row(rrg_quadrant="Weakening", cmf21=0.02)], index=["XLK"])
+
+    scoring.apply_state_machine(df)
+
+    assert sent
+    assert sent[-1]["ticker"] == "XLK"
+    assert sent[-1]["from"] == "HOLD"
+    assert sent[-1]["to"] == "WARNING"

@@ -71,14 +71,12 @@ After B-010 establishes the pattern, wire the rest:
 
 Each is ~2–4 hours after the integration pattern is set. Flip `STUB_MODE = False` in `flow.py` when done.
 
-### B-021 · Telegram / Slack alerting on state transitions
-**File:** `src/scoring.py` — add `_notify_transition(ticker, from_state, to_state)` hook inside `apply_state_machine()`.
-**Send to:** Telegram bot, Slack webhook, or Pushover.
-**Severity tiers from methodology §6:**
-- LOW (info digest, 08:00 daily): `WARNING` transitions
-- HIGH (immediate push): `EXIT` and `BEARISH_STAGE_4`
-- MACRO (separate channel): Faber 10mo flip on SPY
-**Effort:** ~1 hour for one channel, ~2 hours if templating + retry + dedup.
+### B-021 · Telegram / Slack alerting on state transitions — IMPLEMENTED / KEYS PENDING
+**Status:** Telegram bot and Slack webhook channels are implemented in `backlog-stepwise-qa`; live validation awaits alert secrets.
+**Files:** `src/alerts.py`, `src/scoring.py`, `tests/test_alerts.py`, `tests/test_scoring.py`, `.streamlit/secrets.toml.example`, `README.md`.
+**Activation:** leave `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and `SLACK_WEBHOOK_URL` unset to disable network calls. Configure Telegram and/or Slack secrets to enable delivery.
+**Behavior:** `apply_state_machine()` persists `state.json` and the transition log before sending alerts. Provider failures are swallowed so scoring does not fail because an alert endpoint is down.
+**Deferred:** Pushover, severity-specific routing, retry/backoff, dedup, and macro-channel alerts remain future backlog work.
 
 ### B-022 · FRED macro overlay — IMPLEMENTED / KEY PENDING
 **Status:** FRED-backed macro classifier and deterministic tests implemented in `backlog-stepwise-qa`; live validation awaits `FRED_API_KEY`.

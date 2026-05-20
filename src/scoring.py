@@ -188,6 +188,17 @@ def _save_state(by_ticker: dict, transitions: list[dict]) -> None:
     payload["transitions"] = log[-500:]   # cap to last 500 transitions
     with open(STATE_FILE, "w") as f:
         json.dump(payload, f, indent=2, default=str)
+    if transitions:
+        _send_transition_alerts(transitions)
+
+
+def _send_transition_alerts(transitions: list[dict]) -> None:
+    try:
+        from .alerts import send_transition_alerts
+
+        send_transition_alerts(transitions)
+    except Exception:
+        pass
 
 
 def recent_transitions(n: int = 25) -> list[dict]:
