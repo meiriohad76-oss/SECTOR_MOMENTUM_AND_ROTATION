@@ -64,7 +64,7 @@ Status legend:
 ### B-020 · Massive AI flow integration — remaining 4 stubs
 **Safety scaffold:** per-provider opt-in flags added in `backlog-stepwise-qa`: `MASSIVE_TRADES_STUB_MODE`, `FINRA_ATS_STUB_MODE`, `FINRA_SHORT_INTEREST_STUB_MODE`, and `SEC_13F_STUB_MODE`. Leave each unset/`true` for neutral fallback until its feed is configured.
 After B-010 establishes the pattern, wire the rest:
-- **B-020a** `block_trade_upside_ratio()` — Massive `/v3/trades`
+- **B-020a** `block_trade_upside_ratio()` — IMPLEMENTED in `backlog-stepwise-qa`; Massive `/v3/trades`, enabled with `MASSIVE_TRADES_STUB_MODE=false`, neutral on missing key/data/provider errors.
 - **B-020b** `dark_pool_pct()` — FINRA ATS Transparency weekly CSV
 - **B-020c** `short_interest_delta_15d()` — FINRA Reg SHO bi-monthly file
 - **B-020d** `thirteen_f_net_buys_q()` — SEC EDGAR Form 13F-HR (XBRL parsing)

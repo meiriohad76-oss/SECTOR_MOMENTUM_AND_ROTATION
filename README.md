@@ -126,7 +126,7 @@ The remaining provider seams have independent safety flags. Leave each unset/`tr
 - `SEC_13F_STUB_MODE`
 
 - `etf_primary_flow_5d_pct()` → Massive-rendered issuer SHO/source URL per ticker
-- `block_trade_upside_ratio()` → Massive `/v3/trades`
+- `block_trade_upside_ratio()` → Massive `/v3/trades`; enable with `MASSIVE_TRADES_STUB_MODE=false`
 - `dark_pool_pct()` → FINRA ATS Transparency (free, T+1)
 - `short_interest_delta_15d()` → FINRA Reg SHO bi-monthly (free)
 - `thirteen_f_net_buys_q()` → SEC EDGAR Form 13F-HR quarterly (free, T+45)

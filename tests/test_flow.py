@@ -286,6 +286,65 @@ def test_provider_seams_fail_closed_to_neutral_values(monkeypatch):
     assert flow.thirteen_f_net_buys_q("XLK") == 0.0
 
 
+def test_block_trade_upside_ratio_from_massive_trades_uses_block_notional():
+    trades = [
+        {"p": 100.0, "s": 100, "sip_timestamp": 1, "correction": 0},
+        {"p": 101.0, "s": 3_000, "sip_timestamp": 2, "correction": 0},
+        {"p": 102.0, "s": 500, "sip_timestamp": 3, "correction": 0},
+        {"p": 99.0, "s": 4_000, "sip_timestamp": 4, "correction": 0},
+        {"p": 98.0, "s": 20_000, "sip_timestamp": 5, "correction": 1},
+        {"p": 100.0, "s": 10_000, "sip_timestamp": 6, "correction": 0},
+    ]
+
+    ratio = flow.block_trade_upside_ratio_from_massive_trades(trades)
+
+    assert ratio == pytest.approx((101.0 * 3_000 + 100.0 * 10_000) / (99.0 * 4_000))
+
+
+def test_fetch_massive_stock_trades_uses_key_and_trade_endpoint(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"results": [{"p": 100.0, "s": 100}]}
+
+    def fake_get(url, **kwargs):
+        calls.append((url, kwargs))
+        return FakeResponse()
+
+    monkeypatch.setattr(flow, "_resolve_secret", lambda name: "secret" if name == "MASSIVE_API_KEY" else None)
+    monkeypatch.setattr(flow.requests, "get", fake_get)
+
+    trades = flow._fetch_massive_stock_trades("xlk", start_date="2026-05-19", limit=50, timeout=7)
+
+    assert trades == [{"p": 100.0, "s": 100}]
+    assert calls[0][0] == "https://api.massive.com/v3/trades/XLK"
+    assert calls[0][1]["headers"]["Authorization"] == "Bearer secret"
+    assert calls[0][1]["params"]["timestamp.gte"] == "2026-05-19"
+    assert calls[0][1]["params"]["limit"] == 50
+    assert calls[0][1]["params"]["sort"] == "timestamp"
+    assert calls[0][1]["params"]["order"] == "desc"
+    assert calls[0][1]["timeout"] == 7
+
+
+def test_block_trade_upside_ratio_uses_massive_provider_when_enabled(monkeypatch):
+    monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", False, raising=False)
+    monkeypatch.setattr(
+        flow,
+        "_fetch_massive_stock_trades",
+        lambda ticker: [
+            {"p": 100.0, "s": 100, "sip_timestamp": 1},
+            {"p": 101.0, "s": 3_000, "sip_timestamp": 2},
+            {"p": 99.0, "s": 4_000, "sip_timestamp": 3},
+        ],
+    )
+
+    assert flow.block_trade_upside_ratio("XLK") == pytest.approx((101.0 * 3_000) / (99.0 * 4_000))
+
+
 def test_etf_primary_flow_returns_neutral_on_provider_request_error(monkeypatch):
     monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", False)
     monkeypatch.setattr(

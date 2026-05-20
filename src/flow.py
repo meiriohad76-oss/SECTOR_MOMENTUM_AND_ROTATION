@@ -52,7 +52,10 @@ FINRA_ATS_STUB_MODE = _config_flag("FINRA_ATS_STUB_MODE", True)
 FINRA_SHORT_INTEREST_STUB_MODE = _config_flag("FINRA_SHORT_INTEREST_STUB_MODE", True)
 SEC_13F_STUB_MODE = _config_flag("SEC_13F_STUB_MODE", True)
 MASSIVE_BROWSER_URL = "https://render.joinmassive.com/browser"
+MASSIVE_STOCK_TRADES_URL_TEMPLATE = "https://api.massive.com/v3/trades/{ticker}"
 PRIMARY_FLOW_SOURCE_ENV_PREFIX = "ETF_PRIMARY_FLOW_URL_"
+BLOCK_TRADE_MIN_SHARES = 10_000
+BLOCK_TRADE_MIN_NOTIONAL = 200_000.0
 
 
 @dataclass(frozen=True)
@@ -323,8 +326,83 @@ def _neutral_float(value: Optional[float], neutral: float) -> float:
     return number if np.isfinite(number) else neutral
 
 
+def _trade_timestamp(trade: dict) -> float:
+    value = _pick(trade, ["sip_timestamp", "participant_timestamp", "trf_timestamp", "timestamp", "t"])
+    parsed = _parse_float(value)
+    return parsed if parsed is not None else 0.0
+
+
+def _trade_price_and_size(trade: dict) -> tuple[Optional[float], Optional[float]]:
+    return (
+        _parse_float(_pick(trade, ["p", "price"])),
+        _parse_float(_pick(trade, ["s", "size", "volume"])),
+    )
+
+
+def block_trade_upside_ratio_from_massive_trades(trades: list[dict]) -> Optional[float]:
+    clean_trades = []
+    for trade in trades:
+        correction = _parse_float(_pick(trade, ["correction", "c"]))
+        if correction not in (None, 0.0):
+            continue
+        price, size = _trade_price_and_size(trade)
+        if price is None or size is None or price <= 0 or size <= 0:
+            continue
+        clean_trades.append((float(_trade_timestamp(trade)), price, size))
+    clean_trades.sort(key=lambda item: item[0])
+
+    upside_notional = 0.0
+    downside_notional = 0.0
+    previous_price: Optional[float] = None
+    for _, price, size in clean_trades:
+        notional = price * size
+        is_block = size >= BLOCK_TRADE_MIN_SHARES or notional >= BLOCK_TRADE_MIN_NOTIONAL
+        if is_block and previous_price is not None:
+            if price > previous_price:
+                upside_notional += notional
+            elif price < previous_price:
+                downside_notional += notional
+        previous_price = price
+
+    if upside_notional == 0.0 and downside_notional == 0.0:
+        return None
+    if downside_notional == 0.0:
+        return 2.0
+    return upside_notional / downside_notional
+
+
+def _fetch_massive_stock_trades(
+    ticker: str,
+    start_date: Optional[str] = None,
+    limit: int = 5_000,
+    timeout: int = 20,
+) -> list[dict]:
+    token = _resolve_secret("MASSIVE_API_KEY")
+    if not token:
+        return []
+    params: dict[str, str | int] = {
+        "limit": int(limit),
+        "sort": "timestamp",
+        "order": "desc",
+    }
+    if start_date:
+        params["timestamp.gte"] = start_date
+    response = requests.get(
+        MASSIVE_STOCK_TRADES_URL_TEMPLATE.format(ticker=str(ticker).upper()),
+        params=params,
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        return []
+    results = payload.get("results", [])
+    return [item for item in results if isinstance(item, dict)] if isinstance(results, list) else []
+
+
 def _provider_block_trade_upside_ratio(ticker) -> Optional[float]:
-    return None
+    return block_trade_upside_ratio_from_massive_trades(_fetch_massive_stock_trades(ticker))
 
 
 def block_trade_upside_ratio(ticker):
