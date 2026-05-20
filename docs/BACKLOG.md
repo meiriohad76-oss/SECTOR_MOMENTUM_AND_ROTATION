@@ -90,10 +90,11 @@ Each is ~2–4 hours after the integration pattern is set. Flip `STUB_MODE = Fal
 **Behavior:** alert, pick, and RRG context controls update `st.session_state.drill_ticker` plus the URL query param, then rerun into the existing per-ticker drill-down.
 **Deferred:** whole-card HTML clicks and Plotly dot-click capture still need a custom component or event bridge.
 
-### B-024 · Floating refresh / theme buttons in the header
-**Current state:** buttons at bottom of page (DOM order limitation).
-**Fix:** use `streamlit-elements` or a tiny custom component that POSTs to a Streamlit endpoint to mutate session_state from a fixed-position button.
-**Effort:** ~1 hour.
+### B-024 · Floating refresh / theme buttons in the header — IMPLEMENTED
+**Status:** Native Streamlit refresh/theme controls render immediately after the header and are fixed top-right via CSS.
+**Files:** `src/controls.py`, `app.py`, `static/style.css`, `tests/test_controls.py`, `tests/test_header_controls_static.py`.
+**Behavior:** refresh clears cached market data and reruns; theme toggles dark/light session state and reruns.
+**Deferred:** custom component bridge and animated fetching state remain future polish.
 
 ### B-025 · TweaksPanel parity (BLUF Compact / Hidden modes)
 **Source:** `tweaks-panel.jsx` in the Claude Design export has a full preferences dropdown.
@@ -177,7 +178,7 @@ These need a design decision before building:
 - **Branches:** currently all work lands on `main`. Consider feature branches once collaborating.
 - **Auth:** GitHub Personal Access Token stored in Windows credential helper. Renew every 90 days.
 - **State file:** `state.json` on the Pi is the source of truth for state-machine transitions. Don't delete unless you want to reset history.
-- **Cache TTL:** 1 hour (`@st.cache_data(ttl=3600)` in `app.py`). Click the ↻ button or run `_load_data.clear()` to force refresh.
+- **Cache TTL:** 1 hour (`@st.cache_data(ttl=3600)` in `app.py`). Click the ↻ button or call `refresh_market_data(_load_data)` to force refresh.
 
 ---
 

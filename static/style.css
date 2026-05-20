@@ -126,6 +126,7 @@ body {
   display: flex;
   align-items: center;
   gap: 22px;
+  padding-right: 96px;
   font-family: var(--font-mono);
   font-size: 0.74rem;
   color: var(--muted);
@@ -157,6 +158,47 @@ body {
   transition: border-color 150ms ease, color 150ms ease;
 }
 .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- Header native controls ---------- */
+.element-container:has(.header-controls-slot) {
+  height: 0;
+  margin: 0;
+  padding: 0;
+}
+.header-controls-slot + div[data-testid="stHorizontalBlock"],
+.element-container:has(.header-controls-slot) + div[data-testid="stHorizontalBlock"] {
+  position: fixed;
+  top: 12px;
+  right: 28px;
+  width: 78px;
+  z-index: 1000;
+  gap: 8px !important;
+}
+.header-controls-slot + div[data-testid="stHorizontalBlock"] [data-testid="column"],
+.element-container:has(.header-controls-slot) + div[data-testid="stHorizontalBlock"] [data-testid="column"] {
+  width: 34px !important;
+  flex: 0 0 34px !important;
+}
+.header-controls-slot + div[data-testid="stHorizontalBlock"] button,
+.element-container:has(.header-controls-slot) + div[data-testid="stHorizontalBlock"] button {
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--panel);
+  color: var(--fg-dim);
+  font-family: var(--font-mono);
+  line-height: 1;
+  transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+}
+.header-controls-slot + div[data-testid="stHorizontalBlock"] button:hover,
+.element-container:has(.header-controls-slot) + div[data-testid="stHorizontalBlock"] button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--panel-hover);
+}
 
 /* ---------- Section header ---------- */
 .section {

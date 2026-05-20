@@ -15,6 +15,7 @@ from src.data import fetch_ohlcv
 from src.indicators import compute_all_indicators
 from src.flow import compute_flow_signals, flow_composite_z, STUB_MODE
 from src.macro import assess_regime
+from src.controls import refresh_market_data, toggle_theme
 from src.portfolio import (
     analyze_holdings,
     analysis_rows_frame,
@@ -426,6 +427,20 @@ def render_header():
       </header>
     """
     _md(html)
+
+
+def render_header_controls():
+    _md('<div class="header-controls-slot"></div>')
+    ctrl_col1, ctrl_col2 = st.columns(2)
+    with ctrl_col1:
+        if st.button("↻", key="refresh_btn", help="Refresh data", use_container_width=True):
+            refresh_market_data(_load_data)
+            st.rerun()
+    with ctrl_col2:
+        icon = "☀" if st.session_state.theme == "dark" else "☾"
+        if st.button(icon, key="theme_btn", help="Toggle theme", use_container_width=True):
+            toggle_theme(st.session_state)
+            st.rerun()
 
 
 def render_bluf():
@@ -1025,6 +1040,7 @@ def render_footer():
 # =============================== compose page ====================================
 
 render_header()
+render_header_controls()
 render_explainer()
 render_bluf()
 render_status()
@@ -1035,16 +1051,3 @@ render_drill()
 render_portfolio_analyzer()
 render_full_table()
 render_footer()
-
-
-# floating refresh / theme controls (mini fixed buttons, top-right)
-ctrl_col1, ctrl_col2, _ = st.columns([1, 1, 18])
-with ctrl_col1:
-    if st.button("↻", key="refresh_btn", help="Refresh data"):
-        _load_data.clear()
-        st.rerun()
-with ctrl_col2:
-    icon = "☀" if st.session_state.theme == "dark" else "☾"
-    if st.button(icon, key="theme_btn", help="Toggle theme"):
-        st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
-        st.rerun()
