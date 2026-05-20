@@ -345,6 +345,64 @@ def test_block_trade_upside_ratio_uses_massive_provider_when_enabled(monkeypatch
     assert flow.block_trade_upside_ratio("XLK") == pytest.approx((101.0 * 3_000) / (99.0 * 4_000))
 
 
+def test_short_interest_delta_from_finra_records_prefers_reported_change_percent():
+    records = [
+        {"symbolCode": "XLK", "settlementDate": "2026-05-15", "changePercent": "12.5"},
+        {"symbolCode": "XLK", "settlementDate": "2026-04-30", "changePercent": "-3.0"},
+    ]
+
+    assert flow.short_interest_delta_from_finra_records(records) == pytest.approx(12.5)
+
+
+def test_short_interest_delta_from_finra_records_can_compute_from_positions():
+    records = [
+        {"symbolCode": "XLK", "settlementDate": "2026-05-15", "currentShortPositionQuantity": "1,250,000"},
+        {"symbolCode": "XLK", "settlementDate": "2026-04-30", "currentShortPositionQuantity": "1,000,000"},
+    ]
+
+    assert flow.short_interest_delta_from_finra_records(records) == pytest.approx(25.0)
+
+
+def test_fetch_finra_short_interest_posts_symbol_filter(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [{"symbolCode": "XLK", "changePercent": "5.0"}]
+
+    def fake_post(url, **kwargs):
+        calls.append((url, kwargs))
+        return FakeResponse()
+
+    monkeypatch.setattr(flow.requests, "post", fake_post)
+
+    records = flow._fetch_finra_short_interest("xlk", limit=2, timeout=7)
+
+    assert records == [{"symbolCode": "XLK", "changePercent": "5.0"}]
+    assert calls[0][0] == "https://api.finra.org/data/group/otcmarket/name/consolidatedShortInterest"
+    assert calls[0][1]["json"]["limit"] == 2
+    assert calls[0][1]["json"]["compareFilters"][0]["fieldName"] == "symbolCode"
+    assert calls[0][1]["json"]["compareFilters"][0]["fieldValue"] == "XLK"
+    assert "settlementDate" in calls[0][1]["json"]["fields"]
+    assert calls[0][1]["timeout"] == 7
+
+
+def test_short_interest_delta_uses_finra_provider_when_enabled(monkeypatch):
+    monkeypatch.setattr(flow, "FINRA_SHORT_INTEREST_STUB_MODE", False, raising=False)
+    monkeypatch.setattr(
+        flow,
+        "_fetch_finra_short_interest",
+        lambda ticker: [
+            {"symbolCode": "XLK", "settlementDate": "2026-05-15", "changePercent": "-8.25"},
+        ],
+    )
+
+    assert flow.short_interest_delta_15d("XLK") == pytest.approx(-8.25)
+
+
 def test_etf_primary_flow_returns_neutral_on_provider_request_error(monkeypatch):
     monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", False)
     monkeypatch.setattr(

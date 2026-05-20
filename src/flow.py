@@ -53,6 +53,7 @@ FINRA_SHORT_INTEREST_STUB_MODE = _config_flag("FINRA_SHORT_INTEREST_STUB_MODE", 
 SEC_13F_STUB_MODE = _config_flag("SEC_13F_STUB_MODE", True)
 MASSIVE_BROWSER_URL = "https://render.joinmassive.com/browser"
 MASSIVE_STOCK_TRADES_URL_TEMPLATE = "https://api.massive.com/v3/trades/{ticker}"
+FINRA_SHORT_INTEREST_URL = "https://api.finra.org/data/group/otcmarket/name/consolidatedShortInterest"
 PRIMARY_FLOW_SOURCE_ENV_PREFIX = "ETF_PRIMARY_FLOW_URL_"
 BLOCK_TRADE_MIN_SHARES = 10_000
 BLOCK_TRADE_MIN_NOTIONAL = 200_000.0
@@ -428,7 +429,72 @@ def dark_pool_pct(ticker):
 
 
 def _provider_short_interest_delta_15d(ticker) -> Optional[float]:
-    return None
+    return short_interest_delta_from_finra_records(_fetch_finra_short_interest(ticker))
+
+
+def _record_date_key(record: dict):
+    return _date_sort_key(str(_pick(record, ["settlementDate", "settlement_date", "date"]) or ""))
+
+
+def short_interest_delta_from_finra_records(records: list[dict]) -> Optional[float]:
+    ordered = sorted([record for record in records if isinstance(record, dict)], key=_record_date_key)
+    if not ordered:
+        return None
+    latest = ordered[-1]
+    reported = _parse_float(
+        _pick(latest, ["changePercent", "change_percent", "changePercentQuantity", "change percent"])
+    )
+    if reported is not None:
+        return reported
+
+    latest_position = _parse_float(
+        _pick(latest, ["currentShortPositionQuantity", "shortPositionQuantity", "short_position"])
+    )
+    previous_position = _parse_float(
+        _pick(latest, ["previousShortPositionQuantity", "previous_short_position"])
+    )
+    if previous_position is None and len(ordered) >= 2:
+        previous_position = _parse_float(
+            _pick(ordered[-2], ["currentShortPositionQuantity", "shortPositionQuantity", "short_position"])
+        )
+    if latest_position is None or previous_position in (None, 0.0):
+        return None
+    return (latest_position - previous_position) / previous_position * 100.0
+
+
+def _fetch_finra_short_interest(ticker: str, limit: int = 4, timeout: int = 20) -> list[dict]:
+    payload = {
+        "fields": [
+            "symbolCode",
+            "settlementDate",
+            "currentShortPositionQuantity",
+            "previousShortPositionQuantity",
+            "changePercent",
+            "daysToCoverQuantity",
+        ],
+        "compareFilters": [
+            {
+                "compareType": "EQUAL",
+                "fieldName": "symbolCode",
+                "fieldValue": str(ticker).upper(),
+            }
+        ],
+        "limit": int(limit),
+    }
+    response = requests.post(
+        FINRA_SHORT_INTEREST_URL,
+        json=payload,
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    data = response.json()
+    if isinstance(data, list):
+        return [item for item in data if isinstance(item, dict)]
+    if isinstance(data, dict):
+        records = data.get("data") or data.get("results") or data.get("rows") or []
+        return [item for item in records if isinstance(item, dict)] if isinstance(records, list) else []
+    return []
 
 
 def short_interest_delta_15d(ticker):
