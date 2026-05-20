@@ -96,13 +96,11 @@ Each is ~2–4 hours after the integration pattern is set. Flip `STUB_MODE = Fal
 **Behavior:** refresh clears cached market data and reruns; theme toggles dark/light session state and reruns.
 **Deferred:** custom component bridge and animated fetching state remain future polish.
 
-### B-025 · TweaksPanel parity (BLUF Compact / Hidden modes)
-**Source:** `tweaks-panel.jsx` in the Claude Design export has a full preferences dropdown.
-**Add to sidebar (or floating panel):**
-- BLUF mode: Verdict / Compact / Hidden (replace section 1)
-- Density: Comfortable / Compact
-- Sparkline style: Filled / Line only / Off
-**Effort:** ~2 hours.
+### B-025 · TweaksPanel parity (BLUF Compact / Hidden modes) — IMPLEMENTED
+**Status:** Native Streamlit `VIEW OPTIONS` expander is implemented near the header.
+**Files:** `src/preferences.py`, `app.py`, `src/visuals.py`, `static/style.css`, `tests/test_preferences.py`, `tests/test_visuals.py`, `tests/test_view_preferences_static.py`.
+**Controls:** BLUF mode (`Verdict`, `Compact`, `Hidden`), density (`Comfortable`, `Compact`), and sparkline style (`Filled`, `Line`, `Off`).
+**Deferred:** custom floating React-style panel, persisted user profiles, and additional palettes remain future preference work.
 
 ### B-026 · Empty + loading state design
 **Spec:** PRODUCT_DESIGN.md §11 mockup priorities 6 and 7.

@@ -26,6 +26,16 @@ from src.portfolio import (
 )
 from src.scoring import compute_composite, apply_state_machine, recent_transitions
 from src.navigation import initialize_drill_ticker, select_drill_ticker
+from src.preferences import (
+    BLUF_MODES,
+    DENSITY_MODES,
+    SPARKLINE_STYLES,
+    density_class,
+    initialize_preferences,
+    is_compact_bluf,
+    should_render_bluf,
+    sparkline_mode,
+)
 from src.visuals import (
     rrg_chart_dark,
     price_chart_with_30wma,
@@ -252,9 +262,17 @@ if "table_open" not in st.session_state:
     st.session_state.table_open = True
 if "table_sort" not in st.session_state:
     st.session_state.table_sort = "S_score:desc"
+initialize_preferences(st.session_state)
+_density_class = density_class(st.session_state.view_density)
 
-_md(f'<style>{_CSS}{_EXTRA}</style>'
-    f'<script>document.documentElement.setAttribute("data-theme","{st.session_state.theme}");</script>',)
+_md(
+    f'<style>{_CSS}{_EXTRA}</style>'
+    f'<script>'
+    f'document.documentElement.setAttribute("data-theme","{st.session_state.theme}");'
+    f'document.documentElement.classList.remove("density-comfortable","density-compact");'
+    f'document.documentElement.classList.add("{_density_class}");'
+    f'</script>',
+)
 
 
 # =============================== data load (cached) ==============================
@@ -429,6 +447,32 @@ def render_header():
     _md(html)
 
 
+def render_view_preferences():
+    with st.expander("VIEW OPTIONS", expanded=False):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.radio(
+                "BLUF",
+                BLUF_MODES,
+                horizontal=True,
+                key="bluf_mode",
+            )
+        with c2:
+            st.radio(
+                "Density",
+                DENSITY_MODES,
+                horizontal=True,
+                key="view_density",
+            )
+        with c3:
+            st.radio(
+                "Sparkline",
+                SPARKLINE_STYLES,
+                horizontal=True,
+                key="sparkline_style",
+            )
+
+
 def render_header_controls():
     _md('<div class="header-controls-slot"></div>')
     ctrl_col1, ctrl_col2 = st.columns(2)
@@ -444,17 +488,22 @@ def render_header_controls():
 
 
 def render_bluf():
+    if not should_render_bluf(st.session_state.bluf_mode):
+        return
+    compact = is_compact_bluf(st.session_state.bluf_mode)
+    instruction = "Use drill controls below for detail." if compact else "Click any action card → drill-down."
     sub = (
         f"Forward calls: {bluf['exits_count']} tickers expected to underperform soon, "
         f"{bluf['warns_count']} showing topping signals, "
         f"{bluf['buys_count']} predicted to lead the next 4-26 weeks. "
         f"Universe: {len(scored)} ETFs. "
         f"Risk regime is {('on' if regime.risk_on else 'off')} ({regime.phase_hint.lower()} cycle). "
-        f"Click any action card → drill-down."
+        f"{instruction}"
     )
+    compact_class = " compact" if compact else ""
     head_html = f"""
     <section class="section">
-      <div class="bluf">
+      <div class="bluf{compact_class}">
         <div class="bluf-head">
           <div class="bluf-eyebrow">
             <span class="pill-tiny">BLUF</span>
@@ -470,6 +519,12 @@ def render_bluf():
           <span class="buy-num tip-cue" data-tip="{_esc(INDICATOR_TIPS['bluf_buy'])}">{bluf['buys_count']}</span> <span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['bluf_buy'])}">NEW BUYS</span>
         </div>
         <div class="bluf-sub">{sub}</div>
+    """
+    if compact:
+        _md(head_html + "</div></section>")
+        return
+
+    head_html += """
         <div class="bluf-actions">
     """
     cards = []
@@ -636,7 +691,11 @@ def render_picks():
         quad = (p.get("rrg_quadrant") or "—").upper()
         klass_lbl = p["class"]
         spark_color = "#26d65b" if mom >= 0 else "#ef4f4a"
-        spark = svg_sparkline(ohlcv.get(tkr), spark_color) if tkr in ohlcv else ""
+        spark = svg_sparkline(
+            ohlcv.get(tkr),
+            spark_color,
+            style=sparkline_mode(st.session_state.sparkline_style),
+        ) if tkr in ohlcv else ""
         mom_class = "pos" if mom >= 0 else "neg"
         s_class = "pos" if s >= 0 else "neg"
         f_class = "pos" if f >= 0 else "neg"
@@ -1041,6 +1100,7 @@ def render_footer():
 
 render_header()
 render_header_controls()
+render_view_preferences()
 render_explainer()
 render_bluf()
 render_status()

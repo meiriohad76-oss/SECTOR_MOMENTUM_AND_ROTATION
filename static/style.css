@@ -306,6 +306,20 @@ body {
   line-height: 1.45;
   margin-bottom: 22px;
 }
+.bluf.compact {
+  padding: 14px 18px 16px;
+}
+.bluf.compact .bluf-head {
+  margin-bottom: 6px;
+}
+.bluf.compact .bluf-headline {
+  font-size: 1.25rem;
+  margin: 4px 0;
+}
+.bluf.compact .bluf-sub {
+  margin-bottom: 0;
+  font-size: 0.86rem;
+}
 
 .bluf-actions {
   display: grid;
@@ -585,6 +599,26 @@ body {
 .pick-foot .quad {
   color: var(--fg-dim);
   font-weight: 600;
+}
+
+/* ---------- Density preferences ---------- */
+html.density-compact .section {
+  margin-top: 20px;
+}
+html.density-compact .status-row,
+html.density-compact .picks-grid {
+  gap: 10px;
+}
+html.density-compact .tile,
+html.density-compact .pick,
+html.density-compact .action-card {
+  padding: 10px 12px;
+}
+html.density-compact .pick {
+  gap: 8px;
+}
+html.density-compact .pick-spark {
+  height: 38px;
 }
 
 /* ---------- State pill ---------- */
