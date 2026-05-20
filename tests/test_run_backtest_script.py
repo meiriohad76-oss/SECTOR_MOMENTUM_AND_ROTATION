@@ -5,14 +5,17 @@ from scripts import run_backtest
 
 def test_run_backtest_returns_manual_data_error_when_required_prices_missing(monkeypatch, tmp_path):
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
+    monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", lambda tickers, period: {})
 
     assert run_backtest.main() == 2
     assert not run_backtest.REPORT_PATH.exists()
+    assert not run_backtest.EQUITY_PATH.exists()
 
 
 def test_run_backtest_returns_manual_data_error_when_fetch_raises(monkeypatch, tmp_path):
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
+    monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
 
     def fail_fetch(tickers, period):
         raise RuntimeError("download failed")
@@ -21,6 +24,7 @@ def test_run_backtest_returns_manual_data_error_when_fetch_raises(monkeypatch, t
 
     assert run_backtest.main() == 2
     assert not run_backtest.REPORT_PATH.exists()
+    assert not run_backtest.EQUITY_PATH.exists()
 
 
 def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp_path, ohlcv_frame_factory):
@@ -60,6 +64,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
         }
 
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
+    monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
 
     assert run_backtest.main() == 0
@@ -70,6 +75,10 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     assert "60/40 SPY/AGG" in report
     assert "Equal-weight sectors" in report
     assert "## Cost Sensitivity" in report
+    assert run_backtest.EQUITY_PATH.exists()
+    equity = run_backtest.EQUITY_PATH.read_text(encoding="utf-8")
+    assert "60/40 SPY/AGG" in equity
+    assert "Equal-weight sectors" in equity
 
 
 def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
@@ -102,8 +111,10 @@ def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
         }
 
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
+    monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
 
     assert run_backtest.main() == 2
     assert calls == [(expected_tickers, "max")]
     assert not run_backtest.REPORT_PATH.exists()
+    assert not run_backtest.EQUITY_PATH.exists()

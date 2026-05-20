@@ -584,3 +584,16 @@ def format_backtest_report(
     lines.extend(["", "## Acceptance Gates", ""])
     lines.extend(format_gate_report(gates).splitlines()[2:])
     return "\n".join(lines).rstrip() + "\n"
+
+
+def equity_frame(results: dict[str, BacktestResult]) -> pd.DataFrame:
+    if not results:
+        raise ValueError("results must contain at least one backtest result")
+    series = {}
+    for name, result in results.items():
+        equity = result.equity.copy()
+        equity.index = pd.to_datetime(equity.index)
+        series[str(name)] = equity.sort_index()
+    frame = pd.DataFrame(series).sort_index().ffill()
+    frame.index.name = "date"
+    return frame

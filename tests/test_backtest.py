@@ -430,6 +430,20 @@ def test_format_backtest_report_includes_benchmarks_costs_and_gates():
     assert "Out-of-sample Sharpe: PASS" in text
 
 
+def test_equity_frame_combines_named_results_on_date_index():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+    prices = pd.DataFrame({"AAA": [100.0, 110.0, 121.0]}, index=dates)
+    weights = pd.DataFrame({"AAA": [1.0]}, index=[dates[0]])
+    result = backtest.run_weight_backtest(prices, weights, initial_capital=100.0)
+
+    frame = backtest.equity_frame({"Strategy": result})
+
+    assert list(frame.columns) == ["Strategy"]
+    assert frame.index.name == "date"
+    assert frame.iloc[0, 0] == pytest.approx(100.0)
+    assert frame.iloc[-1, 0] == pytest.approx(121.0)
+
+
 def test_build_historical_methodology_targets_slices_inputs_without_lookahead():
     dates = pd.bdate_range("2024-01-01", periods=8)
     ohlcv = {

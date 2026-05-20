@@ -13,6 +13,7 @@ from src.data import fetch_ohlcv
 
 
 REPORT_PATH = Path("docs/backtest_report.md")
+EQUITY_PATH = Path("docs/backtest_equity.csv")
 SECTOR_BENCHMARK_TICKERS = [
     "XLK",
     "XLF",
@@ -73,7 +74,14 @@ def main() -> int:
             gates=gates,
             title="Manual Backtest Smoke Report",
         )
+        equity = backtest.equity_frame(
+            {
+                "60/40 SPY/AGG": sixty_forty_result,
+                "Equal-weight sectors": sector_result,
+            }
+        )
         REPORT_PATH.write_text(report, encoding="utf-8")
+        equity.to_csv(EQUITY_PATH)
     except Exception as exc:
         print(f"Manual backtest data validation failed: {exc}")
         return 2
