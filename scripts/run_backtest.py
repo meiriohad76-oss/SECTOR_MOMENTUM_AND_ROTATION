@@ -30,7 +30,7 @@ SECTOR_BENCHMARK_TICKERS = [
     "XLRE",
     "XLC",
 ]
-REQUIRED_TICKERS = sorted({"AGG", "SPY", *SECTOR_BENCHMARK_TICKERS})
+REQUIRED_TICKERS = sorted({"AGG", "BIL", "SPY", *SECTOR_BENCHMARK_TICKERS})
 
 
 def _sha256_bytes(payload: bytes) -> str:
@@ -78,6 +78,19 @@ def main() -> int:
         return 2
     try:
         rebalance_dates = backtest.weekly_rebalance_dates(prices)
+        methodology_targets = backtest.build_historical_methodology_targets(
+            ohlcv,
+            rebalance_dates=rebalance_dates,
+            phase="MID",
+        )
+        strategy_columns = list(methodology_targets.target_weights.columns)
+        if not strategy_columns:
+            raise ValueError("methodology target builder produced no target columns")
+        methodology_result = backtest.run_weight_backtest(
+            prices[strategy_columns],
+            methodology_targets.target_weights,
+            transaction_cost_bps=5.0,
+        )
         sixty_forty = backtest.sixty_forty_targets(rebalance_dates)
         sixty_forty_result = backtest.run_weight_backtest(
             prices[["AGG", "SPY"]],
@@ -91,17 +104,18 @@ def main() -> int:
             transaction_cost_bps=5.0,
         )
         cost_scenarios = backtest.run_cost_scenarios(
-            prices[["AGG", "SPY"]],
-            sixty_forty,
+            prices[strategy_columns],
+            methodology_targets.target_weights,
             cost_bps_values=[3, 5, 10],
         )
         gates = backtest.evaluate_acceptance_gates(
-            strategy_metrics={**sixty_forty_result.metrics, "state_transitions_per_ticker_year": 0.0},
+            strategy_metrics={**methodology_result.metrics, "state_transitions_per_ticker_year": 0.0},
             equal_weight_metrics=sector_result.metrics,
         )
         report = backtest.format_backtest_report(
-            strategy_metrics=sixty_forty_result.metrics,
+            strategy_metrics=methodology_result.metrics,
             benchmark_metrics={
+                "Methodology": methodology_result.metrics,
                 "60/40 SPY/AGG": sixty_forty_result.metrics,
                 "Equal-weight sectors": sector_result.metrics,
             },
@@ -111,6 +125,7 @@ def main() -> int:
         )
         equity = backtest.equity_frame(
             {
+                "Methodology": methodology_result,
                 "60/40 SPY/AGG": sixty_forty_result,
                 "Equal-weight sectors": sector_result,
             }

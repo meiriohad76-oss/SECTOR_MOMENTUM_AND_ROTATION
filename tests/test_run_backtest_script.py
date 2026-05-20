@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 
+import pandas as pd
+
+from src import backtest
 from scripts import run_backtest
 
 
@@ -43,6 +46,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     calls = []
     expected_tickers = [
         "AGG",
+        "BIL",
         "SPY",
         "XLB",
         "XLC",
@@ -56,11 +60,13 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
         "XLV",
         "XLY",
     ]
+    target_builder_calls = []
 
     def fake_fetch(tickers, period):
         calls.append((tickers, period))
         return {
             "AGG": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0002),
+            "BIL": ohlcv_frame_factory(days=40, start_price=90.0, daily_return=0.0001),
             "SPY": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.001),
             "XLB": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0004),
             "XLC": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0005),
@@ -75,21 +81,46 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
             "XLY": ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0006),
         }
 
+    def fake_build_historical_methodology_targets(ohlcv, rebalance_dates, phase):
+        target_builder_calls.append(
+            {
+                "tickers": sorted(ohlcv),
+                "rebalance_dates": list(rebalance_dates),
+                "phase": phase,
+            }
+        )
+        weights = pd.DataFrame({"XLK": [1.0] * len(rebalance_dates)}, index=rebalance_dates)
+        return backtest.HistoricalSignalTargets(
+            target_weights=weights,
+            states=pd.DataFrame(index=rebalance_dates),
+            snapshots={},
+        )
+
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
+    monkeypatch.setattr(
+        run_backtest.backtest,
+        "build_historical_methodology_targets",
+        fake_build_historical_methodology_targets,
+    )
 
     assert run_backtest.main() == 0
     assert calls == [(expected_tickers, "max")]
+    assert target_builder_calls
+    assert target_builder_calls[0]["tickers"] == expected_tickers
+    assert target_builder_calls[0]["phase"] == "MID"
     assert run_backtest.REPORT_PATH.exists()
     report = run_backtest.REPORT_PATH.read_text(encoding="utf-8")
+    assert "Methodology" in report
     assert "## Benchmark Comparison" in report
     assert "60/40 SPY/AGG" in report
     assert "Equal-weight sectors" in report
     assert "## Cost Sensitivity" in report
     assert run_backtest.EQUITY_PATH.exists()
     equity = run_backtest.EQUITY_PATH.read_text(encoding="utf-8")
+    assert "Methodology" in equity
     assert "60/40 SPY/AGG" in equity
     assert "Equal-weight sectors" in equity
     assert run_backtest.METADATA_PATH.exists()
@@ -97,6 +128,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     assert metadata["report_sha256"] == run_backtest._sha256_bytes(run_backtest.REPORT_PATH.read_bytes())
     assert metadata["equity_sha256"] == run_backtest._sha256_bytes(run_backtest.EQUITY_PATH.read_bytes())
     assert metadata["required_tickers"] == expected_tickers
+    assert "Methodology" in metadata["equity_columns"]
 
 
 def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
@@ -107,6 +139,7 @@ def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
     calls = []
     expected_tickers = [
         "AGG",
+        "BIL",
         "SPY",
         "XLB",
         "XLC",
