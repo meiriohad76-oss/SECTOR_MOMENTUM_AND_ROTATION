@@ -37,6 +37,12 @@ Status legend:
 **Safety:** read-only/in-memory only; no broker API, no portfolio persistence, no scoring recomputation, and no analyzer state writes.
 **QA:** parser/analyzer tests cover malformed files, Excel read errors, missing/invalid tickers, numeric validation, weight inference, zero-weight handling, duplicate scored indexes, string booleans, and display formatting.
 
+### B-012 · Cloudflare Access lockdown - VERIFIED
+**Status:** public dashboard URL is protected by Cloudflare Access as of 2026-05-21.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b012-cloudflare-access-verification.md`.
+**Observed behavior:** unauthenticated requests to `https://sentimentdashboard.ahaddashboards.uk` redirect to `ahadahad.cloudflareaccess.com/cdn-cgi/access/login/...`, include `Www-Authenticate: Cloudflare-Access`, and return a `Sign in - Cloudflare Access` page instead of the Streamlit dashboard.
+**Residual risk:** rerun verification after Cloudflare policy edits; this check does not audit the allowed email list.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -52,12 +58,6 @@ Status legend:
 - Acceptance gates: OOS Sharpe ≥ 0.7, max DD ≤ 75% of benchmark
 **Output:** manual summary report, full methodology report, simulation metadata, notebook inspection guide, and equity chart artifact; dashboard Backtest Lab reads the summary/equity artifacts when present and renders normalized equity plus drawdown views.
 **Why second:** validates whether the methodology actually has edge before more design polish.
-
-### B-012 · Cloudflare Access lockdown — confirm policy is saved
-**Status:** application setup started, policy rules incomplete in screenshots.
-**Action:** verify `https://sentimentdashboard.ahaddashboards.uk` shows the Cloudflare email-OTP wall in incognito. If not, re-do the Policy steps in `one.dash.cloudflare.com → Access → Applications → pi-ai → Policies`.
-
----
 
 ## 💡 Researched but not built
 
