@@ -68,6 +68,20 @@ Observed:
 
 README documents the generated component inventory and backlog marks B-150 implemented with the Streamlit-native residual risk.
 
-- [ ] **Step 2: Review, full QA, commit, push, deploy**
+- [x] **Step 2: Review, full QA, commit, push, deploy**
 
 Request focused review, fix Critical/Important findings, run full local pytest, commit as `feat: add dashboard component docs`, push to GitHub, verify remote SHA, deploy to Pi, run focused/full Pi pytest, and dashboard HTTP smoke.
+
+Observed:
+
+- Focused review: no blocking issues; reviewer noted test guardrail gaps for state writes and catalog drift, fixed before commit.
+- Focused local verification: `python -m pytest tests/test_component_docs.py tests/test_component_docs_app_static.py -q` -> `5 passed in 0.17s`.
+- Full local verification: `python -m pytest -q` -> `329 passed in 14.69s`.
+- Compile verification: `python -m compileall app.py src scripts` -> exit 0.
+- Diff verification: `git diff --check` -> exit 0, with expected CRLF warnings on Windows.
+- Local commit: `aaf753d feat: add dashboard component docs`.
+- GitHub branch: `backlog-stepwise-qa` at `aaf753ddcb0db33b78918a5d2d0f1f8f59cf9775`.
+- Pi pull: fast-forwarded `/home/ahad/SECTOR_MOMENTUM_AND_ROTATION` to `aaf753d`.
+- Pi focused verification: `./.venv/bin/python -m pytest tests/test_component_docs.py tests/test_component_docs_app_static.py -q` -> `5 passed in 0.04s`.
+- Pi full verification: `./.venv/bin/python -m pytest -q` -> `329 passed in 6.55s`.
+- Pi service smoke: `poll_1 sha=aaf753ddcb0db33b78918a5d2d0f1f8f59cf9775 active=active app=200 health=200`.
