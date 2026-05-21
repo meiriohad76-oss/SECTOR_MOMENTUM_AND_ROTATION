@@ -80,6 +80,12 @@ Status legend:
 **Behavior:** context symbols are fetched with the dashboard OHLCV payload; missing data renders as `DATA PENDING`; macro context does not change methodology scoring or state-machine behavior.
 **Evidence:** `docs/superpowers/plans/2026-05-21-b103-macro-context-tiles.md`.
 
+### B-104 - Session high/low tile - IMPLEMENTED
+**Status:** the Market state header now includes a session range tile in `backlog-stepwise-qa`.
+**Files:** `src/macro_tiles.py`, `tests/test_macro_tiles.py`, `tests/test_macro_tiles_app_static.py`, `app.py`.
+**Behavior:** the tile uses the latest SPY high, low, and close from the dashboard OHLCV payload; close location in the latest high/low range controls the tile tone; missing or malformed range data renders as `DATA PENDING`.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b104-session-range-tile.md`.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -141,7 +147,6 @@ Status legend:
 ## 🌟 Ideas for v3+
 
 ### Universe & data
-- **B-104** Add a "session high / low" tile to the status row showing intraday context
 - **B-105** Custom universe builder web UI (currently config-only)
 
 ### Visual / UX

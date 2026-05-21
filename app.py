@@ -19,7 +19,7 @@ from src.data import fetch_ohlcv, _select_ohlcv_provider
 from src.flow import compute_flow_signals, flow_composite_z, STUB_MODE
 from src.indicators import compute_all_indicators
 from src.macro import assess_regime
-from src.macro_tiles import MACRO_CONTEXT_SYMBOLS, macro_tile_rows
+from src.macro_tiles import MACRO_CONTEXT_SYMBOLS, macro_tile_rows, session_range_tile
 from src.navigation import initialize_drill_ticker, select_drill_ticker
 from src.portfolio import (
     analyze_holdings,
@@ -681,6 +681,14 @@ def render_status():
         else ("INVERTED" if regime.yield_curve_positive is False else "—")
     )
 
+    session_row = session_range_tile(ohlcv.get(BENCH["US"]), BENCH["US"])
+    session_tile_html = f"""
+    <div class="tile macro-tile">
+      <div class="tile-label">{_esc(session_row['label'])}<span class="tile-delta">{_esc(session_row['symbol'])}</span></div>
+      <div class="tile-value {session_row['tone']}">{_esc(session_row['value'])}</div>
+      <div class="tile-sub">{_esc(session_row['change'])} / {_esc(session_row['subtitle'])}</div>
+    </div>
+    """
     macro_tiles_html = ""
     for row in macro_tile_rows(ohlcv):
         macro_tiles_html += f"""
@@ -694,7 +702,7 @@ def render_status():
     html = f"""
     <section class="section">
       <div class="section-head">
-        <h2>Market state <span class="count">7 indicators</span></h2>
+        <h2>Market state <span class="count">8 indicators</span></h2>
         <div class="right">UPDATED {datetime.now().strftime('%H:%M').upper()}</div>
       </div>
       <div class="status-row">
@@ -730,6 +738,7 @@ def render_status():
           <div class="tile-sub">{bluf['exits_count']} exit · {bluf['warns_count']} warn</div>
         </div>
 
+        {session_tile_html}
         {macro_tiles_html}
 
       </div>

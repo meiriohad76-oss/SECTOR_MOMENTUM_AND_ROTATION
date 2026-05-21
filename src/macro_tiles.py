@@ -75,3 +75,52 @@ def _row_for(item: Mapping[str, str], frame: pd.DataFrame | None) -> dict[str, s
 
 def macro_tile_rows(ohlcv: Mapping[str, pd.DataFrame]) -> list[dict[str, str]]:
     return [_row_for(item, ohlcv.get(item["symbol"])) for item in MACRO_CONTEXT]
+
+
+def session_range_tile(frame: pd.DataFrame | None, symbol: str) -> dict[str, str]:
+    base = {
+        "label": "Session range",
+        "symbol": symbol,
+        "value": "DATA PENDING",
+        "change": "-",
+        "tone": "warn",
+        "subtitle": "latest bar",
+    }
+    if frame is None or frame.empty:
+        return base
+    try:
+        latest = frame.dropna(how="all").iloc[-1]
+        high = float(latest["high"])
+        low = float(latest["low"])
+        close = float(latest["adj_close"] if "adj_close" in frame.columns else latest["close"])
+    except (IndexError, KeyError, TypeError, ValueError):
+        return base
+    if not (math.isfinite(high) and math.isfinite(low) and math.isfinite(close)):
+        return base
+    if high < low:
+        return base
+
+    span = high - low
+    if math.isclose(span, 0.0):
+        tone = "flat"
+        subtitle = "flat range"
+    else:
+        position = (close - low) / span
+        if position >= 0.75:
+            tone = "up"
+            subtitle = "near high"
+        elif position <= 0.25:
+            tone = "down"
+            subtitle = "near low"
+        else:
+            tone = "flat"
+            subtitle = "mid range"
+
+    return {
+        "label": "Session range",
+        "symbol": symbol,
+        "value": _format_value(close),
+        "change": f"H {_format_value(high)} / L {_format_value(low)}",
+        "tone": tone,
+        "subtitle": subtitle,
+    }
