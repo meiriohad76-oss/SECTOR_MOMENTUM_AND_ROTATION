@@ -138,6 +138,16 @@ Observed:
 - `python -m compileall app.py src scripts` -> exit 0
 - `git diff --check` -> exit 0
 
-- [ ] **Step 5: Review, commit, push, deploy**
+- [x] **Step 5: Review, commit, push, deploy**
 
 Request focused review, fix Critical/Important feedback, commit as `feat: add streamlit performance audit`, push to GitHub, verify remote SHA, deploy to Pi, run focused/full Pi pytest, and dashboard HTTP smoke.
+
+Observed:
+
+- Re-review: no blocking issues after the snapshot/key coverage fixes; residual risk is no browser-rerun test and stringified upload widget values may be noisy.
+- Local commit: `381ca42 feat: add streamlit performance audit`
+- GitHub branch: `backlog-stepwise-qa` at `381ca42289f814ce8de09d0ddffe59ffe1469f36`
+- Pi pull: fast-forwarded `/home/ahad/SECTOR_MOMENTUM_AND_ROTATION` to `381ca42`
+- Pi focused verification: `./.venv/bin/python -m pytest tests/test_performance_audit.py tests/test_performance_audit_app_static.py -q` -> `9 passed in 0.05s`
+- Pi full verification: `./.venv/bin/python -m pytest -q` -> `314 passed in 5.02s`
+- Pi service smoke: `poll_1 active=active http=200`
