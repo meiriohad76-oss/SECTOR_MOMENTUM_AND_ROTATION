@@ -86,6 +86,36 @@ git diff --check
 
 Review fixes: changed HTTP log shipping to start a daemon background thread by default, added `async_mode=False` for deterministic direct handler tests, made blank environment values override Streamlit secrets so `LOG_SHIP_URL=""` disables shipping, and made `scripts/send_email_digest.py` avoid importing `src.scoring` for its simple transition-log read.
 
-- [ ] **Step 4: Review, commit, push, deploy**
+- [x] **Step 4: Review, commit, push, deploy**
 
 Request focused review, fix Critical/Important feedback, commit as `feat: add structured json logging`, push to GitHub, verify remote SHA, deploy to Pi, run focused/full Pi pytest, and dashboard HTTP smoke.
+
+Completion evidence:
+
+```powershell
+python -m pytest tests/test_email_digest_script.py tests/test_structured_logging.py tests/test_structured_logging_app_static.py tests/test_run_journal_app_static.py -q
+# 11 passed
+python -m pytest -q
+# 300 passed
+python -m compileall app.py src scripts
+# exit 0
+git diff --check
+# exit 0
+git push origin backlog-stepwise-qa
+# bc1cabd pushed
+```
+
+Pi evidence:
+
+```bash
+git pull --ff-only
+# fast-forwarded to bc1cabd
+./.venv/bin/python -m pytest tests/test_email_digest_script.py tests/test_structured_logging.py tests/test_structured_logging_app_static.py tests/test_run_journal_app_static.py -q
+# 11 passed
+./.venv/bin/python scripts/send_email_digest.py
+# email_digest=skipped
+./.venv/bin/python -m pytest -q
+# 300 passed
+curl http://127.0.0.1:8501/?ticker=XLK
+# HTTP 200 after service restart poll 7
+```
