@@ -71,6 +71,19 @@ sudo systemctl status sector-dashboard
 
 You should see `active (running)`. The dashboard is now reachable at `http://<pi-ip>:8501` and will restart on boot or after a crash.
 
+### Optional public methodology landing service
+
+B-152 ships a static public landing page under `public/`. To serve it from the same Pi, install `systemd/methodology-landing.service`, adjust the user/path, and bind it to localhost port 8500:
+
+```bash
+sudo cp systemd/methodology-landing.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now methodology-landing
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8500/
+```
+
+Use Cloudflare Tunnel to expose `http://127.0.0.1:8500` on the public root while keeping the Streamlit dashboard on `http://127.0.0.1:8501`.
+
 ### Useful commands
 
 ```bash
@@ -118,4 +131,4 @@ If you see memory pressure, edit `src/universe.py` to trim the universe (e.g. dr
 
 ## Next: expose it publicly
 
-Right now the dashboard is only reachable from your home LAN. To expose it on `dashboard.yourdomain.com` securely without port-forwarding, see [`DEPLOY_CLOUDFLARE_TUNNEL.md`](DEPLOY_CLOUDFLARE_TUNNEL.md).
+Right now the dashboard is only reachable from your home LAN. To expose the public methodology root and protected dashboard securely without port-forwarding, see [`DEPLOY_CLOUDFLARE_TUNNEL.md`](DEPLOY_CLOUDFLARE_TUNNEL.md).

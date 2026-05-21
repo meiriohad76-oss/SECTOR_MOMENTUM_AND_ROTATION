@@ -317,7 +317,11 @@ Status legend:
 **Status:** an extension tutorial is implemented in `backlog-stepwise-qa`.
 **Files:** `docs/how-to-add-sector-indicator-pillar.md`, `tests/test_methodology_tutorial_static.py`, `README.md`, `docs/BACKLOG.md`.
 **Behavior:** the tutorial documents how to extend universe classes, indicators, and pillars while keeping methodology docs, component docs, provider safety, state-machine safety, and verification commands aligned.
-- **B-152** Public methodology landing page on the domain root (separate from the dashboard)
+#### B-152 · Public methodology landing page on domain root — IMPLEMENTED
+**Status:** a static public methodology landing page and Pi/static-route deployment docs are implemented in `backlog-stepwise-qa`.
+**Files:** `public/index.html`, `public/methodology.html`, `public/assets/methodology.css`, `public/assets/methodology-preview.png`, `public/robots.txt`, `public/sitemap.xml`, `public/_headers`, `systemd/methodology-landing.service`, `docs/PUBLIC_METHODOLOGY_LANDING.md`, `docs/DEPLOY_CLOUDFLARE_TUNNEL.md`, `config/cloudflared-config.yml.example`, `tests/test_public_landing_static.py`, `tests/test_public_root_deploy_static.py`, `README.md`, `docs/BACKLOG.md`.
+**Behavior:** the public root serves static methodology education on port 8500, while the dashboard remains a separate Cloudflare Access-protected Streamlit route on port 8501. The page does not expose live picks, protected dashboard content, local files, or credential references.
+**Residual risk:** live public-domain routing still depends on applying the Cloudflare DNS/tunnel or Pages configuration outside the repo.
 
 ---
 

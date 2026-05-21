@@ -121,6 +121,10 @@ B-150 adds a generated component inventory inside the dashboard. The catalog liv
 
 Use [`docs/how-to-add-sector-indicator-pillar.md`](docs/how-to-add-sector-indicator-pillar.md) before adding a universe class, indicator, or pillar. It lists the source files, methodology docs, safety boundaries, and verification commands that must move together.
 
+## Public methodology landing
+
+B-152 adds a static public root in [`public/index.html`](public/index.html). Deployment notes live in [`docs/PUBLIC_METHODOLOGY_LANDING.md`](docs/PUBLIC_METHODOLOGY_LANDING.md): the public methodology page is served separately from the protected dashboard so no live signals or protected dashboard content are exposed.
+
 ## Quick start
 
 ### Windows (local)
