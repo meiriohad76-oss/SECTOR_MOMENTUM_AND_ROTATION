@@ -14,6 +14,10 @@ import pandas as pd
 import streamlit as st
 
 from src.backtest import drawdown_frame, normalized_equity_frame
+from src.comparison_view import (
+    comparison_card_rows,
+    initialize_comparison_tickers,
+)
 from src.controls import refresh_market_data, toggle_theme
 from src.custom_universe import (
     analyze_custom_universe,
@@ -67,7 +71,7 @@ from src.visuals import (
 )
 
 
-APP_VERSION = "v2.4.6"
+APP_VERSION = "v2.4.7"
 DRILL_RANGE_OPTIONS = ("3M", "6M", "1Y", "3Y", "MAX")
 DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + ["^TNX", "^IRX"]))
 
@@ -1082,6 +1086,65 @@ def render_drill():
     _md('<div class="chart-help"><b>Price vs OBV — bearish divergence detector.</b> When price (left axis) makes a new high but OBV (right axis) does <b>not</b>, institutional money isn\'t following the rally. One of the cleanest pre-breakdown signals. Bullish divergence (OBV new high, price not) often marks Stage-1 accumulation bottoms.</div>')
 
 
+def render_comparison_view():
+    options = sorted(scored.index.tolist())
+    initialize_comparison_tickers(
+        st.session_state,
+        scored,
+        current_ticker=st.session_state.drill_ticker,
+    )
+
+    _md(
+        f"""
+        <section class="section" id="comparison-view">
+          <div class="section-head">
+            <h2>Comparison view <span class="count">B-115 · 2-4 tickers</span></h2>
+            <div class="right">{len(scored)} scored tickers</div>
+          </div>
+        </section>
+        """
+    )
+    st.multiselect("COMPARE TICKERS",
+        options,
+        default=[ticker for ticker in st.session_state.comparison_tickers if ticker in options][:4],
+        max_selections=4,
+        key="comparison_tickers",
+    )
+    selected_compare = list(st.session_state.comparison_tickers)[:4]
+    rows = comparison_card_rows(scored, selected_compare)
+    if len(rows) < 2:
+        st.info("Select at least two scored tickers to compare them side by side.")
+        return
+
+    cards = ""
+    for row in rows:
+        state = row["state"]
+        cards += f"""
+        <div class="comparison-card {state}">
+          <div class="comparison-head">
+            <div>
+              <div class="comparison-ticker">{_esc(row['ticker'])}</div>
+              <div class="comparison-class">{_esc(row['class'])}</div>
+            </div>
+            <span class="state">{_esc(state.replace('_', ' '))}</span>
+          </div>
+          <div class="comparison-metrics">
+            <div><span>S</span><b>{_esc(row['s_score'])}</b></div>
+            <div><span>F</span><b>{_esc(row['f_score'])}</b></div>
+            <div><span>MOM</span><b>{_esc(row['momentum'])}</b></div>
+            <div><span>STAGE</span><b>{_esc(row['stage'])}</b></div>
+            <div><span>RRG</span><b>{_esc(row['rrg'])}</b></div>
+            <div><span>RANK</span><b>{_esc(row['rank'])}</b></div>
+          </div>
+          <div class="comparison-flags">
+            <span>{_esc(row['selected'])}</span>
+            <span>{_esc(row['veto'])}</span>
+          </div>
+        </div>
+        """
+    _md(f'<div class="comparison-grid">{cards}</div>')
+
+
 def render_full_table():
     toggle_col, sort_col, _ = st.columns([2, 3, 5])
     with toggle_col:
@@ -1603,6 +1666,7 @@ render_picks()
 render_rrg()
 render_sector_spaghetti()
 render_drill()
+render_comparison_view()
 render_portfolio_analyzer()
 render_custom_universe_builder()
 render_backtest_lab()

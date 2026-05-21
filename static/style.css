@@ -1184,6 +1184,84 @@ html.density-compact .pick-spark {
   color: var(--muted);
 }
 
+/* ---------- Comparison view ---------- */
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.comparison-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--st-hold);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.comparison-card.STAGE_2_BULLISH { border-left-color: var(--st-stage2); }
+.comparison-card.HOLD { border-left-color: var(--st-hold); }
+.comparison-card.WARNING { border-left-color: var(--st-warn); }
+.comparison-card.EXIT { border-left-color: var(--st-exit); }
+.comparison-card.BEARISH_STAGE_4 { border-left-color: var(--st-bear); }
+.comparison-card.STAGE_1_BASING { border-left-color: var(--st-basing); }
+.comparison-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.comparison-ticker {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.comparison-class {
+  color: var(--muted);
+  font-size: 0.7rem;
+  margin-top: 2px;
+}
+.comparison-card .state {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  text-align: right;
+  text-transform: uppercase;
+  line-height: 1.35;
+}
+.comparison-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.comparison-metrics div {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+}
+.comparison-metrics span,
+.comparison-flags span {
+  display: block;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+}
+.comparison-metrics b {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+.comparison-flags {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 /* ---------- Footer ---------- */
 .footer {
   margin-top: 40px;
@@ -1200,6 +1278,7 @@ html.density-compact .pick-spark {
 /* ---------- Responsive ---------- */
 @media (max-width: 1100px) {
   .picks-grid { grid-template-columns: repeat(3, 1fr); }
+  .comparison-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rrg-wrap { grid-template-columns: 1fr; }
   .drill-charts { grid-template-columns: 1fr; }
 }
@@ -1250,6 +1329,7 @@ html.density-compact .pick-spark {
   .full-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .full-table table { min-width: 860px; }
   .row-preview { display: none; }
+  .comparison-grid { grid-template-columns: 1fr; }
   .drill-buttons-slot + div[data-testid="stHorizontalBlock"],
   .element-container:has(.drill-buttons-slot) + div[data-testid="stHorizontalBlock"],
   .rrg-class-controls-slot + div[data-testid="stHorizontalBlock"],

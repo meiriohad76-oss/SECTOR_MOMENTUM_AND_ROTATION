@@ -17,6 +17,7 @@ A Streamlit dashboard that monitors **83+ instruments across US sectors, US indu
 - A **per-ticker chart range selector** for drilling into 3M, 6M, 1Y, 3Y, or all currently loaded price/flow history.
 - A **full-table hover preview** that shows a compact RRG dot card for each ticker row on desktop.
 - A **state transition pulse** that briefly highlights alert rows and active pick cards when a ticker changed state today.
+- A **ticker comparison view** for reviewing 2-4 scored tickers side by side from the current methodology snapshot.
 - A **single-page Streamlit app** (`app.py`) with two sections:
   - **Top:** 7-pillar heatmap — every ticker scored on every pillar, color-coded, with composite score and current state (`STAGE_2_BULLISH` / `HOLD` / `WARNING` / `EXIT` / `BEARISH_STAGE_4` / `STAGE_1_BASING`).
   - **Below:** drill-down tabs — RRG quadrant chart, cross-sectional momentum bar, institutional flow detail, state-machine transition log, per-ticker deep dive with price/CMF/OBV charts.
@@ -95,6 +96,10 @@ B-113 adds a CSS-only hover preview to each full matrix ticker row on desktop. T
 ## Transition pulse
 
 B-114 adds a visual-only pulse class for tickers with state transitions dated today in the existing `state.json` transition log. The pulse highlights recent alert rows and any matching active pick card, uses the new state color, and disables animation when the user prefers reduced motion.
+
+## Comparison view
+
+B-115 adds a read-only comparison section after the per-ticker drill-down. Pick 2-4 scored tickers and compare state, class, S/F scores, 12-1 momentum, Weinstein stage, RRG quadrant, class rank, selection flag, and veto status side by side. The section uses the existing scored snapshot only.
 
 ## Quick start
 

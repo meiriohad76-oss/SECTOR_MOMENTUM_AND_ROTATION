@@ -85,6 +85,7 @@ HOME (single scrollable page)
     ├── Weekly price + 30wMA chart
     ├── CMF chart
     └── OBV / price divergence chart
+├── Comparison view (2-4 tickers side by side from current scored snapshot)
 
 SIDEBAR (persistent)
 ├── Theme toggle (dark default)
@@ -276,6 +277,13 @@ The full 7-pillar matrix uses row hover previews on desktop:
 - Ticker cell reveals a compact RRG card on hover.
 - The card shows current quadrant, mini RRG dot, RS-ratio, RS-momentum, S-score, and F-score.
 - Previews are disabled on phone widths where hover is not a reliable interaction.
+
+### 6.7 Comparison view
+
+Read-only side-by-side cards for 2-4 tickers:
+- Multiselect capped at four scored tickers.
+- Defaults start with the active drill ticker, then active picks by rank.
+- Cards show state, class, S/F scores, 12-1 momentum, Weinstein stage, RRG quadrant, class rank, selected/watch flag, and veto status.
 
 ---
 

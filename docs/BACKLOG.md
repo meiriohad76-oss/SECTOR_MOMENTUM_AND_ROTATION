@@ -134,6 +134,14 @@ Status legend:
 **Evidence:** `docs/superpowers/plans/2026-05-21-b114-state-transition-pulse.md`.
 **Residual risk:** static and pure helper tests verify class wiring; screenshot-level browser animation QA should be added when browser tooling is available.
 
+### B-115 - Comparison view - IMPLEMENTED
+**Status:** a 2-4 ticker side-by-side comparison view is implemented in `backlog-stepwise-qa`.
+**Files:** `src/comparison_view.py`, `tests/test_comparison_view.py`, `tests/test_comparison_view_app_static.py`, `app.py`, `static/style.css`, `README.md`, `docs/PRODUCT_DESIGN.md`.
+**Behavior:** a capped `COMPARE TICKERS` multiselect renders compact cards for state, class, S/F, momentum, Weinstein stage, RRG quadrant, class rank, selection flag, and veto status.
+**Safety:** read-only UI from the current scored dataframe; no provider fetch, scoring, alerting, state-machine, or persistence behavior changes.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b115-comparison-view.md`.
+**Residual risk:** static and pure helper tests verify rendering logic; screenshot-level responsive browser QA should be added when browser tooling is available.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -197,7 +205,6 @@ Status legend:
 ### Universe & data
 
 ### Visual / UX
-- **B-115** Comparison view — pick 2–4 tickers, see side-by-side metrics
 - **B-116** "30wMA reference line" baked into the sparklines (Weinstein context)
 - **B-117** Dark / light theme custom palette options ("Solarized", "Nord", "Mono")
 
