@@ -142,6 +142,14 @@ Status legend:
 **Evidence:** `docs/superpowers/plans/2026-05-21-b115-comparison-view.md`.
 **Residual risk:** static and pure helper tests verify rendering logic; screenshot-level responsive browser QA should be added when browser tooling is available.
 
+### B-116 - 30wMA reference line in sparklines - IMPLEMENTED
+**Status:** pick-card sparklines now include a 30-week moving-average reference line when enough weekly history is loaded in `backlog-stepwise-qa`.
+**Files:** `src/visuals.py`, `tests/test_visuals.py`, `app.py`, `README.md`, `docs/PRODUCT_DESIGN.md`.
+**Behavior:** `svg_sparkline()` computes the latest weekly 30wMA from loaded daily closes, folds it into the SVG y-scale, and renders a subtle dashed horizontal line before the price path.
+**Safety:** visual-only helper change using already-loaded OHLCV; no provider fetch, scoring, alerting, state-machine, or persistence behavior changes.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b116-sparkline-30wma-reference.md`.
+**Residual risk:** SVG helper tests verify markup and warmup behavior; screenshot-level card QA should be added when browser tooling is available.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -205,7 +213,6 @@ Status legend:
 ### Universe & data
 
 ### Visual / UX
-- **B-116** "30wMA reference line" baked into the sparklines (Weinstein context)
 - **B-117** Dark / light theme custom palette options ("Solarized", "Nord", "Mono")
 
 ### Notifications & integrations
@@ -243,10 +250,9 @@ Status legend:
 
 These need a design decision before building:
 
-1. Should sparklines on cards include a horizontal 30-week MA reference line? (B-116)
-2. State pill — color-only or also icon-tagged? (Linear-style vs Bloomberg)
-3. On mobile, drop the RRG entirely or render with a "fullscreen" toggle?
-4. Portfolio overlay feature? Resolved by B-130 read-only analyzer in `backlog-stepwise-qa`; future persistence/broker integration belongs in B-131/B-133.
+1. State pill — color-only or also icon-tagged? (Linear-style vs Bloomberg)
+2. On mobile, drop the RRG entirely or render with a "fullscreen" toggle?
+3. Portfolio overlay feature? Resolved by B-130 read-only analyzer in `backlog-stepwise-qa`; future persistence/broker integration belongs in B-131/B-133.
 
 ---
 

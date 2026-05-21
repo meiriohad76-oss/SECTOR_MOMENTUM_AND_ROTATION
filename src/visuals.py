@@ -399,15 +399,30 @@ def svg_sparkline(df_daily, color: str, width: int = 240, height: int = 50, styl
     if df_daily is None or df_daily.empty:
         return ""
     try:
-        p = df_daily["close"].dropna().iloc[-90:].astype(float).values
+        close = df_daily["close"].dropna().astype(float)
+        p = close.iloc[-90:].values
     except Exception:
         return ""
     if len(p) < 5:
         return ""
-    mn, mx = float(p.min()), float(p.max())
+
+    ma30 = np.nan
+    if isinstance(close.index, pd.DatetimeIndex):
+        weekly = close.resample("W-FRI").last().dropna()
+        if len(weekly) >= 30:
+            ma30 = float(weekly.rolling(30).mean().dropna().iloc[-1])
+
+    scale_values = p
+    if np.isfinite(ma30):
+        scale_values = np.append(scale_values, ma30)
+    mn, mx = float(scale_values.min()), float(scale_values.max())
     rng = max(0.001, mx - mn)
+
+    def y_for(value):
+        return height - ((value - mn) / rng) * (height - 6) - 3
+
     step_x = width / (len(p) - 1)
-    pts = [(i * step_x, height - ((v - mn) / rng) * (height - 6) - 3) for i, v in enumerate(p)]
+    pts = [(i * step_x, y_for(v)) for i, v in enumerate(p)]
     path = " ".join(f"{'M' if i == 0 else 'L'}{x:.2f},{y:.2f}" for i, (x, y) in enumerate(pts))
     area = f"{path} L{width},{height} L0,{height} Z"
     grad_id = f"sg-{abs(hash(color + str(len(p)))) % 100000}"
@@ -420,10 +435,18 @@ def svg_sparkline(df_daily, color: str, width: int = 240, height: int = 50, styl
             f'<stop offset="100%" stop-color="{color}" stop-opacity="0"/></linearGradient></defs>'
             f'<path d="{area}" fill="url(#{grad_id})"/>'
         )
+    ma_line = ""
+    if np.isfinite(ma30):
+        ma_y = y_for(ma30)
+        ma_line = (
+            f'<line class="spark-ma30" x1="0" y1="{ma_y:.2f}" x2="{width}" y2="{ma_y:.2f}" '
+            f'stroke="currentColor" stroke-opacity="0.42" stroke-width="1" stroke-dasharray="4 3"/>'
+        )
     return (
         f'<svg class="pick-spark" viewBox="0 0 {width} {height}" preserveAspectRatio="none" '
         f'xmlns="http://www.w3.org/2000/svg">'
         f'{fill}'
+        f'{ma_line}'
         f'<path d="{path}" fill="none" stroke="{color}" stroke-width="1.5"/>'
         f'<circle cx="{last_x:.2f}" cy="{last_y:.2f}" r="2.2" fill="{color}"/>'
         f'</svg>'

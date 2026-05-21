@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import re
+
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -37,6 +40,46 @@ def test_svg_sparkline_filled_style_keeps_area_fill():
 
     assert 'fill="url(#' in html
     assert 'stroke="#26d65b"' in html
+
+
+def test_svg_sparkline_adds_30wma_reference_when_available():
+    dates = pd.bdate_range("2024-01-01", periods=220)
+    frame = pd.DataFrame({"close": list(range(100, 320))}, index=dates)
+
+    html = svg_sparkline(frame, "#26d65b", style="line")
+
+    assert 'class="spark-ma30"' in html
+    assert 'stroke-dasharray="4 3"' in html
+
+
+def test_svg_sparkline_omits_30wma_reference_without_weekly_warmup():
+    dates = pd.bdate_range("2024-01-01", periods=40)
+    frame = pd.DataFrame({"close": list(range(100, 140))}, index=dates)
+
+    html = svg_sparkline(frame, "#26d65b", style="line")
+
+    assert 'class="spark-ma30"' not in html
+
+
+def test_svg_sparkline_scales_30wma_reference_inside_viewbox_when_above_visible_prices():
+    dates = pd.bdate_range("2024-01-01", periods=220)
+    closes = [400.0] * 130 + [float(value) for value in range(100, 190)]
+    frame = pd.DataFrame({"close": closes}, index=dates)
+
+    html = svg_sparkline(frame, "#26d65b", width=240, height=50, style="line")
+
+    match = re.search(r'class="spark-ma30" x1="0" y1="([0-9.]+)" x2="240" y2="([0-9.]+)"', html)
+    assert match is not None
+    y1 = float(match.group(1))
+    y2 = float(match.group(2))
+    visible_prices = frame["close"].iloc[-90:].to_numpy(dtype=float)
+    ma30 = frame["close"].resample("W-FRI").last().dropna().rolling(30).mean().dropna().iloc[-1]
+    assert ma30 > visible_prices.max()
+    scaled_values = np.append(visible_prices, ma30)
+    expected_y = 50 - ((ma30 - scaled_values.min()) / (scaled_values.max() - scaled_values.min())) * (50 - 6) - 3
+    assert y1 == pytest.approx(expected_y, abs=0.01)
+    assert y2 == pytest.approx(expected_y, abs=0.01)
+    assert 0 <= y1 <= 50
 
 
 def test_relative_strength_lines_frame_normalizes_each_sector_to_100():

@@ -18,6 +18,7 @@ A Streamlit dashboard that monitors **83+ instruments across US sectors, US indu
 - A **full-table hover preview** that shows a compact RRG dot card for each ticker row on desktop.
 - A **state transition pulse** that briefly highlights alert rows and active pick cards when a ticker changed state today.
 - A **ticker comparison view** for reviewing 2-4 scored tickers side by side from the current methodology snapshot.
+- **Pick-card sparklines with a 30-week MA reference line** when enough weekly history is loaded.
 - A **single-page Streamlit app** (`app.py`) with two sections:
   - **Top:** 7-pillar heatmap — every ticker scored on every pillar, color-coded, with composite score and current state (`STAGE_2_BULLISH` / `HOLD` / `WARNING` / `EXIT` / `BEARISH_STAGE_4` / `STAGE_1_BASING`).
   - **Below:** drill-down tabs — RRG quadrant chart, cross-sectional momentum bar, institutional flow detail, state-machine transition log, per-ticker deep dive with price/CMF/OBV charts.
@@ -100,6 +101,10 @@ B-114 adds a visual-only pulse class for tickers with state transitions dated to
 ## Comparison view
 
 B-115 adds a read-only comparison section after the per-ticker drill-down. Pick 2-4 scored tickers and compare state, class, S/F scores, 12-1 momentum, Weinstein stage, RRG quadrant, class rank, selection flag, and veto status side by side. The section uses the existing scored snapshot only.
+
+## Sparkline 30wMA reference
+
+B-116 adds a subtle dashed 30-week moving-average reference line to pick-card sparklines when enough weekly history is available. The line is computed from the same loaded OHLCV used for the price sparkline and does not fetch or score anything new.
 
 ## Quick start
 

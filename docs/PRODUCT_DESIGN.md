@@ -215,7 +215,7 @@ Apply the state color as:
 │ XLK            HOLD  │  ← ticker (mono) + pill (right)
 │ US Sectors           │  ← class name, small, muted
 │                      │
-│ ▁▂▃▅▇█ sparkline     │  ← 50px tall, no axes, green or red fill
+│ ▁▂▃▅▇█ sparkline     │  ← 50px tall, no axes, green/red fill, dashed 30wMA reference when available
 │                      │
 │ S +1.83  ·  F +0.67  │  ← composite + flow scores, mono
 │ MOM +32.4%  Stage 2  │  ← momentum colored, stage number
@@ -284,6 +284,10 @@ Read-only side-by-side cards for 2-4 tickers:
 - Multiselect capped at four scored tickers.
 - Defaults start with the active drill ticker, then active picks by rank.
 - Cards show state, class, S/F scores, 12-1 momentum, Weinstein stage, RRG quadrant, class rank, selected/watch flag, and veto status.
+
+### 6.8 Sparkline 30wMA context
+
+Pick-card sparklines include a subtle dashed horizontal 30-week MA reference when at least 30 weekly closes are available. This keeps the card glanceable while exposing Weinstein context without opening the drill-down.
 
 ---
 
@@ -431,10 +435,9 @@ Use this realistic mock data set when populating mockups:
 
 ## 15. Open questions for designer
 
-1. Should the **sparklines** on cards include a horizontal "30-week MA" line so the Weinstein context is visible in a glance? Or keep cards pure-price for cleanliness?
-2. The **state pill** — do we double-encode (color + emoji icon), or keep it text-only? Text-only is more "Bloomberg," icon-tagged is more "Linear."
-3. For **mobile**, do we ditch the RRG chart entirely (too small to read on a phone) or render it with a "fullscreen" expand button?
-4. **Resolved in B-130:** add a read-only portfolio / single-stock analyzer. It accepts one ticker or CSV/XLS/XLSX holdings upload, maps positions to the existing methodology snapshot, flags WARNING / EXIT / BULLISH action lists, and does not save portfolios or connect to broker APIs.
+1. The **state pill** — do we double-encode (color + emoji icon), or keep it text-only? Text-only is more "Bloomberg," icon-tagged is more "Linear."
+2. For **mobile**, do we ditch the RRG chart entirely (too small to read on a phone) or render it with a "fullscreen" expand button?
+3. **Resolved in B-130:** add a read-only portfolio / single-stock analyzer. It accepts one ticker or CSV/XLS/XLSX holdings upload, maps positions to the existing methodology snapshot, flags WARNING / EXIT / BULLISH action lists, and does not save portfolios or connect to broker APIs.
 
 ---
 

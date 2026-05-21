@@ -71,7 +71,7 @@ from src.visuals import (
 )
 
 
-APP_VERSION = "v2.4.7"
+APP_VERSION = "v2.4.8"
 DRILL_RANGE_OPTIONS = ("3M", "6M", "1Y", "3Y", "MAX")
 DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + ["^TNX", "^IRX"]))
 
