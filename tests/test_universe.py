@@ -109,7 +109,7 @@ def test_app_copy_uses_current_universe_count_without_stale_numbers():
 
     assert "{len(SCORED_TICKERS)} instruments" in text
     assert "{len(scored)} of {len(SCORED_TICKERS)} instruments" in text
-    assert "daily OHLCV (3y, {len(ALL_TICKERS) + 2} symbols)" in text
+    assert "daily OHLCV (3y, {len(DATA_SYMBOLS)} symbols)" in text
     assert "{len(scored)} INSTRUMENTS" in text
     assert "67 ETFs" not in text
     assert "73 ETFs" not in text

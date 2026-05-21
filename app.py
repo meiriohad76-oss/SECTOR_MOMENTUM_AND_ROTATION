@@ -19,6 +19,7 @@ from src.data import fetch_ohlcv, _select_ohlcv_provider
 from src.flow import compute_flow_signals, flow_composite_z, STUB_MODE
 from src.indicators import compute_all_indicators
 from src.macro import assess_regime
+from src.macro_tiles import MACRO_CONTEXT_SYMBOLS, macro_tile_rows
 from src.navigation import initialize_drill_ticker, select_drill_ticker
 from src.portfolio import (
     analyze_holdings,
@@ -55,6 +56,7 @@ from src.visuals import (
 
 
 APP_VERSION = "v2.4.2"
+DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + ["^TNX", "^IRX"]))
 
 
 def _md(html: str):
@@ -162,7 +164,7 @@ SYSTEM_EXPLAINER_HTML = f"""
 <p><b>Forward-looking signal system.</b> The Sentiment Board monitors {len(SCORED_TICKERS)} instruments across US sectors, industries, countries, factors, themes, crypto exposures, and mega-cap stocks, then applies a 7-pillar methodology to <b>predict</b> which sectors will lead and which will break down. Every score, state, and signal you see on this page is a forward call, not a current-state description. The pillars are leading indicators by construction — each one has decades of out-of-sample evidence that <i>past readings predict forward returns</i>.</p>
 
 <h3>Data flow</h3>
-<pre class="flow">yfinance daily OHLCV (3y, {len(ALL_TICKERS) + 2} symbols)
+<pre class="flow">yfinance daily OHLCV (3y, {len(DATA_SYMBOLS)} symbols)
         |
         v
 weekly + monthly resamples for stage / Faber
@@ -320,7 +322,7 @@ _md(
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def _load_data(period: str = "3y") -> dict[str, pd.DataFrame]:
-    tickers = ALL_TICKERS + ["^TNX", "^IRX"]
+    tickers = DATA_SYMBOLS
     return fetch_ohlcv(tickers, period=period)
 
 
@@ -359,7 +361,7 @@ def _record_dashboard_run(scored_df, bluf_payload, regime_obj, transitions_rows,
         "regime_note": regime_obj.note,
         "transition_count_14d": len(transitions_rows),
         "benchmarks": {"us": BENCH["US"], "tbill": BENCH["TBILL"]},
-        "missing_ohlcv": sorted(set(ALL_TICKERS + ["^TNX", "^IRX"]) - set(ohlcv_payload)),
+        "missing_ohlcv": sorted(set(DATA_SYMBOLS) - set(ohlcv_payload)),
         "bluf_counts": {
             "exits": bluf_payload.get("exits_count", 0),
             "warnings": bluf_payload.get("warns_count", 0),
@@ -391,10 +393,11 @@ try:
     if bench_ticker not in ohlcv or bil_ticker not in ohlcv:
         st.error("Missing benchmark/T-bill data. Try the refresh button.")
         st.stop()
+    scoring_ohlcv = {t: ohlcv[t] for t in ALL_TICKERS if t in ohlcv}
 
     render_loading_state(loading_placeholder, "Computing indicators", card_count=4)
-    indicators_df = compute_all_indicators(ohlcv, bench_ticker, bil_ticker)
-    flow_df = compute_flow_signals(ohlcv)
+    indicators_df = compute_all_indicators(scoring_ohlcv, bench_ticker, bil_ticker)
+    flow_df = compute_flow_signals(scoring_ohlcv)
     flow_z = flow_composite_z(flow_df)
     _fred_data = _load_fred()
     regime = assess_regime(ohlcv[bench_ticker], ohlcv.get("^TNX"), ohlcv.get("^IRX"), fred_cache=_fred_data)
@@ -678,10 +681,20 @@ def render_status():
         else ("INVERTED" if regime.yield_curve_positive is False else "—")
     )
 
+    macro_tiles_html = ""
+    for row in macro_tile_rows(ohlcv):
+        macro_tiles_html += f"""
+        <div class="tile macro-tile">
+          <div class="tile-label">{_esc(row['label'])}<span class="tile-delta">{_esc(row['symbol'])}</span></div>
+          <div class="tile-value {row['tone']}">{_esc(row['value'])}</div>
+          <div class="tile-sub">{_esc(row['change'])} Â· {_esc(row['subtitle'])}</div>
+        </div>
+        """
+
     html = f"""
     <section class="section">
       <div class="section-head">
-        <h2>Market state <span class="count">3 indicators</span></h2>
+        <h2>Market state <span class="count">7 indicators</span></h2>
         <div class="right">UPDATED {datetime.now().strftime('%H:%M').upper()}</div>
       </div>
       <div class="status-row">
@@ -716,6 +729,8 @@ def render_status():
           </div>
           <div class="tile-sub">{bluf['exits_count']} exit · {bluf['warns_count']} warn</div>
         </div>
+
+        {macro_tiles_html}
 
       </div>
     </section>

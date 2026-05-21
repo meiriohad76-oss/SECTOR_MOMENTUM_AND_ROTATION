@@ -73,6 +73,13 @@ Status legend:
 **Behavior:** mega-cap stocks rank only against each other in the `Mega-Cap Stocks` class, with `TOP_N["Mega-Cap Stocks"] == 3`.
 **Evidence:** `docs/superpowers/plans/2026-05-21-b102-mega-cap-stocks.md`.
 
+### B-103 - Macro context header tiles - IMPLEMENTED
+**Status:** VIX, gold, oil, and USD context tiles render in the Market state header in `backlog-stepwise-qa`.
+**Files:** `src/macro_tiles.py`, `tests/test_macro_tiles.py`, `tests/test_macro_tiles_app_static.py`, `app.py`, `static/style.css`.
+**Symbols:** `^VIX`, `GLD`, `USO`, and `UUP`.
+**Behavior:** context symbols are fetched with the dashboard OHLCV payload; missing data renders as `DATA PENDING`; macro context does not change methodology scoring or state-machine behavior.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b103-macro-context-tiles.md`.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -134,7 +141,6 @@ Status legend:
 ## 🌟 Ideas for v3+
 
 ### Universe & data
-- **B-103** Add VIX, gold, oil, USD index as macro tiles in the header
 - **B-104** Add a "session high / low" tile to the status row showing intraday context
 - **B-105** Custom universe builder web UI (currently config-only)
 

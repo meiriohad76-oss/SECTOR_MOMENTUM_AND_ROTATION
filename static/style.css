@@ -408,7 +408,7 @@ body {
 /* ---------- Status row ---------- */
 .status-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 14px;
 }
 .tile {
@@ -447,6 +447,11 @@ body {
 .tile-value.up { color: var(--green); }
 .tile-value.down { color: var(--red); }
 .tile-value.warn { color: var(--amber); }
+.tile-value.flat { color: var(--fg-dim); }
+.macro-tile .tile-value {
+  font-size: 1.15rem;
+  white-space: nowrap;
+}
 
 .tile-sub {
   font-family: var(--font-mono);
