@@ -84,6 +84,36 @@ python -m pytest tests/test_ohlcv_store.py tests/test_data.py -q
 
 Review fixes: made cache reads/writes best-effort around provider behavior, anchored the default cache path to the repo root, added requested-period business-day coverage checks for sparse caches, preserved uppercase Massive provider keys for lowercase requests, disabled default cache use in existing data tests, and corrected the `fetch_ohlcv()` column-order docstring.
 
-- [ ] **Step 4: Review, commit, push, deploy**
+- [x] **Step 4: Review, commit, push, deploy**
 
 Request focused review, fix Critical/Important feedback, commit as `feat: add duckdb ohlcv cache`, push to GitHub, verify remote SHA, deploy to Pi with `./.venv/bin/python -m pip install -r requirements.txt`, run focused/full Pi pytest, and dashboard HTTP smoke.
+
+Completion evidence:
+
+```powershell
+python -m pytest tests/test_ohlcv_store.py tests/test_data.py tests/test_run_backtest_script.py -q
+# 25 passed
+python -m pytest -q
+# 292 passed
+python -m compileall app.py src scripts
+# exit 0
+git diff --check
+# exit 0
+git push origin backlog-stepwise-qa
+# 053d4e6 pushed
+```
+
+Pi evidence:
+
+```bash
+git pull --ff-only
+# fast-forwarded to 053d4e6
+./.venv/bin/python -m pip install -r requirements.txt
+# installed duckdb-1.5.3
+./.venv/bin/python -m pytest tests/test_ohlcv_store.py tests/test_data.py tests/test_run_backtest_script.py -q
+# 25 passed
+./.venv/bin/python -m pytest -q
+# 292 passed
+curl http://127.0.0.1:8501/?ticker=XLK
+# HTTP 200 via sector-dashboard smoke
+```
