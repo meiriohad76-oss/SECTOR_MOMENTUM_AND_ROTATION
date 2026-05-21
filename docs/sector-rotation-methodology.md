@@ -81,10 +81,13 @@ A sector is **fully bullish** only when LAYER 1 = RISK_ON, LAYER 2 ranks it top-
 ### 3.5 Thematic exposures
 `ARKK HACK MOO URA LIT TAN ICLN BOTZ`
 
-### 3.6 Defensive / absolute-momentum bench
+### 3.6 Crypto exposures
+`BITO IBIT ETHE`
+
+### 3.7 Defensive / absolute-momentum bench
 `BIL` (T-bill proxy, for Antonacci absolute filter) · `TLT IEF GLD UUP DBC` (risk-off candidates)
 
-### 3.7 Benchmark
+### 3.8 Benchmark
 `SPY` for US, `ACWI` for global, `URTH` for developed-world cross-sector comparison
 
 ---
@@ -322,6 +325,7 @@ N_industries    = 3   (out of 19)
 N_countries     = 3   (out of ~20)
 N_factors       = 1-2 (out of 10)
 N_themes        = 3   (out of 8)
+N_crypto        = 1   (out of 3)
 ```
 **Why flow gets ~23% of the weight** — it's an independent confirmation of the price-based pillars. When price and flow agree, signal quality is much higher; when they disagree, the trade is almost always wrong. Empirically (Lee & Swaminathan 2000; Chordia & Swaminathan 2000) volume-confirmed momentum substantially outperforms pure-price momentum on a risk-adjusted basis.
 

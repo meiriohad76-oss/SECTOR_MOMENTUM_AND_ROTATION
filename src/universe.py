@@ -87,6 +87,12 @@ THEMES = [
     "BOTZ",  # Robotics and artificial intelligence
 ]
 
+CRYPTO = [
+    "BITO",  # Bitcoin futures
+    "IBIT",  # Spot bitcoin
+    "ETHE",  # Ethereum exposure
+]
+
 DEFENSIVES = ["TLT", "IEF", "GLD", "UUP", "DBC"]  # for risk-off pivot
 
 BENCH = {
@@ -101,6 +107,7 @@ UNIVERSE_BY_CLASS = {
     "Countries":    COUNTRIES,
     "Factors":      FACTORS,
     "Themes":       THEMES,
+    "Crypto":       CRYPTO,
 }
 
 ALL_TICKERS = (
@@ -109,6 +116,7 @@ ALL_TICKERS = (
     + COUNTRIES
     + FACTORS
     + THEMES
+    + CRYPTO
     + DEFENSIVES
     + list(BENCH.values())
 )
@@ -133,4 +141,5 @@ TOP_N = {
     "Countries":    3,
     "Factors":      2,
     "Themes":       3,
+    "Crypto":       1,
 }

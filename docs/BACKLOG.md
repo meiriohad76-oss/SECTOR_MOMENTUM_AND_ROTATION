@@ -59,6 +59,13 @@ Status legend:
 **Behavior:** `TAN` and `ICLN` moved from `US Industries` to `Themes` to avoid duplicate tickers; theme ETFs rank within their own class with `TOP_N["Themes"] == 3`.
 **Evidence:** `docs/superpowers/plans/2026-05-21-b100-theme-etfs.md`.
 
+### B-101 - Crypto exposure universe - IMPLEMENTED
+**Status:** crypto exposure ETFs are now a separate universe class in `backlog-stepwise-qa`.
+**Files:** `src/universe.py`, `tests/test_universe.py`, `README.md`, `docs/sector-rotation-methodology.md`, `docs/PRODUCT_DESIGN.md`.
+**Tickers:** `BITO`, `IBIT`, and `ETHE`.
+**Behavior:** crypto tickers rank only against each other in the `Crypto` class, with `TOP_N["Crypto"] == 1` to reflect the separate volatility regime called out in the backlog.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b101-crypto-exposure.md`.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -120,7 +127,6 @@ Status legend:
 ## 🌟 Ideas for v3+
 
 ### Universe & data
-- **B-101** Add BITO, IBIT, ETHE for crypto exposure (different vol regime — needs separate z-score class)
 - **B-102** Add mega-cap individual stocks (NVDA, AAPL, MSFT, AMZN, GOOGL, META, TSLA, etc.) in their own class
 - **B-103** Add VIX, gold, oil, USD index as macro tiles in the header
 - **B-104** Add a "session high / low" tile to the status row showing intraday context
