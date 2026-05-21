@@ -50,6 +50,7 @@ from src.run_debrief import debrief_journal, summarize_debriefs, threshold_revie
 from src.run_journal import DEFAULT_JOURNAL_PATH, append_dashboard_run
 from src.scoring import compute_composite, apply_state_machine, recent_transitions
 from src.table_preview import table_row_rrg_preview_html
+from src.transition_pulse import transition_pulse_class, transition_row_pulse_class
 from src.ui_states import defensive_basket_rows, loading_skeleton_slots
 from src.universe import ALL_TICKERS, SCORED_TICKERS, UNIVERSE_BY_CLASS, BENCH
 from src.universe import US_SECTORS
@@ -66,7 +67,7 @@ from src.visuals import (
 )
 
 
-APP_VERSION = "v2.4.5"
+APP_VERSION = "v2.4.6"
 DRILL_RANGE_OPTIONS = ("3M", "6M", "1Y", "3Y", "MAX")
 DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + ["^TNX", "^IRX"]))
 
@@ -773,11 +774,12 @@ def render_alerts():
         from_state = r.get("from", "—")
         dot_color = color_for_state(new_state)
         when = r.get("date", "")
-        ticker = r.get("ticker", "")
+        ticker = str(r.get("ticker", "")).upper()
+        pulse_class = transition_row_pulse_class(r)
         rows += f"""
-        <div class="alert-row">
+        <div class="alert-row {new_state} {pulse_class}">
           <span class="dot" style="background:{dot_color}"></span>
-          <span class="t">{ticker}</span>
+          <span class="t">{_esc(ticker)}</span>
           <span class="change">
             <span class="from">{from_state.replace('_', ' ')}</span>
             <span class="arrow">→</span>
@@ -882,9 +884,10 @@ def render_picks():
         mom_class = "pos" if mom >= 0 else "neg"
         s_class = "pos" if s >= 0 else "neg"
         f_class = "pos" if f >= 0 else "neg"
+        pulse_class = transition_pulse_class(tkr, transitions)
 
         cards_html += f"""
-        <div class="pick {state}">
+        <div class="pick {state} {pulse_class}">
           <div class="pick-top">
             <div>
               <div class="pick-ticker">{tkr}</div>

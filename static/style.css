@@ -512,6 +512,12 @@ body {
 }
 .alert-row:last-child { border-bottom: 0; }
 .alert-row:hover { background: var(--panel-hover); }
+.alert-row.STAGE_2_BULLISH { --pulse-color: var(--st-stage2); }
+.alert-row.HOLD { --pulse-color: var(--st-hold); }
+.alert-row.WARNING { --pulse-color: var(--st-warn); }
+.alert-row.EXIT { --pulse-color: var(--st-exit); }
+.alert-row.BEARISH_STAGE_4 { --pulse-color: var(--st-bear); }
+.alert-row.STAGE_1_BASING { --pulse-color: var(--st-basing); }
 .alert-row .dot {
   width: 9px; height: 9px; border-radius: 50%;
 }
@@ -549,6 +555,51 @@ body {
 .pick.EXIT { border-left-color: var(--st-exit); }
 .pick.BEARISH_STAGE_4 { border-left-color: var(--st-bear); }
 .pick.STAGE_1_BASING { border-left-color: var(--st-basing); }
+
+@keyframes state-pulse {
+  0% {
+    box-shadow: inset 4px 0 0 var(--pulse-color), 0 0 0 0 color-mix(in srgb, var(--pulse-color) 45%, transparent);
+  }
+  55% {
+    box-shadow: inset 4px 0 0 var(--pulse-color), 0 0 0 6px color-mix(in srgb, var(--pulse-color) 0%, transparent);
+  }
+  100% {
+    box-shadow: inset 4px 0 0 transparent, 0 0 0 0 transparent;
+  }
+}
+@keyframes alert-state-pulse {
+  0% {
+    background: color-mix(in srgb, var(--pulse-color) 16%, transparent);
+    box-shadow: inset 4px 0 0 var(--pulse-color);
+  }
+  55% {
+    background: color-mix(in srgb, var(--pulse-color) 6%, transparent);
+    box-shadow: inset 4px 0 0 var(--pulse-color);
+  }
+  100% {
+    background: transparent;
+    box-shadow: inset 4px 0 0 transparent;
+  }
+}
+.pulse-transition {
+  --pulse-color: var(--accent);
+  animation: state-pulse 900ms ease-out 0s 2;
+}
+.pick.pulse-transition {
+  border-left-color: var(--pulse-color);
+}
+.pick.pulse-transition.STAGE_2_BULLISH { --pulse-color: var(--st-stage2); }
+.pick.pulse-transition.HOLD { --pulse-color: var(--st-hold); }
+.pick.pulse-transition.WARNING { --pulse-color: var(--st-warn); }
+.pick.pulse-transition.EXIT { --pulse-color: var(--st-exit); }
+.pick.pulse-transition.BEARISH_STAGE_4 { --pulse-color: var(--st-bear); }
+.pick.pulse-transition.STAGE_1_BASING { --pulse-color: var(--st-basing); }
+.alert-row.pulse-transition {
+  animation-name: alert-state-pulse;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse-transition { animation: none; }
+}
 
 .pick-top {
   display: flex;

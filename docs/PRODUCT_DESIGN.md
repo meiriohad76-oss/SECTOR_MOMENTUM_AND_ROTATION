@@ -293,7 +293,7 @@ The full 7-pillar matrix uses row hover previews on desktop:
 - **No flashy animations.** This is a trading dashboard — fast, calm, instant feedback.
 - **Hover states:** card left border accent change (`var(--border)` → `var(--accent)`), 150ms ease
 - **Loading states:** subtle inline skeleton bars in cards; never a full-page spinner
-- **State transitions:** when a state changes, briefly (500ms) pulse the card's left border in the new state color before settling
+- **State transitions:** when a state changes, briefly pulse the alert row and matching active pick card in the new state color before settling; respect reduced-motion preferences
 - **Refresh data button:** during fetch, replace text with "FETCHING…" and animated dots
 - **Chart hover:** instant tooltip, no fade
 
