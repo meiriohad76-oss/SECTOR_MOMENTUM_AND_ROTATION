@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 from datetime import datetime, timezone
 import json
 import os
@@ -33,6 +34,7 @@ SECTOR_BENCHMARK_TICKERS = [
 ]
 REQUIRED_TICKERS = sorted({"AGG", "BIL", "SPY", *SECTOR_BENCHMARK_TICKERS})
 DEFAULT_OHLCV_PROVIDER = "auto"
+DEFAULT_LIVE_SMOKE_PERIOD = "2mo"
 
 
 def _sha256_bytes(payload: bytes) -> str:
@@ -67,15 +69,63 @@ def _write_artifacts(report: str, equity, required_tickers: list[str]) -> None:
     _replace_bytes(METADATA_PATH, metadata_bytes)
 
 
-def main() -> int:
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run the B-011 manual backtest harness.")
+    parser.add_argument(
+        "--live-smoke",
+        action="store_true",
+        help="Fetch and validate live OHLCV only; skip the expensive historical simulation.",
+    )
+    parser.add_argument(
+        "--smoke-period",
+        default=DEFAULT_LIVE_SMOKE_PERIOD,
+        help=f"Market-data period for --live-smoke (default: {DEFAULT_LIVE_SMOKE_PERIOD}).",
+    )
+    return parser
+
+
+def _provider() -> str:
+    return os.environ.get("OHLCV_PROVIDER", DEFAULT_OHLCV_PROVIDER)
+
+
+def _download_prices(period: str, provider: str):
+    ohlcv = fetch_ohlcv(REQUIRED_TICKERS, period=period, provider=provider)
+    prices = backtest.close_matrix_from_ohlcv(ohlcv).loc["2003-01-01":]
+    return ohlcv, prices
+
+
+def _validate_required_prices(prices) -> list[str]:
+    return sorted(set(REQUIRED_TICKERS).difference(prices.columns))
+
+
+def _run_live_smoke(period: str) -> int:
+    provider = _provider()
     try:
-        provider = os.environ.get("OHLCV_PROVIDER", DEFAULT_OHLCV_PROVIDER)
-        ohlcv = fetch_ohlcv(REQUIRED_TICKERS, period="max", provider=provider)
-        prices = backtest.close_matrix_from_ohlcv(ohlcv).loc["2003-01-01":]
+        _, prices = _download_prices(period=period, provider=provider)
     except Exception as exc:
         print(f"Manual backtest data download failed: {exc}")
         return 2
-    missing = sorted(set(REQUIRED_TICKERS).difference(prices.columns))
+    missing = _validate_required_prices(prices)
+    if missing:
+        print(f"Missing required price data for manual backtest: {', '.join(missing)}")
+        return 2
+    print(
+        f"Live backtest smoke passed for {len(REQUIRED_TICKERS)} tickers "
+        f"with provider={provider} period={period}; artifacts were not written."
+    )
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv or [])
+    if args.live_smoke:
+        return _run_live_smoke(args.smoke_period)
+    try:
+        ohlcv, prices = _download_prices(period="max", provider=_provider())
+    except Exception as exc:
+        print(f"Manual backtest data download failed: {exc}")
+        return 2
+    missing = _validate_required_prices(prices)
     if missing:
         print(f"Missing required price data for manual backtest: {', '.join(missing)}")
         return 2
@@ -154,4 +204,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))

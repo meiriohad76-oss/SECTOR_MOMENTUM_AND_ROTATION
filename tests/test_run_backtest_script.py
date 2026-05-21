@@ -211,6 +211,46 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     assert "Methodology" in metadata["equity_columns"]
 
 
+def test_run_backtest_live_smoke_fetches_short_period_without_artifacts(
+    monkeypatch,
+    tmp_path,
+    capsys,
+    ohlcv_frame_factory,
+):
+    calls = []
+
+    def fake_fetch(tickers, period, provider):
+        calls.append((list(tickers), period, provider))
+        return {
+            ticker: ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0005)
+            for ticker in tickers
+        }
+
+    def fail_target_builder(*args, **kwargs):
+        raise AssertionError("live smoke should not run the expensive historical target builder")
+
+    monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
+    monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
+    monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
+    monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
+    monkeypatch.setattr(
+        run_backtest.backtest,
+        "build_historical_methodology_targets",
+        fail_target_builder,
+    )
+
+    assert run_backtest.main(["--live-smoke"]) == 0
+
+    assert calls == [(run_backtest.REQUIRED_TICKERS, "2mo", "auto")]
+    assert not run_backtest.REPORT_PATH.exists()
+    assert not run_backtest.EQUITY_PATH.exists()
+    assert not run_backtest.METADATA_PATH.exists()
+    output = capsys.readouterr().out
+    assert "Live backtest smoke passed" in output
+    assert "14 tickers" in output
+
+
 def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
     monkeypatch,
     tmp_path,

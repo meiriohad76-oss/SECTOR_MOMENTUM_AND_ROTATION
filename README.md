@@ -30,6 +30,12 @@ Manual backtest smoke run:
 python scripts/run_backtest.py
 ```
 
+Fast live data smoke, without writing report artifacts or running the full historical methodology simulation:
+
+```powershell
+python scripts/run_backtest.py --live-smoke
+```
+
 The manual runner uses `OHLCV_PROVIDER=auto`: it prefers Massive aggregate bars when `MASSIVE_API_KEY` is configured and falls back to yfinance otherwise. Set `OHLCV_PROVIDER=massive` to force Massive historical bars, or `OHLCV_PROVIDER=yfinance` to force the free default. Keep `MASSIVE_VERIFY_SSL=true` unless a local certificate store blocks manual smoke testing; `MASSIVE_VERIFY_SSL=false` is an explicit troubleshooting override, not a production setting.
 
 The runner writes `docs/backtest_report.md` when market data downloads successfully. Treat that report as manual evidence, not a replacement for the deterministic test suite.
