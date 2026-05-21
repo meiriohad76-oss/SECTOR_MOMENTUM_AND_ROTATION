@@ -60,6 +60,12 @@ def test_session_snapshot_tracks_interactive_widget_keys_and_ignores_audit_state
             "portfolio_single_source": "XLF",
             "custom_universe_mode": "Paste tickers",
             "custom_universe_text": "XLK XLF",
+            "saved_portfolio_select": "Retirement",
+            "loaded_portfolio_name": "Retirement",
+            "save_portfolio_name": "Retirement",
+            "saved_watchlist_select": "Core",
+            "loaded_watchlist_name": "Core",
+            "save_watchlist_name": "Core",
             "sort_choice": "S_score:desc",
             "performance_last_snapshot": (("theme", "light"),),
         }
@@ -72,6 +78,12 @@ def test_session_snapshot_tracks_interactive_widget_keys_and_ignores_audit_state
     assert values["portfolio_single_source"] == "XLF"
     assert values["custom_universe_mode"] == "Paste tickers"
     assert values["custom_universe_text"] == "XLK XLF"
+    assert values["saved_portfolio_select"] == "Retirement"
+    assert values["loaded_portfolio_name"] == "Retirement"
+    assert values["save_portfolio_name"] == "Retirement"
+    assert values["saved_watchlist_select"] == "Core"
+    assert values["loaded_watchlist_name"] == "Core"
+    assert values["save_watchlist_name"] == "Core"
     assert values["sort_choice"] == "S_score:desc"
     assert "performance_last_snapshot" not in values
 

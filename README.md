@@ -12,6 +12,7 @@ A Streamlit dashboard that monitors **83+ instruments across US sectors, US indu
 
 - A **read-only portfolio / single-stock analyzer** that accepts one ticker or a CSV/XLS/XLSX holdings file and maps the input to the current methodology snapshot.
 - A **read-only custom universe builder** that accepts pasted tickers or a CSV/XLS/XLSX ticker file, de-duplicates the list, and ranks matched tickers against the current methodology snapshot.
+- **Saved watchlists and portfolios** stored locally in `data/saved_inputs.json` so repeated ticker lists and uploaded holdings can be reloaded without broker access or cloud sync.
 - A **responsive single-page dashboard layout** with phone-width guards for the header, section controls, alert rows, tables, drill controls, and compact action summaries.
 - A **US sector relative-strength spaghetti chart** that overlays all sector ETF lines versus SPY over the last 12 months.
 - A **per-ticker chart range selector** for drilling into 3M, 6M, 1Y, 3Y, or all currently loaded price/flow history.
@@ -58,7 +59,7 @@ B-130 adds a read-only analyzer section inside the Streamlit app:
 - **Portfolio mode:** upload `.csv`, `.xlsx`, or `.xls` holdings. The file needs a ticker-like column: `ticker`, `symbol`, `holding`, or `asset`.
 - Optional upload columns include `shares`, `quantity`, `qty`, `cost_basis`, `cost`, `market_value`, `value`, `weight`, `sector`, `account`, and `notes`.
 - Weights can be decimals (`0.25`) or percents (`25%` or `25`). If no valid weights are present, analysis falls back to market value weights, then equal weights.
-- Unknown tickers are reported as missing instead of crashing. Uploaded files are analyzed in memory only; the app does not save portfolios or connect to broker accounts.
+- Unknown tickers are reported as missing instead of crashing. Uploaded files are analyzed in memory; named portfolios can be saved locally to `data/saved_inputs.json`, which is ignored by git and Docker. The app does not connect to broker accounts.
 
 ## Custom universe builder
 
@@ -68,7 +69,7 @@ B-105 adds a read-only custom universe section inside the Streamlit app:
 - **Upload file:** upload `.csv`, `.xlsx`, or `.xls` files with a ticker-like column: `ticker`, `symbol`, `holding`, or `asset`.
 - Duplicate tickers are ignored after the first occurrence. Unknown tickers are reported as missing instead of crashing.
 - Matched tickers are ranked by current `S_score` inside the custom list and retain their methodology state, class, flow score, class rank, selection flag, and veto flag.
-- The builder is snapshot-only and in-memory: it does not fetch new OHLCV, alter `src/universe.py`, save watchlists, or write state-machine files.
+- The builder is snapshot-only for scoring: it does not fetch new OHLCV, alter `src/universe.py`, or write state-machine files. Named watchlists can be saved locally to `data/saved_inputs.json`, which is ignored by git and Docker.
 
 ## Mobile view
 

@@ -252,7 +252,11 @@ Status legend:
 ### Portfolio features
 - **B-131** P&L tracker (broker API integration — alpaca, IBKR)
 - **B-132** Backtest "your trades" — run the methodology against a personal trade history
-- **B-133** Save named watchlists / portfolios locally after B-130 read-only analyzer proves useful
+#### B-133 · Save named watchlists / portfolios locally — IMPLEMENTED
+**Status:** named watchlists and portfolios can be saved, loaded, and deleted from the dashboard using a local JSON store.
+**Files:** `src/saved_inputs.py`, `tests/test_saved_inputs.py`, `tests/test_saved_inputs_app_static.py`, `app.py`, `.gitignore`, `.dockerignore`, `README.md`, `docs/superpowers/plans/2026-05-21-b133-saved-inputs.md`.
+**Behavior:** custom-universe ticker lists and portfolio holdings are persisted to `data/saved_inputs.json`, ignored by git/docker, then loaded back into the existing read-only analysis paths. No broker API, cloud sync, scoring recomputation, provider fetch from saved inputs, or state-machine writes were added.
+**Residual risk:** local JSON persistence is single-user and file-based; concurrent browser sessions editing the same saved item are last-write-wins.
 
 ### Engineering & ops
 #### B-140 · GitHub Actions auto-deploy to Pi — IMPLEMENTED / SECRETS CONFIG PENDING

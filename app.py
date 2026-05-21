@@ -39,6 +39,7 @@ from src.portfolio import (
     parse_holdings_csv,
     parse_holdings_excel,
     parse_single_ticker,
+    PortfolioInputResult,
 )
 from src.performance_audit import DashboardPerformanceAudit, classify_rerun, session_snapshot
 from src.preferences import (
@@ -56,6 +57,12 @@ from src.preferences import (
 )
 from src.run_debrief import debrief_journal, summarize_debriefs, threshold_review_candidates
 from src.run_journal import DEFAULT_JOURNAL_PATH, append_dashboard_run, dashboard_run_fingerprint
+from src.saved_inputs import (
+    delete_saved_input,
+    load_saved_inputs,
+    save_portfolio,
+    save_watchlist,
+)
 from src.scoring import compute_composite, apply_state_machine, recent_transitions
 from src.structured_logging import configure_structured_logging, log_event
 from src.table_preview import table_row_rrg_preview_html
@@ -301,6 +308,13 @@ _CSS = (_STATIC / "style.css").read_text(encoding="utf-8")
 BACKTEST_REPORT_PATH = APP_ROOT / "docs" / "backtest_report.md"
 BACKTEST_EQUITY_PATH = APP_ROOT / "docs" / "backtest_equity.csv"
 BACKTEST_METADATA_PATH = APP_ROOT / "docs" / "backtest_metadata.json"
+SAVED_INPUTS_PATH = APP_ROOT / "data" / "saved_inputs.json"
+LOAD_WATCHLIST_LABEL = "LOAD WATCHLIST"
+DELETE_WATCHLIST_LABEL = "DELETE WATCHLIST"
+SAVE_WATCHLIST_LABEL = "SAVE WATCHLIST"
+LOAD_PORTFOLIO_LABEL = "LOAD PORTFOLIO"
+DELETE_PORTFOLIO_LABEL = "DELETE PORTFOLIO"
+SAVE_PORTFOLIO_LABEL = "SAVE PORTFOLIO"
 
 # Streamlit-specific overrides on top of the design CSS
 _EXTRA = """
@@ -1353,6 +1367,67 @@ def _portfolio_result_from_upload(uploaded_file):
     return parse_holdings_csv(payload)
 
 
+def _saved_items(kind: str):
+    return [item for item in load_saved_inputs(SAVED_INPUTS_PATH) if item.kind == kind]
+
+
+def _find_saved_item(kind: str, name: str | None):
+    if not name:
+        return None
+    for item in _saved_items(kind):
+        if item.name.casefold() == str(name).casefold():
+            return item
+    return None
+
+
+def _show_save_result(result) -> None:
+    if result.ok:
+        st.success(result.message)
+    else:
+        st.warning(result.message)
+
+
+def _render_saved_input_controls(kind: str, label: str, loaded_key: str):
+    items = _saved_items(kind)
+    if not items:
+        return None
+    names = [""] + [item.name for item in items]
+    selected = st.selectbox(f"Saved {label.lower()}", names, key=f"saved_{kind}_select")
+    load_label = LOAD_WATCHLIST_LABEL if kind == "watchlist" else LOAD_PORTFOLIO_LABEL
+    delete_label = DELETE_WATCHLIST_LABEL if kind == "watchlist" else DELETE_PORTFOLIO_LABEL
+    c1, c2 = st.columns(2)
+    with c1:
+        if selected and st.button(load_label, key=f"load_saved_{kind}"):
+            st.session_state[loaded_key] = selected
+            loaded = _find_saved_item(kind, selected)
+            if kind == "watchlist" and loaded is not None:
+                st.session_state.custom_universe_mode = "Paste tickers"
+                st.session_state.custom_universe_text = " ".join(loaded.tickers)
+            st.rerun()
+    with c2:
+        if selected and st.button(delete_label, key=f"delete_saved_{kind}"):
+            delete_saved_input(kind, selected, SAVED_INPUTS_PATH)
+            st.session_state[loaded_key] = ""
+            st.rerun()
+    return _find_saved_item(kind, st.session_state.get(loaded_key))
+
+
+def _render_save_portfolio_controls(result, default_name: str = "") -> None:
+    if not result.holdings:
+        return
+    name = st.text_input("Save portfolio as", value=default_name, key="save_portfolio_name")
+    if st.button(SAVE_PORTFOLIO_LABEL, key="save_portfolio_btn"):
+        _show_save_result(save_portfolio(name, result.holdings, SAVED_INPUTS_PATH))
+
+
+def _render_save_watchlist_controls(result, default_name: str = "") -> None:
+    if not result.tickers:
+        return
+    name = st.text_input("Save watchlist as", value=default_name, key="save_watchlist_name")
+    if st.button(SAVE_WATCHLIST_LABEL, key="save_watchlist_btn"):
+        _show_save_result(save_watchlist(name, result.tickers, SAVED_INPUTS_PATH))
+
+
 def _render_portfolio_analysis(result):
     for error in result.errors:
         prefix = f"Row {error.row_number}: " if error.row_number is not None else ""
@@ -1407,6 +1482,11 @@ def render_portfolio_analyzer():
         """
     )
 
+    loaded = _render_saved_input_controls("portfolio", "PORTFOLIO", "loaded_portfolio_name")
+    if loaded is not None:
+        st.caption(f"Loaded portfolio: {loaded.name}")
+        _render_portfolio_analysis(PortfolioInputResult(holdings=loaded.holdings, errors=[]))
+
     mode = st.radio(
         "Analyzer input",
         ["Ticker", "Portfolio"],
@@ -1422,7 +1502,9 @@ def render_portfolio_analyzer():
             placeholder="XLK",
         )
         if ticker:
-            _render_portfolio_analysis(parse_single_ticker(ticker))
+            result = parse_single_ticker(ticker)
+            _render_portfolio_analysis(result)
+            _render_save_portfolio_controls(result, default_name=ticker.upper())
         return
 
     uploaded = st.file_uploader(
@@ -1431,7 +1513,10 @@ def render_portfolio_analyzer():
         key="portfolio_upload",
     )
     if uploaded is not None:
-        _render_portfolio_analysis(_portfolio_result_from_upload(uploaded))
+        result = _portfolio_result_from_upload(uploaded)
+        _render_portfolio_analysis(result)
+        default_name = Path(uploaded.name or "portfolio").stem
+        _render_save_portfolio_controls(result, default_name=default_name)
 
 
 def _custom_universe_result_from_upload(uploaded_file):
@@ -1503,6 +1588,11 @@ def render_custom_universe_builder():
         """
     )
 
+    loaded = _render_saved_input_controls("watchlist", "WATCHLIST", "loaded_watchlist_name")
+    if loaded is not None:
+        st.caption(f"Loaded watchlist: {loaded.name}")
+        _render_custom_universe_analysis(parse_custom_universe_text(" ".join(loaded.tickers)))
+
     mode = st.radio(
         "Custom universe input",
         ["Paste tickers", "Upload file"],
@@ -1518,7 +1608,9 @@ def render_custom_universe_builder():
             placeholder="XLK XLF SOXX NVDA",
             height=90,
         )
-        _render_custom_universe_analysis(parse_custom_universe_text(tickers))
+        result = parse_custom_universe_text(tickers)
+        _render_custom_universe_analysis(result)
+        _render_save_watchlist_controls(result)
         return
 
     uploaded = st.file_uploader(
@@ -1527,7 +1619,10 @@ def render_custom_universe_builder():
         key="custom_universe_upload",
     )
     if uploaded is not None:
-        _render_custom_universe_analysis(_custom_universe_result_from_upload(uploaded))
+        result = _custom_universe_result_from_upload(uploaded)
+        _render_custom_universe_analysis(result)
+        default_name = Path(uploaded.name or "watchlist").stem
+        _render_save_watchlist_controls(result, default_name=default_name)
 
 
 def _load_backtest_metadata():

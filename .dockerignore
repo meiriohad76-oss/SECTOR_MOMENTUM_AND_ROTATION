@@ -33,6 +33,7 @@ data/state.json
 data/feeds/
 data/logs/
 data/run_journal/
+data/saved_inputs.json
 *.duckdb
 *.parquet
 

@@ -45,6 +45,7 @@ data_cache/
 data/feeds/
 data/logs/
 data/run_journal/
+data/saved_inputs.json
 
 # --- Streamlit secrets (API keys etc.) ---
 .streamlit/secrets.toml
