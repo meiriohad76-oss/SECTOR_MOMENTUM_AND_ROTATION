@@ -153,6 +153,8 @@ Each is ~2–4 hours after the integration pattern is set. Flip `STUB_MODE = Fal
 - **B-147** Streamlit performance audit (which sections re-render unnecessarily on theme toggle)
 - **B-148** Migration from 32-bit Pi 2 (retired) to Pi 5 — DONE ✅
 
+- **B-153** Run journal + debrief engine — DESIGN APPROVED; B-153.1 creates the append-only local SQLite run journal, then later slices wire dashboard runs, forward-outcome debriefs, and dashboard/report surfacing.
+
 ### Documentation
 - **B-150** Auto-generated component-doc page (Storybook-style) for the dashboard's React-equivalent components
 - **B-151** "How to add a sector / indicator / pillar" tutorial

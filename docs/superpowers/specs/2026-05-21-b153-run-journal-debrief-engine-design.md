@@ -1,0 +1,37 @@
+# B-153 Run Journal And Debrief Engine Design
+
+## Goal
+
+Persist every methodology run and its decisions so a later debrief engine can measure which recommendations worked, which failed, and which thresholds deserve review.
+
+## Scope
+
+B-153 is split into small slices:
+
+1. B-153.1 creates an append-only local run journal with pure Python helpers and deterministic tests.
+2. B-153.2 wires the Streamlit scoring path to save one run snapshot after scoring and state-machine decisions.
+3. B-153.3 adds a debrief engine that joins saved decisions to forward returns at 1w, 4w, 13w, and 26w.
+4. B-153.4 surfaces debrief summaries as a report and later a dashboard section.
+
+## Architecture
+
+Use a local SQLite database at `data/run_journal/runs.sqlite`. The database is gitignored and owned by the deployed machine, similar to `state.json`. The first slice keeps all code in `src/run_journal.py` and avoids Streamlit, network calls, provider fetches, and app imports.
+
+The journal stores:
+
+- run metadata: run id, timestamp, git SHA, app version, provider, universe count, and metadata JSON
+- scored snapshots: ticker, class, state, score columns, pillar score JSON, and a payload JSON escape hatch
+- decisions/recommendations: decision type, ticker, action, rationale, and payload JSON
+
+The debrief engine will later read the journal, fetch or reuse historical prices, and compute hit rate, forward returns, drawdown avoidance, pillar attribution, and threshold-review candidates.
+
+## Safety
+
+The journal is append-only by `run_id`; duplicate run ids are rejected. It never stores API keys. It should not delete `state.json`, mutate the state machine, or block dashboard rendering if the database write fails in a later Streamlit-wiring slice.
+
+## Acceptance Criteria
+
+- The default database path is under `data/run_journal/` and is ignored by git.
+- Pure tests can create a temporary journal, append a run with scored rows and decisions, and read it back.
+- Duplicate run ids fail instead of silently overwriting historical evidence.
+- No Streamlit import is required to use the journal helpers.
