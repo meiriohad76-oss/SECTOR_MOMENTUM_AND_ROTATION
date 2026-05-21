@@ -25,4 +25,11 @@ def test_app_surfaces_run_debrief_without_fetching_data_inside_section():
 def test_debrief_lab_renders_after_backtest_before_full_table():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
-    assert "render_backtest_lab()\nrender_debrief_lab()\nrender_full_table()" in app_source
+    render_order = [
+        '_render_timed("render_backtest_lab", render_backtest_lab)',
+        '_render_timed("render_debrief_lab", render_debrief_lab)',
+        '_render_timed("render_full_table", render_full_table)',
+    ]
+    positions = [app_source.index(call) for call in render_order]
+
+    assert positions == sorted(positions)

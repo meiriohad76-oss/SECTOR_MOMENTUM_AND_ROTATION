@@ -21,7 +21,14 @@ def test_comparison_view_app_wiring():
     assert 'st.multiselect("COMPARE TICKERS"' in app_source
     assert "selected_compare = list(st.session_state.comparison_tickers)[:4]" in app_source
     assert "comparison_card_rows(scored, selected_compare)" in app_source
-    assert "render_drill()\nrender_comparison_view()\nrender_portfolio_analyzer()" in app_source
+    render_order = [
+        '_render_timed("render_drill", render_drill)',
+        '_render_timed("render_comparison_view", render_comparison_view)',
+        '_render_timed("render_portfolio_analyzer", render_portfolio_analyzer)',
+    ]
+    positions = [app_source.index(call) for call in render_order]
+
+    assert positions == sorted(positions)
 
 
 def test_comparison_view_css_present_and_responsive():

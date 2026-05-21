@@ -10,7 +10,11 @@ def test_view_preferences_are_initialized_and_rendered_near_header():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
     assert "initialize_preferences(st.session_state)" in app_source
-    assert "render_header_controls()\nrender_view_preferences()" in app_source
+    assert '_render_timed("render_header_controls", render_header_controls)' in app_source
+    assert '_render_timed("render_view_preferences", render_view_preferences)' in app_source
+    assert app_source.index('_render_timed("render_header_controls", render_header_controls)') < app_source.index(
+        '_render_timed("render_view_preferences", render_view_preferences)'
+    )
     assert "render_bluf()" in app_source
 
 

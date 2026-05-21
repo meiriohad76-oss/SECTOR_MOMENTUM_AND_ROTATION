@@ -19,7 +19,11 @@ def test_app_wires_sector_spaghetti_chart_from_existing_ohlcv():
 def test_sector_spaghetti_renders_between_rrg_and_drill():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
-    assert (
-        "render_rrg()\nrender_sector_spaghetti()\nrender_drill()"
-        in app_source
-    )
+    render_order = [
+        '_render_timed("render_rrg", render_rrg)',
+        '_render_timed("render_sector_spaghetti", render_sector_spaghetti)',
+        '_render_timed("render_drill", render_drill)',
+    ]
+    positions = [app_source.index(call) for call in render_order]
+
+    assert positions == sorted(positions)

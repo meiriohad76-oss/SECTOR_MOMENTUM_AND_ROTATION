@@ -29,8 +29,13 @@ def test_app_surfaces_backtest_artifacts_without_running_backtest():
 def test_backtest_lab_renders_before_full_table():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
-    assert (
-        "render_portfolio_analyzer()\nrender_custom_universe_builder()\n"
-        "render_backtest_lab()\nrender_debrief_lab()\nrender_full_table()"
-        in app_source
-    )
+    render_order = [
+        '_render_timed("render_portfolio_analyzer", render_portfolio_analyzer)',
+        '_render_timed("render_custom_universe_builder", render_custom_universe_builder)',
+        '_render_timed("render_backtest_lab", render_backtest_lab)',
+        '_render_timed("render_debrief_lab", render_debrief_lab)',
+        '_render_timed("render_full_table", render_full_table)',
+    ]
+    positions = [app_source.index(call) for call in render_order]
+
+    assert positions == sorted(positions)

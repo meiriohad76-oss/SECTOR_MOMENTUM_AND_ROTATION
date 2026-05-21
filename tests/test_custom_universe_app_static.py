@@ -22,11 +22,14 @@ def test_app_wires_custom_universe_builder_without_new_fetch_path():
 def test_custom_universe_renders_between_portfolio_and_backtest_labs():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
-    assert (
-        "render_portfolio_analyzer()\nrender_custom_universe_builder()\n"
-        "render_backtest_lab()"
-        in app_source
-    )
+    render_order = [
+        '_render_timed("render_portfolio_analyzer", render_portfolio_analyzer)',
+        '_render_timed("render_custom_universe_builder", render_custom_universe_builder)',
+        '_render_timed("render_backtest_lab", render_backtest_lab)',
+    ]
+    positions = [app_source.index(call) for call in render_order]
+
+    assert positions == sorted(positions)
 
 
 def test_custom_universe_section_has_stable_styling_hook():

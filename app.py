@@ -40,6 +40,7 @@ from src.portfolio import (
     parse_holdings_excel,
     parse_single_ticker,
 )
+from src.performance_audit import DashboardPerformanceAudit, classify_rerun, session_snapshot
 from src.preferences import (
     BLUF_MODES,
     DENSITY_MODES,
@@ -337,6 +338,9 @@ initialize_preferences(st.session_state)
 _density_class = density_class(st.session_state.view_density)
 _palette_key = palette_key(st.session_state.color_palette)
 _palette_css = palette_css_variables(st.session_state.color_palette, st.session_state.theme)
+PERF_AUDIT = DashboardPerformanceAudit()
+_PERF_START_SNAPSHOT = session_snapshot(st.session_state)
+_PERF_RERUN = classify_rerun(st.session_state.get("performance_last_snapshot"), _PERF_START_SNAPSHOT)
 
 _md(
     f"<style>{_CSS}{_EXTRA}{_palette_css}</style>"
@@ -465,25 +469,27 @@ def _record_dashboard_run(scored_df, bluf_payload, regime_obj, transitions_rows,
 loading_placeholder = st.empty()
 render_loading_state(loading_placeholder, "Loading market data", card_count=4)
 try:
-    ohlcv_result = _load_data("3y")
-    render_provider_status_banner(ohlcv_result)
-    ohlcv = ohlcv_result.data
+    with PERF_AUDIT.section("load_data"):
+        ohlcv_result = _load_data("3y")
+        render_provider_status_banner(ohlcv_result)
+        ohlcv = ohlcv_result.data
 
     bench_ticker = BENCH["US"]
     bil_ticker = BENCH["TBILL"]
     if bench_ticker not in ohlcv or bil_ticker not in ohlcv:
         st.error("Missing benchmark/T-bill data. Try the refresh button.")
         st.stop()
-    scoring_ohlcv = {t: ohlcv[t] for t in ALL_TICKERS if t in ohlcv}
+    with PERF_AUDIT.section("compute_signals"):
+        scoring_ohlcv = {t: ohlcv[t] for t in ALL_TICKERS if t in ohlcv}
 
-    render_loading_state(loading_placeholder, "Computing indicators", card_count=4)
-    indicators_df = compute_all_indicators(scoring_ohlcv, bench_ticker, bil_ticker)
-    flow_df = compute_flow_signals(scoring_ohlcv)
-    flow_z = flow_composite_z(flow_df)
-    _fred_data = _load_fred()
-    regime = assess_regime(ohlcv[bench_ticker], ohlcv.get("^TNX"), ohlcv.get("^IRX"), fred_cache=_fred_data)
-    scored = compute_composite(indicators_df, flow_df, flow_z, phase=regime.phase_hint)
-    scored = apply_state_machine(scored)
+        render_loading_state(loading_placeholder, "Computing indicators", card_count=4)
+        indicators_df = compute_all_indicators(scoring_ohlcv, bench_ticker, bil_ticker)
+        flow_df = compute_flow_signals(scoring_ohlcv)
+        flow_z = flow_composite_z(flow_df)
+        _fred_data = _load_fred()
+        regime = assess_regime(ohlcv[bench_ticker], ohlcv.get("^TNX"), ohlcv.get("^IRX"), fred_cache=_fred_data)
+        scored = compute_composite(indicators_df, flow_df, flow_z, phase=regime.phase_hint)
+        scored = apply_state_machine(scored)
 finally:
     loading_placeholder.empty()
 
@@ -1720,21 +1726,35 @@ def render_footer():
 
 # =============================== compose page ====================================
 
-render_header()
-render_header_controls()
-render_view_preferences()
-render_explainer()
-render_bluf()
-render_status()
-render_alerts()
-render_picks()
-render_rrg()
-render_sector_spaghetti()
-render_drill()
-render_comparison_view()
-render_portfolio_analyzer()
-render_custom_universe_builder()
-render_backtest_lab()
-render_debrief_lab()
-render_full_table()
-render_footer()
+def _render_timed(section_name: str, render_fn):
+    with PERF_AUDIT.section(section_name):
+        return render_fn()
+
+
+_render_timed("render_header", render_header)
+_render_timed("render_header_controls", render_header_controls)
+_render_timed("render_view_preferences", render_view_preferences)
+_render_timed("render_explainer", render_explainer)
+_render_timed("render_bluf", render_bluf)
+_render_timed("render_status", render_status)
+_render_timed("render_alerts", render_alerts)
+_render_timed("render_picks", render_picks)
+_render_timed("render_rrg", render_rrg)
+_render_timed("render_sector_spaghetti", render_sector_spaghetti)
+_render_timed("render_drill", render_drill)
+_render_timed("render_comparison_view", render_comparison_view)
+_render_timed("render_portfolio_analyzer", render_portfolio_analyzer)
+_render_timed("render_custom_universe_builder", render_custom_universe_builder)
+_render_timed("render_backtest_lab", render_backtest_lab)
+_render_timed("render_debrief_lab", render_debrief_lab)
+_render_timed("render_full_table", render_full_table)
+_render_timed("render_footer", render_footer)
+_PERF_FINAL_SNAPSHOT = session_snapshot(st.session_state)
+log_event(APP_LOGGER, "dashboard_performance_audit",
+    rerun_kind=_PERF_RERUN.kind,
+    changed_keys=_PERF_RERUN.changed_keys,
+    sections_ms=PERF_AUDIT.durations_ms,
+    provider=ohlcv_result.provider,
+    scored_count=len(scored),
+)
+st.session_state.performance_last_snapshot = _PERF_FINAL_SNAPSHOT

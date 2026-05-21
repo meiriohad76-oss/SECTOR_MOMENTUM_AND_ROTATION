@@ -294,7 +294,11 @@ Status legend:
 **Files:** `src/data.py`, `src/ohlcv_store.py`, `app.py`, `static/style.css`, `tests/test_data.py`, `tests/test_ohlcv_store.py`, `tests/test_provider_fallback_app_static.py`, `docs/superpowers/plans/2026-05-21-b146-yfinance-fallback.md`.
 **Behavior:** fresh DuckDB cache still serves first, provider misses still fetch normally, and yfinance gaps can fall back to explicit stale cached OHLCV with a compact dashboard provider-status banner. Symbols still missing after provider/cache fallback are surfaced in result warnings for operator visibility.
 **Residual risk:** the banner has static coverage and unit coverage for stale yfinance fallback; it has not yet been screenshot-tested across all responsive breakpoints.
-- **B-147** Streamlit performance audit (which sections re-render unnecessarily on theme toggle)
+#### B-147 · Streamlit performance audit — IMPLEMENTED
+**Status:** dashboard reruns now emit a `dashboard_performance_audit` structured log event with rerun classification, changed session-state keys, provider, scored row count, and per-section timings.
+**Files:** `src/performance_audit.py`, `app.py`, `tests/test_performance_audit.py`, `tests/test_performance_audit_app_static.py`, `docs/superpowers/plans/2026-05-21-b147-streamlit-performance-audit.md`.
+**Behavior:** theme, density, BLUF mode, sparkline style, and palette changes classify as `visual_only`; non-visual controls classify as `interactive`. The app times `load_data`, `compute_signals`, and each major render section without changing provider fetch, scoring, state-machine, or alert behavior.
+**Residual risk:** this ticket records audit evidence but does not yet skip expensive work on visual-only reruns; use the collected logs to choose the next optimization safely.
 - **B-148** Migration from 32-bit Pi 2 (retired) to Pi 5 — DONE ✅
 
 - **B-153** Run journal + debrief engine — IMPLEMENTED through B-153.4; the app now has an append-only local SQLite run journal, dashboard scoring/BLUF auto-recording, a pure forward-outcome debrief engine, and dashboard debrief surfacing. Future polish can add richer exported reports.
