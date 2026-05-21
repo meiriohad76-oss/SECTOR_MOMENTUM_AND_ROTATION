@@ -71,7 +71,7 @@ HOME (single scrollable page)
 │   ├── Cycle phase (EARLY / MID / LATE / RECESSION)
 │   └── Active warnings count
 ├── Alerts banner (last 8 state transitions, color-coded dots)
-├── Picks grid (4 cards per row, scrollable horizontally on mobile)
+├── Picks grid (4 cards per row on desktop, single-column on phone widths)
 │   └── Card: ticker, state pill, sparkline, S-score, F-score, momentum, RRG quadrant
 ├── Rotation centerpiece
 │   ├── Class selector (US Sectors / Industries / Countries / Factors)
@@ -146,12 +146,13 @@ SIDEBAR (persistent)
 
 ### 5.3 Spacing & layout
 
-- **Grid:** 12-column responsive, 24px gutters
+- **Grid:** 12-column responsive, 24px gutters; phone-width sections collapse to one column, while dense data tables keep horizontal scroll.
 - **Tile/card padding:** 14px vertical, 18px horizontal (tiles), 12px/14px (cards)
 - **Section spacing:** 24px between major sections, divider line above each section header
 - **Border radius:** 6px on tiles, cards, and pills (matches Bloomberg-style rectangularity — keep it tight, not pill-shaped)
 - **Border thickness:** 1px standard; 3px left-accent on cards (state-colored)
 - **Page max-width:** 1440px centered (works comfortably on 16:9 monitors)
+- **Mobile behavior:** header metadata wraps, RRG/drill controls wrap, full data tables scroll horizontally, and drill metrics collapse to one column below 520px.
 
 ### 5.4 State colors (consistent across product)
 
@@ -403,7 +404,7 @@ Use this realistic mock data set when populating mockups:
 - Real-time WebSocket data (we run on yfinance 1-hour cache)
 - Position tracking / P&L (this dashboard is signals-only, not a broker)
 - News integration (out of scope; Bloomberg-style headline ticker is a v3 idea)
-- Custom universe builder UI (currently in `src/universe.py` code; web UI to manage is v3)
+- Custom universe persistence/editing beyond the read-only B-105 builder
 - Multi-user / multi-tenant (Cloudflare Access is per-email allowlist for now)
 
 ---

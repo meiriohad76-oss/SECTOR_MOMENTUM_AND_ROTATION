@@ -12,6 +12,7 @@ A Streamlit dashboard that monitors **83+ instruments across US sectors, US indu
 
 - A **read-only portfolio / single-stock analyzer** that accepts one ticker or a CSV/XLS/XLSX holdings file and maps the input to the current methodology snapshot.
 - A **read-only custom universe builder** that accepts pasted tickers or a CSV/XLS/XLSX ticker file, de-duplicates the list, and ranks matched tickers against the current methodology snapshot.
+- A **responsive single-page dashboard layout** with phone-width guards for the header, section controls, alert rows, tables, drill controls, and compact action summaries.
 - A **single-page Streamlit app** (`app.py`) with two sections:
   - **Top:** 7-pillar heatmap — every ticker scored on every pillar, color-coded, with composite score and current state (`STAGE_2_BULLISH` / `HOLD` / `WARNING` / `EXIT` / `BEARISH_STAGE_4` / `STAGE_1_BASING`).
   - **Below:** drill-down tabs — RRG quadrant chart, cross-sectional momentum bar, institutional flow detail, state-machine transition log, per-ticker deep dive with price/CMF/OBV charts.
@@ -61,6 +62,15 @@ B-105 adds a read-only custom universe section inside the Streamlit app:
 - Duplicate tickers are ignored after the first occurrence. Unknown tickers are reported as missing instead of crashing.
 - Matched tickers are ranked by current `S_score` inside the custom list and retain their methodology state, class, flow score, class rank, selection flag, and veto flag.
 - The builder is snapshot-only and in-memory: it does not fetch new OHLCV, alter `src/universe.py`, save watchlists, or write state-machine files.
+
+## Mobile view
+
+B-110 adds CSS and Streamlit markup hooks for narrower screens:
+
+- Header metadata wraps instead of pushing content off screen.
+- RRG class buttons and drill buttons wrap into usable rows on phone widths.
+- Dense tables scroll horizontally rather than squeezing all columns into unreadable text.
+- Alert rows, action summaries, status tiles, defensive cards, and drill metrics collapse into tighter mobile-friendly grids.
 
 ## Quick start
 

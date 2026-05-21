@@ -514,6 +514,7 @@ def _render_drill_buttons(prefix: str, tickers: list[str], max_columns: int = 4)
     drill_tickers = [ticker for ticker in dict.fromkeys(tickers) if ticker in scored.index]
     if not drill_tickers:
         return
+    _md('<div class="drill-buttons-slot"></div>')
     cols = st.columns(min(len(drill_tickers), max_columns))
     for idx, ticker in enumerate(drill_tickers):
         with cols[idx % len(cols)]:
@@ -916,6 +917,7 @@ def render_rrg():
 
     # class selector (Streamlit native buttons styled by our CSS)
     cls_list = list(UNIVERSE_BY_CLASS.keys()) + ["ALL"]
+    _md('<div class="rrg-class-controls-slot"></div>')
     cols = st.columns(len(cls_list))
     for c, cls in zip(cols, cls_list):
         if c.button(cls.upper(), key=f"cls_{cls}",

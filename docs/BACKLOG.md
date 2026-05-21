@@ -94,6 +94,14 @@ Status legend:
 **Safety:** read-only/in-memory only; no OHLCV fetch from user input, no mutation of `src/universe.py`, no watchlist persistence, and no `state.json` writes.
 **Evidence:** `docs/superpowers/plans/2026-05-21-b105-custom-universe-builder.md`.
 
+### B-110 - Mobile-first responsive view - IMPLEMENTED
+**Status:** phone-width responsive guards are implemented in `backlog-stepwise-qa`.
+**Files:** `app.py`, `static/style.css`, `tests/test_mobile_responsive_static.py`, `README.md`, `docs/PRODUCT_DESIGN.md`.
+**Behavior:** header metadata wraps, section heads stack, BLUF/action/status/pick grids collapse, alert rows simplify, full tables scroll horizontally, RRG class controls and drill buttons wrap into usable rows, custom-universe summaries stack, and narrow drill metrics collapse to one column.
+**Safety:** CSS/markup-only; no scoring, data-fetch, provider, persistence, or state-machine behavior changes.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b110-mobile-responsive-view.md`.
+**Residual risk:** local verification includes static coverage and HTTP smoke; screenshot-level mobile browser QA should be added when Playwright or browser tooling is available in the environment.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -157,7 +165,6 @@ Status legend:
 ### Universe & data
 
 ### Visual / UX
-- **B-110** Mobile-first responsive view (currently usable but cramped on phones)
 - **B-111** Sector "spaghetti chart" — every sector's relative-strength line over 12 months, overlaid
 - **B-112** Custom time-range selector in per-ticker drill-down
 - **B-113** Hover preview on table rows (mini RRG dot popover)
