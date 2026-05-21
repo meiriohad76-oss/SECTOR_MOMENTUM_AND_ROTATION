@@ -70,7 +70,7 @@ A sector is **fully bullish** only when LAYER 1 = RISK_ON, LAYER 2 ranks it top-
 `XLK XLF XLE XLV XLI XLY XLP XLU XLB XLRE XLC`
 
 ### 3.2 US industries (drill-down, optional Phase 2)
-`SOXX IGV IHI IHF KRE KIE ITB XHB XRT XOP OIH KWEB FDN ITA JETS SMH IBB XBI GDX TAN ICLN`
+`SOXX IGV IHI IHF KRE KIE ITB XHB XRT XOP OIH KWEB FDN ITA JETS SMH IBB XBI GDX`
 
 ### 3.3 International / country & region
 `VEU VWO EFA EEM EWJ EWG EWU INDA MCHI FXI EWZ EWA EWC EWW KSA EZA EIDO EWY EWT EWS`
@@ -78,10 +78,13 @@ A sector is **fully bullish** only when LAYER 1 = RISK_ON, LAYER 2 ranks it top-
 ### 3.4 Style factors (US)
 `MTUM QUAL USMV VLUE SIZE IWF IWD IJR IJH IWB`
 
-### 3.5 Defensive / absolute-momentum bench
+### 3.5 Thematic exposures
+`ARKK HACK MOO URA LIT TAN ICLN BOTZ`
+
+### 3.6 Defensive / absolute-momentum bench
 `BIL` (T-bill proxy, for Antonacci absolute filter) · `TLT IEF GLD UUP DBC` (risk-off candidates)
 
-### 3.6 Benchmark
+### 3.7 Benchmark
 `SPY` for US, `ACWI` for global, `URTH` for developed-world cross-sector comparison
 
 ---
@@ -315,9 +318,10 @@ S_i = 0.22 * z(M1_i)                 # 12-1 momentum
 
 # Hold top N
 N_us_sectors    = 4   (out of 11)
-N_industries    = 3   (out of ~20)
+N_industries    = 3   (out of 19)
 N_countries     = 3   (out of ~20)
 N_factors       = 1-2 (out of 10)
+N_themes        = 3   (out of 8)
 ```
 **Why flow gets ~23% of the weight** — it's an independent confirmation of the price-based pillars. When price and flow agree, signal quality is much higher; when they disagree, the trade is almost always wrong. Empirically (Lee & Swaminathan 2000; Chordia & Swaminathan 2000) volume-confirmed momentum substantially outperforms pure-price momentum on a risk-adjusted basis.
 

@@ -32,8 +32,6 @@ US_INDUSTRIES = [
     "XOP",   # Oil & gas E&P
     "OIH",   # Oil services
     "GDX",   # Gold miners
-    "TAN",   # Solar
-    "ICLN",  # Clean energy
     "KWEB",  # China internet
     "FDN",   # Internet
     "ITA",   # Aerospace & defense
@@ -78,6 +76,17 @@ FACTORS = [
     "IWB",   # Russell 1000
 ]
 
+THEMES = [
+    "ARKK",  # Disruptive innovation
+    "HACK",  # Cybersecurity
+    "MOO",   # Agribusiness
+    "URA",   # Uranium
+    "LIT",   # Lithium and battery technology
+    "TAN",   # Solar
+    "ICLN",  # Clean energy
+    "BOTZ",  # Robotics and artificial intelligence
+]
+
 DEFENSIVES = ["TLT", "IEF", "GLD", "UUP", "DBC"]  # for risk-off pivot
 
 BENCH = {
@@ -91,6 +100,7 @@ UNIVERSE_BY_CLASS = {
     "US Industries": US_INDUSTRIES,
     "Countries":    COUNTRIES,
     "Factors":      FACTORS,
+    "Themes":       THEMES,
 }
 
 ALL_TICKERS = (
@@ -98,6 +108,7 @@ ALL_TICKERS = (
     + US_INDUSTRIES
     + COUNTRIES
     + FACTORS
+    + THEMES
     + DEFENSIVES
     + list(BENCH.values())
 )
@@ -121,4 +132,5 @@ TOP_N = {
     "US Industries": 3,
     "Countries":    3,
     "Factors":      2,
+    "Themes":       3,
 }

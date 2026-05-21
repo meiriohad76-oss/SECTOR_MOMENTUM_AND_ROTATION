@@ -8,7 +8,7 @@
 
 ## 1. Product summary
 
-A single-page institutional-grade sector rotation dashboard that monitors **67+ ETFs** across US sectors, US industries, international markets, and style factors. Implements a 7-pillar methodology (cross-sectional momentum, Faber, Weinstein Stage 2, Antonacci dual momentum, RRG, business cycle, institutional flow) to identify bullish sectors and alert on bearish reversals.
+A single-page institutional-grade sector rotation dashboard that monitors **73+ ETFs** across US sectors, US industries, international markets, style factors, and thematic exposures. Implements a 7-pillar methodology (cross-sectional momentum, Faber, Weinstein Stage 2, Antonacci dual momentum, RRG, business cycle, institutional flow) to identify bullish sectors and alert on bearish reversals.
 
 **One-line product positioning:**
 *"Bloomberg Terminal aesthetic, retail-trader simplicity. See sector rotation at a glance, get alerted before the breakdown."*

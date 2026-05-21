@@ -52,6 +52,13 @@ Status legend:
 **QA:** `python -m pytest tests/test_flow.py -q` -> `33 passed`; `python -m pytest -q` -> `184 passed`.
 **Residual risk:** live provider validation depends on configured keys/user-agent/CUSIP mappings and should be repeated after provider schema changes.
 
+### B-100 - Theme ETF universe - IMPLEMENTED
+**Status:** theme ETFs are now a first-class universe class in `backlog-stepwise-qa`.
+**Files:** `src/universe.py`, `tests/test_universe.py`, `README.md`, `docs/sector-rotation-methodology.md`, `docs/PRODUCT_DESIGN.md`.
+**Tickers:** `ARKK`, `HACK`, `MOO`, `URA`, `LIT`, `TAN`, `ICLN`, and `BOTZ`.
+**Behavior:** `TAN` and `ICLN` moved from `US Industries` to `Themes` to avoid duplicate tickers; theme ETFs rank within their own class with `TOP_N["Themes"] == 3`.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b100-theme-etfs.md`.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -113,7 +120,6 @@ Status legend:
 ## 🌟 Ideas for v3+
 
 ### Universe & data
-- **B-100** Add ARKK, HACK, MOO, URA, LIT, TAN, ICLN, BOTZ etc. (theme ETFs)
 - **B-101** Add BITO, IBIT, ETHE for crypto exposure (different vol regime — needs separate z-score class)
 - **B-102** Add mega-cap individual stocks (NVDA, AAPL, MSFT, AMZN, GOOGL, META, TSLA, etc.) in their own class
 - **B-103** Add VIX, gold, oil, USD index as macro tiles in the header
