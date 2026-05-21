@@ -49,6 +49,7 @@ from src.preferences import (
 from src.run_debrief import debrief_journal, summarize_debriefs, threshold_review_candidates
 from src.run_journal import DEFAULT_JOURNAL_PATH, append_dashboard_run
 from src.scoring import compute_composite, apply_state_machine, recent_transitions
+from src.table_preview import table_row_rrg_preview_html
 from src.ui_states import defensive_basket_rows, loading_skeleton_slots
 from src.universe import ALL_TICKERS, SCORED_TICKERS, UNIVERSE_BY_CLASS, BENCH
 from src.universe import US_SECTORS
@@ -65,7 +66,7 @@ from src.visuals import (
 )
 
 
-APP_VERSION = "v2.4.4"
+APP_VERSION = "v2.4.5"
 DRILL_RANGE_OPTIONS = ("3M", "6M", "1Y", "3Y", "MAX")
 DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + ["^TNX", "^IRX"]))
 
@@ -1155,6 +1156,7 @@ def render_full_table():
         f = r["F_score"]
         mom = (r.get("mom_12_1") or 0) * 100
         state = r["state"]
+        preview_html = table_row_rrg_preview_html(tkr, r)
 
         p_tds = "".join(
             f'<td class="num"><span class="dot {"ok" if ok else "bad"}">{"●" if ok else "○"}</span></td>'
@@ -1163,7 +1165,7 @@ def render_full_table():
 
         rows_html += f"""
         <tr>
-          <td class="t">{tkr}</td>
+          <td class="t table-ticker">{_esc(tkr)}{preview_html}</td>
           <td style="color:var(--muted)">{r['class']}</td>
           <td><span class="pill {state}" data-tip="{_esc(STATE_TIPS.get(state, ""))}">{state.replace('_', ' ')}</span></td>
           {p_tds}

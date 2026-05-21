@@ -77,7 +77,7 @@ HOME (single scrollable page)
 │   ├── Class selector (US Sectors / Industries / Countries / Factors)
 │   └── Big RRG quadrant chart (interactive, hover + click)
 ├── US sector relative-strength spaghetti chart (12-month lines vs SPY)
-├── Full 7-pillar table (collapsed by default, expandable)
+├── Full 7-pillar table (collapsed by default, expandable, desktop hover RRG previews)
 └── Per-ticker drill-down
     ├── Ticker picker
     ├── Chart range selector (3M / 6M / 1Y / 3Y / MAX loaded data)
@@ -271,6 +271,11 @@ Then three full-width charts stacked or in 2-column:
 - OBV + price overlay (dual-axis)
 
 Below: expandable raw table of every indicator value for that ticker.
+
+The full 7-pillar matrix uses row hover previews on desktop:
+- Ticker cell reveals a compact RRG card on hover.
+- The card shows current quadrant, mini RRG dot, RS-ratio, RS-momentum, S-score, and F-score.
+- Previews are disabled on phone widths where hover is not a reliable interaction.
 
 ---
 

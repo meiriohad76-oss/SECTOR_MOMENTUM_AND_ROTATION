@@ -118,6 +118,14 @@ Status legend:
 **Evidence:** `docs/superpowers/plans/2026-05-21-b112-drill-time-range-selector.md`.
 **Residual risk:** `MAX` means all data already loaded by the dashboard run, currently bounded by the app's configured OHLCV payload; screenshot-level browser QA should be added when browser tooling is available.
 
+### B-113 - Hover preview on table rows - IMPLEMENTED
+**Status:** desktop hover previews are implemented for full matrix ticker rows in `backlog-stepwise-qa`.
+**Files:** `src/table_preview.py`, `tests/test_table_preview.py`, `tests/test_table_hover_preview_static.py`, `app.py`, `static/style.css`, `README.md`, `docs/PRODUCT_DESIGN.md`.
+**Behavior:** hovering a ticker row in the full 7-pillar matrix reveals a compact RRG preview card with ticker, quadrant, mini RRG dot, RS-ratio, RS-momentum, S-score, and F-score.
+**Safety:** uses already-computed scored-row fields only; no JavaScript, provider fetch, scoring, alerting, state-machine, or persistence behavior changes.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b113-table-hover-preview.md`.
+**Residual risk:** CSS-only hover behavior is covered by static tests and HTTP smoke; screenshot-level browser QA should be added when browser tooling is available.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -181,7 +189,6 @@ Status legend:
 ### Universe & data
 
 ### Visual / UX
-- **B-113** Hover preview on table rows (mini RRG dot popover)
 - **B-114** State transition pulse animation when a ticker just flipped
 - **B-115** Comparison view — pick 2–4 tickers, see side-by-side metrics
 - **B-116** "30wMA reference line" baked into the sparklines (Weinstein context)
