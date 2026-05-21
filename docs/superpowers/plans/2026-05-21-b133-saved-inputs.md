@@ -113,6 +113,16 @@ Observed:
 - `python -m compileall app.py src scripts` -> exit 0
 - `git diff --check` -> exit 0
 
-- [ ] **Step 6: Review, commit, push, deploy**
+- [x] **Step 6: Review, commit, push, deploy**
 
 Request focused review, fix Critical/Important feedback, commit as `feat: save named watchlists and portfolios`, push to GitHub, verify remote SHA, deploy to Pi, run focused/full Pi pytest, and dashboard HTTP smoke.
+
+Observed:
+
+- Focused review: no blocking issues; residual risk is static Streamlit wiring coverage and file-based last-write-wins persistence.
+- Local commit: `3e17bf6 feat: save named watchlists and portfolios`
+- GitHub branch: `backlog-stepwise-qa` at `3e17bf634a1cbfbdbbf7051fba1de9faaa01370e`
+- Pi pull: fast-forwarded `/home/ahad/SECTOR_MOMENTUM_AND_ROTATION` to `3e17bf6`
+- Pi focused verification: `./.venv/bin/python -m pytest tests/test_saved_inputs.py tests/test_saved_inputs_app_static.py -q` -> `10 passed in 0.07s`
+- Pi full verification: `./.venv/bin/python -m pytest -q` -> `324 passed in 4.99s`
+- Pi service smoke: `poll_7 active=active http=200`
