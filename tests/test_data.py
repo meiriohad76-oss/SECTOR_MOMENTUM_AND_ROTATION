@@ -3,8 +3,14 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 
 from src import data
+
+
+@pytest.fixture(autouse=True)
+def disable_default_ohlcv_cache(monkeypatch):
+    monkeypatch.setenv("OHLCV_CACHE_ENABLED", "false")
 
 
 def test_to_weekly_aggregates_ohlcv_to_friday_close():
@@ -257,3 +263,42 @@ def test_fetch_ohlcv_explicit_yfinance_ignores_massive_environment(monkeypatch):
     )
 
     assert list(data.fetch_ohlcv(["XLK"], provider="yfinance")) == ["XLK"]
+
+
+def test_fetch_ohlcv_massive_preserves_lowercase_request_as_provider_symbol(monkeypatch):
+    monkeypatch.setenv("OHLCV_PROVIDER", "massive")
+    monkeypatch.setenv("MASSIVE_API_KEY", "secret")
+    base = pd.Timestamp("2024-01-01", tz="UTC")
+    results = [
+        {
+            "t": int((base + pd.Timedelta(days=idx)).timestamp() * 1000),
+            "o": 100.0 + idx,
+            "h": 101.0 + idx,
+            "l": 99.0 + idx,
+            "c": 100.5 + idx,
+            "v": 1_000_000 + idx,
+        }
+        for idx in range(40)
+    ]
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"results": results}
+
+    def fake_get(url, params, headers, timeout, verify=None):
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        data,
+        "requests",
+        SimpleNamespace(get=fake_get, RequestException=RuntimeError),
+        raising=False,
+    )
+
+    out = data.fetch_ohlcv(["xlk"], provider="massive")
+
+    assert list(out) == ["XLK"]
+    assert len(out["XLK"]) == 40

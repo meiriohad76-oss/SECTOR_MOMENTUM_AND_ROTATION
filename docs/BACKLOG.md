@@ -277,7 +277,12 @@ Status legend:
 **Behavior:** excludes the same T-bill/index tickers as before, uses up to `min(8, os.cpu_count(), eligible_ticker_count)` workers by default, accepts `max_workers=1` for serial debugging, and keeps the app/backtest call sites unchanged.
 **Residual risk:** tests patch the executor contract and verify output order; they do not benchmark real dashboard latency across a large live universe.
 
-- **B-144** Local DuckDB store for OHLC (skip yfinance refetch on Pi reboot)
+#### B-144 · Local DuckDB OHLCV store — IMPLEMENTED
+**Status:** `fetch_ohlcv()` now reads a persistent local DuckDB cache before provider calls and writes successful provider frames back to cache.
+**Files:** `src/ohlcv_store.py`, `src/data.py`, `tests/test_ohlcv_store.py`, `requirements.txt`, `docs/superpowers/plans/2026-05-21-b144-duckdb-ohlcv-cache.md`.
+**Behavior:** cache defaults to `data_cache/ohlcv.duckdb`, can be moved with `OHLCV_CACHE_PATH`, can be disabled with `OHLCV_CACHE_ENABLED=false`, serves only period-covering fresh daily data, fetches only cache misses, and preserves the existing de-duplicated ticker order.
+**Residual risk:** cache freshness uses a small daily-data tolerance and is covered by unit tests; it has not yet been load-tested with the full live universe over many months of Pi writes.
+
 - **B-145** Structured logging (JSON logs) + log shipping to a free Logflare/Grafana endpoint
 - **B-146** Graceful degradation when yfinance rate-limits (cached fallback, banner)
 - **B-147** Streamlit performance audit (which sections re-render unnecessarily on theme toggle)

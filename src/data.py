@@ -15,6 +15,8 @@ import pandas as pd
 import requests
 import yfinance as yf
 
+from .ohlcv_store import ohlcv_cache_enabled, read_cached_ohlcv, write_cached_ohlcv
+
 
 MASSIVE_AGGS_URL_TEMPLATE = (
     "https://api.massive.com/v2/aggs/ticker/{ticker}/range/"
@@ -245,12 +247,35 @@ def fetch_ohlcv(
     Returns
     -------
     dict mapping ticker -> DataFrame indexed by date with columns
-    [open, high, low, close, adj_close, volume].
+    [open, high, low, close, volume, adj_close].
     """
     tickers = list(dict.fromkeys(tickers))  # de-dup preserving order
-    if _select_ohlcv_provider(provider) == "massive":
-        return _fetch_massive_ohlcv(tickers, period=period, interval=interval)
-    return _fetch_yfinance_ohlcv(tickers, period=period, interval=interval)
+    provider_name = _select_ohlcv_provider(provider)
+    cached: dict[str, pd.DataFrame] = {}
+    if ohlcv_cache_enabled():
+        try:
+            cached = read_cached_ohlcv(tickers, period=period, interval=interval)
+        except Exception:
+            cached = {}
+    missing = [ticker for ticker in tickers if ticker not in cached]
+    fetched: dict[str, pd.DataFrame] = {}
+    if missing:
+        if provider_name == "massive":
+            fetched = _fetch_massive_ohlcv(missing, period=period, interval=interval)
+        else:
+            fetched = _fetch_yfinance_ohlcv(missing, period=period, interval=interval)
+        if fetched and ohlcv_cache_enabled():
+            try:
+                write_cached_ohlcv(fetched, provider=provider_name, interval=interval)
+            except Exception:
+                pass
+    combined = {**cached, **fetched}
+    ordered = {}
+    for ticker in tickers:
+        key = ticker if ticker in combined else str(ticker).upper()
+        if key in combined and key not in ordered:
+            ordered[key] = combined[key]
+    return ordered
 
 
 def to_weekly(df: pd.DataFrame) -> pd.DataFrame:
