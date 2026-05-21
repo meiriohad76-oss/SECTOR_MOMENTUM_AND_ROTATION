@@ -93,6 +93,16 @@ CRYPTO = [
     "ETHE",  # Ethereum exposure
 ]
 
+MEGA_CAP_STOCKS = [
+    "NVDA",   # NVIDIA
+    "AAPL",   # Apple
+    "MSFT",   # Microsoft
+    "AMZN",   # Amazon
+    "GOOGL",  # Alphabet
+    "META",   # Meta Platforms
+    "TSLA",   # Tesla
+]
+
 DEFENSIVES = ["TLT", "IEF", "GLD", "UUP", "DBC"]  # for risk-off pivot
 
 BENCH = {
@@ -108,6 +118,7 @@ UNIVERSE_BY_CLASS = {
     "Factors":      FACTORS,
     "Themes":       THEMES,
     "Crypto":       CRYPTO,
+    "Mega-Cap Stocks": MEGA_CAP_STOCKS,
 }
 
 SCORED_TICKERS = (
@@ -117,6 +128,7 @@ SCORED_TICKERS = (
     + FACTORS
     + THEMES
     + CRYPTO
+    + MEGA_CAP_STOCKS
     + DEFENSIVES
 )
 
@@ -146,4 +158,5 @@ TOP_N = {
     "Factors":      2,
     "Themes":       3,
     "Crypto":       1,
+    "Mega-Cap Stocks": 3,
 }

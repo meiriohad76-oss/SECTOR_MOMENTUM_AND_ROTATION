@@ -159,10 +159,10 @@ def _grade_letter(s: float | None) -> str:
 SYSTEM_EXPLAINER_HTML = f"""
 <div class="explainer">
 
-<p><b>Forward-looking signal system.</b> The Sentiment Board monitors {len(SCORED_TICKERS)} ETFs across US sectors, industries, countries, factors, themes, and crypto exposures, then applies a 7-pillar methodology to <b>predict</b> which sectors will lead and which will break down. Every score, state, and signal you see on this page is a forward call, not a current-state description. The pillars are leading indicators by construction — each one has decades of out-of-sample evidence that <i>past readings predict forward returns</i>.</p>
+<p><b>Forward-looking signal system.</b> The Sentiment Board monitors {len(SCORED_TICKERS)} instruments across US sectors, industries, countries, factors, themes, crypto exposures, and mega-cap stocks, then applies a 7-pillar methodology to <b>predict</b> which sectors will lead and which will break down. Every score, state, and signal you see on this page is a forward call, not a current-state description. The pillars are leading indicators by construction — each one has decades of out-of-sample evidence that <i>past readings predict forward returns</i>.</p>
 
 <h3>Data flow</h3>
-<pre class="flow">yfinance daily OHLCV (3y, ~70 tickers)
+<pre class="flow">yfinance daily OHLCV (3y, {len(ALL_TICKERS) + 2} symbols)
         |
         v
 weekly + monthly resamples for stage / Faber
@@ -587,7 +587,7 @@ def render_bluf():
         f"Forward calls: {bluf['exits_count']} tickers expected to underperform soon, "
         f"{bluf['warns_count']} showing topping signals, "
         f"{bluf['buys_count']} predicted to lead the next 4-26 weeks. "
-        f"Universe: {len(scored)} ETFs. "
+        f"Universe: {len(scored)} instruments. "
         f"Risk regime is {('on' if regime.risk_on else 'off')} ({regime.phase_hint.lower()} cycle). "
         f"{instruction}"
     )
@@ -1111,7 +1111,7 @@ def render_full_table():
     html = f"""
     <section class="section">
       <div class="section-head">
-        <h2>Full 7-pillar matrix <span class="count">{len(scored)} of {len(SCORED_TICKERS)} ETFs</span></h2>
+        <h2>Full 7-pillar matrix <span class="count">{len(scored)} of {len(SCORED_TICKERS)} instruments</span></h2>
       </div>
       <div class="full-table">
         <table>
@@ -1411,7 +1411,7 @@ def render_debrief_lab():
 def render_footer():
     html = f"""
     <div class="footer">
-      <span>{len(scored)} ETFS · 7 PILLARS · STUB MODE {'ON' if STUB_MODE else 'OFF'} · CACHE TTL 60min</span>
+      <span>{len(scored)} INSTRUMENTS · 7 PILLARS · STUB MODE {'ON' if STUB_MODE else 'OFF'} · CACHE TTL 60min</span>
       <span>{APP_VERSION} · {st.session_state.theme.upper()} · MEIRI / READ-ONLY</span>
     </div>
     </div>

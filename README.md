@@ -1,6 +1,6 @@
 # Sector Rotation Dashboard
 
-A Streamlit dashboard that monitors **76+ ETFs across US sectors, US industries, international markets, style factors, thematic exposures, and crypto exposures** using a 7-pillar layered methodology to identify bullish sectors and alert on bearish reversals.
+A Streamlit dashboard that monitors **83+ instruments across US sectors, US industries, international markets, style factors, thematic exposures, crypto exposures, and mega-cap stocks** using a 7-pillar layered methodology to identify bullish sectors and alert on bearish reversals.
 
 > The methodology layers six peer-reviewed price pillars (cross-sectional momentum, Faber 10mo SMA, Weinstein Stage 2, Antonacci dual momentum, RRG, business cycle) with a seventh **institutional flow** pillar (CMF, OBV, MFI, RVOL, distribution days, block-trade tape, ETF creations, 13F, short interest).
 >
@@ -91,7 +91,7 @@ sector-rotation-dashboard/
 ├── run.bat                         <- Windows one-click launcher
 ├── run-diagnostic.bat              <- Windows verbose launcher
 ├── src/
-│   ├── universe.py                 <- 76+ tickers grouped by class
+│   ├── universe.py                 <- 83+ tickers grouped by class
 │   ├── data.py                     <- OHLCV ingestion: yfinance default, Massive optional
 │   ├── indicators.py               <- Pillars 1-5 + breadth
 │   ├── flow.py                     <- Pillar 7: CMF/OBV/MFI/RVOL + 5 stubs

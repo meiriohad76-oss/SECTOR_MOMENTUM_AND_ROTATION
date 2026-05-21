@@ -66,6 +66,13 @@ Status legend:
 **Behavior:** crypto tickers rank only against each other in the `Crypto` class, with `TOP_N["Crypto"] == 1` to reflect the separate volatility regime called out in the backlog.
 **Evidence:** `docs/superpowers/plans/2026-05-21-b101-crypto-exposure.md`.
 
+### B-102 - Mega-cap stock universe - IMPLEMENTED
+**Status:** mega-cap individual stocks are now a separate universe class in `backlog-stepwise-qa`.
+**Files:** `src/universe.py`, `tests/test_universe.py`, `app.py`, `README.md`, `docs/sector-rotation-methodology.md`, `docs/PRODUCT_DESIGN.md`.
+**Tickers:** `NVDA`, `AAPL`, `MSFT`, `AMZN`, `GOOGL`, `META`, and `TSLA`.
+**Behavior:** mega-cap stocks rank only against each other in the `Mega-Cap Stocks` class, with `TOP_N["Mega-Cap Stocks"] == 3`.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b102-mega-cap-stocks.md`.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -127,7 +134,6 @@ Status legend:
 ## 🌟 Ideas for v3+
 
 ### Universe & data
-- **B-102** Add mega-cap individual stocks (NVDA, AAPL, MSFT, AMZN, GOOGL, META, TSLA, etc.) in their own class
 - **B-103** Add VIX, gold, oil, USD index as macro tiles in the header
 - **B-104** Add a "session high / low" tile to the status row showing intraday context
 - **B-105** Custom universe builder web UI (currently config-only)

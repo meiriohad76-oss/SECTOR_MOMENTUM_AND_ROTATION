@@ -84,10 +84,13 @@ A sector is **fully bullish** only when LAYER 1 = RISK_ON, LAYER 2 ranks it top-
 ### 3.6 Crypto exposures
 `BITO IBIT ETHE`
 
-### 3.7 Defensive / absolute-momentum bench
+### 3.7 Mega-cap individual stocks
+`NVDA AAPL MSFT AMZN GOOGL META TSLA`
+
+### 3.8 Defensive / absolute-momentum bench
 `BIL` (T-bill proxy, for Antonacci absolute filter) · `TLT IEF GLD UUP DBC` (risk-off candidates)
 
-### 3.8 Benchmark
+### 3.9 Benchmark
 `SPY` for US, `ACWI` for global, `URTH` for developed-world cross-sector comparison
 
 ---
@@ -326,6 +329,7 @@ N_countries     = 3   (out of ~20)
 N_factors       = 1-2 (out of 10)
 N_themes        = 3   (out of 8)
 N_crypto        = 1   (out of 3)
+N_mega_cap_stocks = 3   (out of 7)
 ```
 **Why flow gets ~23% of the weight** — it's an independent confirmation of the price-based pillars. When price and flow agree, signal quality is much higher; when they disagree, the trade is almost always wrong. Empirically (Lee & Swaminathan 2000; Chordia & Swaminathan 2000) volume-confirmed momentum substantially outperforms pure-price momentum on a risk-adjusted basis.
 
@@ -427,7 +431,7 @@ sector-rotation/
 
 ## 8. Backtest plan (before going live)
 
-1. **Data range**: 2003–today (so it spans the 2008 GFC, 2011 EU crisis, 2020 COVID, 2022 bear). Use longest possible for ETFs that exist; substitute index total-return for older history (e.g., MSCI EAFE for EFA).
+1. **Data range**: 2003–today (so it spans the 2008 GFC, 2011 EU crisis, 2020 COVID, 2022 bear). Use the longest available history for each instrument; substitute index total-return for ETF history gaps where appropriate (e.g., MSCI EAFE for EFA).
 2. **Walk-forward**: Train universe weights on 2003–2014, lock parameters, then run 2015–today as out-of-sample. Do **not** tune on the out-of-sample window.
 3. **Benchmark**: 60/40 SPY/AGG and equal-weight 11-sector portfolio.
 4. **Metrics to log**: CAGR, Sharpe, Sortino, max drawdown, Calmar, hit-rate by signal, turnover, average holding period, transaction-cost sensitivity (3, 5, 10 bps per side).
@@ -449,7 +453,7 @@ sector-rotation/
 2. **"Myth of sector rotation"** (Molchanov & Stangl 2018): the deterministic business-cycle → sector map underperforms once you account for forward-looking phase identification. **Conclusion**: the macro overlay should only nudge the composite, not drive it.
 3. **RRG is a visualization, not a system**: the RS-Ratio/RS-Momentum formulas above are an approximation; the proprietary version differs. Don't claim RRG-branded backtests if you publish.
 4. **Data-mined factor zoo**: limit yourself to the five canonical factors (momentum, value, quality, low-vol, size) — anything else is suspect.
-5. **Survivorship bias** in ETF universe: a few sector / country ETFs have closed (e.g., GREK relisted multiple times). Use a delisted-aware data provider for honest backtests.
+5. **Survivorship bias** in the instrument universe: a few sector / country ETFs have closed (e.g., GREK relisted multiple times), and stock leadership changes over time. Use a delisted-aware data provider for honest backtests.
 6. **Bear-market false positives**: the state machine will whipsaw in a choppy market. The 4-week cooldown (§6.2) and "2-of-3 timeframes" rule (§2) are designed for this — don't relax them.
 
 ---
