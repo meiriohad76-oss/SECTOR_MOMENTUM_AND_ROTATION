@@ -178,3 +178,23 @@ def test_sparse_cache_does_not_block_provider_refresh(tmp_path, monkeypatch):
 
     assert len(calls) == 1
     assert out["XLK"]["close"].iloc[-1] == provider_frame["close"].iloc[-1]
+
+
+def test_stale_cache_can_be_read_only_when_allowed(tmp_path):
+    cache_path = tmp_path / "ohlcv.duckdb"
+    today = date.today()
+    stale_frame = _frame(end=today - timedelta(days=8))
+    ohlcv_store.write_cached_ohlcv({"XLK": stale_frame}, cache_path=cache_path, provider="unit-test")
+
+    fresh = ohlcv_store.read_cached_ohlcv(["XLK"], period="2mo", cache_path=cache_path, today=today)
+    stale = ohlcv_store.read_cached_ohlcv(
+        ["XLK"],
+        period="2mo",
+        cache_path=cache_path,
+        today=today,
+        allow_stale=True,
+    )
+
+    assert fresh == {}
+    assert list(stale) == ["XLK"]
+    assert stale["XLK"].index.max() == stale_frame.index.max()

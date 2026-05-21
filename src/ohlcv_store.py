@@ -160,14 +160,20 @@ def write_cached_ohlcv(
         conn.close()
 
 
-def _frame_is_usable(frame: pd.DataFrame, start: pd.Timestamp, today: date, stale_after_days: int) -> bool:
+def _frame_is_usable(
+    frame: pd.DataFrame,
+    start: pd.Timestamp,
+    today: date,
+    stale_after_days: int,
+    allow_stale: bool = False,
+) -> bool:
     requested = frame.loc[frame.index >= start]
     if len(requested) <= 30:
         return False
     if frame.index.min() > start + pd.Timedelta(days=COVERAGE_TOLERANCE_DAYS):
         return False
     fresh_after = pd.Timestamp(today - timedelta(days=stale_after_days))
-    if requested.index.max() < fresh_after:
+    if not allow_stale and requested.index.max() < fresh_after:
         return False
     expected = pd.bdate_range(start=start.normalize(), end=pd.Timestamp(today).normalize())
     if len(expected) == 0:
@@ -183,6 +189,7 @@ def read_cached_ohlcv(
     cache_path: str | Path | None = None,
     today: date | None = None,
     stale_after_days: int = FRESHNESS_TOLERANCE_DAYS,
+    allow_stale: bool = False,
 ) -> dict[str, pd.DataFrame]:
     path = ohlcv_cache_path(cache_path)
     if duckdb is None or not path.exists():
@@ -218,7 +225,7 @@ def read_cached_ohlcv(
                 frame = frame.set_index("date").sort_index()
                 frame.index.name = None
                 frame = frame[OHLCV_COLUMNS].apply(pd.to_numeric, errors="coerce")
-                if not _frame_is_usable(frame, start, as_of, stale_after_days):
+                if not _frame_is_usable(frame, start, as_of, stale_after_days, allow_stale=allow_stale):
                     continue
                 out[str(ticker)] = frame.loc[frame.index >= start, OHLCV_COLUMNS].copy()
             except Exception:

@@ -7,6 +7,7 @@ Public API:
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, timedelta
 import os
 from typing import Iterable
@@ -22,6 +23,18 @@ MASSIVE_AGGS_URL_TEMPLATE = (
     "https://api.massive.com/v2/aggs/ticker/{ticker}/range/"
     "{multiplier}/{timespan}/{from_date}/{to_date}"
 )
+
+
+@dataclass(frozen=True)
+class OhlcvFetchResult:
+    data: dict[str, pd.DataFrame]
+    provider: str
+    fetched: tuple[str, ...] = ()
+    fresh_cache_hits: tuple[str, ...] = ()
+    stale_cache_hits: tuple[str, ...] = ()
+    missing: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
+    used_stale_cache: bool = False
 
 
 def _resolve_secret(name: str) -> str | None:
@@ -249,6 +262,20 @@ def fetch_ohlcv(
     dict mapping ticker -> DataFrame indexed by date with columns
     [open, high, low, close, volume, adj_close].
     """
+    return fetch_ohlcv_result(tickers, period=period, interval=interval, provider=provider).data
+
+
+def _warning_symbol_text(count: int) -> str:
+    return "symbol" if count == 1 else "symbols"
+
+
+def fetch_ohlcv_result(
+    tickers: Iterable[str],
+    period: str = "3y",
+    interval: str = "1d",
+    provider: str | None = None,
+) -> OhlcvFetchResult:
+    """Fetch OHLCV and return provider/cache metadata for operator status UI."""
     tickers = list(dict.fromkeys(tickers))  # de-dup preserving order
     provider_name = _select_ohlcv_provider(provider)
     cached: dict[str, pd.DataFrame] = {}
@@ -269,13 +296,53 @@ def fetch_ohlcv(
                 write_cached_ohlcv(fetched, provider=provider_name, interval=interval)
             except Exception:
                 pass
-    combined = {**cached, **fetched}
+    stale_cached: dict[str, pd.DataFrame] = {}
+    provider_misses = [ticker for ticker in missing if ticker not in fetched and str(ticker).upper() not in fetched]
+    if provider_name == "yfinance" and provider_misses and ohlcv_cache_enabled():
+        try:
+            stale_cached = read_cached_ohlcv(
+                provider_misses,
+                period=period,
+                interval=interval,
+                allow_stale=True,
+            )
+        except Exception:
+            stale_cached = {}
+    combined = {**cached, **stale_cached, **fetched}
     ordered = {}
     for ticker in tickers:
         key = ticker if ticker in combined else str(ticker).upper()
         if key in combined and key not in ordered:
             ordered[key] = combined[key]
-    return ordered
+    missing_after_fallback = []
+    for ticker in tickers:
+        key = ticker if ticker in ordered else str(ticker).upper()
+        if key not in ordered:
+            missing_after_fallback.append(str(ticker))
+
+    warnings: list[str] = []
+    if stale_cached:
+        count = len(stale_cached)
+        warnings.append(
+            f"Using stale cached OHLCV for {count} {_warning_symbol_text(count)} "
+            f"because {provider_name} returned no fresh rows."
+        )
+    if missing_after_fallback:
+        count = len(missing_after_fallback)
+        warnings.append(
+            f"Missing OHLCV for {count} {_warning_symbol_text(count)} after {provider_name} fetch."
+        )
+
+    return OhlcvFetchResult(
+        data=ordered,
+        provider=provider_name,
+        fetched=tuple(key for key in ordered if key in fetched),
+        fresh_cache_hits=tuple(key for key in ordered if key in cached),
+        stale_cache_hits=tuple(key for key in ordered if key in stale_cached),
+        missing=tuple(missing_after_fallback),
+        warnings=tuple(warnings),
+        used_stale_cache=bool(stale_cached),
+    )
 
 
 def to_weekly(df: pd.DataFrame) -> pd.DataFrame:

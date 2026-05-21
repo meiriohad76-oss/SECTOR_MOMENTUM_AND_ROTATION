@@ -239,6 +239,57 @@ def test_fetch_ohlcv_yfinance_returns_empty_on_download_error(monkeypatch):
     assert data.fetch_ohlcv(["XLK"], provider="yfinance") == {}
 
 
+def test_fetch_ohlcv_result_uses_stale_cache_when_yfinance_is_unavailable(tmp_path, monkeypatch):
+    from src import ohlcv_store
+
+    today = pd.Timestamp.today().date()
+    cache_path = tmp_path / "ohlcv.duckdb"
+    stale_dates = pd.bdate_range(end=pd.Timestamp(today) - pd.Timedelta(days=8), periods=80)
+    stale_frame = pd.DataFrame(
+        {
+            "open": range(80),
+            "high": range(1, 81),
+            "low": range(80),
+            "close": range(100, 180),
+            "volume": [1_000_000] * 80,
+            "adj_close": range(100, 180),
+        },
+        index=stale_dates,
+    )
+    monkeypatch.setenv("OHLCV_CACHE_PATH", str(cache_path))
+    monkeypatch.setenv("OHLCV_CACHE_ENABLED", "true")
+    ohlcv_store.write_cached_ohlcv({"XLK": stale_frame}, cache_path=cache_path, provider="unit-test")
+
+    def fail_download(**kwargs):
+        raise RuntimeError("Too Many Requests")
+
+    monkeypatch.setattr(data.yf, "download", fail_download)
+
+    result = data.fetch_ohlcv_result(["XLK"], period="2mo", provider="yfinance")
+
+    assert list(result.data) == ["XLK"]
+    assert result.provider == "yfinance"
+    assert result.used_stale_cache is True
+    assert result.stale_cache_hits == ("XLK",)
+    assert result.fetched == ()
+    assert result.missing == ()
+    assert result.warnings == ("Using stale cached OHLCV for 1 symbol because yfinance returned no fresh rows.",)
+
+
+def test_fetch_ohlcv_result_reports_provider_gap_when_no_cache(monkeypatch):
+    def fail_download(**kwargs):
+        raise RuntimeError("Too Many Requests")
+
+    monkeypatch.setattr(data.yf, "download", fail_download)
+
+    result = data.fetch_ohlcv_result(["XLK"], period="2mo", provider="yfinance")
+
+    assert result.data == {}
+    assert result.used_stale_cache is False
+    assert result.missing == ("XLK",)
+    assert result.warnings == ("Missing OHLCV for 1 symbol after yfinance fetch.",)
+
+
 def test_fetch_ohlcv_explicit_yfinance_ignores_massive_environment(monkeypatch):
     monkeypatch.setenv("OHLCV_PROVIDER", "massive")
     monkeypatch.setenv("MASSIVE_API_KEY", "secret")

@@ -1729,6 +1729,32 @@ div[class*="block-container"] {
 }
 .chart-help b { color: var(--fg-dim); font-weight: 600; }
 
+/* ---------- Provider status ---------- */
+.provider-status-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 1480px;
+  margin: 0 auto 12px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--amber) 38%, var(--border));
+  border-left: 3px solid var(--amber);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--amber) 10%, var(--panel));
+  color: var(--fg-dim);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+.provider-status-banner .label {
+  flex: 0 0 auto;
+  color: var(--amber);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 /* ---------- Tile help (drill-down) ---------- */
 .tile-help {
   font-size: 0.74rem;

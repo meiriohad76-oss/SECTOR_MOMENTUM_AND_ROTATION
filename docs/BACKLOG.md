@@ -289,7 +289,11 @@ Status legend:
 **Behavior:** writes compact JSON lines to `data/logs/app.jsonl` by default, keeps Streamlit reruns idempotent by replacing prior structured handlers, logs dashboard run-journal success/failure events, and optionally posts the same JSON payload to `LOG_SHIP_URL` with `LOG_SHIP_TOKEN` bearer auth.
 **Residual risk:** shipping is a generic JSON HTTP endpoint rather than a provider-specific Logflare/Loki schema; endpoint mapping may need a small adapter once the target service is chosen.
 
-- **B-146** Graceful degradation when yfinance rate-limits (cached fallback, banner)
+#### B-146 · yfinance stale-cache fallback banner — IMPLEMENTED
+**Status:** `fetch_ohlcv_result()` now exposes provider/cache metadata while `fetch_ohlcv()` keeps the original dict-returning contract.
+**Files:** `src/data.py`, `src/ohlcv_store.py`, `app.py`, `static/style.css`, `tests/test_data.py`, `tests/test_ohlcv_store.py`, `tests/test_provider_fallback_app_static.py`, `docs/superpowers/plans/2026-05-21-b146-yfinance-fallback.md`.
+**Behavior:** fresh DuckDB cache still serves first, provider misses still fetch normally, and yfinance gaps can fall back to explicit stale cached OHLCV with a compact dashboard provider-status banner. Symbols still missing after provider/cache fallback are surfaced in result warnings for operator visibility.
+**Residual risk:** the banner has static coverage and unit coverage for stale yfinance fallback; it has not yet been screenshot-tested across all responsive breakpoints.
 - **B-147** Streamlit performance audit (which sections re-render unnecessarily on theme toggle)
 - **B-148** Migration from 32-bit Pi 2 (retired) to Pi 5 — DONE ✅
 

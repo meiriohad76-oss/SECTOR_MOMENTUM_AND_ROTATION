@@ -26,7 +26,7 @@ from src.custom_universe import (
     parse_custom_universe_text,
     summary_counts_frame,
 )
-from src.data import fetch_ohlcv, _select_ohlcv_provider
+from src.data import fetch_ohlcv_result, _select_ohlcv_provider
 from src.flow import compute_flow_signals, flow_composite_z, STUB_MODE
 from src.indicators import compute_all_indicators
 from src.macro import assess_regime
@@ -352,9 +352,30 @@ _md(
 # =============================== data load (cached) ==============================
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def _load_data(period: str = "3y") -> dict[str, pd.DataFrame]:
+def _load_data(period: str = "3y"):
     tickers = DATA_SYMBOLS
-    return fetch_ohlcv(tickers, period=period)
+    return fetch_ohlcv_result(tickers, period=period)
+
+
+def provider_status_banner_html(ohlcv_result):
+    if not (ohlcv_result.used_stale_cache or ohlcv_result.missing or ohlcv_result.warnings):
+        return ""
+    label = "Provider degraded" if ohlcv_result.used_stale_cache else "Provider gap"
+    details = " ".join(_esc(message) for message in ohlcv_result.warnings)
+    if not details:
+        details = "Market data provider returned a partial response."
+    return f"""
+    <div class="provider-status-banner" role="status">
+      <span class="label">{_esc(label)}</span>
+      <span>{details}</span>
+    </div>
+    """
+
+
+def render_provider_status_banner(ohlcv_result) -> None:
+    html = provider_status_banner_html(ohlcv_result)
+    if html:
+        _md(html)
 
 
 @st.cache_data(ttl=21600, show_spinner=False)  # FRED updates monthly/weekly, cache 6h
@@ -444,7 +465,9 @@ def _record_dashboard_run(scored_df, bluf_payload, regime_obj, transitions_rows,
 loading_placeholder = st.empty()
 render_loading_state(loading_placeholder, "Loading market data", card_count=4)
 try:
-    ohlcv = _load_data("3y")
+    ohlcv_result = _load_data("3y")
+    render_provider_status_banner(ohlcv_result)
+    ohlcv = ohlcv_result.data
 
     bench_ticker = BENCH["US"]
     bil_ticker = BENCH["TBILL"]
