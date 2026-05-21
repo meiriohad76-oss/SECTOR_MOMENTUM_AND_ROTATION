@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -13,7 +14,7 @@ import pandas as pd
 import streamlit as st
 
 from src.universe import ALL_TICKERS, UNIVERSE_BY_CLASS, BENCH
-from src.data import fetch_ohlcv
+from src.data import fetch_ohlcv, _select_ohlcv_provider
 from src.indicators import compute_all_indicators
 from src.flow import compute_flow_signals, flow_composite_z, STUB_MODE
 from src.macro import assess_regime
@@ -38,6 +39,7 @@ from src.preferences import (
     should_render_bluf,
     sparkline_mode,
 )
+from src.run_journal import DEFAULT_JOURNAL_PATH, append_dashboard_run
 from src.ui_states import defensive_basket_rows, loading_skeleton_slots
 from src.visuals import (
     rrg_chart_dark,
@@ -48,6 +50,9 @@ from src.visuals import (
     color_for_state,
     STATE_COLOR,
 )
+
+
+APP_VERSION = "v2.4.2"
 
 
 def _md(html: str):
@@ -329,6 +334,51 @@ def _load_fred() -> dict:
         return {}
 
 
+def _current_git_sha() -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=Path(__file__).resolve().parent,
+            capture_output=True,
+            check=True,
+            text=True,
+            timeout=2,
+        )
+    except Exception:
+        return None
+    return result.stdout.strip() or None
+
+
+def _record_dashboard_run(scored_df, bluf_payload, regime_obj, transitions_rows, ohlcv_payload) -> None:
+    metadata = {
+        "phase": regime_obj.phase_hint,
+        "risk_on": regime_obj.risk_on,
+        "fred_used": regime_obj.fred_used,
+        "regime_note": regime_obj.note,
+        "transition_count_14d": len(transitions_rows),
+        "benchmarks": {"us": BENCH["US"], "tbill": BENCH["TBILL"]},
+        "missing_ohlcv": sorted(set(ALL_TICKERS + ["^TNX", "^IRX"]) - set(ohlcv_payload)),
+        "bluf_counts": {
+            "exits": bluf_payload.get("exits_count", 0),
+            "warnings": bluf_payload.get("warns_count", 0),
+            "buys": bluf_payload.get("buys_count", 0),
+        },
+    }
+    result = append_dashboard_run(
+        DEFAULT_JOURNAL_PATH,
+        scored_df,
+        bluf_payload,
+        git_sha=_current_git_sha(),
+        app_version=APP_VERSION,
+        provider=_select_ohlcv_provider(None),
+        metadata=metadata,
+    )
+    if result.ok:
+        st.session_state.run_journal_last_run_id = result.run_id
+    else:
+        st.session_state.run_journal_last_error = result.error
+
+
 loading_placeholder = st.empty()
 render_loading_state(loading_placeholder, "Loading market data", card_count=4)
 try:
@@ -431,6 +481,7 @@ def _build_bluf(scored_df: pd.DataFrame):
 
 bluf = _build_bluf(scored)
 transitions = recent_transitions(n=14)
+_record_dashboard_run(scored, bluf, regime, transitions, ohlcv)
 
 # Phase index for the phase bar
 PHASE_IDX = {"EARLY": 0, "MID": 1, "LATE": 2, "RECESSION": 3, "UNKNOWN": -1}
@@ -1253,7 +1304,7 @@ def render_footer():
     html = f"""
     <div class="footer">
       <span>{len(scored)} ETFS · 7 PILLARS · STUB MODE {'ON' if STUB_MODE else 'OFF'} · CACHE TTL 60min</span>
-      <span>v2.4.2 · {st.session_state.theme.upper()} · MEIRI / READ-ONLY</span>
+      <span>{APP_VERSION} · {st.session_state.theme.upper()} · MEIRI / READ-ONLY</span>
     </div>
     </div>
     """  # closes <div class="app">

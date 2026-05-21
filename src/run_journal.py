@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
+import hashlib
 import json
+import math
 from pathlib import Path
 import sqlite3
 from typing import Any, Mapping, Sequence
@@ -44,6 +46,35 @@ class DecisionRecord:
     payload: Mapping[str, Any] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class JournalAppendResult:
+    ok: bool
+    run_id: str | None = None
+    error: str | None = None
+
+
+PILLAR_SCORE_COLUMNS = (
+    "mom_12_1",
+    "mansfield_rs",
+    "rs_ratio",
+    "rs_momentum",
+    "cycle_tilt",
+    "breadth_50d",
+    "cmf21",
+    "obv_slope",
+    "mfi14",
+    "rvol",
+    "dist_days_25",
+    "etf_primary_flow_5d_pct",
+    "block_trade_upside_ratio",
+    "dark_pool_pct",
+    "short_interest_delta_15d",
+    "thirteen_f_net_buys_q",
+)
+SCORED_PRIMARY_COLUMNS = {"class", "state", "S_score", "F_score"}
+BLUF_ACTIONS = {"exit": "EXIT", "warn": "WATCH", "buy": "BUY"}
+
+
 def _json_default(value: Any) -> Any:
     if isinstance(value, (datetime, date)):
         return value.isoformat()
@@ -64,6 +95,225 @@ def _from_json(payload: str) -> dict[str, Any]:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _clean_scalar(value: Any) -> Any:
+    if value is None:
+        return None
+    if hasattr(value, "item"):
+        try:
+            value = value.item()
+        except (TypeError, ValueError):
+            pass
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    try:
+        if bool(value != value):
+            return None
+    except (TypeError, ValueError):
+        return None
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    return value
+
+
+def _clean_json_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): cleaned
+            for key, item in value.items()
+            if (cleaned := _clean_json_value(item)) is not None
+        }
+    if isinstance(value, (list, tuple)):
+        return [cleaned for item in value if (cleaned := _clean_json_value(item)) is not None]
+    return _clean_scalar(value)
+
+
+def _clean_mapping(payload: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        str(key): cleaned
+        for key, value in payload.items()
+        if (cleaned := _clean_json_value(value)) is not None
+    }
+
+
+def _float_or_none(value: Any) -> float | None:
+    cleaned = _clean_scalar(value)
+    if cleaned is None:
+        return None
+    try:
+        return float(cleaned)
+    except (TypeError, ValueError):
+        return None
+
+
+def _text_or_none(value: Any) -> str | None:
+    cleaned = _clean_scalar(value)
+    if cleaned is None:
+        return None
+    return str(cleaned)
+
+
+def _compact_run_timestamp(started_at_utc: str) -> str:
+    text = str(started_at_utc).replace("+00:00", "Z")
+    return "".join(ch for ch in text if ch.isalnum())
+
+
+def scored_snapshot_records_from_frame(scored_df: Any) -> list[ScoredSnapshotRecord]:
+    columns = set(getattr(scored_df, "columns", []))
+    payload_columns = [
+        column
+        for column in getattr(scored_df, "columns", [])
+        if column not in SCORED_PRIMARY_COLUMNS and column not in PILLAR_SCORE_COLUMNS
+    ]
+
+    records: list[ScoredSnapshotRecord] = []
+    for ticker, row in scored_df.iterrows():
+        pillar_scores = {
+            column: cleaned
+            for column in PILLAR_SCORE_COLUMNS
+            if column in columns and (cleaned := _clean_json_value(row.get(column))) is not None
+        }
+        payload = {
+            str(column): cleaned
+            for column in payload_columns
+            if (cleaned := _clean_json_value(row.get(column))) is not None
+        }
+        records.append(
+            ScoredSnapshotRecord(
+                ticker=str(ticker).upper(),
+                asset_class=_text_or_none(row.get("class")),
+                state=_text_or_none(row.get("state")),
+                s_score=_float_or_none(row.get("S_score")),
+                f_score=_float_or_none(row.get("F_score")),
+                pillar_scores=pillar_scores,
+                payload=payload,
+            )
+        )
+    return records
+
+
+def decision_records_from_bluf(bluf: Mapping[str, Any]) -> list[DecisionRecord]:
+    decisions: list[DecisionRecord] = []
+    actions = bluf.get("actions", []) if isinstance(bluf, Mapping) else []
+    for group in actions:
+        if not isinstance(group, Mapping):
+            continue
+        kind = str(group.get("kind") or "").strip().lower()
+        action = BLUF_ACTIONS.get(kind, kind.upper() or "REVIEW")
+        label = _text_or_none(group.get("label"))
+        eta = _text_or_none(group.get("eta"))
+        state = _text_or_none(group.get("state"))
+        payload = _clean_mapping({"kind": kind, "label": label, "eta": eta, "state": state})
+        for item in group.get("tickers", []):
+            if not isinstance(item, Mapping):
+                continue
+            ticker = _text_or_none(item.get("t") or item.get("ticker"))
+            if not ticker:
+                continue
+            decisions.append(
+                DecisionRecord(
+                    decision_type="bluf",
+                    ticker=ticker.upper(),
+                    action=action,
+                    rationale=_text_or_none(item.get("note")),
+                    payload=payload,
+                )
+            )
+    return decisions
+
+
+def _dashboard_run_digest(
+    scored_rows: Sequence[ScoredSnapshotRecord],
+    decisions: Sequence[DecisionRecord],
+    metadata: Mapping[str, Any],
+) -> str:
+    payload = {
+        "scores": [
+            {
+                "ticker": row.ticker,
+                "asset_class": row.asset_class,
+                "state": row.state,
+                "s_score": row.s_score,
+                "f_score": row.f_score,
+                "pillar_scores": row.pillar_scores,
+                "payload": row.payload,
+            }
+            for row in scored_rows
+        ],
+        "decisions": [
+            {
+                "decision_type": decision.decision_type,
+                "action": decision.action,
+                "ticker": decision.ticker,
+                "rationale": decision.rationale,
+                "payload": decision.payload,
+            }
+            for decision in decisions
+        ],
+        "metadata": metadata,
+    }
+    encoded = json.dumps(payload, default=_json_default, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:12]
+
+
+def build_dashboard_run_records(
+    scored_df: Any,
+    bluf: Mapping[str, Any],
+    *,
+    started_at_utc: str | None = None,
+    git_sha: str | None = None,
+    app_version: str | None = None,
+    provider: str | None = None,
+    metadata: Mapping[str, Any] | None = None,
+) -> tuple[RunRecord, list[ScoredSnapshotRecord], list[DecisionRecord]]:
+    started = started_at_utc or _utc_now()
+    scored_rows = scored_snapshot_records_from_frame(scored_df)
+    decisions = decision_records_from_bluf(bluf)
+    clean_metadata = _clean_mapping(metadata or {})
+    digest = _dashboard_run_digest(scored_rows, decisions, clean_metadata)
+    run = RunRecord(
+        run_id=f"dashboard-{_compact_run_timestamp(started)}-{digest}",
+        started_at_utc=started,
+        git_sha=git_sha,
+        app_version=app_version,
+        provider=provider,
+        universe_count=len(scored_rows),
+        metadata=clean_metadata,
+    )
+    return run, scored_rows, decisions
+
+
+def append_dashboard_run(
+    db_path: str | Path,
+    scored_df: Any,
+    bluf: Mapping[str, Any],
+    *,
+    started_at_utc: str | None = None,
+    git_sha: str | None = None,
+    app_version: str | None = None,
+    provider: str | None = None,
+    metadata: Mapping[str, Any] | None = None,
+) -> JournalAppendResult:
+    run: RunRecord | None = None
+    try:
+        run, scored_rows, decisions = build_dashboard_run_records(
+            scored_df,
+            bluf,
+            started_at_utc=started_at_utc,
+            git_sha=git_sha,
+            app_version=app_version,
+            provider=provider,
+            metadata=metadata,
+        )
+        append_run(db_path, run, scored_rows=scored_rows, decisions=decisions)
+    except Exception as exc:
+        return JournalAppendResult(
+            ok=False,
+            run_id=run.run_id if run else None,
+            error=f"{type(exc).__name__}: {exc}",
+        )
+    return JournalAppendResult(ok=True, run_id=run.run_id)
 
 
 def initialize_journal(db_path: str | Path = DEFAULT_JOURNAL_PATH) -> None:

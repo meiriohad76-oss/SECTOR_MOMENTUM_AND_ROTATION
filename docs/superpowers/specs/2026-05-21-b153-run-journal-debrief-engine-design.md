@@ -15,7 +15,7 @@ B-153 is split into small slices:
 
 ## Architecture
 
-Use a local SQLite database at `data/run_journal/runs.sqlite`. The database is gitignored and owned by the deployed machine, similar to `state.json`. The first slice keeps all code in `src/run_journal.py` and avoids Streamlit, network calls, provider fetches, and app imports.
+Use a local SQLite database at `data/run_journal/runs.sqlite`. The database is gitignored and owned by the deployed machine, similar to `state.json`. The first slice keeps all code in `src/run_journal.py` and avoids Streamlit, network calls, provider fetches, and app imports. The second slice adds pure conversion helpers plus a small Streamlit call after BLUF/state-machine scoring so dashboard runs are journaled without changing scoring behavior.
 
 The journal stores:
 
@@ -35,3 +35,6 @@ The journal is append-only by `run_id`; duplicate run ids are rejected. It never
 - Pure tests can create a temporary journal, append a run with scored rows and decisions, and read it back.
 - Duplicate run ids fail instead of silently overwriting historical evidence.
 - No Streamlit import is required to use the journal helpers.
+- Scored dashboard frames can be converted into journal snapshot rows without losing pillar/payload evidence.
+- BLUF action groups expand into per-ticker decision rows with action, rationale, label, ETA, and state.
+- Streamlit records the scored snapshot and BLUF decisions after scoring, and journal write failures are captured without blocking the dashboard render.
