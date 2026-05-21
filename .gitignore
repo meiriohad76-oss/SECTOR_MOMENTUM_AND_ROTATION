@@ -43,6 +43,7 @@ data/state.json
 *.parquet
 data_cache/
 data/feeds/
+data/logs/
 data/run_journal/
 
 # --- Streamlit secrets (API keys etc.) ---

@@ -56,6 +56,7 @@ from src.preferences import (
 from src.run_debrief import debrief_journal, summarize_debriefs, threshold_review_candidates
 from src.run_journal import DEFAULT_JOURNAL_PATH, append_dashboard_run, dashboard_run_fingerprint
 from src.scoring import compute_composite, apply_state_machine, recent_transitions
+from src.structured_logging import configure_structured_logging, log_event
 from src.table_preview import table_row_rrg_preview_html
 from src.transition_pulse import transition_pulse_class, transition_row_pulse_class
 from src.ui_states import defensive_basket_rows, loading_skeleton_slots
@@ -75,6 +76,7 @@ from src.visuals import (
 
 
 APP_VERSION = "v2.4.9"
+APP_LOGGER = configure_structured_logging()
 DRILL_RANGE_OPTIONS = ("3M", "6M", "1Y", "3Y", "MAX")
 DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + ["^TNX", "^IRX"]))
 
@@ -422,8 +424,21 @@ def _record_dashboard_run(scored_df, bluf_payload, regime_obj, transitions_rows,
     if result.ok:
         st.session_state.run_journal_last_run_id = result.run_id
         st.session_state.run_journal_last_fingerprint = fingerprint
+        log_event(APP_LOGGER, "dashboard_run_recorded",
+            run_id=result.run_id,
+            provider=provider,
+            ticker_count=len(scored_df),
+            transition_count_14d=metadata["transition_count_14d"],
+            git_sha=git_sha,
+        )
     else:
         st.session_state.run_journal_last_error = result.error
+        log_event(APP_LOGGER, "dashboard_run_journal_error",
+            level="WARNING",
+            error=result.error,
+            provider=provider,
+            git_sha=git_sha,
+        )
 
 
 loading_placeholder = st.empty()

@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from pathlib import Path
 
 from scripts import send_email_digest
+
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_email_digest_script_sends_chronological_recent_transitions(monkeypatch, capsys):
@@ -41,3 +45,10 @@ def test_email_digest_script_runs_directly_from_repo_root():
 
     assert result.returncode == 0
     assert "email_digest=" in result.stdout
+
+
+def test_email_digest_script_avoids_heavy_scoring_import():
+    script_source = (ROOT / "scripts" / "send_email_digest.py").read_text(encoding="utf-8")
+
+    assert "from src.scoring import recent_transitions" not in script_source
+    assert "def recent_transitions" in script_source

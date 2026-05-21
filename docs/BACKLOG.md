@@ -283,7 +283,12 @@ Status legend:
 **Behavior:** cache defaults to `data_cache/ohlcv.duckdb`, can be moved with `OHLCV_CACHE_PATH`, can be disabled with `OHLCV_CACHE_ENABLED=false`, serves only period-covering fresh daily data, fetches only cache misses, and preserves the existing de-duplicated ticker order.
 **Residual risk:** cache freshness uses a small daily-data tolerance and is covered by unit tests; it has not yet been load-tested with the full live universe over many months of Pi writes.
 
-- **B-145** Structured logging (JSON logs) + log shipping to a free Logflare/Grafana endpoint
+#### B-145 · Structured JSON logging — IMPLEMENTED
+**Status:** app-level JSONL logging and optional best-effort HTTP log shipping are implemented in `backlog-stepwise-qa`.
+**Files:** `src/structured_logging.py`, `tests/test_structured_logging.py`, `tests/test_structured_logging_app_static.py`, `app.py`, `.gitignore`, `.dockerignore`, `.streamlit/secrets.toml.example`, `docs/superpowers/plans/2026-05-21-b145-structured-logging.md`.
+**Behavior:** writes compact JSON lines to `data/logs/app.jsonl` by default, keeps Streamlit reruns idempotent by replacing prior structured handlers, logs dashboard run-journal success/failure events, and optionally posts the same JSON payload to `LOG_SHIP_URL` with `LOG_SHIP_TOKEN` bearer auth.
+**Residual risk:** shipping is a generic JSON HTTP endpoint rather than a provider-specific Logflare/Loki schema; endpoint mapping may need a small adapter once the target service is chosen.
+
 - **B-146** Graceful degradation when yfinance rate-limits (cached fallback, banner)
 - **B-147** Streamlit performance audit (which sections re-render unnecessarily on theme toggle)
 - **B-148** Migration from 32-bit Pi 2 (retired) to Pi 5 — DONE ✅
