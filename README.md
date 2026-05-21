@@ -11,6 +11,7 @@ A Streamlit dashboard that monitors **83+ instruments across US sectors, US indu
 ## What you get
 
 - A **read-only portfolio / single-stock analyzer** that accepts one ticker or a CSV/XLS/XLSX holdings file and maps the input to the current methodology snapshot.
+- A **read-only custom universe builder** that accepts pasted tickers or a CSV/XLS/XLSX ticker file, de-duplicates the list, and ranks matched tickers against the current methodology snapshot.
 - A **single-page Streamlit app** (`app.py`) with two sections:
   - **Top:** 7-pillar heatmap — every ticker scored on every pillar, color-coded, with composite score and current state (`STAGE_2_BULLISH` / `HOLD` / `WARNING` / `EXIT` / `BEARISH_STAGE_4` / `STAGE_1_BASING`).
   - **Below:** drill-down tabs — RRG quadrant chart, cross-sectional momentum bar, institutional flow detail, state-machine transition log, per-ticker deep dive with price/CMF/OBV charts.
@@ -50,6 +51,16 @@ B-130 adds a read-only analyzer section inside the Streamlit app:
 - Optional upload columns include `shares`, `quantity`, `qty`, `cost_basis`, `cost`, `market_value`, `value`, `weight`, `sector`, `account`, and `notes`.
 - Weights can be decimals (`0.25`) or percents (`25%` or `25`). If no valid weights are present, analysis falls back to market value weights, then equal weights.
 - Unknown tickers are reported as missing instead of crashing. Uploaded files are analyzed in memory only; the app does not save portfolios or connect to broker accounts.
+
+## Custom universe builder
+
+B-105 adds a read-only custom universe section inside the Streamlit app:
+
+- **Paste tickers:** enter a comma, space, semicolon, or newline separated ticker list.
+- **Upload file:** upload `.csv`, `.xlsx`, or `.xls` files with a ticker-like column: `ticker`, `symbol`, `holding`, or `asset`.
+- Duplicate tickers are ignored after the first occurrence. Unknown tickers are reported as missing instead of crashing.
+- Matched tickers are ranked by current `S_score` inside the custom list and retain their methodology state, class, flow score, class rank, selection flag, and veto flag.
+- The builder is snapshot-only and in-memory: it does not fetch new OHLCV, alter `src/universe.py`, save watchlists, or write state-machine files.
 
 ## Quick start
 
@@ -97,6 +108,7 @@ sector-rotation-dashboard/
 │   ├── flow.py                     <- Pillar 7: CMF/OBV/MFI/RVOL + 5 stubs
 │   ├── macro.py                    <- Pillar 6: Faber + yield curve
 │   ├── portfolio.py                <- Read-only ticker/portfolio parsing and analysis
+│   ├── custom_universe.py          <- Read-only custom universe parsing and ranking
 │   ├── scoring.py                  <- Composite + state machine
 │   └── visuals.py                  <- Plotly RRG/momentum/price charts
 ├── docs/

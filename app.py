@@ -15,6 +15,13 @@ import streamlit as st
 
 from src.backtest import drawdown_frame, normalized_equity_frame
 from src.controls import refresh_market_data, toggle_theme
+from src.custom_universe import (
+    analyze_custom_universe,
+    custom_universe_rows_frame,
+    parse_custom_universe_file,
+    parse_custom_universe_text,
+    summary_counts_frame,
+)
 from src.data import fetch_ohlcv, _select_ohlcv_provider
 from src.flow import compute_flow_signals, flow_composite_z, STUB_MODE
 from src.indicators import compute_all_indicators
@@ -55,7 +62,7 @@ from src.visuals import (
 )
 
 
-APP_VERSION = "v2.4.2"
+APP_VERSION = "v2.4.3"
 DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + ["^TNX", "^IRX"]))
 
 
@@ -301,6 +308,8 @@ if "portfolio_single_ticker" not in st.session_state:
     st.session_state.portfolio_single_ticker = st.session_state.drill_ticker
 if "portfolio_single_source" not in st.session_state:
     st.session_state.portfolio_single_source = st.session_state.drill_ticker
+if "custom_universe_text" not in st.session_state:
+    st.session_state.custom_universe_text = ""
 if "table_open" not in st.session_state:
     st.session_state.table_open = True
 if "table_sort" not in st.session_state:
@@ -1249,6 +1258,102 @@ def render_portfolio_analyzer():
         _render_portfolio_analysis(_portfolio_result_from_upload(uploaded))
 
 
+def _custom_universe_result_from_upload(uploaded_file):
+    return parse_custom_universe_file(uploaded_file.getvalue(), uploaded_file.name or "")
+
+
+def _render_custom_universe_analysis(result):
+    for error in result.errors:
+        prefix = f"Row {error.row_number}: " if error.row_number is not None else ""
+        suffix = f" ({error.column})" if error.column else ""
+        token = f": {error.token}" if error.token else ""
+        st.warning(f"{prefix}{error.message}{token}{suffix}")
+
+    if result.duplicate_tickers:
+        st.warning("Duplicate tickers ignored: " + ", ".join(result.duplicate_tickers))
+
+    if not result.tickers:
+        return
+
+    try:
+        analysis = analyze_custom_universe(result.tickers, scored)
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+
+    if analysis.missing_tickers:
+        st.warning("Missing from scored universe: " + ", ".join(analysis.missing_tickers))
+
+    _md(
+        f"""
+        <div class="custom-universe-summary">
+          <div><span>AVAILABLE</span><b>{len(analysis.available_tickers)}</b></div>
+          <div><span>MISSING</span><b>{len(analysis.missing_tickers)}</b></div>
+          <div><span>INPUT</span><b>{len(result.tickers)}</b></div>
+        </div>
+        """
+    )
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.dataframe(summary_counts_frame(analysis.class_counts, "Class"), hide_index=True, use_container_width=True)
+    with c2:
+        st.dataframe(summary_counts_frame(analysis.state_counts, "State"), hide_index=True, use_container_width=True)
+    with c3:
+        actions = analysis.action_tickers
+        _md(
+            f"""
+            <div class="portfolio-actions">
+              <div class="pa-row exit"><span>EXIT</span><b>{_esc(', '.join(actions['exit']) or '-')}</b></div>
+              <div class="pa-row warn"><span>WARNING</span><b>{_esc(', '.join(actions['warning']) or '-')}</b></div>
+              <div class="pa-row buy"><span>BULLISH</span><b>{_esc(', '.join(actions['bullish']) or '-')}</b></div>
+            </div>
+            """
+        )
+
+    st.dataframe(custom_universe_rows_frame(analysis), hide_index=True, use_container_width=True)
+    _render_drill_buttons("custom_universe_drill", analysis.available_tickers[:8])
+
+
+def render_custom_universe_builder():
+    _md(
+        f"""
+        <section class="section" id="custom-universe-builder">
+          <div class="section-head">
+            <h2>Custom universe <span class="count">B-105 · read-only</span></h2>
+            <div class="right">{len(scored)} scored tickers</div>
+          </div>
+        </section>
+        """
+    )
+
+    mode = st.radio(
+        "Custom universe input",
+        ["Paste tickers", "Upload file"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="custom_universe_mode",
+    )
+
+    if mode == "Paste tickers":
+        tickers = st.text_area(
+            "Custom tickers",
+            key="custom_universe_text",
+            placeholder="XLK XLF SOXX NVDA",
+            height=90,
+        )
+        _render_custom_universe_analysis(parse_custom_universe_text(tickers))
+        return
+
+    uploaded = st.file_uploader(
+        "Custom universe file",
+        type=["csv", "xlsx", "xls"],
+        key="custom_universe_upload",
+    )
+    if uploaded is not None:
+        _render_custom_universe_analysis(_custom_universe_result_from_upload(uploaded))
+
+
 def _load_backtest_metadata():
     if not BACKTEST_METADATA_PATH.exists():
         return None
@@ -1456,6 +1561,7 @@ render_picks()
 render_rrg()
 render_drill()
 render_portfolio_analyzer()
+render_custom_universe_builder()
 render_backtest_lab()
 render_debrief_lab()
 render_full_table()

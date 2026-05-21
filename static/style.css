@@ -903,6 +903,34 @@ html.density-compact .pick-spark {
 .portfolio-actions .pa-row.warn { border-left-color: var(--st-warn); }
 .portfolio-actions .pa-row.buy { border-left-color: var(--st-stage2); }
 
+.custom-universe-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.custom-universe-summary > div {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 10px 12px;
+  min-height: 54px;
+}
+.custom-universe-summary span {
+  display: block;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+}
+.custom-universe-summary b {
+  display: block;
+  margin-top: 3px;
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+}
+
 .collapsible-toggle {
   width: 100%;
   background: transparent;
@@ -1034,6 +1062,7 @@ html.density-compact .pick-spark {
   .status-row { grid-template-columns: 1fr; }
   .picks-grid { grid-template-columns: 1fr; }
   .drill-metrics { grid-template-columns: 1fr 1fr; }
+  .custom-universe-summary { grid-template-columns: 1fr; }
 }
 
 /* Scrollbar */

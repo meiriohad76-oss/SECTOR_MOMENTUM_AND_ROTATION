@@ -86,6 +86,14 @@ Status legend:
 **Behavior:** the tile uses the latest SPY high, low, and close from the dashboard OHLCV payload; close location in the latest high/low range controls the tile tone; missing or malformed range data renders as `DATA PENDING`.
 **Evidence:** `docs/superpowers/plans/2026-05-21-b104-session-range-tile.md`.
 
+### B-105 - Custom universe builder web UI - IMPLEMENTED
+**Status:** a read-only custom universe section is implemented in `backlog-stepwise-qa`.
+**Files:** `src/custom_universe.py`, `tests/test_custom_universe.py`, `tests/test_custom_universe_app_static.py`, `app.py`, `static/style.css`, `README.md`.
+**Inputs:** pasted ticker lists separated by comma, semicolon, whitespace, or newlines; `.csv`, `.xlsx`, or `.xls` files with ticker/symbol/holding/asset aliases.
+**Behavior:** the UI validates and de-duplicates tickers, reports invalid/duplicate/missing entries, ranks matched tickers by current `S_score` inside the custom list, shows class/state count summaries and action buckets, and exposes drill buttons for matched tickers.
+**Safety:** read-only/in-memory only; no OHLCV fetch from user input, no mutation of `src/universe.py`, no watchlist persistence, and no `state.json` writes.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b105-custom-universe-builder.md`.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -147,7 +155,6 @@ Status legend:
 ## 🌟 Ideas for v3+
 
 ### Universe & data
-- **B-105** Custom universe builder web UI (currently config-only)
 
 ### Visual / UX
 - **B-110** Mobile-first responsive view (currently usable but cramped on phones)

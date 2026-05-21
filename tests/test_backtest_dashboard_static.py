@@ -30,6 +30,7 @@ def test_backtest_lab_renders_before_full_table():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
     assert (
-        "render_portfolio_analyzer()\nrender_backtest_lab()\nrender_debrief_lab()\nrender_full_table()"
+        "render_portfolio_analyzer()\nrender_custom_universe_builder()\n"
+        "render_backtest_lab()\nrender_debrief_lab()\nrender_full_table()"
         in app_source
     )
