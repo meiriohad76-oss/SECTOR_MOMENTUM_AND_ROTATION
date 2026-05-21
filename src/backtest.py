@@ -678,3 +678,35 @@ def equity_frame(results: dict[str, BacktestResult]) -> pd.DataFrame:
     frame = pd.DataFrame(series).sort_index().ffill()
     frame.index.name = "date"
     return frame
+
+
+def _clean_equity_artifact(equity: pd.DataFrame) -> pd.DataFrame:
+    frame = equity.copy()
+    frame.index = pd.to_datetime(frame.index)
+    frame = frame.sort_index().apply(pd.to_numeric, errors="coerce").dropna(how="all").ffill()
+    if frame.empty:
+        frame.index.name = "date"
+        return frame
+    values = frame.to_numpy(dtype=float)
+    if not np.isfinite(values).all() or (frame <= 0).any().any():
+        raise ValueError("equity values must be finite and strictly positive")
+    frame.index.name = "date"
+    return frame
+
+
+def normalized_equity_frame(equity: pd.DataFrame) -> pd.DataFrame:
+    frame = _clean_equity_artifact(equity)
+    if frame.empty:
+        return frame
+    normalized = frame.div(frame.iloc[0])
+    normalized.index.name = "date"
+    return normalized
+
+
+def drawdown_frame(equity: pd.DataFrame) -> pd.DataFrame:
+    frame = _clean_equity_artifact(equity)
+    if frame.empty:
+        return frame
+    drawdown = frame.div(frame.cummax()).sub(1.0)
+    drawdown.index.name = "date"
+    return drawdown

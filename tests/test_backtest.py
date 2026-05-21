@@ -491,6 +491,44 @@ def test_equity_frame_combines_named_results_on_date_index():
     assert frame.iloc[-1, 0] == pytest.approx(121.0)
 
 
+def test_normalized_equity_frame_rebases_each_series_to_one():
+    dates = pd.bdate_range("2024-01-01", periods=3)
+    equity = pd.DataFrame(
+        {
+            "Methodology": [100.0, 110.0, 121.0],
+            "Benchmark": [50.0, 45.0, 60.0],
+        },
+        index=dates,
+    )
+
+    normalized = backtest.normalized_equity_frame(equity)
+
+    assert normalized.index.name == "date"
+    assert normalized.loc[dates[0]].to_dict() == pytest.approx(
+        {"Methodology": 1.0, "Benchmark": 1.0}
+    )
+    assert normalized.loc[dates[-1]].to_dict() == pytest.approx(
+        {"Methodology": 1.21, "Benchmark": 1.20}
+    )
+
+
+def test_drawdown_frame_reports_percent_below_running_high():
+    dates = pd.bdate_range("2024-01-01", periods=4)
+    equity = pd.DataFrame(
+        {
+            "Methodology": [100.0, 120.0, 90.0, 126.0],
+            "Benchmark": [50.0, 40.0, 60.0, 54.0],
+        },
+        index=dates,
+    )
+
+    drawdown = backtest.drawdown_frame(equity)
+
+    assert drawdown.index.name == "date"
+    assert drawdown["Methodology"].tolist() == pytest.approx([0.0, 0.0, -0.25, 0.0])
+    assert drawdown["Benchmark"].tolist() == pytest.approx([0.0, -0.20, 0.0, -0.10])
+
+
 def test_build_historical_methodology_targets_slices_inputs_without_lookahead():
     dates = pd.bdate_range("2024-01-01", periods=8)
     ohlcv = {

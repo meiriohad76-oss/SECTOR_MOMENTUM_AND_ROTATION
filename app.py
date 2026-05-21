@@ -13,12 +13,13 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from src.universe import ALL_TICKERS, UNIVERSE_BY_CLASS, BENCH
-from src.data import fetch_ohlcv, _select_ohlcv_provider
-from src.indicators import compute_all_indicators
-from src.flow import compute_flow_signals, flow_composite_z, STUB_MODE
-from src.macro import assess_regime
+from src.backtest import drawdown_frame, normalized_equity_frame
 from src.controls import refresh_market_data, toggle_theme
+from src.data import fetch_ohlcv, _select_ohlcv_provider
+from src.flow import compute_flow_signals, flow_composite_z, STUB_MODE
+from src.indicators import compute_all_indicators
+from src.macro import assess_regime
+from src.navigation import initialize_drill_ticker, select_drill_ticker
 from src.portfolio import (
     analyze_holdings,
     analysis_rows_frame,
@@ -27,8 +28,6 @@ from src.portfolio import (
     parse_holdings_excel,
     parse_single_ticker,
 )
-from src.scoring import compute_composite, apply_state_machine, recent_transitions
-from src.navigation import initialize_drill_ticker, select_drill_ticker
 from src.preferences import (
     BLUF_MODES,
     DENSITY_MODES,
@@ -41,7 +40,9 @@ from src.preferences import (
 )
 from src.run_debrief import debrief_journal, summarize_debriefs, threshold_review_candidates
 from src.run_journal import DEFAULT_JOURNAL_PATH, append_dashboard_run
+from src.scoring import compute_composite, apply_state_machine, recent_transitions
 from src.ui_states import defensive_basket_rows, loading_skeleton_slots
+from src.universe import ALL_TICKERS, UNIVERSE_BY_CLASS, BENCH
 from src.visuals import (
     rrg_chart_dark,
     price_chart_with_30wma,
@@ -1290,7 +1291,24 @@ def render_backtest_lab():
         if equity.empty:
             st.warning("Backtest equity artifact is empty.")
             return
-        st.line_chart(equity, use_container_width=True)
+        _md(
+            """
+            <div class="chart-help">
+              <b>Normalized equity.</b> Each series starts at 1.0 so the methodology
+              and benchmarks can be compared on the same base.
+            </div>
+            """
+        )
+        st.line_chart(normalized_equity_frame(equity), use_container_width=True)
+        _md(
+            """
+            <div class="chart-help">
+              <b>Drawdown.</b> Percent below each series running high; lower readings
+              show the depth of the underwater period.
+            </div>
+            """
+        )
+        st.line_chart(drawdown_frame(equity), use_container_width=True)
     else:
         _md(
             """

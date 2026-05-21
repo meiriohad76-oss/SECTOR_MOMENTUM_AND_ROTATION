@@ -12,11 +12,16 @@ def test_app_surfaces_backtest_artifacts_without_running_backtest():
     assert 'BACKTEST_REPORT_PATH = APP_ROOT / "docs" / "backtest_report.md"' in app_source
     assert 'BACKTEST_EQUITY_PATH = APP_ROOT / "docs" / "backtest_equity.csv"' in app_source
     assert 'BACKTEST_METADATA_PATH = APP_ROOT / "docs" / "backtest_metadata.json"' in app_source
+    assert "from src.backtest import drawdown_frame, normalized_equity_frame" in app_source
     assert "def render_backtest_lab():" in app_source
     assert "def _load_backtest_metadata():" in app_source
     assert "def _artifact_hash_matches(" in app_source
     assert "python scripts/run_backtest.py" in app_source
     assert "pd.read_csv(BACKTEST_EQUITY_PATH" in app_source
+    assert "normalized_equity_frame(equity)" in app_source
+    assert "drawdown_frame(equity)" in app_source
+    assert "Normalized equity" in app_source
+    assert "Drawdown" in app_source
     assert "st.line_chart(" in app_source
     assert "run_backtest.main(" not in app_source
 
