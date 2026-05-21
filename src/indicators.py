@@ -1,7 +1,9 @@
 """Pillars 1-5 + breadth. Inputs: daily OHLCV from data.fetch_ohlcv."""
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+import os
 from typing import Optional
 
 import numpy as np
@@ -127,35 +129,62 @@ def breadth_proxy(df):
     return float(window.mean())
 
 
-def compute_all_indicators(ohlcv, bench_ticker="SPY", bil_ticker="BIL"):
+def _eligible_indicator_items(ohlcv, bil_ticker):
+    return [
+        (tkr, df)
+        for tkr, df in ohlcv.items()
+        if tkr != bil_ticker and not str(tkr).startswith("^")
+    ]
+
+
+def _indicator_row(tkr, df, bench, bil):
+    m121 = momentum_12_1(df)
+    fab = faber_signal(df)
+    st = stage_analysis(df, bench)
+    ant = antonacci_absolute(df, bil)
+    r = rrg(df, bench)
+    b = breadth_proxy(df)
+    return {
+        "ticker": tkr,
+        "mom_12_1": m121,
+        "faber": fab,
+        "stage": st.stage if st else None,
+        "above_30wma": st.above_30wma if st else None,
+        "ma_slope_pos": st.slope_positive if st else None,
+        "mansfield_rs": st.mansfield_rs if st else None,
+        "antonacci": ant,
+        "rs_ratio": r.rs_ratio if r else None,
+        "rs_momentum": r.rs_momentum if r else None,
+        "rrg_quadrant": r.quadrant if r else None,
+        "breadth_50d": b,
+    }
+
+
+def _resolve_indicator_worker_count(max_workers: Optional[int], job_count: int) -> int:
+    if job_count <= 1:
+        return 1
+    if max_workers is None:
+        max_workers = min(8, os.cpu_count() or 1)
+    try:
+        resolved = int(max_workers)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("max_workers must be a positive integer") from exc
+    if resolved < 1:
+        raise ValueError("max_workers must be a positive integer")
+    return min(resolved, job_count)
+
+
+def compute_all_indicators(ohlcv, bench_ticker="SPY", bil_ticker="BIL", *, max_workers: Optional[int] = None):
     if bench_ticker not in ohlcv or bil_ticker not in ohlcv:
         raise ValueError(f"Benchmark {bench_ticker} or T-bill {bil_ticker} missing from data.")
     bench = ohlcv[bench_ticker]
     bil = ohlcv[bil_ticker]
-    rows = []
-    for tkr, df in ohlcv.items():
-        if tkr == bil_ticker:
-            continue
-        if str(tkr).startswith("^"):
-            continue
-        m121 = momentum_12_1(df)
-        fab = faber_signal(df)
-        st = stage_analysis(df, bench)
-        ant = antonacci_absolute(df, bil)
-        r = rrg(df, bench)
-        b = breadth_proxy(df)
-        rows.append({
-            "ticker": tkr,
-            "mom_12_1": m121,
-            "faber": fab,
-            "stage": st.stage if st else None,
-            "above_30wma": st.above_30wma if st else None,
-            "ma_slope_pos": st.slope_positive if st else None,
-            "mansfield_rs": st.mansfield_rs if st else None,
-            "antonacci": ant,
-            "rs_ratio": r.rs_ratio if r else None,
-            "rs_momentum": r.rs_momentum if r else None,
-            "rrg_quadrant": r.quadrant if r else None,
-            "breadth_50d": b,
-        })
+    items = _eligible_indicator_items(ohlcv, bil_ticker)
+    worker_count = _resolve_indicator_worker_count(max_workers, len(items))
+    if worker_count == 1:
+        rows = [_indicator_row(tkr, df, bench, bil) for tkr, df in items]
+    else:
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = [executor.submit(_indicator_row, tkr, df, bench, bil) for tkr, df in items]
+            rows = [future.result() for future in futures]
     return pd.DataFrame(rows).set_index("ticker")

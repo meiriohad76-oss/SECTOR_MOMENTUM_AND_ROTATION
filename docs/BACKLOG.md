@@ -271,7 +271,12 @@ Status legend:
 **Residual risk:** static tests verify scaffold contents; Docker runtime build was attempted locally but Docker Desktop/daemon was unavailable, so runtime container startup still needs validation on a Docker-enabled machine.
 
 - **B-142** Unit tests for data/indicators/flow/scoring — DONE in `backlog-stepwise-qa`; pytest harness covers pure modules before provider integration.
-- **B-143** Parallelize indicator computations (currently sequential per-ticker)
+#### B-143 · Parallel indicator computations — IMPLEMENTED
+**Status:** `compute_all_indicators()` now computes eligible ticker rows through a bounded `ThreadPoolExecutor` by default while preserving deterministic ticker order.
+**Files:** `src/indicators.py`, `tests/test_indicators.py`, `docs/superpowers/plans/2026-05-21-b143-parallel-indicators.md`.
+**Behavior:** excludes the same T-bill/index tickers as before, uses up to `min(8, os.cpu_count(), eligible_ticker_count)` workers by default, accepts `max_workers=1` for serial debugging, and keeps the app/backtest call sites unchanged.
+**Residual risk:** tests patch the executor contract and verify output order; they do not benchmark real dashboard latency across a large live universe.
+
 - **B-144** Local DuckDB store for OHLC (skip yfinance refetch on Pi reboot)
 - **B-145** Structured logging (JSON logs) + log shipping to a free Logflare/Grafana endpoint
 - **B-146** Graceful degradation when yfinance rate-limits (cached fallback, banner)

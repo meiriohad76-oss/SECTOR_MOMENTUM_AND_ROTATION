@@ -50,7 +50,7 @@ python -m compileall app.py src scripts
 git diff --check
 ```
 
-- [ ] **Step 3: Review, commit, push, deploy**
+- [x] **Step 3: Review, commit, push, deploy**
 
 Request focused review, fix Critical/Important feedback, commit as `chore: add docker compose dev stack`, push to GitHub, verify remote SHA, deploy to Pi, run focused/full Pi pytest, and dashboard HTTP smoke.
 
@@ -70,3 +70,31 @@ docker compose build
 Review fixes: switched Compose default provider to `yfinance`, moved container state persistence to `STATE_FILE=/app/data/state.json`, removed the fragile root `state.json` bind mount, and broadened `.dockerignore` secret/private-key exclusions.
 
 Second review fixes: added explicit common private-key filename exclusions to `.dockerignore` and regression coverage for `STATE_FILE` environment import behavior.
+
+Completion evidence:
+
+```powershell
+python -m pytest tests/test_docker_compose_static.py tests/test_scoring.py -q
+# 11 passed
+python -m pytest -q
+# 281 passed
+python -m compileall app.py src scripts
+# exit 0
+git diff --check
+# exit 0
+git push origin backlog-stepwise-qa
+# d74d309 pushed
+```
+
+Pi evidence:
+
+```bash
+git pull --ff-only
+# fast-forwarded to d74d309
+./.venv/bin/python -m pytest tests/test_docker_compose_static.py tests/test_scoring.py -q
+# 11 passed
+./.venv/bin/python -m pytest -q
+# 281 passed
+curl http://127.0.0.1:8501/?ticker=XLK
+# HTTP 200 via sector-dashboard smoke
+```

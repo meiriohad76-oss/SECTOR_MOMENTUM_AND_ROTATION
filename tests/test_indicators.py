@@ -1,8 +1,41 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+from pandas.testing import assert_frame_equal
 import pytest
 
 from src import indicators
+
+
+class _ImmediateFuture:
+    def __init__(self, value):
+        self._value = value
+
+    def result(self):
+        return self._value
+
+
+def _recording_executor():
+    submitted = []
+    created = []
+
+    class RecordingExecutor:
+        def __init__(self, max_workers):
+            self.max_workers = max_workers
+            created.append(self)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def submit(self, fn, *args, **kwargs):
+            submitted.append(args[0])
+            return _ImmediateFuture(fn(*args, **kwargs))
+
+    return RecordingExecutor, submitted, created
 
 
 def test_indicator_helpers_return_none_for_short_history(ohlcv_frame_factory):
@@ -44,3 +77,48 @@ def test_compute_all_indicators_excludes_tbill_and_index_tickers(market_ohlcv):
         "rrg_quadrant",
         "breadth_50d",
     }.issubset(set(out.columns))
+
+
+def test_compute_all_indicators_parallelizes_eligible_tickers_by_default(market_ohlcv, monkeypatch):
+    executor, submitted, created = _recording_executor()
+    monkeypatch.setattr(indicators, "ThreadPoolExecutor", executor, raising=False)
+    monkeypatch.setattr(indicators, "os", SimpleNamespace(cpu_count=lambda: 4), raising=False)
+
+    out = indicators.compute_all_indicators(market_ohlcv)
+
+    assert created
+    assert created[0].max_workers == 4
+    assert submitted == ["XLK", "XLF", "SOXX", "SPY"]
+    assert list(out.index) == submitted
+
+
+def test_compute_all_indicators_respects_explicit_worker_count_and_order(market_ohlcv, monkeypatch):
+    executor, submitted, created = _recording_executor()
+    monkeypatch.setattr(indicators, "ThreadPoolExecutor", executor, raising=False)
+
+    out = indicators.compute_all_indicators(market_ohlcv, max_workers=3)
+
+    assert created
+    assert created[0].max_workers == 3
+    assert submitted == ["XLK", "XLF", "SOXX", "SPY"]
+    assert list(out.index) == submitted
+
+
+def test_compute_all_indicators_can_run_serially_for_debugging(market_ohlcv, monkeypatch):
+    class FailingExecutor:
+        def __init__(self, max_workers):
+            raise AssertionError("serial indicator execution should not create an executor")
+
+    monkeypatch.setattr(indicators, "ThreadPoolExecutor", FailingExecutor, raising=False)
+
+    out = indicators.compute_all_indicators(market_ohlcv, max_workers=1)
+
+    assert list(out.index) == ["XLK", "XLF", "SOXX", "SPY"]
+
+
+def test_compute_all_indicators_parallel_output_matches_serial_output(market_ohlcv):
+    parallel = indicators.compute_all_indicators(market_ohlcv)
+    serial = indicators.compute_all_indicators(market_ohlcv, max_workers=1)
+
+    assert list(parallel.index) == list(serial.index)
+    assert_frame_equal(parallel, serial)
