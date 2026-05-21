@@ -199,6 +199,14 @@ Status legend:
 **Evidence:** `docs/superpowers/plans/2026-05-21-b122-transition-feeds.md`.
 **Residual risk:** tests verify artifact generation and formatting; external feed hosting/subscription is not configured yet. iCal line folding and corrupted-date hardening remain future compatibility polish.
 
+### B-123 · Discord / Mattermost webhooks — IMPLEMENTED / WEBHOOK CONFIG PENDING
+**Status:** Discord and Mattermost transition webhook routes are implemented in `backlog-stepwise-qa`; live validation awaits webhook URLs.
+**Files:** `src/alerts.py`, `tests/test_alerts.py`, `.streamlit/secrets.toml.example`, `README.md`.
+**Activation:** leave `DISCORD_WEBHOOK_URL` and `MATTERMOST_WEBHOOK_URL` unset to disable network calls. Configure either URL in Streamlit secrets or environment variables to enable delivery.
+**Behavior:** after `apply_state_machine()` persists transitions, configured Discord and Mattermost webhooks receive the same transition text as Slack. Discord uses the normal `content` payload; Mattermost uses the Slack-compatible `text` payload. Provider failures are swallowed so scoring remains non-blocking.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b123-discord-mattermost-webhooks.md`.
+**Residual risk:** unit tests mock webhook delivery; live provider validation remains a configuration task.
+
 ### B-022 · FRED macro overlay — IMPLEMENTED / KEY PENDING
 **Status:** FRED-backed macro classifier and deterministic tests implemented in `backlog-stepwise-qa`; live validation awaits `FRED_API_KEY`.
 **Files:** `src/fred_data.py`, `src/macro.py`, `tests/test_fred_data.py`, `tests/test_macro.py`.
@@ -240,7 +248,6 @@ Status legend:
 
 ### Notifications & integrations
 - **B-121** Push notifications for HIGH severity (mobile install via PWA)
-- **B-123** Discord / Mattermost webhook in addition to Telegram/Slack
 
 ### Portfolio features
 - **B-131** P&L tracker (broker API integration — alpaca, IBKR)

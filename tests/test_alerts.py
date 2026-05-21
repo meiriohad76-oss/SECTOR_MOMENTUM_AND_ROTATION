@@ -53,6 +53,61 @@ def test_send_transition_alerts_posts_to_telegram_and_slack(monkeypatch):
     assert "XLK transitioned HOLD -> WARNING" in calls[1][1]["json"]["text"]
 
 
+def test_send_transition_alerts_posts_to_discord_and_mattermost(monkeypatch):
+    calls = []
+
+    def fake_secret(name):
+        values = {
+            "DISCORD_WEBHOOK_URL": "https://discord.test/webhook",
+            "MATTERMOST_WEBHOOK_URL": "https://mattermost.test/hooks/abc",
+        }
+        return values.get(name)
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+    def fake_post(url, **kwargs):
+        calls.append((url, kwargs))
+        return FakeResponse()
+
+    monkeypatch.setattr(alerts, "_resolve_secret", fake_secret)
+    monkeypatch.setattr(alerts.requests, "post", fake_post)
+
+    alerts.send_transition_alerts(
+        [{"ticker": "XLK", "from": "HOLD", "to": "WARNING", "date": "2026-05-20"}],
+        timeout=6,
+    )
+
+    assert [call[0] for call in calls] == [
+        "https://discord.test/webhook",
+        "https://mattermost.test/hooks/abc",
+    ]
+    assert "XLK transitioned HOLD -> WARNING" in calls[0][1]["json"]["content"]
+    assert "XLK transitioned HOLD -> WARNING" in calls[1][1]["json"]["text"]
+    assert calls[0][1]["timeout"] == 6
+    assert calls[1][1]["timeout"] == 6
+
+
+def test_send_transition_alerts_ignores_discord_mattermost_request_errors(monkeypatch):
+    def fake_secret(name):
+        values = {
+            "DISCORD_WEBHOOK_URL": "https://discord.test/webhook",
+            "MATTERMOST_WEBHOOK_URL": "https://mattermost.test/hooks/abc",
+        }
+        return values.get(name)
+
+    def fail_post(url, **kwargs):
+        raise alerts.requests.Timeout("webhook timed out")
+
+    monkeypatch.setattr(alerts, "_resolve_secret", fake_secret)
+    monkeypatch.setattr(alerts.requests, "post", fail_post)
+
+    alerts.send_transition_alerts(
+        [{"ticker": "XLK", "from": "HOLD", "to": "WARNING", "date": "2026-05-20"}]
+    )
+
+
 def test_send_transition_alerts_ignores_provider_request_errors(monkeypatch):
     def fake_secret(name):
         values = {

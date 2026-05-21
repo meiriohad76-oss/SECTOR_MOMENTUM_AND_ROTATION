@@ -157,6 +157,8 @@ def send_transition_alerts(transitions: list[dict], timeout: int = 5) -> None:
     telegram_token = _resolve_secret("TELEGRAM_BOT_TOKEN")
     telegram_chat_id = _resolve_secret("TELEGRAM_CHAT_ID")
     slack_webhook_url = _resolve_secret("SLACK_WEBHOOK_URL")
+    discord_webhook_url = _resolve_secret("DISCORD_WEBHOOK_URL")
+    mattermost_webhook_url = _resolve_secret("MATTERMOST_WEBHOOK_URL")
 
     if telegram_token and telegram_chat_id:
         try:
@@ -173,6 +175,28 @@ def send_transition_alerts(transitions: list[dict], timeout: int = 5) -> None:
         try:
             response = requests.post(
                 slack_webhook_url,
+                json={"text": text},
+                timeout=timeout,
+            )
+            response.raise_for_status()
+        except requests.RequestException:
+            pass
+
+    if discord_webhook_url:
+        try:
+            response = requests.post(
+                discord_webhook_url,
+                json={"content": text},
+                timeout=timeout,
+            )
+            response.raise_for_status()
+        except requests.RequestException:
+            pass
+
+    if mattermost_webhook_url:
+        try:
+            response = requests.post(
+                mattermost_webhook_url,
                 json={"text": text},
                 timeout=timeout,
             )

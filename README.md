@@ -203,7 +203,7 @@ The remaining provider seams have independent safety flags. Leave each unset/`tr
 
 ## State transition alerts
 
-`apply_state_machine()` writes `state.json` first, then sends optional transition alerts through Telegram and/or Slack. Leave alert secrets unset to disable network calls. To enable alerts, configure `TELEGRAM_BOT_TOKEN` plus `TELEGRAM_CHAT_ID`, and/or `SLACK_WEBHOOK_URL`, in Streamlit secrets or environment variables.
+`apply_state_machine()` writes `state.json` first, then sends optional transition alerts through Telegram, Slack, Discord, and/or Mattermost. Leave alert secrets unset to disable network calls. To enable alerts, configure `TELEGRAM_BOT_TOKEN` plus `TELEGRAM_CHAT_ID`, and/or `SLACK_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL`, or `MATTERMOST_WEBHOOK_URL`, in Streamlit secrets or environment variables.
 
 B-120 adds an optional LOW-severity email digest for transitions from the previous US/Eastern day. Configure `SMTP_HOST`, optional `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `EMAIL_DIGEST_FROM`, and comma-separated `EMAIL_DIGEST_TO`, then schedule:
 
