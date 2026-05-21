@@ -257,6 +257,29 @@ def _dashboard_run_digest(
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:12]
 
 
+def dashboard_run_fingerprint(
+    scored_df: Any,
+    bluf: Mapping[str, Any],
+    *,
+    git_sha: str | None = None,
+    app_version: str | None = None,
+    provider: str | None = None,
+    metadata: Mapping[str, Any] | None = None,
+) -> str:
+    scored_rows = scored_snapshot_records_from_frame(scored_df)
+    decisions = decision_records_from_bluf(bluf)
+    clean_metadata = _clean_mapping(metadata or {})
+    content_digest = _dashboard_run_digest(scored_rows, decisions, clean_metadata)
+    payload = {
+        "content_digest": content_digest,
+        "git_sha": git_sha,
+        "app_version": app_version,
+        "provider": provider,
+    }
+    encoded = json.dumps(payload, default=_json_default, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:16]
+
+
 def build_dashboard_run_records(
     scored_df: Any,
     bluf: Mapping[str, Any],

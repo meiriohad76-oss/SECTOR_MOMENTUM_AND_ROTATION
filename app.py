@@ -43,15 +43,18 @@ from src.portfolio import (
 from src.preferences import (
     BLUF_MODES,
     DENSITY_MODES,
+    PALETTE_OPTIONS,
     SPARKLINE_STYLES,
     density_class,
     initialize_preferences,
     is_compact_bluf,
+    palette_css_variables,
+    palette_key,
     should_render_bluf,
     sparkline_mode,
 )
 from src.run_debrief import debrief_journal, summarize_debriefs, threshold_review_candidates
-from src.run_journal import DEFAULT_JOURNAL_PATH, append_dashboard_run
+from src.run_journal import DEFAULT_JOURNAL_PATH, append_dashboard_run, dashboard_run_fingerprint
 from src.scoring import compute_composite, apply_state_machine, recent_transitions
 from src.table_preview import table_row_rrg_preview_html
 from src.transition_pulse import transition_pulse_class, transition_row_pulse_class
@@ -71,7 +74,7 @@ from src.visuals import (
 )
 
 
-APP_VERSION = "v2.4.8"
+APP_VERSION = "v2.4.9"
 DRILL_RANGE_OPTIONS = ("3M", "6M", "1Y", "3Y", "MAX")
 DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + ["^TNX", "^IRX"]))
 
@@ -330,11 +333,14 @@ if "table_sort" not in st.session_state:
     st.session_state.table_sort = "S_score:desc"
 initialize_preferences(st.session_state)
 _density_class = density_class(st.session_state.view_density)
+_palette_key = palette_key(st.session_state.color_palette)
+_palette_css = palette_css_variables(st.session_state.color_palette, st.session_state.theme)
 
 _md(
-    f'<style>{_CSS}{_EXTRA}</style>'
+    f"<style>{_CSS}{_EXTRA}{_palette_css}</style>"
     f'<script>'
     f'document.documentElement.setAttribute("data-theme","{st.session_state.theme}");'
+    f'document.documentElement.setAttribute("data-palette","{_palette_key}");'
     f'document.documentElement.classList.remove("density-comfortable","density-compact");'
     f'document.documentElement.classList.add("{_density_class}");'
     f'</script>',
@@ -391,17 +397,31 @@ def _record_dashboard_run(scored_df, bluf_payload, regime_obj, transitions_rows,
             "buys": bluf_payload.get("buys_count", 0),
         },
     }
+    git_sha = _current_git_sha()
+    provider = _select_ohlcv_provider(None)
+    fingerprint = dashboard_run_fingerprint(
+        scored_df,
+        bluf_payload,
+        git_sha=git_sha,
+        app_version=APP_VERSION,
+        provider=provider,
+        metadata=metadata,
+    )
+    if st.session_state.get("run_journal_last_fingerprint") == fingerprint:
+        return
+
     result = append_dashboard_run(
         DEFAULT_JOURNAL_PATH,
         scored_df,
         bluf_payload,
-        git_sha=_current_git_sha(),
+        git_sha=git_sha,
         app_version=APP_VERSION,
-        provider=_select_ohlcv_provider(None),
+        provider=provider,
         metadata=metadata,
     )
     if result.ok:
         st.session_state.run_journal_last_run_id = result.run_id
+        st.session_state.run_journal_last_fingerprint = fingerprint
     else:
         st.session_state.run_journal_last_error = result.error
 
@@ -567,7 +587,7 @@ def render_header():
 
 def render_view_preferences():
     with st.expander("VIEW OPTIONS", expanded=False):
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4 = st.columns(4)
         with c1:
             st.radio(
                 "BLUF",
@@ -588,6 +608,13 @@ def render_view_preferences():
                 SPARKLINE_STYLES,
                 horizontal=True,
                 key="sparkline_style",
+            )
+        with c4:
+            st.radio(
+                "Palette",
+                PALETTE_OPTIONS,
+                horizontal=True,
+                key="color_palette",
             )
 
 

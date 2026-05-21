@@ -150,6 +150,14 @@ Status legend:
 **Evidence:** `docs/superpowers/plans/2026-05-21-b116-sparkline-30wma-reference.md`.
 **Residual risk:** SVG helper tests verify markup and warmup behavior; screenshot-level card QA should be added when browser tooling is available.
 
+### B-117 - Custom dashboard palettes - IMPLEMENTED
+**Status:** Solarized, Nord, and Mono palette options are implemented in `backlog-stepwise-qa`.
+**Files:** `src/preferences.py`, `src/run_journal.py`, `tests/test_preferences.py`, `tests/test_view_preferences_static.py`, `tests/test_run_journal.py`, `tests/test_run_journal_app_static.py`, `app.py`, `static/style.css`, `README.md`, `docs/PRODUCT_DESIGN.md`.
+**Behavior:** `VIEW OPTIONS` now includes a `Palette` radio with `Default`, `Solarized`, `Nord`, and `Mono`. The app renders selected palette variables into the page CSS and also writes `data-palette` on the document root for traceability while preserving the dark/light theme toggle.
+**Safety:** visual-only preference/CSS change; no provider fetch, scoring, alerting, or state-machine behavior changes. A stable run-journal fingerprint prevents palette/theme/density reruns from appending duplicate methodology runs.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b117-custom-palettes.md`.
+**Residual risk:** static tests verify palette wiring and token presence; screenshot-level palette QA should be added when browser tooling is available.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -213,7 +221,6 @@ Status legend:
 ### Universe & data
 
 ### Visual / UX
-- **B-117** Dark / light theme custom palette options ("Solarized", "Nord", "Mono")
 
 ### Notifications & integrations
 - **B-120** Email digest at 08:00 ET (LOW severity transitions)

@@ -238,6 +238,58 @@ def test_build_dashboard_run_records_adds_metadata_and_stable_run_id():
     assert decisions[0].action == "BUY"
 
 
+def test_dashboard_run_fingerprint_is_stable_and_input_sensitive():
+    scored = pd.DataFrame(
+        {
+            "class": ["US Sectors"],
+            "state": ["STAGE_2_BULLISH"],
+            "S_score": [0.91],
+            "F_score": [0.33],
+            "selected": [True],
+        },
+        index=["XLK"],
+    )
+    bluf = {
+        "actions": [
+            {
+                "kind": "buy",
+                "label": "BUY CANDIDATES",
+                "eta": "ENTER ON DIP",
+                "state": "STAGE_2_BULLISH",
+                "tickers": [{"t": "XLK", "note": "S +0.91"}],
+            }
+        ]
+    }
+
+    fingerprint = run_journal.dashboard_run_fingerprint(
+        scored,
+        bluf,
+        git_sha="abc1234",
+        app_version="v2.4.9",
+        provider="massive",
+        metadata={"phase": "MID", "risk_on": True},
+    )
+    same_fingerprint = run_journal.dashboard_run_fingerprint(
+        scored,
+        bluf,
+        git_sha="abc1234",
+        app_version="v2.4.9",
+        provider="massive",
+        metadata={"phase": "MID", "risk_on": True},
+    )
+    changed_fingerprint = run_journal.dashboard_run_fingerprint(
+        scored,
+        bluf,
+        git_sha="abc1234",
+        app_version="v2.4.9",
+        provider="massive",
+        metadata={"phase": "LATE", "risk_on": False},
+    )
+
+    assert fingerprint == same_fingerprint
+    assert fingerprint != changed_fingerprint
+
+
 def test_append_dashboard_run_is_non_blocking_when_journal_write_fails(monkeypatch, tmp_path):
     scored = pd.DataFrame(
         {"class": ["US Sectors"], "state": ["WARNING"], "S_score": [-0.1], "F_score": [-0.2]},

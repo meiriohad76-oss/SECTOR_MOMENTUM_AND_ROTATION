@@ -19,6 +19,7 @@ A Streamlit dashboard that monitors **83+ instruments across US sectors, US indu
 - A **state transition pulse** that briefly highlights alert rows and active pick cards when a ticker changed state today.
 - A **ticker comparison view** for reviewing 2-4 scored tickers side by side from the current methodology snapshot.
 - **Pick-card sparklines with a 30-week MA reference line** when enough weekly history is loaded.
+- **Custom dashboard palettes**: Default, Solarized, Nord, and Mono layered over the existing dark/light theme.
 - A **single-page Streamlit app** (`app.py`) with two sections:
   - **Top:** 7-pillar heatmap — every ticker scored on every pillar, color-coded, with composite score and current state (`STAGE_2_BULLISH` / `HOLD` / `WARNING` / `EXIT` / `BEARISH_STAGE_4` / `STAGE_1_BASING`).
   - **Below:** drill-down tabs — RRG quadrant chart, cross-sectional momentum bar, institutional flow detail, state-machine transition log, per-ticker deep dive with price/CMF/OBV charts.
@@ -105,6 +106,10 @@ B-115 adds a read-only comparison section after the per-ticker drill-down. Pick 
 ## Sparkline 30wMA reference
 
 B-116 adds a subtle dashed 30-week moving-average reference line to pick-card sparklines when enough weekly history is available. The line is computed from the same loaded OHLCV used for the price sparkline and does not fetch or score anything new.
+
+## Custom palettes
+
+B-117 adds a `Palette` preference in `VIEW OPTIONS`. Choose `Default`, `Solarized`, `Nord`, or `Mono`; the choice sets CSS tokens only and works alongside the existing dark/light toggle.
 
 ## Quick start
 

@@ -87,8 +87,9 @@ HOME (single scrollable page)
     └── OBV / price divergence chart
 ├── Comparison view (2-4 tickers side by side from current scored snapshot)
 
-SIDEBAR (persistent)
+HEADER / VIEW OPTIONS
 ├── Theme toggle (dark default)
+├── Palette selector in VIEW OPTIONS (Default / Solarized / Nord / Mono)
 ├── Lookback selector (3y / 5y / max)
 ├── Refresh data button
 ├── Asset class filter (multi-select)
@@ -288,6 +289,14 @@ Read-only side-by-side cards for 2-4 tickers:
 ### 6.8 Sparkline 30wMA context
 
 Pick-card sparklines include a subtle dashed horizontal 30-week MA reference when at least 30 weekly closes are available. This keeps the card glanceable while exposing Weinstein context without opening the drill-down.
+
+### 6.9 Palette options
+
+The dashboard keeps the dark/light theme toggle and adds palette variants as CSS token overrides:
+- Default: existing Bloomberg-terminal palette.
+- Solarized: warm analytical palette with Solarized dark/light bases.
+- Nord: cool blue-gray palette for lower-contrast scanning.
+- Mono: grayscale operator mode with state colors preserved.
 
 ---
 
