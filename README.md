@@ -214,6 +214,15 @@ cd /home/ahad/SECTOR_MOMENTUM_AND_ROTATION
 
 For 08:00 ET delivery from cron, set `CRON_TZ=America/New_York` and run the command at `0 8 * * *`. With no SMTP settings or no LOW-severity transitions, the script exits cleanly with `email_digest=skipped`.
 
+B-122 adds local RSS and iCal feed artifact generation from the same transition log:
+
+```bash
+cd /home/ahad/SECTOR_MOMENTUM_AND_ROTATION
+./.venv/bin/python scripts/export_transition_feeds.py
+```
+
+The script writes `data/feeds/transitions.rss` and `data/feeds/transitions.ics` and prints the generated paths. These files are gitignored local artifacts; publish or sync them separately if you want external feed readers to subscribe.
+
 Dashboard deep links support `?ticker=XLK`; the app opens with that ticker selected in the per-ticker drill-down.
 
 ## Methodology references

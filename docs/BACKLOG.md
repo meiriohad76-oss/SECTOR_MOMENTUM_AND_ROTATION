@@ -191,6 +191,14 @@ Status legend:
 **Evidence:** `docs/superpowers/plans/2026-05-21-b120-email-digest.md`.
 **Residual risk:** unit tests mock SMTP; live SMTP validation and scheduler enablement remain environment configuration tasks.
 
+### B-122 · RSS / iCal feed of state transitions — IMPLEMENTED / PUBLISH CONFIG PENDING
+**Status:** RSS and iCal transition feed generation is implemented in `backlog-stepwise-qa`; public publishing/sync is left to deployment configuration.
+**Files:** `src/transition_feeds.py`, `scripts/export_transition_feeds.py`, `tests/test_transition_feeds.py`, `tests/test_export_transition_feeds_script.py`, `.gitignore`, `README.md`.
+**Activation:** run `./.venv/bin/python scripts/export_transition_feeds.py` on the Pi. Generated files are `data/feeds/transitions.rss` and `data/feeds/transitions.ics`.
+**Behavior:** reads the persisted transition log, normalizes transition feed items, writes RSS 2.0 newest-first items and iCal all-day events, and escapes XML/iCal text.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b122-transition-feeds.md`.
+**Residual risk:** tests verify artifact generation and formatting; external feed hosting/subscription is not configured yet. iCal line folding and corrupted-date hardening remain future compatibility polish.
+
 ### B-022 · FRED macro overlay — IMPLEMENTED / KEY PENDING
 **Status:** FRED-backed macro classifier and deterministic tests implemented in `backlog-stepwise-qa`; live validation awaits `FRED_API_KEY`.
 **Files:** `src/fred_data.py`, `src/macro.py`, `tests/test_fred_data.py`, `tests/test_macro.py`.
@@ -232,7 +240,6 @@ Status legend:
 
 ### Notifications & integrations
 - **B-121** Push notifications for HIGH severity (mobile install via PWA)
-- **B-122** RSS / iCal feed of state transitions
 - **B-123** Discord / Mattermost webhook in addition to Telegram/Slack
 
 ### Portfolio features
