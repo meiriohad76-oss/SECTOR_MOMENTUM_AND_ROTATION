@@ -4,6 +4,8 @@ import pandas as pd
 import pytest
 
 from src.visuals import (
+    filter_ohlcv_lookback,
+    price_chart_with_30wma,
     relative_strength_lines_frame,
     sector_spaghetti_chart,
     svg_sparkline,
@@ -115,3 +117,44 @@ def test_sector_spaghetti_chart_adds_one_trace_per_available_sector():
 
     assert [trace.name for trace in fig.data] == ["XLK", "XLF"]
     assert fig.layout.yaxis.title.text == "Relative strength vs SPY, start = 100"
+
+
+def test_filter_ohlcv_lookback_uses_latest_available_date():
+    dates = pd.date_range("2025-01-01", "2025-08-01", freq="MS")
+    frame = _ohlcv(list(range(len(dates))), dates)
+
+    filtered = filter_ohlcv_lookback(frame, "3M")
+
+    assert filtered.index.min() == pd.Timestamp("2025-05-01")
+    assert filtered.index.max() == pd.Timestamp("2025-08-01")
+
+
+def test_filter_ohlcv_lookback_max_keeps_all_rows_sorted():
+    dates = pd.to_datetime(["2025-03-01", "2025-01-01", "2025-02-01"])
+    frame = _ohlcv([3, 1, 2], dates)
+
+    filtered = filter_ohlcv_lookback(frame, "MAX")
+
+    assert list(filtered.index) == sorted(dates)
+
+
+def test_filter_ohlcv_lookback_invalid_range_uses_one_year_default():
+    dates = pd.date_range("2024-01-01", "2025-08-01", freq="MS")
+    frame = _ohlcv(list(range(len(dates))), dates)
+
+    filtered = filter_ohlcv_lookback(frame, "BAD")
+
+    assert filtered.index.min() == pd.Timestamp("2024-08-01")
+
+
+def test_price_chart_with_30wma_visible_since_preserves_sma_warmup():
+    dates = pd.bdate_range("2024-01-01", periods=420)
+    frame = _ohlcv(list(range(100, 520)), dates)
+    visible_since = dates[-63]
+
+    fig = price_chart_with_30wma(frame, "XLK", visible_since=visible_since)
+
+    close_trace, sma_trace = fig.data
+    assert min(close_trace.x) >= visible_since
+    assert min(sma_trace.x) >= visible_since
+    assert any(pd.notna(value) for value in sma_trace.y)

@@ -55,6 +55,7 @@ from src.universe import US_SECTORS
 from src.visuals import (
     rrg_chart_dark,
     sector_spaghetti_chart,
+    filter_ohlcv_lookback,
     price_chart_with_30wma,
     cmf_chart,
     obv_chart,
@@ -64,7 +65,8 @@ from src.visuals import (
 )
 
 
-APP_VERSION = "v2.4.3"
+APP_VERSION = "v2.4.4"
+DRILL_RANGE_OPTIONS = ("3M", "6M", "1Y", "3Y", "MAX")
 DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + ["^TNX", "^IRX"]))
 
 
@@ -306,6 +308,10 @@ if "klass" not in st.session_state:
     st.session_state.klass = "US Sectors"
 if "drill_ticker" not in st.session_state:
     st.session_state.drill_ticker = "XLK"
+if "drill_range" not in st.session_state:
+    st.session_state.drill_range = "1Y"
+elif st.session_state.drill_range not in DRILL_RANGE_OPTIONS:
+    st.session_state.drill_range = "1Y"
 if "portfolio_single_ticker" not in st.session_state:
     st.session_state.portfolio_single_ticker = st.session_state.drill_ticker
 if "portfolio_single_source" not in st.session_state:
@@ -1003,6 +1009,15 @@ def render_drill():
                            label_visibility="visible")
     if new_sel != sel:
         _go_to_drill(new_sel)
+    st.radio(
+        "CHART RANGE",
+        DRILL_RANGE_OPTIONS,
+        horizontal=True,
+        key="drill_range",
+    )
+    selected_range = st.session_state.drill_range
+    drill_ohlcv = filter_ohlcv_lookback(ohlcv[sel], selected_range)
+    visible_since = drill_ohlcv.index.min()
 
     # header tiles
     head_html = f"""
@@ -1051,14 +1066,14 @@ def render_drill():
     # Charts
     c1, c2 = st.columns(2)
     with c1:
-        st.plotly_chart(price_chart_with_30wma(ohlcv[sel], sel),
+        st.plotly_chart(price_chart_with_30wma(ohlcv[sel], sel, visible_since=visible_since),
                         use_container_width=True, config={"displayModeBar": False})
         _md('<div class="chart-help"><b>Weinstein Stage 2 visual check.</b> Want price (solid line) above the dashed <b>30-week SMA</b>, with the MA sloping <b>upward</b>. Stage 2 confirmed when both hold AND Mansfield RS &gt; 0. Price crossing below the MA on a weekly close is the canonical EXIT trigger.</div>')
     with c2:
-        st.plotly_chart(cmf_chart(ohlcv[sel], sel),
+        st.plotly_chart(cmf_chart(ohlcv[sel], sel, visible_since=visible_since),
                         use_container_width=True, config={"displayModeBar": False})
         _md('<div class="chart-help"><b>Chaikin Money Flow (21d) — volume-weighted accumulation/distribution.</b> Above <span style="color:var(--green)">+0.10</span> = strong accumulation (institutional buying). Below <span style="color:var(--red)">-0.10</span> = strong distribution. Sustained negative CMF during a Stage-2 advance is an early Stage-3 topping warning.</div>')
-    st.plotly_chart(obv_chart(ohlcv[sel], sel),
+    st.plotly_chart(obv_chart(ohlcv[sel], sel, visible_since=visible_since),
                     use_container_width=True, config={"displayModeBar": False})
     _md('<div class="chart-help"><b>Price vs OBV — bearish divergence detector.</b> When price (left axis) makes a new high but OBV (right axis) does <b>not</b>, institutional money isn\'t following the rally. One of the cleanest pre-breakdown signals. Bullish divergence (OBV new high, price not) often marks Stage-1 accumulation bottoms.</div>')
 

@@ -110,6 +110,14 @@ Status legend:
 **Evidence:** `docs/superpowers/plans/2026-05-21-b111-sector-spaghetti-chart.md`.
 **Residual risk:** static and pure helper tests verify behavior; browser screenshot QA should be added when browser tooling is available.
 
+### B-112 - Custom time-range selector in per-ticker drill-down - IMPLEMENTED
+**Status:** a per-ticker drill-down chart range selector is implemented in `backlog-stepwise-qa`.
+**Files:** `src/visuals.py`, `tests/test_visuals.py`, `tests/test_drill_range_app_static.py`, `app.py`, `README.md`, `docs/PRODUCT_DESIGN.md`.
+**Behavior:** the drill-down exposes `3M`, `6M`, `1Y`, `3Y`, and `MAX` ranges. The selected range clips the visible price/30wMA, CMF, and OBV chart windows by the latest available data date while rolling indicators keep the full loaded OHLCV warmup.
+**Safety:** uses existing in-memory OHLCV only; no provider fetch, scoring, alerting, state-machine, or persistence behavior changes.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b112-drill-time-range-selector.md`.
+**Residual risk:** `MAX` means all data already loaded by the dashboard run, currently bounded by the app's configured OHLCV payload; screenshot-level browser QA should be added when browser tooling is available.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -173,7 +181,6 @@ Status legend:
 ### Universe & data
 
 ### Visual / UX
-- **B-112** Custom time-range selector in per-ticker drill-down
 - **B-113** Hover preview on table rows (mini RRG dot popover)
 - **B-114** State transition pulse animation when a ticker just flipped
 - **B-115** Comparison view — pick 2–4 tickers, see side-by-side metrics

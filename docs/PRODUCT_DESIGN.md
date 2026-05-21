@@ -80,6 +80,7 @@ HOME (single scrollable page)
 ├── Full 7-pillar table (collapsed by default, expandable)
 └── Per-ticker drill-down
     ├── Ticker picker
+    ├── Chart range selector (3M / 6M / 1Y / 3Y / MAX loaded data)
     ├── 4 metric tiles (S-score, F-score, state, RRG quadrant)
     ├── Weekly price + 30wMA chart
     ├── CMF chart
@@ -258,6 +259,11 @@ Four metric tiles in a row:
 - Flow score (color: green/red by sign; sub label: "VETO" or "OK")
 - State (pill or large colored text)
 - RRG quadrant (text only)
+
+Above the chart group, a compact range selector controls the time window used by the drill charts:
+- 3M, 6M, 1Y, 3Y, MAX
+- The selected range clips the visible chart window while indicators compute from the full loaded ticker OHLCV warmup.
+- MAX means the full loaded dashboard payload, not a fresh provider fetch.
 
 Then three full-width charts stacked or in 2-column:
 - Weekly price + 30wMA line (Plotly)

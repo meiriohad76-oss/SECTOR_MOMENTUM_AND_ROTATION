@@ -96,12 +96,33 @@ def momentum_bar(df: pd.DataFrame, title: str = "12-1 Cross-sectional Momentum")
 
 # ---- Price + 30wMA chart for the drill-down -------------------------------------
 
-def price_chart_with_30wma(df_daily: pd.DataFrame, ticker: str) -> go.Figure:
+
+def _clip_to_visible_since(
+    data: pd.Series | pd.DataFrame,
+    visible_since: object | None,
+) -> pd.Series | pd.DataFrame:
+    if visible_since is None or not isinstance(data.index, pd.DatetimeIndex):
+        return data
+    try:
+        cutoff = pd.Timestamp(visible_since)
+    except (TypeError, ValueError):
+        return data
+    if pd.isna(cutoff):
+        return data
+    return data.loc[data.index >= cutoff]
+
+
+def price_chart_with_30wma(
+    df_daily: pd.DataFrame,
+    ticker: str,
+    visible_since: object | None = None,
+) -> go.Figure:
     weekly = df_daily.resample("W-FRI").agg({"close": "last"})
     weekly["sma30"] = weekly["close"].rolling(30).mean()
+    visible_weekly = _clip_to_visible_since(weekly, visible_since)
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=weekly.index, y=weekly["close"], name="Close (weekly)", line=dict(width=2)))
-    fig.add_trace(go.Scatter(x=weekly.index, y=weekly["sma30"], name="30-week SMA", line=dict(width=1.5, dash="dash")))
+    fig.add_trace(go.Scatter(x=visible_weekly.index, y=visible_weekly["close"], name="Close (weekly)", line=dict(width=2)))
+    fig.add_trace(go.Scatter(x=visible_weekly.index, y=visible_weekly["sma30"], name="30-week SMA", line=dict(width=1.5, dash="dash")))
     fig.update_layout(
         title=f"{ticker} — weekly price vs 30-week SMA",
         height=400,
@@ -112,14 +133,19 @@ def price_chart_with_30wma(df_daily: pd.DataFrame, ticker: str) -> go.Figure:
     return fig
 
 
-def cmf_chart(df_daily: pd.DataFrame, ticker: str) -> go.Figure:
+def cmf_chart(
+    df_daily: pd.DataFrame,
+    ticker: str,
+    visible_since: object | None = None,
+) -> go.Figure:
     high, low, close, vol = df_daily["high"], df_daily["low"], df_daily["close"], df_daily["volume"]
     rng = (high - low).replace(0, np.nan)
     mfm = ((close - low) - (high - close)) / rng
     mfv = (mfm * vol).fillna(0)
     cmf = mfv.rolling(21).sum() / vol.rolling(21).sum().replace(0, np.nan)
+    visible_cmf = _clip_to_visible_since(cmf, visible_since)
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=cmf.index, y=cmf, name="CMF(21)", line=dict(width=1.5)))
+    fig.add_trace(go.Scatter(x=visible_cmf.index, y=visible_cmf, name="CMF(21)", line=dict(width=1.5)))
     fig.add_hline(y=0.10, line=dict(color="#1A8A4E", dash="dot"))
     fig.add_hline(y=0, line=dict(color="#999"))
     fig.add_hline(y=-0.10, line=dict(color="#D5562C", dash="dot"))
@@ -133,12 +159,18 @@ def cmf_chart(df_daily: pd.DataFrame, ticker: str) -> go.Figure:
     return fig
 
 
-def obv_chart(df_daily: pd.DataFrame, ticker: str) -> go.Figure:
+def obv_chart(
+    df_daily: pd.DataFrame,
+    ticker: str,
+    visible_since: object | None = None,
+) -> go.Figure:
     sign = np.sign(df_daily["close"].diff().fillna(0))
     obv = (sign * df_daily["volume"]).cumsum()
+    visible_daily = _clip_to_visible_since(df_daily, visible_since)
+    visible_obv = _clip_to_visible_since(obv, visible_since)
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df_daily.index, y=df_daily["close"], name="Close", yaxis="y1", line=dict(width=1.5)))
-    fig.add_trace(go.Scatter(x=obv.index, y=obv, name="OBV", yaxis="y2", line=dict(width=1.5, color="#3B6FB6")))
+    fig.add_trace(go.Scatter(x=visible_daily.index, y=visible_daily["close"], name="Close", yaxis="y1", line=dict(width=1.5)))
+    fig.add_trace(go.Scatter(x=visible_obv.index, y=visible_obv, name="OBV", yaxis="y2", line=dict(width=1.5, color="#3B6FB6")))
     fig.update_layout(
         title=f"{ticker} — Price vs OBV (divergence detector)",
         height=350,
@@ -149,6 +181,34 @@ def obv_chart(df_daily: pd.DataFrame, ticker: str) -> go.Figure:
         legend=dict(orientation="h", yanchor="top", y=-0.1),
     )
     return fig
+
+
+_DRILL_LOOKBACK_OFFSETS = {
+    "3M": pd.DateOffset(months=3),
+    "6M": pd.DateOffset(months=6),
+    "1Y": pd.DateOffset(years=1),
+    "3Y": pd.DateOffset(years=3),
+}
+
+
+def filter_ohlcv_lookback(df_daily: pd.DataFrame, range_key: str) -> pd.DataFrame:
+    """Return daily OHLCV rows inside the selected drill-down chart range."""
+    frame = df_daily.copy()
+    if frame.empty or not isinstance(frame.index, pd.DatetimeIndex):
+        return frame
+
+    frame = frame.sort_index()
+    key = str(range_key or "1Y").upper()
+    if key == "MAX":
+        return frame.copy()
+
+    offset = _DRILL_LOOKBACK_OFFSETS.get(key, _DRILL_LOOKBACK_OFFSETS["1Y"])
+    latest = frame.index.max()
+    if pd.isna(latest):
+        return frame.copy()
+
+    cutoff = latest - offset
+    return frame.loc[frame.index >= cutoff].copy()
 
 
 # ---- Bloomberg-terminal style additions -----------------------------------------

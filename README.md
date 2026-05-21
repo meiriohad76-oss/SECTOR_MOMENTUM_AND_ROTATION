@@ -14,6 +14,7 @@ A Streamlit dashboard that monitors **83+ instruments across US sectors, US indu
 - A **read-only custom universe builder** that accepts pasted tickers or a CSV/XLS/XLSX ticker file, de-duplicates the list, and ranks matched tickers against the current methodology snapshot.
 - A **responsive single-page dashboard layout** with phone-width guards for the header, section controls, alert rows, tables, drill controls, and compact action summaries.
 - A **US sector relative-strength spaghetti chart** that overlays all sector ETF lines versus SPY over the last 12 months.
+- A **per-ticker chart range selector** for drilling into 3M, 6M, 1Y, 3Y, or all currently loaded price/flow history.
 - A **single-page Streamlit app** (`app.py`) with two sections:
   - **Top:** 7-pillar heatmap — every ticker scored on every pillar, color-coded, with composite score and current state (`STAGE_2_BULLISH` / `HOLD` / `WARNING` / `EXIT` / `BEARISH_STAGE_4` / `STAGE_1_BASING`).
   - **Below:** drill-down tabs — RRG quadrant chart, cross-sectional momentum bar, institutional flow detail, state-machine transition log, per-ticker deep dive with price/CMF/OBV charts.
@@ -76,6 +77,14 @@ B-110 adds CSS and Streamlit markup hooks for narrower screens:
 ## Sector relative strength
 
 B-111 adds a sector spaghetti chart after the RRG section. It uses the already-loaded OHLCV snapshot, compares each US sector ETF with SPY, normalizes every line to 100 at the start of the 12-month window, and sorts traces by latest relative strength.
+
+## Drill-down chart ranges
+
+B-112 adds a `CHART RANGE` control to the per-ticker drill-down. The selector clips the visible weekly price/30wMA, CMF, and OBV chart windows while keeping the full loaded ticker OHLCV available for rolling-indicator warmup.
+
+- Supported ranges: `3M`, `6M`, `1Y`, `3Y`, and `MAX`.
+- The range is anchored to the latest available date in the loaded data, not the system clock.
+- `MAX` means all OHLCV already loaded for the current dashboard run; it does not request a longer provider window.
 
 ## Quick start
 
