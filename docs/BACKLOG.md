@@ -43,6 +43,15 @@ Status legend:
 **Observed behavior:** unauthenticated requests to `https://sentimentdashboard.ahaddashboards.uk` redirect to `ahadahad.cloudflareaccess.com/cdn-cgi/access/login/...`, include `Www-Authenticate: Cloudflare-Access`, and return a `Sign in - Cloudflare Access` page instead of the Streamlit dashboard.
 **Residual risk:** rerun verification after Cloudflare policy edits; this check does not audit the allowed email list.
 
+### B-020 · Massive / FINRA / SEC provider flow seams - IMPLEMENTED
+**Status:** all four remaining Pillar 7 provider seams are implemented in `backlog-stepwise-qa` with provider-specific opt-in stub flags and fail-closed neutral fallbacks.
+**Files:** `src/flow.py`, `tests/test_flow.py`, `.streamlit/secrets.toml.example`, `README.md`.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b020-provider-flow-status.md`.
+**Implemented feeds:** Massive `/v3/trades` block-trade upside ratio, FINRA ATS weekly dark-pool percentage, FINRA consolidated short-interest delta, and SEC 13F net-buy parsing from configured data-set zip plus CUSIP mappings.
+**Activation:** leave `MASSIVE_TRADES_STUB_MODE`, `FINRA_ATS_STUB_MODE`, `FINRA_SHORT_INTEREST_STUB_MODE`, and `SEC_13F_STUB_MODE` unset/`true` until each feed is configured; flip individual flags to `false` for live validation.
+**QA:** `python -m pytest tests/test_flow.py -q` -> `33 passed`; `python -m pytest -q` -> `184 passed`.
+**Residual risk:** live provider validation depends on configured keys/user-agent/CUSIP mappings and should be repeated after provider schema changes.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -60,16 +69,6 @@ Status legend:
 **Why second:** validates whether the methodology actually has edge before more design polish.
 
 ## 💡 Researched but not built
-
-### B-020 · Massive AI flow integration — remaining 4 stubs
-**Safety scaffold:** per-provider opt-in flags added in `backlog-stepwise-qa`: `MASSIVE_TRADES_STUB_MODE`, `FINRA_ATS_STUB_MODE`, `FINRA_SHORT_INTEREST_STUB_MODE`, and `SEC_13F_STUB_MODE`. Leave each unset/`true` for neutral fallback until its feed is configured.
-After B-010 establishes the pattern, wire the rest:
-- **B-020a** `block_trade_upside_ratio()` — IMPLEMENTED in `backlog-stepwise-qa`; Massive `/v3/trades`, enabled with `MASSIVE_TRADES_STUB_MODE=false`, neutral on missing key/data/provider errors.
-- **B-020b** `dark_pool_pct()` — IMPLEMENTED in `backlog-stepwise-qa`; FINRA ATS weekly summary, enabled with `FINRA_ATS_STUB_MODE=false`, neutral on missing data/provider errors.
-- **B-020c** `short_interest_delta_15d()` — IMPLEMENTED in `backlog-stepwise-qa`; FINRA consolidated short-interest dataset, enabled with `FINRA_SHORT_INTEREST_STUB_MODE=false`, neutral on missing data/provider errors.
-- **B-020d** `thirteen_f_net_buys_q()` — IMPLEMENTED in `backlog-stepwise-qa`; configured SEC 13F data-set zip plus `SEC_13F_CUSIP_<TICKER>` mapping, enabled with `SEC_13F_STUB_MODE=false`, neutral on missing config/data/provider errors.
-
-Each is ~2–4 hours after the integration pattern is set. Flip `STUB_MODE = False` in `flow.py` when done.
 
 ### B-021 · Telegram / Slack alerting on state transitions — IMPLEMENTED / KEYS PENDING
 **Status:** Telegram bot and Slack webhook channels are implemented in `backlog-stepwise-qa`; live validation awaits alert secrets.
