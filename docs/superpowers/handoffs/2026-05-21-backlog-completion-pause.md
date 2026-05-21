@@ -10,7 +10,8 @@ The user asked to pause and keep a clean continuation point.
 
 - Base before this pause slice: `b680bf0 docs: record b152 deploy evidence`
 - Verified code commit: `b7a9fc32446943657ce44548c7ec27473dd39705 feat: complete remaining backlog tickets`
-- This handoff is committed immediately after the verified code commit.
+- Initial handoff commit: `f8c7122f9f3a2886d6d271178ff536d9a6b452e1 docs: add backlog completion pause handoff`
+- GitHub push verified after the handoff: `origin/backlog-stepwise-qa` reached `f8c7122f9f3a2886d6d271178ff536d9a6b452e1`.
 
 ## What Was Implemented In The Latest Code Commit
 
@@ -80,7 +81,6 @@ Result: exit `0`.
 
 - Code review was not run for this final slice because the subagent thread pool was already full.
 - Pi deployment for `b7a9fc3` and this handoff commit has not been run yet at the time this file was written.
-- GitHub push is the next command after committing this handoff; verify with `git ls-remote origin refs/heads/backlog-stepwise-qa`.
 - B-121 live push delivery needs VAPID/subscription configuration.
 - B-131 broker sync needs broker API credentials and a separate import/sync design.
 - B-011 long-window evidence should be refreshed after provider keys/data availability changes.
@@ -96,19 +96,13 @@ git log --oneline -5
 git ls-remote origin refs/heads/backlog-stepwise-qa
 ```
 
-2. If not already done, push to GitHub:
-
-```powershell
-git push origin backlog-stepwise-qa
-```
-
-3. Deploy to the Pi and run Pi verification:
+2. Deploy to the Pi and run Pi verification:
 
 ```powershell
 ssh -i "$env:USERPROFILE\.ssh\codex_ahadpi_ed25519" -o BatchMode=yes -o ConnectTimeout=8 ahad@10.100.102.18 'cd /home/ahad/SECTOR_MOMENTUM_AND_ROTATION && git pull --ff-only origin backlog-stepwise-qa && ./.venv/bin/python -m pytest tests/test_pwa_push.py tests/test_pl_tracker.py tests/test_personal_trades.py tests/test_remaining_backlog_app_static.py tests/test_run_backtest_script.py -q && ./.venv/bin/python -m pytest -q && systemctl is-active sector-dashboard && curl -s -o /dev/null -w "%{http_code}\n" --max-time 8 "http://127.0.0.1:8501/?ticker=XLK"'
 ```
 
-4. If Pi verification passes, restart the dashboard service only if needed:
+3. If Pi verification passes, restart the dashboard service only if needed:
 
 ```powershell
 ssh -i "$env:USERPROFILE\.ssh\codex_ahadpi_ed25519" -o BatchMode=yes -o ConnectTimeout=8 ahad@10.100.102.18 'sudo systemctl restart sector-dashboard && sleep 5 && curl -s -o /dev/null -w "%{http_code}\n" --max-time 8 "http://127.0.0.1:8501/?ticker=XLK"'
