@@ -263,7 +263,13 @@ Status legend:
 **Evidence:** `docs/superpowers/plans/2026-05-21-b140-github-actions-pi-deploy.md`.
 **Residual risk:** not live-validated from GitHub Actions because repo secrets and a GitHub-reachable SSH endpoint are still configuration tasks.
 
-- **B-141** Add docker-compose for easier local development
+#### B-141 · Docker Compose for local development — IMPLEMENTED
+**Status:** Dockerfile, compose service, and static coverage are implemented in `backlog-stepwise-qa`.
+**Files:** `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `tests/test_docker_compose_static.py`, `README.md`, `docs/BACKLOG.md`.
+**Activation:** run `docker compose up --build`, then open `http://127.0.0.1:8501/?ticker=XLK`.
+**Behavior:** builds a Python 3.12 Streamlit container, exposes port `8501`, defaults to yfinance for free local data, mounts `.streamlit/` and `data/`, writes container state to `data/state.json`, and adds an HTTP healthcheck.
+**Residual risk:** static tests verify scaffold contents; Docker runtime build was attempted locally but Docker Desktop/daemon was unavailable, so runtime container startup still needs validation on a Docker-enabled machine.
+
 - **B-142** Unit tests for data/indicators/flow/scoring — DONE in `backlog-stepwise-qa`; pytest harness covers pure modules before provider integration.
 - **B-143** Parallelize indicator computations (currently sequential per-ticker)
 - **B-144** Local DuckDB store for OHLC (skip yfinance refetch on Pi reboot)

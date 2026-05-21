@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 
 import pandas as pd
@@ -96,6 +97,18 @@ def test_apply_state_machine_persists_transitions_to_patched_state_file(tmp_path
     assert saved["transitions"][-1]["ticker"] == "XLK"
     assert saved["transitions"][-1]["from"] == "HOLD"
     assert saved["transitions"][-1]["to"] == "WARNING"
+
+
+def test_state_file_can_be_configured_from_environment(tmp_path, monkeypatch):
+    state_file = tmp_path / "container-state.json"
+
+    monkeypatch.setenv("STATE_FILE", str(state_file))
+    reloaded = importlib.reload(scoring)
+    try:
+        assert reloaded.STATE_FILE == state_file
+    finally:
+        monkeypatch.delenv("STATE_FILE", raising=False)
+        importlib.reload(scoring)
 
 
 def test_apply_state_machine_dates_transitions_by_us_eastern_day(tmp_path, monkeypatch):

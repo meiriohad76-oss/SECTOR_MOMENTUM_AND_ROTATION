@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -17,7 +18,7 @@ from .universe import class_of, TOP_N
 from .macro import cycle_tilt
 
 
-STATE_FILE = Path(__file__).resolve().parent.parent / "state.json"
+STATE_FILE = Path(os.environ.get("STATE_FILE", Path(__file__).resolve().parent.parent / "state.json"))
 EASTERN_TZ = ZoneInfo("America/New_York")
 
 STATES = ["STAGE_2_BULLISH", "HOLD", "WARNING", "EXIT", "BEARISH_STAGE_4", "STAGE_1_BASING"]

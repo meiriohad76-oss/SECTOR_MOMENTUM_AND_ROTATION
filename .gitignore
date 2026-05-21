@@ -27,6 +27,7 @@ Thumbs.db
 # --- Streamlit / app local state ---
 .streamlit/secrets.toml
 state.json
+data/state.json
 *.log
 .cache/
 

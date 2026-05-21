@@ -1,0 +1,21 @@
+services:
+  sector-dashboard:
+    build: .
+    image: sector-momentum-dashboard:dev
+    ports:
+      - "8501:8501"
+    environment:
+      OHLCV_PROVIDER: ${OHLCV_PROVIDER:-yfinance}
+      FLOW_STUB_MODE: ${FLOW_STUB_MODE:-true}
+      MASSIVE_VERIFY_SSL: ${MASSIVE_VERIFY_SSL:-true}
+      STATE_FILE: ${STATE_FILE:-/app/data/state.json}
+    volumes:
+      - ./.streamlit:/app/.streamlit:ro
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8501/?ticker=XLK || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+    restart: unless-stopped

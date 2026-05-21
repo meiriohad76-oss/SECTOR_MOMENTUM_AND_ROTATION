@@ -139,6 +139,16 @@ streamlit run app.py
 
 For a 24/7 deployment on a Raspberry Pi with a public URL via Cloudflare Tunnel, see [`docs/DEPLOY_RASPBERRY_PI.md`](docs/DEPLOY_RASPBERRY_PI.md) and [`docs/DEPLOY_CLOUDFLARE_TUNNEL.md`](docs/DEPLOY_CLOUDFLARE_TUNNEL.md). For push-to-Pi automation, see [`docs/DEPLOY_GITHUB_ACTIONS_PI.md`](docs/DEPLOY_GITHUB_ACTIONS_PI.md).
 
+### Docker Compose (dev)
+
+To run the dashboard in a local container:
+
+```bash
+docker compose up --build
+```
+
+Open `http://127.0.0.1:8501/?ticker=XLK`. The compose stack mounts `.streamlit/` and `data/`; container state is written to `data/state.json` through the `STATE_FILE` environment variable, so a clean checkout starts without a pre-created root `state.json`. `.dockerignore` keeps real secrets, private keys, and generated data out of the image build context.
+
 ## Project layout
 
 ```
