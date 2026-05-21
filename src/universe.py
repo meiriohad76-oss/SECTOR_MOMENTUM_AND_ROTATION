@@ -110,7 +110,7 @@ UNIVERSE_BY_CLASS = {
     "Crypto":       CRYPTO,
 }
 
-ALL_TICKERS = (
+SCORED_TICKERS = (
     US_SECTORS
     + US_INDUSTRIES
     + COUNTRIES
@@ -118,6 +118,10 @@ ALL_TICKERS = (
     + THEMES
     + CRYPTO
     + DEFENSIVES
+)
+
+ALL_TICKERS = (
+    SCORED_TICKERS
     + list(BENCH.values())
 )
 

@@ -4,7 +4,16 @@ import re
 from pathlib import Path
 
 from src import universe
-from src.universe import ALL_TICKERS, THEMES, TOP_N, UNIVERSE_BY_CLASS, US_INDUSTRIES, class_of
+from src.universe import (
+    ALL_TICKERS,
+    BENCH,
+    SCORED_TICKERS,
+    THEMES,
+    TOP_N,
+    UNIVERSE_BY_CLASS,
+    US_INDUSTRIES,
+    class_of,
+)
 
 
 EXPECTED_CRYPTO_TICKERS = ("BITO", "IBIT", "ETHE")
@@ -37,6 +46,13 @@ def test_all_tickers_includes_theme_etfs_without_duplicates():
     for ticker in EXPECTED_THEME_TICKERS + EXPECTED_CRYPTO_TICKERS:
         assert ticker in ALL_TICKERS
     assert len(ALL_TICKERS) == len(set(ALL_TICKERS))
+
+
+def test_scored_tickers_exclude_benchmarks_for_dashboard_counts():
+    assert len(SCORED_TICKERS) == 76
+    for ticker in BENCH.values():
+        assert ticker in ALL_TICKERS
+        assert ticker not in SCORED_TICKERS
 
 
 def test_every_universe_class_has_positive_top_n_target():
@@ -74,7 +90,7 @@ def test_product_design_summary_documents_theme_universe_count():
 def test_app_copy_uses_current_universe_count_without_stale_numbers():
     text = (ROOT / "app.py").read_text(encoding="utf-8")
 
-    assert "{len(ALL_TICKERS)} ETFs" in text
-    assert "{len(scored)} of {len(ALL_TICKERS)} ETFs" in text
+    assert "{len(SCORED_TICKERS)} ETFs" in text
+    assert "{len(scored)} of {len(SCORED_TICKERS)} ETFs" in text
     assert "67 ETFs" not in text
     assert "73 ETFs" not in text

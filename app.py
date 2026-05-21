@@ -42,7 +42,7 @@ from src.run_debrief import debrief_journal, summarize_debriefs, threshold_revie
 from src.run_journal import DEFAULT_JOURNAL_PATH, append_dashboard_run
 from src.scoring import compute_composite, apply_state_machine, recent_transitions
 from src.ui_states import defensive_basket_rows, loading_skeleton_slots
-from src.universe import ALL_TICKERS, UNIVERSE_BY_CLASS, BENCH
+from src.universe import ALL_TICKERS, SCORED_TICKERS, UNIVERSE_BY_CLASS, BENCH
 from src.visuals import (
     rrg_chart_dark,
     price_chart_with_30wma,
@@ -159,7 +159,7 @@ def _grade_letter(s: float | None) -> str:
 SYSTEM_EXPLAINER_HTML = f"""
 <div class="explainer">
 
-<p><b>Forward-looking signal system.</b> The Sentiment Board monitors {len(ALL_TICKERS)} ETFs across US sectors, industries, countries, factors, themes, and crypto exposures, then applies a 7-pillar methodology to <b>predict</b> which sectors will lead and which will break down. Every score, state, and signal you see on this page is a forward call, not a current-state description. The pillars are leading indicators by construction — each one has decades of out-of-sample evidence that <i>past readings predict forward returns</i>.</p>
+<p><b>Forward-looking signal system.</b> The Sentiment Board monitors {len(SCORED_TICKERS)} ETFs across US sectors, industries, countries, factors, themes, and crypto exposures, then applies a 7-pillar methodology to <b>predict</b> which sectors will lead and which will break down. Every score, state, and signal you see on this page is a forward call, not a current-state description. The pillars are leading indicators by construction — each one has decades of out-of-sample evidence that <i>past readings predict forward returns</i>.</p>
 
 <h3>Data flow</h3>
 <pre class="flow">yfinance daily OHLCV (3y, ~70 tickers)
@@ -1111,7 +1111,7 @@ def render_full_table():
     html = f"""
     <section class="section">
       <div class="section-head">
-        <h2>Full 7-pillar matrix <span class="count">{len(scored)} of {len(ALL_TICKERS)} ETFs</span></h2>
+        <h2>Full 7-pillar matrix <span class="count">{len(scored)} of {len(SCORED_TICKERS)} ETFs</span></h2>
       </div>
       <div class="full-table">
         <table>
