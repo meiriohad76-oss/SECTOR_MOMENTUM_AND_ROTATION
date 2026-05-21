@@ -255,7 +255,14 @@ Status legend:
 - **B-133** Save named watchlists / portfolios locally after B-130 read-only analyzer proves useful
 
 ### Engineering & ops
-- **B-140** Move from manual git commits to GitHub Actions auto-deploy to Pi
+#### B-140 · GitHub Actions auto-deploy to Pi — IMPLEMENTED / SECRETS CONFIG PENDING
+**Status:** GitHub Actions workflow and operator guide are implemented in `backlog-stepwise-qa`; live runs await GitHub repo secrets and a Pi SSH endpoint reachable by GitHub.
+**Files:** `.github/workflows/deploy-pi.yml`, `tests/test_github_actions_deploy_static.py`, `docs/DEPLOY_GITHUB_ACTIONS_PI.md`, `README.md`, `docs/BACKLOG.md`.
+**Activation:** configure `PI_HOST`, `PI_USER`, `PI_SSH_KEY`, `PI_KNOWN_HOSTS`, `PI_REPO_PATH`, and optional `PI_SERVICE_NAME` as GitHub repository secrets. The workflow runs on push to `backlog-stepwise-qa` and via manual dispatch.
+**Behavior:** SSHes to the Pi with a pinned host key, fast-forwards the branch, syncs `requirements.txt`, runs full pytest on the Pi, restarts the Streamlit service by terminating its current `MainPID`, and polls `http://127.0.0.1:8501/?ticker=XLK` for HTTP `200`.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b140-github-actions-pi-deploy.md`.
+**Residual risk:** not live-validated from GitHub Actions because repo secrets and a GitHub-reachable SSH endpoint are still configuration tasks.
+
 - **B-141** Add docker-compose for easier local development
 - **B-142** Unit tests for data/indicators/flow/scoring — DONE in `backlog-stepwise-qa`; pytest harness covers pure modules before provider integration.
 - **B-143** Parallelize indicator computations (currently sequential per-ticker)

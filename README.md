@@ -137,7 +137,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-For a 24/7 deployment on a Raspberry Pi with a public URL via Cloudflare Tunnel, see [`docs/DEPLOY_RASPBERRY_PI.md`](docs/DEPLOY_RASPBERRY_PI.md) and [`docs/DEPLOY_CLOUDFLARE_TUNNEL.md`](docs/DEPLOY_CLOUDFLARE_TUNNEL.md).
+For a 24/7 deployment on a Raspberry Pi with a public URL via Cloudflare Tunnel, see [`docs/DEPLOY_RASPBERRY_PI.md`](docs/DEPLOY_RASPBERRY_PI.md) and [`docs/DEPLOY_CLOUDFLARE_TUNNEL.md`](docs/DEPLOY_CLOUDFLARE_TUNNEL.md). For push-to-Pi automation, see [`docs/DEPLOY_GITHUB_ACTIONS_PI.md`](docs/DEPLOY_GITHUB_ACTIONS_PI.md).
 
 ## Project layout
 
