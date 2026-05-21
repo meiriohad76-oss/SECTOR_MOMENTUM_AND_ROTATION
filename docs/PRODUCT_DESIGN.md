@@ -76,6 +76,7 @@ HOME (single scrollable page)
 ├── Rotation centerpiece
 │   ├── Class selector (US Sectors / Industries / Countries / Factors)
 │   └── Big RRG quadrant chart (interactive, hover + click)
+├── US sector relative-strength spaghetti chart (12-month lines vs SPY)
 ├── Full 7-pillar table (collapsed by default, expandable)
 └── Per-ticker drill-down
     ├── Ticker picker

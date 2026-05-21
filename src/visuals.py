@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
+from .data import close_price
+
 
 # ---- color helpers ---------------------------------------------------------------
 
@@ -157,6 +159,98 @@ TERM_RED    = "#ef4f4a"
 TERM_AMBER  = "#e6b450"
 TERM_BLUE   = "#5fa8d3"
 TERM_MUTED  = "#8b8b8b"
+
+
+def relative_strength_lines_frame(
+    ohlcv: dict[str, pd.DataFrame],
+    sector_tickers: list[str],
+    bench_ticker: str = "SPY",
+    lookback_days: int = 252,
+) -> pd.DataFrame:
+    """Return sector relative-strength lines normalized to 100 at the start."""
+    if bench_ticker not in ohlcv:
+        return pd.DataFrame()
+
+    try:
+        bench = close_price(ohlcv[bench_ticker]).dropna().astype(float)
+    except (KeyError, TypeError, ValueError):
+        return pd.DataFrame()
+    if bench.empty:
+        return pd.DataFrame()
+
+    lines: dict[str, pd.Series] = {}
+    for ticker in sector_tickers:
+        if ticker == bench_ticker or ticker not in ohlcv:
+            continue
+        try:
+            prices = close_price(ohlcv[ticker]).dropna().astype(float)
+        except (KeyError, TypeError, ValueError):
+            continue
+        aligned = pd.concat({"price": prices, "bench": bench}, axis=1, sort=False).dropna()
+        if aligned.empty:
+            continue
+        aligned = aligned.tail(max(2, int(lookback_days)))
+        ratio = aligned["price"] / aligned["bench"].replace(0, np.nan)
+        ratio = ratio.replace([np.inf, -np.inf], np.nan).dropna()
+        if len(ratio) < 2 or ratio.iloc[0] == 0 or pd.isna(ratio.iloc[0]):
+            continue
+        lines[ticker] = (ratio / ratio.iloc[0]) * 100.0
+
+    if not lines:
+        return pd.DataFrame()
+
+    frame = pd.DataFrame(lines).dropna(how="all")
+    if frame.empty:
+        return frame
+    latest = frame.apply(lambda column: column.dropna().iloc[-1] if column.notna().any() else np.nan)
+    ordered = latest.dropna().sort_values(ascending=False).index.tolist()
+    return frame[ordered]
+
+
+def sector_spaghetti_chart(
+    ohlcv: dict[str, pd.DataFrame],
+    sector_tickers: list[str],
+    bench_ticker: str = "SPY",
+    lookback_days: int = 252,
+) -> go.Figure:
+    """Overlaid 12-month sector relative-strength lines versus SPY."""
+    frame = relative_strength_lines_frame(
+        ohlcv,
+        sector_tickers,
+        bench_ticker=bench_ticker,
+        lookback_days=lookback_days,
+    )
+    fig = go.Figure()
+    for ticker in frame.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=frame.index,
+                y=frame[ticker],
+                mode="lines",
+                name=ticker,
+                line=dict(width=1.8),
+                hovertemplate=f"<b>{ticker}</b><br>%{{x|%Y-%m-%d}}<br>RS %{{y:.1f}}<extra></extra>",
+            )
+        )
+    fig.add_hline(y=100, line=dict(color="#444", width=1, dash="dot"))
+    fig.update_layout(
+        title=dict(text="US SECTOR RELATIVE STRENGTH", font=dict(size=14, color="#ccc", family="JetBrains Mono, monospace")),
+        xaxis=dict(title="", color="#888", gridcolor="#222", showgrid=True),
+        yaxis=dict(title=f"Relative strength vs {bench_ticker}, start = 100", color="#888", gridcolor="#222", showgrid=True),
+        height=460,
+        margin=dict(l=44, r=24, t=48, b=36),
+        plot_bgcolor="#0a0a0a",
+        paper_bgcolor="rgba(0,0,0,0)",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.22,
+            xanchor="left",
+            x=0,
+            font=dict(size=10, color="#ccc", family="JetBrains Mono, monospace"),
+        ),
+    )
+    return fig
 
 
 def sparkline(df_daily: pd.DataFrame, height: int = 60) -> go.Figure:

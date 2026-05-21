@@ -51,8 +51,10 @@ from src.run_journal import DEFAULT_JOURNAL_PATH, append_dashboard_run
 from src.scoring import compute_composite, apply_state_machine, recent_transitions
 from src.ui_states import defensive_basket_rows, loading_skeleton_slots
 from src.universe import ALL_TICKERS, SCORED_TICKERS, UNIVERSE_BY_CLASS, BENCH
+from src.universe import US_SECTORS
 from src.visuals import (
     rrg_chart_dark,
+    sector_spaghetti_chart,
     price_chart_with_30wma,
     cmf_chart,
     obv_chart,
@@ -964,6 +966,24 @@ def render_rrg():
             _render_drill_buttons(f"rrg_drill_{q.lower()}", tickers[:8], max_columns=2)
 
 
+def render_sector_spaghetti():
+    fig = sector_spaghetti_chart(ohlcv, US_SECTORS, BENCH["US"])
+    _md(
+        """
+        <section class="section" id="sector-spaghetti">
+          <div class="section-head">
+            <h2>Sector spaghetti chart <span class="count">B-111 · US sectors</span></h2>
+            <div class="right">12M RELATIVE STRENGTH VS SPY</div>
+          </div>
+        </section>
+        """
+    )
+    if not fig.data:
+        st.info("Sector relative-strength chart is unavailable until sector and SPY price data are loaded.")
+        return
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
 def render_drill():
     sel = st.session_state.drill_ticker
     if sel not in ohlcv:
@@ -1561,6 +1581,7 @@ render_status()
 render_alerts()
 render_picks()
 render_rrg()
+render_sector_spaghetti()
 render_drill()
 render_portfolio_analyzer()
 render_custom_universe_builder()

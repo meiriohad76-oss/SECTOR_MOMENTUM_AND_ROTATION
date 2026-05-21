@@ -102,6 +102,14 @@ Status legend:
 **Evidence:** `docs/superpowers/plans/2026-05-21-b110-mobile-responsive-view.md`.
 **Residual risk:** local verification includes static coverage and HTTP smoke; screenshot-level mobile browser QA should be added when Playwright or browser tooling is available in the environment.
 
+### B-111 - Sector spaghetti chart - IMPLEMENTED
+**Status:** a US sector relative-strength spaghetti chart is implemented in `backlog-stepwise-qa`.
+**Files:** `src/visuals.py`, `tests/test_visuals.py`, `tests/test_sector_spaghetti_app_static.py`, `app.py`, `README.md`, `docs/PRODUCT_DESIGN.md`.
+**Behavior:** the chart overlays all available US sector ETFs versus SPY over the latest 252 trading days, normalizes every line to 100 at the start of the window, sorts traces by latest relative strength, and renders after the RRG section.
+**Safety:** uses already-loaded dashboard OHLCV only; no new fetch path, no scoring changes, no state writes, and no persistence.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b111-sector-spaghetti-chart.md`.
+**Residual risk:** static and pure helper tests verify behavior; browser screenshot QA should be added when browser tooling is available.
+
 ---
 
 ## 🎯 Next-session priorities
@@ -165,7 +173,6 @@ Status legend:
 ### Universe & data
 
 ### Visual / UX
-- **B-111** Sector "spaghetti chart" — every sector's relative-strength line over 12 months, overlaid
 - **B-112** Custom time-range selector in per-ticker drill-down
 - **B-113** Hover preview on table rows (mini RRG dot popover)
 - **B-114** State transition pulse animation when a ticker just flipped
