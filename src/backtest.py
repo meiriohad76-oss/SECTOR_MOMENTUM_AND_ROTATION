@@ -693,6 +693,73 @@ def format_backtest_report(
     return "\n".join(lines).rstrip() + "\n"
 
 
+def format_methodology_report(
+    strategy_metrics: dict[str, float],
+    benchmark_metrics: dict[str, dict[str, float]],
+    gates: dict[str, dict | bool],
+    window_metrics: dict[str, dict[str, float]],
+    simulation_summary: dict[str, int | float | str | None],
+    title: str = "Historical Methodology Backtest Report",
+) -> str:
+    lines = [
+        f"# {title}",
+        "",
+        "## Executive Summary",
+        "",
+        (
+            "This report is research evidence, not investment advice. It summarizes the "
+            "manual B-011 historical methodology run and should be read alongside the "
+            "deterministic pytest suite."
+        ),
+        "",
+        (
+            f"The methodology full-period CAGR is {_percent(_metric_value(strategy_metrics, 'cagr'))}, "
+            f"Sharpe is {_number(_metric_value(strategy_metrics, 'sharpe'))}, and max drawdown is "
+            f"{_percent(_metric_value(strategy_metrics, 'max_drawdown'))}."
+        ),
+        "",
+        "## Methodology Under Test",
+        "",
+        (
+            "The strategy path uses the historical methodology target builder: each rebalance "
+            "date slices OHLCV through that date, scores with pure `src/` modules, converts "
+            "selected tickers to equal target weights, and records states through `decide_state()` "
+            "without calling `apply_state_machine()` or writing `state.json`."
+        ),
+        "",
+        (
+            "provider-backed historical flow is neutral until as-of provider snapshots exist, "
+            "which avoids current-data leakage in this report."
+        ),
+        "",
+        "## Evidence Tables",
+        "",
+        "### Historical Methodology Simulation",
+        "",
+    ]
+    lines.extend(_simulation_summary_table(simulation_summary))
+    lines.extend(["", "### Strategy Metrics", ""])
+    lines.extend(_strategy_metrics_table(strategy_metrics))
+    lines.extend(["", "### Benchmark Comparison", ""])
+    lines.extend(_benchmark_table(benchmark_metrics))
+    lines.extend(["", "### In-Sample / Out-of-Sample", ""])
+    lines.extend(_window_metrics_table(window_metrics))
+    lines.extend(["", "## Acceptance Gates", ""])
+    lines.extend(format_gate_report(gates).splitlines()[2:])
+    lines.extend(
+        [
+            "",
+            "## Limitations And Next Work",
+            "",
+            "- Manual artifacts are evidence for review, not a live-edge claim.",
+            "- provider-backed historical flow is neutral until timestamped as-of feeds are available.",
+            "- The notebook/report guide does not replace deterministic tests or live provider validation.",
+            "- Backtest results do not guarantee future performance.",
+        ]
+    )
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def equity_frame(results: dict[str, BacktestResult]) -> pd.DataFrame:
     if not results:
         raise ValueError("results must contain at least one backtest result")

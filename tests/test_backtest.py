@@ -488,6 +488,55 @@ def test_format_backtest_report_includes_benchmarks_costs_and_gates():
     assert "Out-of-sample Sharpe: PASS" in text
 
 
+def test_format_methodology_report_includes_research_narrative_sections():
+    strategy_metrics = {
+        "total_return": 0.24,
+        "cagr": 0.12,
+        "sharpe": 0.91,
+        "sortino": 1.30,
+        "max_drawdown": -0.18,
+        "calmar": 0.67,
+        "annualized_turnover": 1.20,
+    }
+    benchmark_metrics = {
+        "Methodology": strategy_metrics,
+        "60/40 SPY/AGG": {"cagr": 0.08, "sharpe": 0.70, "max_drawdown": -0.22},
+        "Equal-weight sectors": {"cagr": 0.10, "sharpe": 0.74, "max_drawdown": -0.25},
+    }
+    gates = backtest.evaluate_acceptance_gates(
+        strategy_metrics={**strategy_metrics, "state_transitions_per_ticker_year": 2.0},
+        equal_weight_metrics=benchmark_metrics["Equal-weight sectors"],
+    )
+
+    text = backtest.format_methodology_report(
+        strategy_metrics=strategy_metrics,
+        benchmark_metrics=benchmark_metrics,
+        gates=gates,
+        window_metrics={
+            "Methodology full period": strategy_metrics,
+            "Methodology out-of-sample": {**strategy_metrics, "total_return": 0.12},
+        },
+        simulation_summary={
+            "start_date": "2024-01-01",
+            "end_date": "2024-03-01",
+            "rebalance_count": 9,
+            "state_ticker_count": 11,
+            "selected_ticker_count": 4,
+            "state_transition_count": 7,
+            "state_transitions_per_ticker_year": 2.75,
+        },
+    )
+
+    assert "# Historical Methodology Backtest Report" in text
+    assert "## Executive Summary" in text
+    assert "## Methodology Under Test" in text
+    assert "## Evidence Tables" in text
+    assert "## Acceptance Gates" in text
+    assert "## Limitations And Next Work" in text
+    assert "research evidence, not investment advice" in text
+    assert "provider-backed historical flow is neutral" in text
+
+
 def test_equity_frame_combines_named_results_on_date_index():
     dates = pd.bdate_range("2024-01-01", periods=3)
     prices = pd.DataFrame({"AAA": [100.0, 110.0, 121.0]}, index=dates)

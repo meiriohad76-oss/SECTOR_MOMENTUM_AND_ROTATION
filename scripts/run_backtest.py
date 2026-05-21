@@ -17,6 +17,7 @@ from src.data import fetch_ohlcv
 
 
 REPORT_PATH = ROOT / "docs" / "backtest_report.md"
+METHODOLOGY_REPORT_PATH = ROOT / "docs" / "backtest_methodology_report.md"
 EQUITY_PATH = ROOT / "docs" / "backtest_equity.csv"
 METADATA_PATH = ROOT / "docs" / "backtest_metadata.json"
 SECTOR_BENCHMARK_TICKERS = [
@@ -50,18 +51,44 @@ def _replace_bytes(path: Path, payload: bytes) -> None:
     tmp_path.replace(path)
 
 
+def _stage_artifacts(payloads: dict[Path, bytes]) -> list[tuple[Path, Path]]:
+    staged = []
+    try:
+        for path, payload in payloads.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp_path = path.with_name(path.name + ".tmp")
+            tmp_path.write_bytes(payload)
+            staged.append((tmp_path, path))
+    except Exception:
+        for tmp_path, _ in staged:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+        raise
+    return staged
+
+
+def _replace_staged_artifacts(staged: list[tuple[Path, Path]]) -> None:
+    for tmp_path, path in staged:
+        tmp_path.replace(path)
+
+
 def _write_artifacts(
     report: str,
+    methodology_report: str,
     equity,
     required_tickers: list[str],
     simulation_summary: dict | None = None,
 ) -> None:
     report_bytes = report.encode("utf-8")
+    methodology_report_bytes = methodology_report.encode("utf-8")
     equity_csv = equity.to_csv()
     equity_bytes = equity_csv.encode("utf-8")
     metadata = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "report_sha256": _sha256_bytes(report_bytes),
+        "methodology_report_sha256": _sha256_bytes(methodology_report_bytes),
         "equity_sha256": _sha256_bytes(equity_bytes),
         "required_tickers": required_tickers,
         "equity_rows": int(len(equity)),
@@ -70,9 +97,15 @@ def _write_artifacts(
     }
 
     metadata_bytes = (json.dumps(metadata, indent=2, sort_keys=True) + "\n").encode("utf-8")
-    _replace_bytes(REPORT_PATH, report_bytes)
-    _replace_bytes(EQUITY_PATH, equity_bytes)
-    _replace_bytes(METADATA_PATH, metadata_bytes)
+    staged = _stage_artifacts(
+        {
+            REPORT_PATH: report_bytes,
+            METHODOLOGY_REPORT_PATH: methodology_report_bytes,
+            EQUITY_PATH: equity_bytes,
+            METADATA_PATH: metadata_bytes,
+        }
+    )
+    _replace_staged_artifacts(staged)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -201,6 +234,23 @@ def main(argv: list[str] | None = None) -> int:
             simulation_summary=simulation_summary,
             title="Manual Backtest Smoke Report",
         )
+        methodology_report = backtest.format_methodology_report(
+            strategy_metrics=methodology_result.metrics,
+            benchmark_metrics={
+                "Methodology": methodology_result.metrics,
+                "60/40 SPY/AGG": sixty_forty_result.metrics,
+                "Equal-weight sectors": sector_result.metrics,
+            },
+            gates=gates,
+            window_metrics={
+                "Methodology full period": methodology_windows["Full period"],
+                "Methodology in-sample": methodology_windows["In-sample"],
+                "Methodology out-of-sample": methodology_oos_metrics,
+                "60/40 out-of-sample": sixty_forty_windows["Out-of-sample"],
+                "Equal-weight sectors out-of-sample": sector_oos_metrics,
+            },
+            simulation_summary=simulation_summary,
+        )
         equity = backtest.equity_frame(
             {
                 "Methodology": methodology_result,
@@ -208,7 +258,13 @@ def main(argv: list[str] | None = None) -> int:
                 "Equal-weight sectors": sector_result,
             }
         )
-        _write_artifacts(report, equity, REQUIRED_TICKERS, simulation_summary=simulation_summary)
+        _write_artifacts(
+            report,
+            methodology_report,
+            equity,
+            REQUIRED_TICKERS,
+            simulation_summary=simulation_summary,
+        )
     except Exception as exc:
         print(f"Manual backtest data validation failed: {exc}")
         return 2
