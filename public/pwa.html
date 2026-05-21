@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/assets/methodology.css">
+  <title>Sector Momentum Alerts</title>
+</head>
+<body>
+  <main class="page-shell">
+    <section class="hero">
+      <p class="eyebrow">PWA alert shell</p>
+      <h1>Sector Momentum Alerts</h1>
+      <p class="hero-copy">
+        Install this page on mobile to receive high-severity dashboard notifications after
+        VAPID keys and browser subscriptions are configured.
+      </p>
+      <a class="button" href="/notification-feed.json">Current alert feed</a>
+    </section>
+    <section class="content-section">
+      <h2>High-severity feed</h2>
+      <pre id="feed-output">Loading notification-feed.json...</pre>
+    </section>
+  </main>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/pwa-sw.js');
+    }
+    fetch('/notification-feed.json', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((payload) => {
+        document.getElementById('feed-output').textContent = JSON.stringify(payload, null, 2);
+      })
+      .catch(() => {
+        document.getElementById('feed-output').textContent = 'Notification feed unavailable.';
+      });
+  </script>
+</body>
+</html>

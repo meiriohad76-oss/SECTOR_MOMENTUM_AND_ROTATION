@@ -11,6 +11,8 @@ A Streamlit dashboard that monitors **83+ instruments across US sectors, US indu
 ## What you get
 
 - A **read-only portfolio / single-stock analyzer** that accepts one ticker or a CSV/XLS/XLSX holdings file and maps the input to the current methodology snapshot.
+- A local **P&L tracker** for uploaded/saved holdings with shares and cost basis, using already-loaded dashboard prices.
+- A **personal trade-history backtest** that compares uploaded trades with historical methodology-state artifacts from the manual backtest runner.
 - A **read-only custom universe builder** that accepts pasted tickers or a CSV/XLS/XLSX ticker file, de-duplicates the list, and ranks matched tickers against the current methodology snapshot.
 - **Saved watchlists and portfolios** stored locally in `data/saved_inputs.json` so repeated ticker lists and uploaded holdings can be reloaded without broker access or cloud sync.
 - A **responsive single-page dashboard layout** with phone-width guards for the header, section controls, alert rows, tables, drill controls, and compact action summaries.
@@ -21,6 +23,7 @@ A Streamlit dashboard that monitors **83+ instruments across US sectors, US indu
 - A **ticker comparison view** for reviewing 2-4 scored tickers side by side from the current methodology snapshot.
 - **Pick-card sparklines with a 30-week MA reference line** when enough weekly history is loaded.
 - **Custom dashboard palettes**: Default, Solarized, Nord, and Mono layered over the existing dark/light theme.
+- A static **PWA alert shell** for HIGH severity transition notifications once VAPID keys and browser subscriptions are configured.
 - A generated **component-doc inventory** that documents each Streamlit render section, its inputs, UI states, and QA coverage in a Storybook-style reference panel.
 - A **single-page Streamlit app** (`app.py`) with two sections:
   - **Top:** 7-pillar heatmap — every ticker scored on every pillar, color-coded, with composite score and current state (`STAGE_2_BULLISH` / `HOLD` / `WARNING` / `EXIT` / `BEARISH_STAGE_4` / `STAGE_1_BASING`).
@@ -50,7 +53,7 @@ python scripts/run_backtest.py --live-smoke
 The manual runner uses `OHLCV_PROVIDER=auto`: it prefers Massive aggregate bars when `MASSIVE_API_KEY` is configured and falls back to yfinance otherwise. Set `OHLCV_PROVIDER=massive` to force Massive historical bars, or `OHLCV_PROVIDER=yfinance` to force the free default. Keep `MASSIVE_VERIFY_SSL=true` unless a local certificate store blocks manual smoke testing; `MASSIVE_VERIFY_SSL=false` is an explicit troubleshooting override, not a production setting.
 
 The runner writes `docs/backtest_report.md` when market data downloads successfully. Treat that report as manual evidence, not a replacement for the deterministic test suite.
-The report uses the historical methodology target builder as the strategy path, then compares it with 60/40 and equal-weight sector benchmarks. It includes strategy metrics, benchmark comparison, 3/5/10 bps cost sensitivity, historical simulation evidence, in-sample / out-of-sample metrics, and acceptance-gate status with the evidence/rule behind each gate. The simulation evidence records rebalance count, state ticker coverage, selected ticker count, state transition count, and state transitions per ticker-year. Acceptance gates use out-of-sample metrics by default, with 2015-01-01 as the current OOS boundary, and the state-transition gate now uses the simulated historical states instead of a placeholder. The runner also writes `docs/backtest_methodology_report.md`, `docs/backtest_equity.csv`, and `docs/backtest_metadata.json`; the dashboard's Backtest Lab section displays the summary report, normalized equity chart, and drawdown chart only when the metadata hashes match the artifact files. Use `notebooks/backtest_methodology_report.ipynb` as a lightweight artifact inspection guide. These are manual research artifacts, not live-edge claims.
+The report uses the historical methodology target builder as the strategy path, then compares it with 60/40 and equal-weight sector benchmarks. It includes strategy metrics, benchmark comparison, 3/5/10 bps cost sensitivity, historical simulation evidence, in-sample / out-of-sample metrics, and acceptance-gate status with the evidence/rule behind each gate. The simulation evidence records rebalance count, state ticker coverage, selected ticker count, state transition count, and state transitions per ticker-year. Acceptance gates use out-of-sample metrics by default, with 2015-01-01 as the current OOS boundary, and the state-transition gate now uses the simulated historical states instead of a placeholder. The runner also writes `docs/backtest_methodology_report.md`, `docs/backtest_equity.csv`, `docs/backtest_states.csv`, and `docs/backtest_metadata.json`; the dashboard's Backtest Lab section displays the summary report, normalized equity chart, and drawdown chart only when the metadata hashes match the artifact files. Use `notebooks/backtest_methodology_report.ipynb` as a lightweight artifact inspection guide. These are manual research artifacts, not live-edge claims.
 
 ## Portfolio analyzer
 
@@ -61,6 +64,17 @@ B-130 adds a read-only analyzer section inside the Streamlit app:
 - Optional upload columns include `shares`, `quantity`, `qty`, `cost_basis`, `cost`, `market_value`, `value`, `weight`, `sector`, `account`, and `notes`.
 - Weights can be decimals (`0.25`) or percents (`25%` or `25`). If no valid weights are present, analysis falls back to market value weights, then equal weights.
 - Unknown tickers are reported as missing instead of crashing. Uploaded files are analyzed in memory; named portfolios can be saved locally to `data/saved_inputs.json`, which is ignored by git and Docker. The app does not connect to broker accounts.
+- B-131 adds a local P&L tracker in the same section. If holdings include `shares` and `cost_basis`, the dashboard joins them to already-loaded latest closes and shows cost, value, unrealized P&L, P&L %, and missing-input diagnostics. Broker sync remains config pending; no broker API calls are made.
+
+## Personal trade-history backtest
+
+B-132 adds an offline alignment check for personal trade history:
+
+- Run `python scripts/run_backtest.py` first so `docs/backtest_states.csv` and matching metadata hashes exist.
+- Upload a CSV/XLS/XLSX trade file with date, ticker, side, shares, and price columns.
+- BUY trades are aligned when the latest methodology state at or before the trade date is `STAGE_2_BULLISH` or `HOLD`.
+- SELL trades are aligned when the latest methodology state is `WARNING`, `EXIT`, or `BEARISH_STAGE_4`.
+- Uploaded trades are not saved, sent to a broker, or written into the run journal.
 
 ## Custom universe builder
 
@@ -124,6 +138,16 @@ Use [`docs/how-to-add-sector-indicator-pillar.md`](docs/how-to-add-sector-indica
 ## Public methodology landing
 
 B-152 adds a static public root in [`public/index.html`](public/index.html). Deployment notes live in [`docs/PUBLIC_METHODOLOGY_LANDING.md`](docs/PUBLIC_METHODOLOGY_LANDING.md): the public methodology page is served separately from the protected dashboard so no live signals or protected dashboard content are exposed.
+
+## PWA high-severity alerts
+
+B-121 adds static PWA assets and a push-notification sender seam:
+
+```bash
+./.venv/bin/python scripts/send_pwa_push_notifications.py
+```
+
+The script writes `public/notification-feed.json` from recent HIGH severity transitions and can send Web Push notifications once `VAPID_PRIVATE_KEY`, `VAPID_CLAIM_EMAIL`, optional `PWA_DASHBOARD_URL`, and local browser subscriptions in `data/pwa_push_subscriptions.json` are configured. The subscription file is ignored by git and Docker.
 
 ## Quick start
 

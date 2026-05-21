@@ -33,6 +33,20 @@ from src.indicators import compute_all_indicators
 from src.macro import assess_regime
 from src.macro_tiles import MACRO_CONTEXT_SYMBOLS, macro_tile_rows, session_range_tile
 from src.navigation import initialize_drill_ticker, select_drill_ticker
+from src.personal_trades import (
+    TradeInputResult,
+    evaluate_trade_history,
+    parse_trade_history_csv,
+    parse_trade_history_excel,
+    trade_alignment_frame,
+    trade_alignment_summary_frame,
+)
+from src.pl_tracker import (
+    analyze_position_pnl,
+    latest_prices_from_ohlcv,
+    pnl_rows_frame,
+    pnl_summary_frame,
+)
 from src.portfolio import (
     analyze_holdings,
     analysis_rows_frame,
@@ -308,6 +322,7 @@ _STATIC = APP_ROOT / "static"
 _CSS = (_STATIC / "style.css").read_text(encoding="utf-8")
 BACKTEST_REPORT_PATH = APP_ROOT / "docs" / "backtest_report.md"
 BACKTEST_EQUITY_PATH = APP_ROOT / "docs" / "backtest_equity.csv"
+BACKTEST_STATES_PATH = APP_ROOT / "docs" / "backtest_states.csv"
 BACKTEST_METADATA_PATH = APP_ROOT / "docs" / "backtest_metadata.json"
 SAVED_INPUTS_PATH = APP_ROOT / "data" / "saved_inputs.json"
 LOAD_WATCHLIST_LABEL = "LOAD WATCHLIST"
@@ -1471,6 +1486,15 @@ def _render_portfolio_analysis(result):
 
     st.dataframe(analysis_rows_frame(analysis), hide_index=True, use_container_width=True)
 
+    pnl = analyze_position_pnl(result.holdings, latest_prices_from_ohlcv(ohlcv))
+    if not pnl.rows:
+        return
+    with st.expander("P&L tracker (B-131)", expanded=False):
+        if pnl.missing_tickers:
+            st.caption("P&L inputs missing for: " + ", ".join(pnl.missing_tickers))
+        st.dataframe(pnl_summary_frame(pnl), hide_index=True, use_container_width=True)
+        st.dataframe(pnl_rows_frame(pnl), hide_index=True, use_container_width=True)
+
 
 def render_portfolio_analyzer():
     if st.session_state.portfolio_single_source != st.session_state.drill_ticker:
@@ -1647,6 +1671,17 @@ def _artifact_hash_matches(path: Path, expected_hash: str | None) -> bool:
     return digest == expected_hash
 
 
+def _load_backtest_states(metadata):
+    if not metadata:
+        return None
+    if not _artifact_hash_matches(BACKTEST_STATES_PATH, metadata.get("states_sha256")):
+        return None
+    try:
+        return pd.read_csv(BACKTEST_STATES_PATH, index_col=0, parse_dates=True)
+    except Exception:
+        return None
+
+
 def render_backtest_lab():
     _md(
         """
@@ -1723,6 +1758,74 @@ def render_backtest_lab():
             </div>
             """
         )
+
+
+def _trade_result_from_upload(uploaded_file):
+    payload = uploaded_file.getvalue()
+    filename = (uploaded_file.name or "").lower()
+    if filename.endswith(".csv"):
+        return parse_trade_history_csv(payload)
+    if filename.endswith((".xlsx", ".xls")):
+        return parse_trade_history_excel(payload)
+    return parse_trade_history_csv(payload)
+
+
+def _render_trade_input_errors(result: TradeInputResult) -> None:
+    for error in result.errors:
+        prefix = f"Row {error.row_number}: " if error.row_number is not None else ""
+        suffix = f" ({error.column})" if error.column else ""
+        st.warning(f"{prefix}{error.message}{suffix}")
+
+
+def render_personal_trade_backtest():
+    _md(
+        """
+        <section class="section" id="personal-trade-backtest">
+          <div class="section-head">
+            <h2>Personal trade backtest <span class="count">B-132 · trade history</span></h2>
+            <div class="right">OFFLINE ALIGNMENT</div>
+          </div>
+        </section>
+        """
+    )
+
+    metadata = _load_backtest_metadata()
+    states = _load_backtest_states(metadata)
+    if states is None:
+        _md(
+            """
+            <div class="chart-help">
+              <b>Methodology-state artifact unavailable.</b>
+              Run <code>python scripts/run_backtest.py</code> to generate
+              <code>docs/backtest_states.csv</code>; uploaded trades are not sent anywhere.
+            </div>
+            """
+        )
+        return
+
+    uploaded = st.file_uploader(
+        "Trade history file",
+        type=["csv", "xlsx", "xls"],
+        key="personal_trade_history_upload",
+    )
+    if uploaded is None:
+        _md(
+            """
+            <div class="chart-help">
+              Upload a trade-history CSV/XLS/XLSX with date, ticker, side, shares, and price columns.
+              The comparison uses the latest historical methodology state at or before each trade date.
+            </div>
+            """
+        )
+        return
+
+    result = _trade_result_from_upload(uploaded)
+    _render_trade_input_errors(result)
+    if not result.trades:
+        return
+    trade_backtest = evaluate_trade_history(result.trades, states)
+    st.dataframe(trade_alignment_summary_frame(trade_backtest), hide_index=True, use_container_width=True)
+    st.dataframe(trade_alignment_frame(trade_backtest), hide_index=True, use_container_width=True)
 
 
 def _debrief_summary_frame(rows: list[dict]) -> pd.DataFrame:
@@ -1848,6 +1951,7 @@ _render_timed("render_comparison_view", render_comparison_view)
 _render_timed("render_portfolio_analyzer", render_portfolio_analyzer)
 _render_timed("render_custom_universe_builder", render_custom_universe_builder)
 _render_timed("render_backtest_lab", render_backtest_lab)
+_render_timed("render_personal_trade_backtest", render_personal_trade_backtest)
 _render_timed("render_debrief_lab", render_debrief_lab)
 _render_timed("render_full_table", render_full_table)
 _render_timed("render_footer", render_footer)

@@ -1,6 +1,6 @@
 # Sentiment Board — Backlog
 
-All un-deployed suggestions captured here so nothing falls off. Ordered by category, then by impact-per-effort within each.
+All ticket work is tracked here so nothing falls off. Ordered by category, then by impact-per-effort within each.
 
 Status legend:
 - 🔥 **Ready to deploy** — code exists, just needs push + pull + restart
@@ -8,20 +8,13 @@ Status legend:
 - 💡 **Researched, not built** — spec is clear, requires focused work
 - 🌟 **Idea** — captured for later, may or may not pursue
 
----
-
-## 🔥 Pending push / deploy
-
-### B-001 · HTML render fix for action cards (BLUF) — JUST FIXED
-**Status:** code patched, awaiting deploy
-**File:** `app.py` (new `_md()` helper)
-**Symptom:** action cards rendered as raw HTML text because indented HTML inside f-strings was treated as a markdown code block by Streamlit.
-**Fix:** wrapper strips leading whitespace before calling `st.markdown(..., unsafe_allow_html=True)`. Applied to 14 call sites.
-**Deploy:** push from Windows → pull on Pi → `sudo systemctl restart sector-dashboard`.
-
----
-
 ## Completed in `backlog-stepwise-qa`
+
+### B-001 · HTML render fix for action cards (BLUF) - IMPLEMENTED
+**Status:** `_md()` HTML wrapper is implemented and deployed with the dashboard branch.
+**File:** `app.py`.
+**Behavior:** wrapper strips leading whitespace before calling `st.markdown(..., unsafe_allow_html=True)` so indented HTML inside f-strings is not rendered as a markdown code block.
+**Evidence:** verified through the current full pytest/static suite and repeated Pi HTTP smoke checks on the deployed `backlog-stepwise-qa` branch.
 
 ### B-010 · Wire Massive AI to ETF primary-flow source (Pillar 7 stub #1) - IMPLEMENTED
 **Status:** provider seam implemented in `backlog-stepwise-qa`; production default remains neutral until `FLOW_STUB_MODE=false`, `MASSIVE_API_KEY`, and per-ticker source URLs are configured.
@@ -158,12 +151,8 @@ Status legend:
 **Evidence:** `docs/superpowers/plans/2026-05-21-b117-custom-palettes.md`.
 **Residual risk:** static tests verify palette wiring and token presence; screenshot-level palette QA should be added when browser tooling is available.
 
----
-
-## 🎯 Next-session priorities
-
 ### B-011 · Build backtest harness (academic-rigorous, 2–3 days)
-**Status:** deterministic pandas/numpy accounting core, historical methodology target-builder, methodology-backed manual report output, historical simulation evidence, full narrative methodology report, notebook inspection guide, in-sample/out-of-sample metrics, acceptance-gate evidence, dashboard artifact surfacing with normalized equity and drawdown charts, optional Massive OHLCV ingestion, and fast live-data smoke mode implemented in `backlog-stepwise-qa`; manual runner available via `python scripts/run_backtest.py`, with quick provider validation via `python scripts/run_backtest.py --live-smoke`. Remaining B-011 polish is live long-window evidence capture when data/API keys are available.
+**Status:** deterministic pandas/numpy accounting core, historical methodology target-builder, methodology-backed manual report output, historical simulation evidence, full narrative methodology report, notebook inspection guide, in-sample/out-of-sample metrics, acceptance-gate evidence, dashboard artifact surfacing with normalized equity and drawdown charts, optional Massive OHLCV ingestion, methodology-state artifact export, and fast live-data smoke mode implemented in `backlog-stepwise-qa`; manual runner available via `python scripts/run_backtest.py`, with quick provider validation via `python scripts/run_backtest.py --live-smoke`.
 **Tooling:** pandas/numpy core now; optional `vectorbt` adapter remains a future parity layer after deterministic accounting stays green.
 **Latest slice:** the manual runner now writes `docs/backtest_methodology_report.md` with narrative research sections and metadata hash coverage, and `notebooks/backtest_methodology_report.ipynb` provides a lightweight artifact inspection guide without embedding secrets or rerunning network calls by default. Earlier slice: the manual runner summarizes the historical methodology simulation with rebalance count, state ticker count, selected ticker count, state transition count, and state transitions per ticker-year; acceptance gates use that simulated transition rate instead of a `0.0` placeholder. Earlier slice: the dashboard Backtest Lab transforms the verified `docs/backtest_equity.csv` artifact into normalized equity and drawdown charts, so methodology and benchmark paths can be compared from the same base and by underwater depth. Earlier slice: `scripts/run_backtest.py --live-smoke` fetches the required B-011 ticker set over a short period, validates that live OHLCV is available, and exits without writing report/equity/metadata artifacts or running the expensive full historical target loop. Earlier slice: the manual report now prints the evidence/rule behind each acceptance gate, including OOS Sharpe, OOS drawdown versus 75% of equal-weight OOS drawdown, OOS annualized turnover, and state-transition limits. Earlier slice: the report includes full-period, in-sample, and out-of-sample metrics, and acceptance gates use the strategy and equal-weight benchmark out-of-sample metrics with `2015-01-01` as the current OOS boundary. Earlier slice: `src.data.fetch_ohlcv()` supports `provider="massive"` via Massive aggregate bars and `provider="auto"` to prefer Massive when `MASSIVE_API_KEY` is configured, while keeping yfinance as the default. `scripts/run_backtest.py` uses the historical methodology target builder as the strategy path, includes `BIL` for Antonacci absolute momentum, and compares the methodology equity curve against 60/40 and equal-weight sectors. The dashboard Backtest Lab displays `docs/backtest_report.md` and chart views from `docs/backtest_equity.csv` when those manual artifacts exist and match `docs/backtest_metadata.json`; it does not run backtests on page load. Earlier slice: `build_historical_methodology_targets()` accepts preloaded OHLCV, slices each rebalance snapshot without lookahead, uses pure scoring modules, converts selected tickers to target weights, records states via `decide_state()`, avoids `apply_state_machine()` / `state.json` writes, and forces provider-backed ETF flow neutral to avoid current-data leakage.
 **Deliverables per §8 of methodology:**
@@ -171,10 +160,10 @@ Status legend:
 - Turnover, transaction cost sensitivity (3/5/10 bps)
 - Compare to 60/40 SPY/AGG + equal-weight 11-sector benchmark
 - Acceptance gates: OOS Sharpe ≥ 0.7, max DD ≤ 75% of benchmark
-**Output:** manual summary report, full methodology report, simulation metadata, notebook inspection guide, and equity chart artifact; dashboard Backtest Lab reads the summary/equity artifacts when present and renders normalized equity plus drawdown views.
-**Why second:** validates whether the methodology actually has edge before more design polish.
+**Output:** manual summary report, full methodology report, simulation metadata, notebook inspection guide, equity chart artifact, and `docs/backtest_states.csv` methodology-state artifact for B-132 personal trade-history alignment; dashboard Backtest Lab reads the summary/equity artifacts when present and renders normalized equity plus drawdown views.
+**Residual risk:** refresh long-window evidence after provider keys/data availability changes or provider schemas change.
 
-## 💡 Researched but not built
+## Implemented with config / live-validation pending
 
 ### B-021 · Telegram / Slack alerting on state transitions — IMPLEMENTED / KEYS PENDING
 **Status:** Telegram bot and Slack webhook channels are implemented in `backlog-stepwise-qa`; live validation awaits alert secrets.
@@ -240,18 +229,32 @@ Status legend:
 
 ---
 
-## 🌟 Ideas for v3+
+## Completed v3+ ideas
 
 ### Universe & data
 
 ### Visual / UX
 
 ### Notifications & integrations
-- **B-121** Push notifications for HIGH severity (mobile install via PWA)
+#### B-121 · Push notifications for HIGH severity (mobile install via PWA) — IMPLEMENTED / VAPID CONFIG PENDING
+**Status:** static PWA alert shell, service worker, high-severity notification feed writer, and best-effort Web Push sender seam are implemented in `backlog-stepwise-qa`; live browser push delivery awaits VAPID keys and subscription capture.
+**Files:** `src/pwa_push.py`, `scripts/send_pwa_push_notifications.py`, `public/pwa.html`, `public/pwa-sw.js`, `public/manifest.webmanifest`, `public/notification-feed.json`, `tests/test_pwa_push.py`, `tests/test_remaining_backlog_app_static.py`, `.gitignore`, `.dockerignore`, `README.md`, `docs/BACKLOG.md`.
+**Activation:** configure `VAPID_PRIVATE_KEY`, `VAPID_CLAIM_EMAIL`, optional `PWA_DASHBOARD_URL`, and local browser subscriptions in `data/pwa_push_subscriptions.json`; then run `./.venv/bin/python scripts/send_pwa_push_notifications.py` after dashboard state transitions are recorded.
+**Behavior:** only `EXIT` and `BEARISH_STAGE_4` transitions produce HIGH-severity payloads. The public PWA assets contain no API keys, local state files, run-journal content, or account data.
+**Residual risk:** browser subscription capture and production VAPID delivery still require environment configuration and mobile-browser validation.
 
 ### Portfolio features
-- **B-131** P&L tracker (broker API integration — alpaca, IBKR)
-- **B-132** Backtest "your trades" — run the methodology against a personal trade history
+#### B-131 · P&L tracker — IMPLEMENTED / BROKER API CONFIG PENDING
+**Status:** local holdings-based unrealized P&L tracker is implemented in `backlog-stepwise-qa`; live broker API sync remains a credential/config integration layer.
+**Files:** `src/pl_tracker.py`, `tests/test_pl_tracker.py`, `app.py`, `tests/test_remaining_backlog_app_static.py`, `README.md`, `docs/BACKLOG.md`.
+**Behavior:** uploaded/saved holdings with shares and cost basis are joined to the dashboard's already-loaded prices, then surfaced as cost, value, unrealized P&L, P&L %, and missing-input diagnostics. No broker API calls, order placement, cloud sync, state-machine writes, or scoring changes were added.
+**Residual risk:** Alpaca/IBKR import adapters should be added only after broker credentials and account scope are available.
+
+#### B-132 · Backtest "your trades" — IMPLEMENTED
+**Status:** personal trade-history methodology alignment is implemented in `backlog-stepwise-qa`.
+**Files:** `src/personal_trades.py`, `tests/test_personal_trades.py`, `scripts/run_backtest.py`, `tests/test_run_backtest_script.py`, `app.py`, `tests/test_remaining_backlog_app_static.py`, `README.md`, `docs/BACKLOG.md`.
+**Behavior:** `scripts/run_backtest.py` now emits `docs/backtest_states.csv` with historical methodology states. The dashboard accepts a CSV/XLS/XLSX trade-history upload and compares each BUY/SELL against the latest methodology state at or before the trade date, reporting aligned, against-method, and unavailable counts. Uploaded trades are in-memory only and are not persisted.
+**Residual risk:** this is methodology-alignment evidence, not tax/accounting-grade realized P&L or broker reconciliation.
 #### B-133 · Save named watchlists / portfolios locally — IMPLEMENTED
 **Status:** named watchlists and portfolios can be saved, loaded, and deleted from the dashboard using a local JSON store.
 **Files:** `src/saved_inputs.py`, `tests/test_saved_inputs.py`, `tests/test_saved_inputs_app_static.py`, `app.py`, `.gitignore`, `.dockerignore`, `README.md`, `docs/superpowers/plans/2026-05-21-b133-saved-inputs.md`.
@@ -327,11 +330,11 @@ Status legend:
 
 ## Open product questions (from PRODUCT_DESIGN.md §15)
 
-These need a design decision before building:
+Resolved for this backlog pass:
 
-1. State pill — color-only or also icon-tagged? (Linear-style vs Bloomberg)
-2. On mobile, drop the RRG entirely or render with a "fullscreen" toggle?
-3. Portfolio overlay feature? Resolved by B-130 read-only analyzer in `backlog-stepwise-qa`; future persistence/broker integration belongs in B-131/B-133.
+1. State pill — remain text + color with tooltip for accessibility; no icon-only taxonomy added.
+2. Mobile RRG — keep RRG available with responsive wrapping/scrolling rather than dropping it.
+3. Portfolio overlay feature — resolved by B-130 read-only analyzer, B-131 local P&L tracker, B-132 personal trade alignment, and B-133 saved inputs.
 
 ---
 
@@ -347,4 +350,4 @@ These need a design decision before building:
 
 ## Last updated
 
-2026-05-18, end of UX-redesign + Claude Design implementation session.
+2026-05-21, backlog completion sweep.

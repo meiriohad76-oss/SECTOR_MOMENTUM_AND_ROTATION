@@ -19,6 +19,7 @@ from src.data import fetch_ohlcv
 REPORT_PATH = ROOT / "docs" / "backtest_report.md"
 METHODOLOGY_REPORT_PATH = ROOT / "docs" / "backtest_methodology_report.md"
 EQUITY_PATH = ROOT / "docs" / "backtest_equity.csv"
+STATES_PATH = ROOT / "docs" / "backtest_states.csv"
 METADATA_PATH = ROOT / "docs" / "backtest_metadata.json"
 SECTOR_BENCHMARK_TICKERS = [
     "XLK",
@@ -78,6 +79,7 @@ def _write_artifacts(
     report: str,
     methodology_report: str,
     equity,
+    states,
     required_tickers: list[str],
     simulation_summary: dict | None = None,
 ) -> None:
@@ -85,14 +87,19 @@ def _write_artifacts(
     methodology_report_bytes = methodology_report.encode("utf-8")
     equity_csv = equity.to_csv()
     equity_bytes = equity_csv.encode("utf-8")
+    states_csv = states.to_csv()
+    states_bytes = states_csv.encode("utf-8")
     metadata = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "report_sha256": _sha256_bytes(report_bytes),
         "methodology_report_sha256": _sha256_bytes(methodology_report_bytes),
         "equity_sha256": _sha256_bytes(equity_bytes),
+        "states_sha256": _sha256_bytes(states_bytes),
         "required_tickers": required_tickers,
         "equity_rows": int(len(equity)),
         "equity_columns": list(equity.columns),
+        "states_rows": int(len(states)),
+        "states_columns": list(states.columns),
         "simulation_summary": simulation_summary or {},
     }
 
@@ -102,6 +109,7 @@ def _write_artifacts(
             REPORT_PATH: report_bytes,
             METHODOLOGY_REPORT_PATH: methodology_report_bytes,
             EQUITY_PATH: equity_bytes,
+            STATES_PATH: states_bytes,
             METADATA_PATH: metadata_bytes,
         }
     )
@@ -262,6 +270,7 @@ def main(argv: list[str] | None = None) -> int:
             report,
             methodology_report,
             equity,
+            methodology_targets.states,
             REQUIRED_TICKERS,
             simulation_summary=simulation_summary,
         )

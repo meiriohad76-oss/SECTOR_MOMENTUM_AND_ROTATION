@@ -13,6 +13,7 @@ def test_run_backtest_artifact_paths_are_repo_root_anchored():
     assert run_backtest.REPORT_PATH == run_backtest.ROOT / "docs" / "backtest_report.md"
     assert run_backtest.METHODOLOGY_REPORT_PATH == run_backtest.ROOT / "docs" / "backtest_methodology_report.md"
     assert run_backtest.EQUITY_PATH == run_backtest.ROOT / "docs" / "backtest_equity.csv"
+    assert run_backtest.STATES_PATH == run_backtest.ROOT / "docs" / "backtest_states.csv"
     assert run_backtest.METADATA_PATH == run_backtest.ROOT / "docs" / "backtest_metadata.json"
 
 
@@ -20,6 +21,7 @@ def test_run_backtest_returns_manual_data_error_when_required_prices_missing(mon
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "METHODOLOGY_REPORT_PATH", tmp_path / "backtest_methodology_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "STATES_PATH", tmp_path / "backtest_states.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", lambda tickers, period, provider: {})
@@ -28,6 +30,7 @@ def test_run_backtest_returns_manual_data_error_when_required_prices_missing(mon
     assert not run_backtest.REPORT_PATH.exists()
     assert not run_backtest.METHODOLOGY_REPORT_PATH.exists()
     assert not run_backtest.EQUITY_PATH.exists()
+    assert not run_backtest.STATES_PATH.exists()
     assert not run_backtest.METADATA_PATH.exists()
 
 
@@ -35,6 +38,7 @@ def test_run_backtest_returns_manual_data_error_when_fetch_raises(monkeypatch, t
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "METHODOLOGY_REPORT_PATH", tmp_path / "backtest_methodology_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "STATES_PATH", tmp_path / "backtest_states.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
 
@@ -47,6 +51,7 @@ def test_run_backtest_returns_manual_data_error_when_fetch_raises(monkeypatch, t
     assert not run_backtest.REPORT_PATH.exists()
     assert not run_backtest.METHODOLOGY_REPORT_PATH.exists()
     assert not run_backtest.EQUITY_PATH.exists()
+    assert not run_backtest.STATES_PATH.exists()
     assert not run_backtest.METADATA_PATH.exists()
 
 
@@ -172,6 +177,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "METHODOLOGY_REPORT_PATH", tmp_path / "backtest_methodology_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "STATES_PATH", tmp_path / "backtest_states.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
@@ -221,6 +227,10 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     assert "Methodology" in equity
     assert "60/40 SPY/AGG" in equity
     assert "Equal-weight sectors" in equity
+    assert run_backtest.STATES_PATH.exists()
+    states = pd.read_csv(run_backtest.STATES_PATH, index_col=0)
+    assert list(states.columns) == ["XLK", "XLF"]
+    assert "WARNING" in states["XLK"].tolist()
     assert run_backtest.METADATA_PATH.exists()
     metadata = json.loads(run_backtest.METADATA_PATH.read_text(encoding="utf-8"))
     assert metadata["report_sha256"] == run_backtest._sha256_bytes(run_backtest.REPORT_PATH.read_bytes())
@@ -228,10 +238,12 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
         run_backtest.METHODOLOGY_REPORT_PATH.read_bytes()
     )
     assert metadata["equity_sha256"] == run_backtest._sha256_bytes(run_backtest.EQUITY_PATH.read_bytes())
+    assert metadata["states_sha256"] == run_backtest._sha256_bytes(run_backtest.STATES_PATH.read_bytes())
     assert metadata["required_tickers"] == expected_tickers
     assert metadata["simulation_summary"]["state_transition_count"] == 2
     assert metadata["simulation_summary"]["state_transitions_per_ticker_year"] > 0.0
     assert "Methodology" in metadata["equity_columns"]
+    assert metadata["states_columns"] == ["XLK", "XLF"]
 
 
 def test_run_backtest_live_smoke_fetches_short_period_without_artifacts(
@@ -255,6 +267,7 @@ def test_run_backtest_live_smoke_fetches_short_period_without_artifacts(
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "METHODOLOGY_REPORT_PATH", tmp_path / "backtest_methodology_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "STATES_PATH", tmp_path / "backtest_states.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
@@ -270,6 +283,7 @@ def test_run_backtest_live_smoke_fetches_short_period_without_artifacts(
     assert not run_backtest.REPORT_PATH.exists()
     assert not run_backtest.METHODOLOGY_REPORT_PATH.exists()
     assert not run_backtest.EQUITY_PATH.exists()
+    assert not run_backtest.STATES_PATH.exists()
     assert not run_backtest.METADATA_PATH.exists()
     output = capsys.readouterr().out
     assert "Live backtest smoke passed" in output
@@ -309,6 +323,7 @@ def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "METHODOLOGY_REPORT_PATH", tmp_path / "backtest_methodology_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "STATES_PATH", tmp_path / "backtest_states.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
@@ -318,6 +333,7 @@ def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(
     assert not run_backtest.REPORT_PATH.exists()
     assert not run_backtest.METHODOLOGY_REPORT_PATH.exists()
     assert not run_backtest.EQUITY_PATH.exists()
+    assert not run_backtest.STATES_PATH.exists()
     assert not run_backtest.METADATA_PATH.exists()
 
 
@@ -332,6 +348,7 @@ def test_run_backtest_honors_configured_ohlcv_provider(monkeypatch, tmp_path):
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "METHODOLOGY_REPORT_PATH", tmp_path / "backtest_methodology_report.md")
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "STATES_PATH", tmp_path / "backtest_states.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
 
@@ -343,14 +360,17 @@ def test_write_artifacts_does_not_replace_existing_files_when_stage_fails(monkey
     report_path = tmp_path / "backtest_report.md"
     methodology_path = tmp_path / "backtest_methodology_report.md"
     equity_path = tmp_path / "backtest_equity.csv"
+    states_path = tmp_path / "backtest_states.csv"
     metadata_path = tmp_path / "backtest_metadata.json"
     report_path.write_text("old report", encoding="utf-8")
     methodology_path.write_text("old methodology", encoding="utf-8")
     equity_path.write_text("old equity", encoding="utf-8")
+    states_path.write_text("old states", encoding="utf-8")
     metadata_path.write_text("old metadata", encoding="utf-8")
     monkeypatch.setattr(run_backtest, "REPORT_PATH", report_path)
     monkeypatch.setattr(run_backtest, "METHODOLOGY_REPORT_PATH", methodology_path)
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", equity_path)
+    monkeypatch.setattr(run_backtest, "STATES_PATH", states_path)
     monkeypatch.setattr(run_backtest, "METADATA_PATH", metadata_path)
 
     original_write_bytes = run_backtest.Path.write_bytes
@@ -367,6 +387,7 @@ def test_write_artifacts_does_not_replace_existing_files_when_stage_fails(monkey
             "new report",
             "new methodology",
             pd.DataFrame({"Methodology": [1.0]}, index=pd.Index(["2024-01-01"], name="date")),
+            pd.DataFrame({"XLK": ["HOLD"]}, index=pd.Index(["2024-01-01"], name="date")),
             ["XLK"],
             simulation_summary={"state_transitions_per_ticker_year": 1.0},
         )
@@ -374,4 +395,5 @@ def test_write_artifacts_does_not_replace_existing_files_when_stage_fails(monkey
     assert report_path.read_text(encoding="utf-8") == "old report"
     assert methodology_path.read_text(encoding="utf-8") == "old methodology"
     assert equity_path.read_text(encoding="utf-8") == "old equity"
+    assert states_path.read_text(encoding="utf-8") == "old states"
     assert metadata_path.read_text(encoding="utf-8") == "old metadata"

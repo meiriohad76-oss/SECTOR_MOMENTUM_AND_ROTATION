@@ -117,9 +117,9 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         name="Portfolio analyzer",
         section="Analysis",
         render_function="render_portfolio_analyzer",
-        data_inputs=("single ticker", "uploaded holdings", "saved portfolios"),
-        states=("ticker mode", "file mode", "missing tickers", "saved inputs"),
-        qa=("portfolio tests", "saved input tests"),
+        data_inputs=("single ticker", "uploaded holdings", "saved portfolios", "loaded OHLCV prices"),
+        states=("ticker mode", "file mode", "missing tickers", "saved inputs", "P&L tracker"),
+        qa=("portfolio tests", "saved input tests", "P&L tracker tests"),
     ),
     ComponentDoc(
         name="Custom universe builder",
@@ -136,6 +136,14 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         data_inputs=("manual backtest report", "equity artifact", "metadata hash"),
         states=("artifact ready", "artifact missing", "hash mismatch"),
         qa=("backtest static tests", "backtest unit tests"),
+    ),
+    ComponentDoc(
+        name="Personal trade backtest",
+        section="Research",
+        render_function="render_personal_trade_backtest",
+        data_inputs=("uploaded trade history", "methodology state artifact", "metadata hash"),
+        states=("artifact ready", "artifact missing", "trade parse errors", "alignment table"),
+        qa=("personal trade tests", "static app wiring"),
     ),
     ComponentDoc(
         name="Debrief lab",
