@@ -50,7 +50,12 @@ def _replace_bytes(path: Path, payload: bytes) -> None:
     tmp_path.replace(path)
 
 
-def _write_artifacts(report: str, equity, required_tickers: list[str]) -> None:
+def _write_artifacts(
+    report: str,
+    equity,
+    required_tickers: list[str],
+    simulation_summary: dict | None = None,
+) -> None:
     report_bytes = report.encode("utf-8")
     equity_csv = equity.to_csv()
     equity_bytes = equity_csv.encode("utf-8")
@@ -61,6 +66,7 @@ def _write_artifacts(report: str, equity, required_tickers: list[str]) -> None:
         "required_tickers": required_tickers,
         "equity_rows": int(len(equity)),
         "equity_columns": list(equity.columns),
+        "simulation_summary": simulation_summary or {},
     }
 
     metadata_bytes = (json.dumps(metadata, indent=2, sort_keys=True) + "\n").encode("utf-8")
@@ -139,6 +145,7 @@ def main(argv: list[str] | None = None) -> int:
         strategy_columns = list(methodology_targets.target_weights.columns)
         if not strategy_columns:
             raise ValueError("methodology target builder produced no target columns")
+        simulation_summary = backtest.historical_simulation_summary(methodology_targets)
         methodology_result = backtest.run_weight_backtest(
             prices[strategy_columns],
             methodology_targets.target_weights,
@@ -167,7 +174,12 @@ def main(argv: list[str] | None = None) -> int:
         methodology_oos_metrics = methodology_windows["Out-of-sample"]
         sector_oos_metrics = sector_windows["Out-of-sample"]
         gates = backtest.evaluate_acceptance_gates(
-            strategy_metrics={**methodology_oos_metrics, "state_transitions_per_ticker_year": 0.0},
+            strategy_metrics={
+                **methodology_oos_metrics,
+                "state_transitions_per_ticker_year": simulation_summary[
+                    "state_transitions_per_ticker_year"
+                ],
+            },
             equal_weight_metrics=sector_oos_metrics,
         )
         report = backtest.format_backtest_report(
@@ -186,6 +198,7 @@ def main(argv: list[str] | None = None) -> int:
                 "60/40 out-of-sample": sixty_forty_windows["Out-of-sample"],
                 "Equal-weight sectors out-of-sample": sector_oos_metrics,
             },
+            simulation_summary=simulation_summary,
             title="Manual Backtest Smoke Report",
         )
         equity = backtest.equity_frame(
@@ -195,7 +208,7 @@ def main(argv: list[str] | None = None) -> int:
                 "Equal-weight sectors": sector_result,
             }
         )
-        _write_artifacts(report, equity, REQUIRED_TICKERS)
+        _write_artifacts(report, equity, REQUIRED_TICKERS, simulation_summary=simulation_summary)
     except Exception as exc:
         print(f"Manual backtest data validation failed: {exc}")
         return 2

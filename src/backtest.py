@@ -641,12 +641,35 @@ def _window_metrics_table(window_metrics: dict[str, dict[str, float]]) -> list[s
     return lines
 
 
+def _simulation_summary_table(summary: dict[str, int | float | str | None]) -> list[str]:
+    rows = [
+        ("Start date", summary.get("start_date")),
+        ("End date", summary.get("end_date")),
+        ("Rebalances", summary.get("rebalance_count")),
+        ("State tickers", summary.get("state_ticker_count")),
+        ("Selected tickers", summary.get("selected_ticker_count")),
+        ("State transitions", summary.get("state_transition_count")),
+        ("State transitions per ticker-year", summary.get("state_transitions_per_ticker_year")),
+    ]
+    lines = ["| Evidence | Value |", "|---|---:|"]
+    for label, value in rows:
+        if value is None:
+            formatted = "-"
+        elif isinstance(value, float):
+            formatted = f"{value:.2f}"
+        else:
+            formatted = str(value)
+        lines.append(f"| {label} | {formatted} |")
+    return lines
+
+
 def format_backtest_report(
     strategy_metrics: dict[str, float],
     benchmark_metrics: dict[str, dict[str, float]],
     cost_scenarios: pd.DataFrame,
     gates: dict[str, dict | bool],
     window_metrics: Optional[dict[str, dict[str, float]]] = None,
+    simulation_summary: Optional[dict[str, int | float | str | None]] = None,
     oos_start: str | pd.Timestamp = "2015-01-01",
     title: str = "Backtest Report",
 ) -> str:
@@ -657,6 +680,9 @@ def format_backtest_report(
     lines.extend(_benchmark_table(benchmark_metrics))
     lines.extend(["", "## Cost Sensitivity", ""])
     lines.extend(_cost_sensitivity_table(cost_scenarios))
+    if simulation_summary:
+        lines.extend(["", "## Historical Methodology Simulation", ""])
+        lines.extend(_simulation_summary_table(simulation_summary))
     if window_metrics:
         lines.extend(["", "## In-Sample / Out-of-Sample", ""])
         lines.append(f"OOS starts: {pd.Timestamp(oos_start).date().isoformat()}")
@@ -678,6 +704,73 @@ def equity_frame(results: dict[str, BacktestResult]) -> pd.DataFrame:
     frame = pd.DataFrame(series).sort_index().ffill()
     frame.index.name = "date"
     return frame
+
+
+def _state_transition_count(states: pd.DataFrame) -> int:
+    count = 0
+    for column in states.columns:
+        values = states[column].dropna().astype(str)
+        if len(values) < 2:
+            continue
+        count += int(values.ne(values.shift()).iloc[1:].sum())
+    return count
+
+
+def state_transition_rate(states: pd.DataFrame, periods_per_year: int | float = 52) -> float:
+    periods = _finite_scalar("periods_per_year", periods_per_year)
+    if periods <= 0:
+        raise ValueError("periods_per_year must be positive")
+    if states.empty or states.shape[1] == 0 or len(states.index) < 2:
+        return 0.0
+    frame = states.copy()
+    frame.index = pd.to_datetime(frame.index)
+    frame = frame.sort_index()
+    transition_count = 0
+    observed_intervals = 0
+    for column in frame.columns:
+        values = frame[column].dropna().astype(str)
+        if len(values) < 2:
+            continue
+        transition_count += int(values.ne(values.shift()).iloc[1:].sum())
+        observed_intervals += len(values) - 1
+    if transition_count == 0:
+        return 0.0
+    if observed_intervals == 0:
+        return 0.0
+    observed_years = observed_intervals / periods
+    return float(transition_count / observed_years)
+
+
+def historical_simulation_summary(
+    targets: HistoricalSignalTargets,
+    periods_per_year: int | float = 52,
+) -> dict[str, int | float | str | None]:
+    states = targets.states.copy()
+    weights = targets.target_weights.copy()
+    if not states.empty:
+        states.index = pd.to_datetime(states.index)
+        states = states.sort_index()
+    if not weights.empty:
+        weights.index = pd.to_datetime(weights.index)
+        weights = weights.sort_index()
+
+    index = weights.index if len(weights.index) else states.index
+    start_date = pd.Timestamp(index[0]).date().isoformat() if len(index) else None
+    end_date = pd.Timestamp(index[-1]).date().isoformat() if len(index) else None
+    selected_ticker_count = 0
+    if not weights.empty:
+        numeric_weights = weights.apply(pd.to_numeric, errors="coerce").fillna(0.0)
+        selected_ticker_count = int((numeric_weights.abs() > 0).any(axis=0).sum())
+
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "rebalance_count": int(len(index)),
+        "state_ticker_count": int(sum(1 for column in states.columns if states[column].notna().any())),
+        "selected_ticker_count": selected_ticker_count,
+        "state_transition_count": _state_transition_count(states) if not states.empty else 0,
+        "state_transitions_per_ticker_year": state_transition_rate(states, periods_per_year=periods_per_year),
+    }
 
 
 def _clean_equity_artifact(equity: pd.DataFrame) -> pd.DataFrame:

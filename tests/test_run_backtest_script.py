@@ -87,6 +87,12 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
         }
 
     def fake_build_historical_methodology_targets(ohlcv, rebalance_dates, phase):
+        rebalance_dates = pd.DatetimeIndex(rebalance_dates)
+        xlk_states = ["HOLD"] * len(rebalance_dates)
+        xlf_states = ["EXIT"] * len(rebalance_dates)
+        if len(rebalance_dates) > 1:
+            xlk_states[-1] = "WARNING"
+            xlf_states[1:] = ["HOLD"] * (len(rebalance_dates) - 1)
         target_builder_calls.append(
             {
                 "tickers": sorted(ohlcv),
@@ -97,7 +103,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
         weights = pd.DataFrame({"XLK": [1.0] * len(rebalance_dates)}, index=rebalance_dates)
         return backtest.HistoricalSignalTargets(
             target_weights=weights,
-            states=pd.DataFrame(index=rebalance_dates),
+            states=pd.DataFrame({"XLK": xlk_states, "XLF": xlf_states}, index=rebalance_dates),
             snapshots={},
         )
 
@@ -187,7 +193,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     assert gate_calls
     assert len(split_calls) == 3
     assert gate_calls[0]["strategy_metrics"]["sharpe"] == pytest.approx(7.77)
-    assert gate_calls[0]["strategy_metrics"]["state_transitions_per_ticker_year"] == pytest.approx(0.0)
+    assert gate_calls[0]["strategy_metrics"]["state_transitions_per_ticker_year"] > 0.0
     assert gate_calls[0]["equal_weight_metrics"]["max_drawdown"] == pytest.approx(-0.44)
     assert run_backtest.REPORT_PATH.exists()
     report = run_backtest.REPORT_PATH.read_text(encoding="utf-8")
@@ -196,6 +202,8 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     assert "60/40 SPY/AGG" in report
     assert "Equal-weight sectors" in report
     assert "## Cost Sensitivity" in report
+    assert "## Historical Methodology Simulation" in report
+    assert "State transitions per ticker-year" in report
     assert "## In-Sample / Out-of-Sample" in report
     assert "Out-of-sample" in report
     assert run_backtest.EQUITY_PATH.exists()
@@ -208,6 +216,8 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     assert metadata["report_sha256"] == run_backtest._sha256_bytes(run_backtest.REPORT_PATH.read_bytes())
     assert metadata["equity_sha256"] == run_backtest._sha256_bytes(run_backtest.EQUITY_PATH.read_bytes())
     assert metadata["required_tickers"] == expected_tickers
+    assert metadata["simulation_summary"]["state_transition_count"] == 2
+    assert metadata["simulation_summary"]["state_transitions_per_ticker_year"] > 0.0
     assert "Methodology" in metadata["equity_columns"]
 
 

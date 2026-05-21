@@ -460,6 +460,15 @@ def test_format_backtest_report_includes_benchmarks_costs_and_gates():
             "In-sample": {**strategy_metrics, "total_return": 0.30},
             "Out-of-sample": {**strategy_metrics, "total_return": 0.12, "sharpe": 0.82},
         },
+        simulation_summary={
+            "start_date": "2024-01-01",
+            "end_date": "2024-03-01",
+            "rebalance_count": 9,
+            "state_ticker_count": 11,
+            "selected_ticker_count": 4,
+            "state_transition_count": 7,
+            "state_transitions_per_ticker_year": 2.75,
+        },
         title="Manual Backtest Smoke Report",
     )
 
@@ -473,6 +482,8 @@ def test_format_backtest_report_includes_benchmarks_costs_and_gates():
     assert "## In-Sample / Out-of-Sample" in text
     assert "OOS starts: 2015-01-01" in text
     assert "| Out-of-sample | 12.00% |" in text
+    assert "## Historical Methodology Simulation" in text
+    assert "| State transitions per ticker-year | 2.75 |" in text
     assert "## Acceptance Gates" in text
     assert "Out-of-sample Sharpe: PASS" in text
 
@@ -489,6 +500,62 @@ def test_equity_frame_combines_named_results_on_date_index():
     assert frame.index.name == "date"
     assert frame.iloc[0, 0] == pytest.approx(100.0)
     assert frame.iloc[-1, 0] == pytest.approx(121.0)
+
+
+def test_state_transition_rate_counts_changes_per_ticker_year():
+    dates = pd.bdate_range("2024-01-01", periods=4)
+    states = pd.DataFrame(
+        {
+            "AAA": ["HOLD", "HOLD", "WARNING", "WARNING"],
+            "BBB": ["EXIT", "HOLD", "HOLD", "STAGE_2_BULLISH"],
+        },
+        index=dates,
+    )
+
+    rate = backtest.state_transition_rate(states, periods_per_year=4)
+
+    assert rate == pytest.approx(2.0)
+
+
+def test_state_transition_rate_uses_observed_intervals_for_sparse_state_history():
+    dates = pd.bdate_range("2024-01-01", periods=5)
+    states = pd.DataFrame(
+        {
+            "AAA": ["HOLD", "WARNING", None, None, None],
+            "BBB": [None, None, None, "EXIT", "HOLD"],
+        },
+        index=dates,
+    )
+
+    rate = backtest.state_transition_rate(states, periods_per_year=4)
+
+    assert rate == pytest.approx(4.0)
+
+
+def test_historical_simulation_summary_reports_rebalance_state_and_selection_evidence():
+    dates = pd.bdate_range("2024-01-01", periods=4)
+    targets = backtest.HistoricalSignalTargets(
+        target_weights=pd.DataFrame(
+            {"AAA": [1.0, 0.5, 0.0, 0.0], "BBB": [0.0, 0.5, 1.0, 1.0]},
+            index=dates,
+        ),
+        states=pd.DataFrame(
+            {
+                "AAA": ["HOLD", "HOLD", "WARNING", "WARNING"],
+                "BBB": ["EXIT", "HOLD", "HOLD", "HOLD"],
+            },
+            index=dates,
+        ),
+        snapshots={},
+    )
+
+    summary = backtest.historical_simulation_summary(targets, periods_per_year=4)
+
+    assert summary["rebalance_count"] == 4
+    assert summary["state_ticker_count"] == 2
+    assert summary["selected_ticker_count"] == 2
+    assert summary["state_transition_count"] == 2
+    assert summary["state_transitions_per_ticker_year"] == pytest.approx(4 / 3)
 
 
 def test_normalized_equity_frame_rebases_each_series_to_one():
