@@ -34,6 +34,20 @@ Observed:
 
 Document how to add a sector/universe class, add an indicator, and add or change a pillar. Include exact files, tests, provider boundaries, state-machine boundaries, and Pi verification expectations.
 
-- [ ] **Step 2: Verify, review, commit, push, deploy**
+- [x] **Step 2: Verify, review, commit, push, deploy**
 
 Run focused/full local QA, request focused review, commit as `docs: add methodology extension tutorial`, push to GitHub, verify remote SHA, deploy to Pi, run focused/full Pi pytest, and dashboard HTTP smoke.
+
+Observed:
+
+- Focused review: no blocking issues; reviewer noted a minor defensive-ticker wording mismatch, fixed before commit.
+- Focused local verification: `python -m pytest tests/test_methodology_tutorial_static.py -q` -> `4 passed in 0.06s`.
+- Full local verification: `python -m pytest -q` -> `333 passed in 21.97s`.
+- Compile verification: `python -m compileall app.py src scripts` -> exit 0.
+- Diff verification: `git diff --check` -> exit 0, with expected CRLF warnings on Windows.
+- Local commit: `1c6b90c docs: add methodology extension tutorial`.
+- GitHub branch: `backlog-stepwise-qa` at `1c6b90c41d754eb27231282ea5354cac4321ad42`.
+- Pi pull: fast-forwarded `/home/ahad/SECTOR_MOMENTUM_AND_ROTATION` to `1c6b90c`.
+- Pi focused verification: `./.venv/bin/python -m pytest tests/test_methodology_tutorial_static.py -q` -> `4 passed in 0.03s`.
+- Pi full verification: `./.venv/bin/python -m pytest -q` -> `333 passed in 4.94s`.
+- Pi service smoke: `poll_1 sha=1c6b90c41d754eb27231282ea5354cac4321ad42 active=active app=200 health=200`.
