@@ -117,6 +117,10 @@ B-117 adds a `Palette` preference in `VIEW OPTIONS`. Choose `Default`, `Solarize
 
 B-150 adds a generated component inventory inside the dashboard. The catalog lives in `src/component_docs.py`, and the Streamlit panel renders the catalog without fetching market data, recomputing signals, or writing state. It documents each render section, its primary inputs, expected UI states, and the test surface that guards it.
 
+## Extending the methodology
+
+Use [`docs/how-to-add-sector-indicator-pillar.md`](docs/how-to-add-sector-indicator-pillar.md) before adding a universe class, indicator, or pillar. It lists the source files, methodology docs, safety boundaries, and verification commands that must move together.
+
 ## Quick start
 
 ### Windows (local)

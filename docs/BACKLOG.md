@@ -313,7 +313,10 @@ Status legend:
 **Files:** `src/component_docs.py`, `tests/test_component_docs.py`, `tests/test_component_docs_app_static.py`, `app.py`, `static/style.css`, `README.md`, `docs/BACKLOG.md`.
 **Behavior:** the dashboard exposes a collapsed Component Docs panel generated from a pure metadata catalog. Each render section lists its source function, inputs, UI states, and QA coverage; the panel does not fetch OHLCV, recompute indicators, or mutate the state machine.
 **Residual risk:** this is a Streamlit-native reference panel rather than a separate external Storybook server.
-- **B-151** "How to add a sector / indicator / pillar" tutorial
+#### B-151 · How to add a sector / indicator / pillar tutorial — IMPLEMENTED
+**Status:** an extension tutorial is implemented in `backlog-stepwise-qa`.
+**Files:** `docs/how-to-add-sector-indicator-pillar.md`, `tests/test_methodology_tutorial_static.py`, `README.md`, `docs/BACKLOG.md`.
+**Behavior:** the tutorial documents how to extend universe classes, indicators, and pillars while keeping methodology docs, component docs, provider safety, state-machine safety, and verification commands aligned.
 - **B-152** Public methodology landing page on the domain root (separate from the dashboard)
 
 ---
