@@ -8,6 +8,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -17,6 +18,7 @@ from .macro import cycle_tilt
 
 
 STATE_FILE = Path(__file__).resolve().parent.parent / "state.json"
+EASTERN_TZ = ZoneInfo("America/New_York")
 
 STATES = ["STAGE_2_BULLISH", "HOLD", "WARNING", "EXIT", "BEARISH_STAGE_4", "STAGE_1_BASING"]
 
@@ -145,11 +147,22 @@ def decide_state(row: pd.Series) -> str:
     return "HOLD"
 
 
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _transition_date(now: datetime | None = None) -> str:
+    current = now or _now_utc()
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    return current.astimezone(EASTERN_TZ).date().isoformat()
+
+
 def apply_state_machine(scored_df: pd.DataFrame) -> pd.DataFrame:
     """Add a 'state' column. Reads + writes state.json so transitions persist."""
     prior = _load_state()
     df = scored_df.copy()
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = _transition_date()
     new_states = []
     transitions = []
     for tkr, row in df.iterrows():

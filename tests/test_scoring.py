@@ -98,6 +98,29 @@ def test_apply_state_machine_persists_transitions_to_patched_state_file(tmp_path
     assert saved["transitions"][-1]["to"] == "WARNING"
 
 
+def test_apply_state_machine_dates_transitions_by_us_eastern_day(tmp_path, monkeypatch):
+    state_file = tmp_path / "state.json"
+    state_file.write_text(
+        json.dumps(
+            {
+                "updated": "2026-05-20T00:00:00",
+                "by_ticker": {"XLK": {"state": "HOLD", "date": "2026-05-20"}},
+                "transitions": [],
+            }
+        )
+    )
+    monkeypatch.setattr(scoring, "STATE_FILE", state_file)
+    monkeypatch.setattr(scoring, "_send_transition_alerts", lambda transitions: None)
+    monkeypatch.setattr(scoring, "_now_utc", lambda: scoring.datetime(2026, 5, 21, 1, 0, tzinfo=scoring.timezone.utc))
+    df = pd.DataFrame([_row(rrg_quadrant="Weakening", cmf21=0.02)], index=["XLK"])
+
+    scoring.apply_state_machine(df)
+    saved = json.loads(state_file.read_text())
+
+    assert saved["transitions"][-1]["date"] == "2026-05-20"
+    assert saved["by_ticker"]["XLK"]["date"] == "2026-05-20"
+
+
 def test_apply_state_machine_notifies_after_persisting_transitions(tmp_path, monkeypatch):
     state_file = tmp_path / "state.json"
     state_file.write_text(

@@ -181,7 +181,15 @@ Status legend:
 **Files:** `src/alerts.py`, `src/scoring.py`, `tests/test_alerts.py`, `tests/test_scoring.py`, `.streamlit/secrets.toml.example`, `README.md`.
 **Activation:** leave `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and `SLACK_WEBHOOK_URL` unset to disable network calls. Configure Telegram and/or Slack secrets to enable delivery.
 **Behavior:** `apply_state_machine()` persists `state.json` and the transition log before sending alerts. Provider failures are swallowed so scoring does not fail because an alert endpoint is down.
-**Deferred:** Pushover, severity-specific routing, retry/backoff, dedup, and macro-channel alerts remain future backlog work.
+**Deferred:** Pushover, retry/backoff, dedup, and macro-channel alerts remain future backlog work.
+
+### B-120 · Email digest at 08:00 ET — IMPLEMENTED / SMTP CONFIG PENDING
+**Status:** LOW-severity daily email digest helpers and script entry point are implemented in `backlog-stepwise-qa`; live delivery awaits SMTP secrets and a Pi cron/systemd schedule.
+**Files:** `src/alerts.py`, `src/scoring.py`, `scripts/send_email_digest.py`, `tests/test_alerts.py`, `tests/test_scoring.py`, `tests/test_email_digest_script.py`, `.streamlit/secrets.toml.example`, `README.md`.
+**Activation:** leave `SMTP_HOST` and/or `EMAIL_DIGEST_TO` unset to disable network calls. Configure SMTP secrets, then schedule `./.venv/bin/python scripts/send_email_digest.py` for `08:00 America/New_York`.
+**Behavior:** the digest filters yesterday's transitions in US/Eastern time, excludes immediate HIGH states (`EXIT`, `BEARISH_STAGE_4`), sends one plain-text email when configured, and returns `email_digest=skipped` when there is nothing to send or SMTP is unavailable.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b120-email-digest.md`.
+**Residual risk:** unit tests mock SMTP; live SMTP validation and scheduler enablement remain environment configuration tasks.
 
 ### B-022 · FRED macro overlay — IMPLEMENTED / KEY PENDING
 **Status:** FRED-backed macro classifier and deterministic tests implemented in `backlog-stepwise-qa`; live validation awaits `FRED_API_KEY`.
@@ -223,7 +231,6 @@ Status legend:
 ### Visual / UX
 
 ### Notifications & integrations
-- **B-120** Email digest at 08:00 ET (LOW severity transitions)
 - **B-121** Push notifications for HIGH severity (mobile install via PWA)
 - **B-122** RSS / iCal feed of state transitions
 - **B-123** Discord / Mattermost webhook in addition to Telegram/Slack

@@ -205,6 +205,15 @@ The remaining provider seams have independent safety flags. Leave each unset/`tr
 
 `apply_state_machine()` writes `state.json` first, then sends optional transition alerts through Telegram and/or Slack. Leave alert secrets unset to disable network calls. To enable alerts, configure `TELEGRAM_BOT_TOKEN` plus `TELEGRAM_CHAT_ID`, and/or `SLACK_WEBHOOK_URL`, in Streamlit secrets or environment variables.
 
+B-120 adds an optional LOW-severity email digest for transitions from the previous US/Eastern day. Configure `SMTP_HOST`, optional `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `EMAIL_DIGEST_FROM`, and comma-separated `EMAIL_DIGEST_TO`, then schedule:
+
+```bash
+cd /home/ahad/SECTOR_MOMENTUM_AND_ROTATION
+./.venv/bin/python scripts/send_email_digest.py
+```
+
+For 08:00 ET delivery from cron, set `CRON_TZ=America/New_York` and run the command at `0 8 * * *`. With no SMTP settings or no LOW-severity transitions, the script exits cleanly with `email_digest=skipped`.
+
 Dashboard deep links support `?ticker=XLK`; the app opens with that ticker selected in the per-ticker drill-down.
 
 ## Methodology references
