@@ -69,6 +69,16 @@ Observed:
 - `python -m compileall app.py src scripts` -> exit 0
 - `git diff --check` -> exit 0
 
-- [ ] **Step 4: Review, commit, push, deploy**
+- [x] **Step 4: Review, commit, push, deploy**
 
 Request focused review, fix Critical/Important feedback, commit as `feat: add yfinance stale-cache fallback`, push to GitHub, verify remote SHA, deploy to Pi, run focused/full Pi pytest, and dashboard HTTP smoke.
+
+Observed:
+
+- Focused reviewer: no blocking issues; residual risk is static banner coverage rather than screenshot/responsive coverage.
+- Local commit: `127017c feat: add yfinance stale-cache fallback`
+- GitHub branch: `backlog-stepwise-qa` at `127017ce3b3c5bc8a950afca5ae825a87fd0ef56`
+- Pi pull: fast-forwarded `/home/ahad/SECTOR_MOMENTUM_AND_ROTATION` to `127017c`
+- Pi focused verification: `./.venv/bin/python -m pytest tests/test_ohlcv_store.py tests/test_data.py tests/test_provider_fallback_app_static.py -q` -> `22 passed in 1.38s`
+- Pi full verification: `./.venv/bin/python -m pytest -q` -> `305 passed in 4.98s`
+- Pi service smoke: `poll_1 active=active http=200`
