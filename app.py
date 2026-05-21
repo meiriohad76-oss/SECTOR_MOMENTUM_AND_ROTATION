@@ -39,6 +39,7 @@ from src.preferences import (
     should_render_bluf,
     sparkline_mode,
 )
+from src.run_debrief import debrief_journal, summarize_debriefs, threshold_review_candidates
 from src.run_journal import DEFAULT_JOURNAL_PATH, append_dashboard_run
 from src.ui_states import defensive_basket_rows, loading_skeleton_slots
 from src.visuals import (
@@ -1300,6 +1301,95 @@ def render_backtest_lab():
         )
 
 
+def _debrief_summary_frame(rows: list[dict]) -> pd.DataFrame:
+    if not rows:
+        return pd.DataFrame()
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        return frame
+    rename = {
+        "action": "Action",
+        "horizon": "Horizon",
+        "decision_count": "Decisions",
+        "available_count": "Matured",
+        "hit_rate": "Hit Rate",
+        "average_forward_return": "Avg Forward Return",
+    }
+    frame = frame.rename(columns=rename)
+    for column in ["Hit Rate", "Avg Forward Return"]:
+        if column in frame:
+            frame[column] = frame[column].map(lambda value: "-" if pd.isna(value) else f"{float(value) * 100:.1f}%")
+    return frame
+
+
+def _debrief_candidate_frame(rows: list[dict]) -> pd.DataFrame:
+    if not rows:
+        return pd.DataFrame()
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        return frame
+    rename = {
+        "run_id": "Run",
+        "ticker": "Ticker",
+        "action": "Action",
+        "horizon": "Horizon",
+        "forward_return": "Forward Return",
+        "state": "State",
+        "s_score": "S",
+        "f_score": "F",
+        "rationale": "Rationale",
+    }
+    frame = frame.rename(columns=rename)
+    if "Forward Return" in frame:
+        frame["Forward Return"] = frame["Forward Return"].map(lambda value: f"{float(value) * 100:.1f}%")
+    return frame
+
+
+def render_debrief_lab():
+    _md(
+        """
+        <section class="section" id="debrief-lab">
+          <div class="section-head">
+            <h2>Debrief lab <span class="count">B-153 · run outcomes</span></h2>
+            <div class="right">LOCAL JOURNAL</div>
+          </div>
+        </section>
+        """
+    )
+
+    try:
+        records = debrief_journal(DEFAULT_JOURNAL_PATH, ohlcv, limit=100)
+        summary = _debrief_summary_frame(summarize_debriefs(records))
+        candidates = _debrief_candidate_frame(threshold_review_candidates(records, horizon="4w", min_abs_return=0.02))
+    except Exception as exc:
+        st.warning(f"Run debrief unavailable: {exc}")
+        return
+
+    if summary.empty:
+        _md(
+            """
+            <div class="chart-help">
+              <b>No matured run outcomes yet.</b>
+              The dashboard is recording decisions now; forward windows need trading days to mature before hit rates appear.
+            </div>
+            """
+        )
+        return
+
+    st.dataframe(summary, hide_index=True, use_container_width=True)
+    if candidates.empty:
+        _md(
+            """
+            <div class="chart-help">
+              No 4-week threshold-review candidates yet.
+            </div>
+            """
+        )
+    else:
+        with st.expander("Threshold review candidates", expanded=False):
+            st.dataframe(candidates, hide_index=True, use_container_width=True)
+
+
 def render_footer():
     html = f"""
     <div class="footer">
@@ -1325,5 +1415,6 @@ render_rrg()
 render_drill()
 render_portfolio_analyzer()
 render_backtest_lab()
+render_debrief_lab()
 render_full_table()
 render_footer()

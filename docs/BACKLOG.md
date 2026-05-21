@@ -153,7 +153,7 @@ Each is ~2–4 hours after the integration pattern is set. Flip `STUB_MODE = Fal
 - **B-147** Streamlit performance audit (which sections re-render unnecessarily on theme toggle)
 - **B-148** Migration from 32-bit Pi 2 (retired) to Pi 5 — DONE ✅
 
-- **B-153** Run journal + debrief engine — B-153.1/B-153.2/B-153.3 IMPLEMENTED; the app now has an append-only local SQLite run journal, dashboard scoring/BLUF auto-recording, and a pure forward-outcome debrief engine. Next slice adds dashboard/report surfacing.
+- **B-153** Run journal + debrief engine — IMPLEMENTED through B-153.4; the app now has an append-only local SQLite run journal, dashboard scoring/BLUF auto-recording, a pure forward-outcome debrief engine, and dashboard debrief surfacing. Future polish can add richer exported reports.
 
 ### Documentation
 - **B-150** Auto-generated component-doc page (Storybook-style) for the dashboard's React-equivalent components
