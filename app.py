@@ -14,6 +14,7 @@ import pandas as pd
 import streamlit as st
 
 from src.backtest import drawdown_frame, normalized_equity_frame
+from src.component_docs import DASHBOARD_COMPONENT_DOCS, component_docs_html
 from src.comparison_view import (
     comparison_card_rows,
     initialize_comparison_tickers,
@@ -617,6 +618,11 @@ def _render_drill_buttons(prefix: str, tickers: list[str], max_columns: int = 4)
 def render_explainer():
     with st.expander("📖  HOW THIS WORKS — system, data flow, pillars, gates", expanded=False):
         _md(SYSTEM_EXPLAINER_HTML)
+
+
+def render_component_docs():
+    with st.expander("COMPONENT DOCS", expanded=False):
+        _md(component_docs_html(DASHBOARD_COMPONENT_DOCS))
 
 
 def render_header():
@@ -1830,6 +1836,7 @@ _render_timed("render_header", render_header)
 _render_timed("render_header_controls", render_header_controls)
 _render_timed("render_view_preferences", render_view_preferences)
 _render_timed("render_explainer", render_explainer)
+_render_timed("render_component_docs", render_component_docs)
 _render_timed("render_bluf", render_bluf)
 _render_timed("render_status", render_status)
 _render_timed("render_alerts", render_alerts)

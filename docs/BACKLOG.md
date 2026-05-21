@@ -308,7 +308,11 @@ Status legend:
 - **B-153** Run journal + debrief engine — IMPLEMENTED through B-153.4; the app now has an append-only local SQLite run journal, dashboard scoring/BLUF auto-recording, a pure forward-outcome debrief engine, and dashboard debrief surfacing. Future polish can add richer exported reports.
 
 ### Documentation
-- **B-150** Auto-generated component-doc page (Storybook-style) for the dashboard's React-equivalent components
+#### B-150 · Auto-generated component-doc page — IMPLEMENTED
+**Status:** a generated Storybook-style component inventory is implemented in `backlog-stepwise-qa`.
+**Files:** `src/component_docs.py`, `tests/test_component_docs.py`, `tests/test_component_docs_app_static.py`, `app.py`, `static/style.css`, `README.md`, `docs/BACKLOG.md`.
+**Behavior:** the dashboard exposes a collapsed Component Docs panel generated from a pure metadata catalog. Each render section lists its source function, inputs, UI states, and QA coverage; the panel does not fetch OHLCV, recompute indicators, or mutate the state machine.
+**Residual risk:** this is a Streamlit-native reference panel rather than a separate external Storybook server.
 - **B-151** "How to add a sector / indicator / pillar" tutorial
 - **B-152** Public methodology landing page on the domain root (separate from the dashboard)
 

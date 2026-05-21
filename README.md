@@ -21,6 +21,7 @@ A Streamlit dashboard that monitors **83+ instruments across US sectors, US indu
 - A **ticker comparison view** for reviewing 2-4 scored tickers side by side from the current methodology snapshot.
 - **Pick-card sparklines with a 30-week MA reference line** when enough weekly history is loaded.
 - **Custom dashboard palettes**: Default, Solarized, Nord, and Mono layered over the existing dark/light theme.
+- A generated **component-doc inventory** that documents each Streamlit render section, its inputs, UI states, and QA coverage in a Storybook-style reference panel.
 - A **single-page Streamlit app** (`app.py`) with two sections:
   - **Top:** 7-pillar heatmap — every ticker scored on every pillar, color-coded, with composite score and current state (`STAGE_2_BULLISH` / `HOLD` / `WARNING` / `EXIT` / `BEARISH_STAGE_4` / `STAGE_1_BASING`).
   - **Below:** drill-down tabs — RRG quadrant chart, cross-sectional momentum bar, institutional flow detail, state-machine transition log, per-ticker deep dive with price/CMF/OBV charts.
@@ -111,6 +112,10 @@ B-116 adds a subtle dashed 30-week moving-average reference line to pick-card sp
 ## Custom palettes
 
 B-117 adds a `Palette` preference in `VIEW OPTIONS`. Choose `Default`, `Solarized`, `Nord`, or `Mono`; the choice sets CSS tokens only and works alongside the existing dark/light toggle.
+
+## Component docs
+
+B-150 adds a generated component inventory inside the dashboard. The catalog lives in `src/component_docs.py`, and the Streamlit panel renders the catalog without fetching market data, recomputing signals, or writing state. It documents each render section, its primary inputs, expected UI states, and the test surface that guards it.
 
 ## Quick start
 

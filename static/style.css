@@ -1729,6 +1729,49 @@ div[class*="block-container"] {
 }
 .chart-help b { color: var(--fg-dim); font-weight: 600; }
 
+/* ---------- Component docs ---------- */
+.component-doc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+.component-doc-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 14px 16px;
+}
+.component-doc-kicker,
+.component-doc-source,
+.component-doc-card dt {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.component-doc-kicker { color: var(--accent); }
+.component-doc-card h3 {
+  margin: 7px 0 6px;
+  font-size: 0.98rem;
+  letter-spacing: 0;
+}
+.component-doc-source {
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.component-doc-card dl {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 7px 10px;
+  margin: 0;
+}
+.component-doc-card dt { color: var(--fg-dim); }
+.component-doc-card dd {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 /* ---------- Provider status ---------- */
 .provider-status-banner {
   display: flex;
