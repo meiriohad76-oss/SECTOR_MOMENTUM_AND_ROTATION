@@ -12,6 +12,8 @@ def test_loading_state_replaces_streamlit_spinners():
     assert "render_loading_state(" in app_source
     assert "loading_placeholder = st.empty()" in app_source
     assert "loading_placeholder.empty()" in app_source
+    assert 'aria-busy="true"' in app_source
+    assert "--skeleton-index:{slot}" in app_source
     assert "st.spinner(" not in app_source
 
 
@@ -32,3 +34,7 @@ def test_empty_and_loading_css_exists():
     assert ".loading-state" in css
     assert ".skeleton-card" in css
     assert ".skeleton-line" in css
+    assert ".skeleton-card::after" in css
+    assert "@keyframes loading-shimmer" in css
+    assert "animation: loading-shimmer" in css
+    assert "@media (prefers-reduced-motion: reduce)" in css

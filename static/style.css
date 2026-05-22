@@ -887,7 +887,18 @@ body {
   flex-direction: column;
   gap: 10px;
   min-height: 132px;
+  overflow: hidden;
   padding: 14px;
+  position: relative;
+}
+.skeleton-card::after {
+  animation: loading-shimmer 1.4s ease-in-out infinite;
+  animation-delay: calc(var(--skeleton-index, 0) * 120ms);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.11), transparent);
+  content: "";
+  inset: 0;
+  position: absolute;
+  transform: translateX(-120%);
 }
 .skeleton-line {
   height: 10px;
@@ -908,6 +919,15 @@ body {
   width: 46%;
   height: 8px;
   margin-top: auto;
+}
+@keyframes loading-shimmer {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-card::after {
+    animation: none;
+  }
 }
 
 /* ---------- Density preferences ---------- */

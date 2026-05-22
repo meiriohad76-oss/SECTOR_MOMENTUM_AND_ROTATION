@@ -238,7 +238,7 @@ Status legend:
 **Status:** Native Streamlit refresh/theme controls render immediately after the header and are fixed top-right via CSS.
 **Files:** `src/controls.py`, `app.py`, `static/style.css`, `tests/test_controls.py`, `tests/test_header_controls_static.py`.
 **Behavior:** refresh clears cached market data and reruns; theme toggles dark/light session state and reruns.
-**Deferred:** custom component bridge and animated fetching state remain future polish.
+**Deferred:** custom component bridge remains future polish; animated fetching feedback is handled by the B-026 shimmer loading state.
 
 ### B-025 · TweaksPanel parity (BLUF Compact / Hidden modes) — IMPLEMENTED
 **Status:** Native Streamlit `VIEW OPTIONS` expander and local preference profiles are implemented near the header.
@@ -251,8 +251,8 @@ Status legend:
 **Status:** dashboard-native empty and loading states are implemented in `backlog-stepwise-qa`.
 **Files:** `src/ui_states.py`, `app.py`, `static/style.css`, `tests/test_ui_states.py`, `tests/test_empty_loading_states_static.py`.
 **Empty state:** when no picks meet gates, the `Picks` section shows a risk-off basket focused on `TLT / GLD / BIL`, using scored state/S/F values when available and `DATA PENDING` fallbacks when not.
-**Loading state:** first-page market-data fetch and indicator computation use a temporary inline skeleton placeholder; the old `st.spinner()` wrappers are removed.
-**Deferred:** async fetching, stale-cache banners, provider retry UX, and custom frontend shimmer components remain future reliability/polish work.
+**Loading state:** first-page market-data fetch and indicator computation use a temporary inline skeleton placeholder with accessible `aria-busy` state, per-card shimmer animation, and reduced-motion handling; the old `st.spinner()` wrappers are removed.
+**Deferred:** async fetching, stale-cache banners, and provider retry UX remain future reliability/polish work.
 
 ---
 

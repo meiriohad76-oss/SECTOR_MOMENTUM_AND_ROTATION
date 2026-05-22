@@ -125,9 +125,9 @@ def _md(html: str):
 
 def render_loading_state(placeholder, label: str, card_count: int = 4) -> None:
     cards = ""
-    for _ in loading_skeleton_slots(card_count):
-        cards += """
-        <div class="skeleton-card">
+    for slot in loading_skeleton_slots(card_count):
+        cards += f"""
+        <div class="skeleton-card" style="--skeleton-index:{slot}">
           <div class="skeleton-line short"></div>
           <div class="skeleton-line wide"></div>
           <div class="skeleton-line"></div>
@@ -136,7 +136,7 @@ def render_loading_state(placeholder, label: str, card_count: int = 4) -> None:
         """
     html = f"""
     <div class="app loading-app">
-      <section class="section loading-state" aria-live="polite">
+      <section class="section loading-state" aria-live="polite" aria-busy="true">
         <div class="section-head">
           <h2>{label}</h2>
           <div class="right">FETCHING</div>
