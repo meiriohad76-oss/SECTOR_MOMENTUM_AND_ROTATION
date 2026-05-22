@@ -49,6 +49,16 @@ Result:
 Live backtest smoke passed for 14 tickers with provider=massive period=2mo; artifacts were not written.
 ```
 
+After the secrets file was copied, the running Streamlit service was restarted through the non-sudo MainPID path so it could read the new secrets:
+
+```text
+OLD_PID=504482
+NEW_PID=517927
+systemctl is-active sector-dashboard -> active
+dashboard HTTP smoke -> 200
+git rev-parse HEAD -> 9409b4a3cabe57f76efaf0fbca8be033f12bf516
+```
+
 Earlier failed Pi smoke root cause: the Massive key existed only on the Windows checkout, not on AHADPI5. Without the copied `.streamlit/secrets.toml`, direct Pi script runs could not resolve `MASSIVE_API_KEY` and the Massive API returned `401`.
 
 Current config status checked on 2026-05-22:
