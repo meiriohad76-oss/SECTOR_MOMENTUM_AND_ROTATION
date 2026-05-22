@@ -368,6 +368,43 @@ def test_evaluate_macro_condition_variants_compares_defensive_filter():
     assert row["max_drawdown_delta"] > 0.0
 
 
+def test_evaluate_macro_condition_variants_adds_validation_evidence_columns():
+    dates = pd.bdate_range("2014-12-29", periods=8)
+    prices = pd.DataFrame(
+        {"AAA": [100.0, 105.0, 110.0, 55.0, 56.0, 57.0, 58.0, 59.0]},
+        index=dates,
+    )
+    target_weights = pd.DataFrame(
+        {"AAA": [1.0, 1.0, 1.0, 1.0]},
+        index=[dates[0], dates[2], dates[4], dates[6]],
+    )
+    macro_data = {"T10Y2Y": pd.Series([1.0, 0.5], index=[dates[0], dates[2]])}
+
+    summary = backtest.evaluate_macro_condition_variants(
+        prices,
+        target_weights,
+        macro_data,
+        rules=[
+            backtest.MacroVariantRule(
+                name="Curve falling defensive",
+                series_id="T10Y2Y",
+                condition="falling",
+                exposure_multiplier=0.0,
+            )
+        ],
+        transaction_cost_bps=0.0,
+        periods_per_year=252,
+    )
+
+    row = summary.iloc[0]
+    assert row["active_oos_rebalances"] == 2
+    assert row["variant_trade_count"] >= row["baseline_trade_count"]
+    assert row["variant_hit_rate"] >= 0.0
+    assert row["oos_variant_sharpe"] > row["oos_baseline_sharpe"]
+    assert row["oos_max_drawdown_delta"] > 0.0
+    assert row["promotion_label"] == "needs more testing"
+
+
 def test_evaluate_acceptance_gates_compares_oos_to_equal_weight_benchmark():
     report = backtest.evaluate_acceptance_gates(
         strategy_metrics={

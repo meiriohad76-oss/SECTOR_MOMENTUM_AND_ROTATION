@@ -15,6 +15,12 @@ def test_run_backtest_artifact_paths_are_repo_root_anchored():
     assert run_backtest.EQUITY_PATH == run_backtest.ROOT / "docs" / "backtest_equity.csv"
     assert run_backtest.STATES_PATH == run_backtest.ROOT / "docs" / "backtest_states.csv"
     assert run_backtest.METADATA_PATH == run_backtest.ROOT / "docs" / "backtest_metadata.json"
+    assert run_backtest.FRED_VALIDATION_REPORT_PATH == (
+        run_backtest.ROOT / "docs" / "fred_macro_validation_report.md"
+    )
+    assert run_backtest.FRED_VALIDATION_SUMMARY_PATH == (
+        run_backtest.ROOT / "docs" / "fred_macro_validation_summary.csv"
+    )
 
 
 def test_run_backtest_parser_exposes_macro_variants_flag():
@@ -102,6 +108,8 @@ def test_run_backtest_writes_macro_variant_summary_to_metadata(monkeypatch, tmp_
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
     monkeypatch.setattr(run_backtest, "STATES_PATH", tmp_path / "backtest_states.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
+    monkeypatch.setattr(run_backtest, "FRED_VALIDATION_REPORT_PATH", tmp_path / "fred_macro_validation_report.md")
+    monkeypatch.setattr(run_backtest, "FRED_VALIDATION_SUMMARY_PATH", tmp_path / "fred_macro_validation_summary.csv")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
     monkeypatch.setattr(
@@ -109,6 +117,7 @@ def test_run_backtest_writes_macro_variant_summary_to_metadata(monkeypatch, tmp_
         "build_historical_methodology_targets",
         fake_build_historical_methodology_targets,
     )
+    monkeypatch.setattr(run_backtest, "_fetch_macro_data", lambda enabled: {"T10Y2Y": pd.Series([1.0, 0.5])})
     monkeypatch.setattr(run_backtest, "_build_macro_variant_summary", lambda **kwargs: macro_summary)
 
     assert run_backtest.main(["--macro-variants"]) == 0
@@ -118,6 +127,110 @@ def test_run_backtest_writes_macro_variant_summary_to_metadata(monkeypatch, tmp_
     assert "## Macro Condition Variants" in report
     assert metadata["macro_variant_summary"][0]["variant"] == "Curve falling defensive"
     assert metadata["macro_variant_summary"][0]["total_return_delta"] == pytest.approx(0.04)
+
+
+def test_run_backtest_writes_fred_validation_report_when_macro_variants_enabled(
+    monkeypatch,
+    tmp_path,
+    ohlcv_frame_factory,
+):
+    macro_summary = pd.DataFrame(
+        [
+            {
+                "variant": "Curve falling defensive",
+                "series_id": "T10Y2Y",
+                "condition": "falling",
+                "active_rebalances": 24,
+                "active_oos_rebalances": 12,
+                "baseline_total_return": 0.40,
+                "variant_total_return": 0.44,
+                "total_return_delta": 0.04,
+                "baseline_cagr": 0.08,
+                "variant_cagr": 0.09,
+                "cagr_delta": 0.01,
+                "baseline_sharpe": 0.70,
+                "variant_sharpe": 0.81,
+                "sharpe_delta": 0.11,
+                "baseline_max_drawdown": -0.20,
+                "variant_max_drawdown": -0.18,
+                "max_drawdown_delta": 0.02,
+                "baseline_annualized_turnover": 1.2,
+                "variant_annualized_turnover": 1.1,
+                "annualized_turnover_delta": -0.1,
+                "baseline_hit_rate": 0.51,
+                "variant_hit_rate": 0.53,
+                "hit_rate_delta": 0.02,
+                "baseline_trade_count": 30,
+                "variant_trade_count": 28,
+                "trade_count_delta": -2,
+                "oos_baseline_cagr": 0.07,
+                "oos_variant_cagr": 0.08,
+                "oos_cagr_delta": 0.01,
+                "oos_baseline_sharpe": 0.65,
+                "oos_variant_sharpe": 0.78,
+                "oos_sharpe_delta": 0.13,
+                "oos_baseline_max_drawdown": -0.19,
+                "oos_variant_max_drawdown": -0.16,
+                "oos_max_drawdown_delta": 0.03,
+                "oos_baseline_annualized_turnover": 1.3,
+                "oos_variant_annualized_turnover": 1.0,
+                "oos_annualized_turnover_delta": -0.3,
+                "promotion_label": "needs more testing",
+            }
+        ]
+    )
+
+    def fake_fetch(tickers, period, provider):
+        return {
+            ticker: ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0005)
+            for ticker in tickers
+        }
+
+    def fake_build_historical_methodology_targets(ohlcv, rebalance_dates, phase):
+        del ohlcv, phase
+        rebalance_dates = pd.DatetimeIndex(rebalance_dates)
+        weights = pd.DataFrame({"XLK": [1.0] * len(rebalance_dates)}, index=rebalance_dates)
+        return backtest.HistoricalSignalTargets(
+            target_weights=weights,
+            states=pd.DataFrame({"XLK": ["HOLD"] * len(rebalance_dates)}, index=rebalance_dates),
+            snapshots={},
+        )
+
+    monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
+    monkeypatch.setattr(run_backtest, "METHODOLOGY_REPORT_PATH", tmp_path / "backtest_methodology_report.md")
+    monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "STATES_PATH", tmp_path / "backtest_states.csv")
+    monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
+    monkeypatch.setattr(run_backtest, "FRED_VALIDATION_REPORT_PATH", tmp_path / "fred_macro_validation_report.md")
+    monkeypatch.setattr(run_backtest, "FRED_VALIDATION_SUMMARY_PATH", tmp_path / "fred_macro_validation_summary.csv")
+    monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
+    monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
+    monkeypatch.setattr(run_backtest, "_resolved_provider", lambda provider: "massive")
+    monkeypatch.setattr(run_backtest, "_fred_config_status", lambda macro_data: "configured")
+    monkeypatch.setattr(
+        run_backtest.backtest,
+        "build_historical_methodology_targets",
+        fake_build_historical_methodology_targets,
+    )
+    monkeypatch.setattr(run_backtest, "_fetch_macro_data", lambda enabled: {"T10Y2Y": pd.Series([1.0, 0.5])})
+    monkeypatch.setattr(run_backtest, "_build_macro_variant_summary", lambda **kwargs: macro_summary)
+
+    assert run_backtest.main(["--macro-variants"]) == 0
+
+    validation_report = run_backtest.FRED_VALIDATION_REPORT_PATH.read_text(encoding="utf-8")
+    validation_summary = pd.read_csv(run_backtest.FRED_VALIDATION_SUMMARY_PATH)
+    metadata = json.loads(run_backtest.METADATA_PATH.read_text(encoding="utf-8"))
+    assert "# FRED Macro Historical Validation Report" in validation_report
+    assert "Requested OHLCV provider: auto" in validation_report
+    assert "Resolved OHLCV provider: massive" in validation_report
+    assert "FRED status: configured" in validation_report
+    assert "Curve falling defensive" in validation_report
+    assert "needs more testing" in validation_report
+    assert "No FRED macro rule is promoted into live scoring" in validation_report
+    assert validation_summary.loc[0, "promotion_label"] == "needs more testing"
+    assert metadata["fred_validation_report_sha256"] == run_backtest._sha256_bytes(
+        run_backtest.FRED_VALIDATION_REPORT_PATH.read_bytes()
+    )
 
 
 def test_run_backtest_returns_manual_data_error_when_required_prices_missing(monkeypatch, tmp_path):

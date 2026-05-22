@@ -245,6 +245,40 @@ def split_backtest_metrics(
     }
 
 
+def _positive_return_rate(returns: pd.Series) -> float:
+    values = returns.astype(float).dropna()
+    if values.empty:
+        return 0.0
+    return float((values > 0.0).mean())
+
+
+def _turnover_trade_count(turnover: pd.Series) -> int:
+    if turnover is None or len(turnover) == 0:
+        return 0
+    values = turnover.astype(float).abs().dropna()
+    return int((values > 1e-12).sum())
+
+
+def _result_validation_stats(
+    result: BacktestResult,
+    mask: pd.Series | None = None,
+    periods_per_year: int = TRADING_DAYS_PER_YEAR,
+) -> dict[str, float | int]:
+    if mask is None:
+        returns = result.net_returns.astype(float)
+    else:
+        returns = result.net_returns.loc[mask].astype(float)
+    turnover = result.turnover.reindex(returns.index).fillna(0.0)
+    stats = performance_metrics(
+        returns,
+        turnover=turnover,
+        periods_per_year=periods_per_year,
+    )
+    stats["hit_rate"] = _positive_return_rate(returns)
+    stats["trade_count"] = _turnover_trade_count(turnover)
+    return stats
+
+
 def run_weight_backtest(
     prices: pd.DataFrame,
     target_weights: pd.DataFrame,
@@ -455,10 +489,40 @@ def _macro_adjusted_targets(
 def _variant_metric_row(
     rule: MacroVariantRule,
     mask: pd.Series,
-    baseline_metrics: dict[str, float],
-    variant_metrics: dict[str, float],
+    baseline: BacktestResult,
+    variant: BacktestResult,
+    periods_per_year: int,
+    oos_start: str | pd.Timestamp,
 ) -> dict[str, float | int | str]:
-    return {
+    start = pd.Timestamp(oos_start)
+    oos_mask = pd.Series(baseline.net_returns.index >= start, index=baseline.net_returns.index)
+    in_sample_mask = pd.Series(baseline.net_returns.index < start, index=baseline.net_returns.index)
+    active_oos = mask.loc[mask.index >= start]
+    active_in_sample = mask.loc[mask.index < start]
+    baseline_full = _result_validation_stats(baseline, periods_per_year=periods_per_year)
+    variant_full = _result_validation_stats(variant, periods_per_year=periods_per_year)
+    baseline_in_sample = _result_validation_stats(
+        baseline,
+        mask=in_sample_mask,
+        periods_per_year=periods_per_year,
+    )
+    variant_in_sample = _result_validation_stats(
+        variant,
+        mask=in_sample_mask,
+        periods_per_year=periods_per_year,
+    )
+    baseline_oos = _result_validation_stats(
+        baseline,
+        mask=oos_mask,
+        periods_per_year=periods_per_year,
+    )
+    variant_oos = _result_validation_stats(
+        variant,
+        mask=oos_mask,
+        periods_per_year=periods_per_year,
+    )
+
+    row = {
         "variant": rule.name,
         "series_id": rule.series_id,
         "condition": rule.condition,
@@ -466,16 +530,60 @@ def _variant_metric_row(
         "lookback_periods": int(rule.lookback_periods),
         "exposure_multiplier": float(rule.exposure_multiplier),
         "active_rebalances": int(mask.sum()),
-        "baseline_total_return": float(baseline_metrics["total_return"]),
-        "variant_total_return": float(variant_metrics["total_return"]),
-        "total_return_delta": float(variant_metrics["total_return"] - baseline_metrics["total_return"]),
-        "baseline_sharpe": float(baseline_metrics["sharpe"]),
-        "variant_sharpe": float(variant_metrics["sharpe"]),
-        "sharpe_delta": float(variant_metrics["sharpe"] - baseline_metrics["sharpe"]),
-        "baseline_max_drawdown": float(baseline_metrics["max_drawdown"]),
-        "variant_max_drawdown": float(variant_metrics["max_drawdown"]),
-        "max_drawdown_delta": float(variant_metrics["max_drawdown"] - baseline_metrics["max_drawdown"]),
+        "active_in_sample_rebalances": int(active_in_sample.sum()),
+        "active_oos_rebalances": int(active_oos.sum()),
     }
+    _add_variant_metric_fields(row, "", baseline_full, variant_full)
+    _add_variant_metric_fields(row, "in_sample_", baseline_in_sample, variant_in_sample)
+    _add_variant_metric_fields(row, "oos_", baseline_oos, variant_oos)
+    row["promotion_label"] = macro_variant_promotion_label(row)
+    return row
+
+
+def _add_variant_metric_fields(
+    row: dict[str, float | int | str],
+    prefix: str,
+    baseline_stats: dict[str, float | int],
+    variant_stats: dict[str, float | int],
+) -> None:
+    for metric in [
+        "total_return",
+        "cagr",
+        "sharpe",
+        "max_drawdown",
+        "annualized_turnover",
+        "hit_rate",
+        "trade_count",
+    ]:
+        baseline_value = baseline_stats[metric]
+        variant_value = variant_stats[metric]
+        row[f"{prefix}baseline_{metric}"] = float(baseline_value)
+        row[f"{prefix}variant_{metric}"] = float(variant_value)
+        row[f"{prefix}{metric}_delta"] = float(variant_value) - float(baseline_value)
+
+
+def macro_variant_promotion_label(
+    row: dict[str, float | int | str],
+    min_active_oos_rebalances: int = 20,
+    min_oos_sharpe_delta: float = 0.10,
+) -> str:
+    active_oos = int(row.get("active_oos_rebalances", 0))
+    if active_oos < min_active_oos_rebalances:
+        return "needs more testing"
+    oos_sharpe_delta = _finite_scalar("oos_sharpe_delta", row.get("oos_sharpe_delta", 0.0))
+    oos_cagr_delta = _finite_scalar("oos_cagr_delta", row.get("oos_cagr_delta", 0.0))
+    oos_drawdown_delta = _finite_scalar("oos_max_drawdown_delta", row.get("oos_max_drawdown_delta", 0.0))
+    full_sharpe_delta = _finite_scalar("sharpe_delta", row.get("sharpe_delta", 0.0))
+    if (
+        oos_sharpe_delta >= min_oos_sharpe_delta
+        and oos_cagr_delta >= 0.0
+        and oos_drawdown_delta >= 0.0
+        and full_sharpe_delta >= 0.0
+    ):
+        return "candidate"
+    if oos_sharpe_delta <= 0.0 and oos_cagr_delta <= 0.0 and oos_drawdown_delta <= 0.0:
+        return "do not promote"
+    return "needs more testing"
 
 
 def evaluate_macro_condition_variants(
@@ -485,6 +593,7 @@ def evaluate_macro_condition_variants(
     rules: Sequence[MacroVariantRule],
     transaction_cost_bps: float = 5.0,
     periods_per_year: int = TRADING_DAYS_PER_YEAR,
+    oos_start: str | pd.Timestamp = "2015-01-01",
 ) -> pd.DataFrame:
     if not rules:
         return pd.DataFrame()
@@ -519,10 +628,29 @@ def evaluate_macro_condition_variants(
             transaction_cost_bps=transaction_cost_bps,
             periods_per_year=periods_per_year,
         )
-        rows.append(_variant_metric_row(rule, mask, baseline.metrics, variant.metrics))
+        rows.append(
+            _variant_metric_row(
+                rule,
+                mask,
+                baseline,
+                variant,
+                periods_per_year=periods_per_year,
+                oos_start=oos_start,
+            )
+        )
     if not rows:
         return pd.DataFrame()
-    return pd.DataFrame(rows).sort_values(["sharpe_delta", "total_return_delta"], ascending=False).reset_index(drop=True)
+    frame = pd.DataFrame(rows)
+    promotion_rank = {"candidate": 0, "needs more testing": 1, "do not promote": 2}
+    frame["_promotion_rank"] = frame["promotion_label"].map(promotion_rank).fillna(9)
+    return (
+        frame.sort_values(
+            ["_promotion_rank", "oos_sharpe_delta", "oos_cagr_delta", "sharpe_delta"],
+            ascending=[True, False, False, False],
+        )
+        .drop(columns=["_promotion_rank"])
+        .reset_index(drop=True)
+    )
 
 
 def _required_metric(metrics: dict[str, float], key: str, label: str) -> float:

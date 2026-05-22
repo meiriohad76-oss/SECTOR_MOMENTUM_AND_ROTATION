@@ -15,7 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src import backtest
-from src.data import fetch_ohlcv
+from src.data import _select_ohlcv_provider, fetch_ohlcv
 from src.fred_data import fetch_fred
 
 
@@ -24,6 +24,8 @@ METHODOLOGY_REPORT_PATH = ROOT / "docs" / "backtest_methodology_report.md"
 EQUITY_PATH = ROOT / "docs" / "backtest_equity.csv"
 STATES_PATH = ROOT / "docs" / "backtest_states.csv"
 METADATA_PATH = ROOT / "docs" / "backtest_metadata.json"
+FRED_VALIDATION_REPORT_PATH = ROOT / "docs" / "fred_macro_validation_report.md"
+FRED_VALIDATION_SUMMARY_PATH = ROOT / "docs" / "fred_macro_validation_summary.csv"
 SECTOR_BENCHMARK_TICKERS = [
     "XLK",
     "XLF",
@@ -106,6 +108,8 @@ def _write_artifacts(
     required_tickers: list[str],
     simulation_summary: dict | None = None,
     macro_variant_summary=None,
+    fred_validation_report: str | None = None,
+    fred_validation_summary=None,
 ) -> None:
     report_bytes = report.encode("utf-8")
     methodology_report_bytes = methodology_report.encode("utf-8")
@@ -127,17 +131,23 @@ def _write_artifacts(
         "simulation_summary": simulation_summary or {},
         "macro_variant_summary": _frame_records(macro_variant_summary),
     }
-
+    payloads = {
+        REPORT_PATH: report_bytes,
+        METHODOLOGY_REPORT_PATH: methodology_report_bytes,
+        EQUITY_PATH: equity_bytes,
+        STATES_PATH: states_bytes,
+    }
+    if fred_validation_report is not None:
+        fred_validation_report_bytes = fred_validation_report.encode("utf-8")
+        payloads[FRED_VALIDATION_REPORT_PATH] = fred_validation_report_bytes
+        metadata["fred_validation_report_sha256"] = _sha256_bytes(fred_validation_report_bytes)
+    if fred_validation_summary is not None:
+        fred_validation_summary_bytes = fred_validation_summary.to_csv(index=False).encode("utf-8")
+        payloads[FRED_VALIDATION_SUMMARY_PATH] = fred_validation_summary_bytes
+        metadata["fred_validation_summary_sha256"] = _sha256_bytes(fred_validation_summary_bytes)
     metadata_bytes = (json.dumps(metadata, indent=2, sort_keys=True) + "\n").encode("utf-8")
-    staged = _stage_artifacts(
-        {
-            REPORT_PATH: report_bytes,
-            METHODOLOGY_REPORT_PATH: methodology_report_bytes,
-            EQUITY_PATH: equity_bytes,
-            STATES_PATH: states_bytes,
-            METADATA_PATH: metadata_bytes,
-        }
-    )
+    payloads[METADATA_PATH] = metadata_bytes
+    staged = _stage_artifacts(payloads)
     _replace_staged_artifacts(staged)
 
 
@@ -171,10 +181,16 @@ def _frame_records(frame) -> list[dict]:
     return json.loads(frame.to_json(orient="records"))
 
 
-def _build_macro_variant_summary(*, enabled: bool, prices, target_weights):
+def _fetch_macro_data(enabled: bool) -> dict[str, pd.Series]:
+    if not enabled:
+        return {}
+    return fetch_fred(start_date="2003-01-01")
+
+
+def _build_macro_variant_summary(*, enabled: bool, prices, target_weights, macro_data=None):
     if not enabled:
         return pd.DataFrame()
-    fred_data = fetch_fred(start_date="2003-01-01")
+    fred_data = macro_data if macro_data is not None else _fetch_macro_data(enabled=True)
     if not fred_data:
         return pd.DataFrame()
     return backtest.evaluate_macro_condition_variants(
@@ -184,6 +200,151 @@ def _build_macro_variant_summary(*, enabled: bool, prices, target_weights):
         rules=MACRO_VARIANT_RULES,
         transaction_cost_bps=5.0,
     )
+
+
+def _resolved_provider(provider: str) -> str:
+    try:
+        return _select_ohlcv_provider(provider)
+    except Exception:
+        return str(provider)
+
+
+def _fred_config_status(macro_data: dict[str, pd.Series]) -> str:
+    if macro_data:
+        return "configured"
+    return "not configured or no FRED series returned"
+
+
+def _index_window(index) -> tuple[str, str, int]:
+    values = pd.DatetimeIndex(pd.to_datetime(index))
+    if len(values) == 0:
+        return "-", "-", 0
+    return values.min().date().isoformat(), values.max().date().isoformat(), int(len(values))
+
+
+def _macro_windows(macro_data: dict[str, pd.Series]) -> list[str]:
+    if not macro_data:
+        return ["- No FRED macro series were returned."]
+    lines = []
+    for series_id in sorted(macro_data):
+        start, end, count = _index_window(macro_data[series_id].dropna().index)
+        lines.append(f"- {series_id}: {start} to {end} ({count} observations)")
+    return lines
+
+
+def _pct(value) -> str:
+    try:
+        return f"{float(value) * 100:.2f}%"
+    except (TypeError, ValueError):
+        return "-"
+
+
+def _num(value) -> str:
+    try:
+        return f"{float(value):.2f}"
+    except (TypeError, ValueError):
+        return "-"
+
+
+def _int_text(value) -> str:
+    try:
+        return str(int(value))
+    except (TypeError, ValueError):
+        return "-"
+
+
+def _fred_validation_variant_table(macro_variant_summary: pd.DataFrame) -> list[str]:
+    if macro_variant_summary is None or macro_variant_summary.empty:
+        return [
+            "No macro variant rows were produced. Do not promote any FRED macro rule from this run.",
+        ]
+    lines = [
+        "| Variant | Series | Label | Active OOS | CAGR Delta | Sharpe Delta | Drawdown Delta | OOS CAGR Delta | OOS Sharpe Delta | OOS Drawdown Delta | Turnover Delta | Hit-Rate Delta | Trade Count Delta |",
+        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for _, row in macro_variant_summary.iterrows():
+        lines.append(
+            f"| {row.get('variant', '-')} | "
+            f"{row.get('series_id', '-')} | "
+            f"{row.get('promotion_label', 'needs more testing')} | "
+            f"{_int_text(row.get('active_oos_rebalances'))} | "
+            f"{_pct(row.get('cagr_delta'))} | "
+            f"{_num(row.get('sharpe_delta'))} | "
+            f"{_pct(row.get('max_drawdown_delta'))} | "
+            f"{_pct(row.get('oos_cagr_delta'))} | "
+            f"{_num(row.get('oos_sharpe_delta'))} | "
+            f"{_pct(row.get('oos_max_drawdown_delta'))} | "
+            f"{_pct(row.get('annualized_turnover_delta'))} | "
+            f"{_pct(row.get('hit_rate_delta'))} | "
+            f"{_int_text(row.get('trade_count_delta'))} |"
+        )
+    return lines
+
+
+def _format_fred_validation_report(
+    *,
+    macro_variant_summary: pd.DataFrame,
+    prices: pd.DataFrame,
+    target_weights: pd.DataFrame,
+    macro_data: dict[str, pd.Series],
+    requested_provider: str,
+    resolved_provider: str,
+    fred_status: str,
+    generated_at_utc: str,
+    oos_start: str = "2015-01-01",
+) -> str:
+    price_start, price_end, price_rows = _index_window(prices.index)
+    rebalance_start, rebalance_end, rebalance_count = _index_window(target_weights.index)
+    lines = [
+        "# FRED Macro Historical Validation Report",
+        "",
+        f"Generated UTC: {generated_at_utc}",
+        "Ticket: B-157",
+        "",
+        (
+            "No FRED macro rule is promoted into live scoring, veto logic, alerts, "
+            "recommendations, or broker behavior by this report."
+        ),
+        "",
+        "## Provider Configuration",
+        "",
+        f"- Requested OHLCV provider: {requested_provider}",
+        f"- Resolved OHLCV provider: {resolved_provider}",
+        f"- FRED status: {fred_status}",
+        f"- OOS start: {pd.Timestamp(oos_start).date().isoformat()}",
+        "",
+        "## Data Windows",
+        "",
+        f"- Market prices: {price_start} to {price_end} ({price_rows} rows, {len(prices.columns)} tickers)",
+        f"- Methodology rebalances: {rebalance_start} to {rebalance_end} ({rebalance_count} rows)",
+        "",
+        "## FRED Series Windows",
+        "",
+    ]
+    lines.extend(_macro_windows(macro_data))
+    lines.extend(
+        [
+            "",
+            "## Promotion Label Rules",
+            "",
+            "- `candidate`: at least 20 active out-of-sample rebalances, OOS Sharpe delta >= 0.10, OOS CAGR delta >= 0, OOS drawdown delta >= 0, and full-period Sharpe delta >= 0.",
+            "- `do not promote`: enough OOS observations and no OOS improvement in Sharpe, CAGR, or drawdown.",
+            "- `needs more testing`: mixed evidence or insufficient OOS observations.",
+            "",
+            "## Variant Results",
+            "",
+        ]
+    )
+    lines.extend(_fred_validation_variant_table(macro_variant_summary))
+    lines.extend(
+        [
+            "",
+            "## Decision",
+            "",
+            "Use B-158 only for variants labeled `candidate` after review. Leave all other rules out of live behavior.",
+        ]
+    )
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def _download_prices(period: str, provider: str):
@@ -218,8 +379,9 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv or [])
     if args.live_smoke:
         return _run_live_smoke(args.smoke_period)
+    requested_provider = _provider()
     try:
-        ohlcv, prices = _download_prices(period="max", provider=_provider())
+        ohlcv, prices = _download_prices(period="max", provider=requested_provider)
     except Exception as exc:
         print(f"Manual backtest data download failed: {exc}")
         return 2
@@ -263,11 +425,27 @@ def main(argv: list[str] | None = None) -> int:
             methodology_targets.target_weights,
             cost_bps_values=[3, 5, 10],
         )
+        macro_data = _fetch_macro_data(enabled=bool(args.macro_variants))
         macro_variant_summary = _build_macro_variant_summary(
             enabled=bool(args.macro_variants),
             prices=prices[strategy_columns],
             target_weights=methodology_targets.target_weights,
+            macro_data=macro_data,
         )
+        fred_validation_report = None
+        fred_validation_summary = None
+        if args.macro_variants:
+            fred_validation_summary = macro_variant_summary
+            fred_validation_report = _format_fred_validation_report(
+                macro_variant_summary=macro_variant_summary,
+                prices=prices[strategy_columns],
+                target_weights=methodology_targets.target_weights,
+                macro_data=macro_data,
+                requested_provider=requested_provider,
+                resolved_provider=_resolved_provider(requested_provider),
+                fred_status=_fred_config_status(macro_data),
+                generated_at_utc=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            )
         methodology_oos_metrics = methodology_windows["Out-of-sample"]
         sector_oos_metrics = sector_windows["Out-of-sample"]
         gates = backtest.evaluate_acceptance_gates(
@@ -332,11 +510,15 @@ def main(argv: list[str] | None = None) -> int:
             REQUIRED_TICKERS,
             simulation_summary=simulation_summary,
             macro_variant_summary=macro_variant_summary,
+            fred_validation_report=fred_validation_report,
+            fred_validation_summary=fred_validation_summary,
         )
     except Exception as exc:
         print(f"Manual backtest data validation failed: {exc}")
         return 2
     print(f"Wrote {REPORT_PATH}")
+    if args.macro_variants:
+        print(f"Wrote {FRED_VALIDATION_REPORT_PATH}")
     return 0
 
 
