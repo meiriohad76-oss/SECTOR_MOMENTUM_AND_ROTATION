@@ -232,6 +232,14 @@ docker compose up --build
 
 Open `http://127.0.0.1:8501/?ticker=XLK`. The compose stack mounts `.streamlit/` and `data/`; container state is written to `data/state.json` through the `STATE_FILE` environment variable, so a clean checkout starts without a pre-created root `state.json`. `.dockerignore` keeps real secrets, private keys, and generated data out of the image build context.
 
+If port `8501` is already used by a local service, run a conflict-free smoke on another host port:
+
+```bash
+DASHBOARD_HOST_PORT=18501 docker compose up --build
+```
+
+Then open `http://127.0.0.1:18501/?ticker=XLK`.
+
 ## Project layout
 
 ```

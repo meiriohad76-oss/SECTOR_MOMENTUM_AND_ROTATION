@@ -346,11 +346,12 @@ Status legend:
 **Residual risk:** the deploy path depends on the AHADPI5 self-hosted GitHub runner remaining online with the `sector-pi` label and the Pi service continuing to use the expected local port.
 
 #### B-141 · Docker Compose for local development — IMPLEMENTED
-**Status:** Dockerfile, compose service, and static coverage are implemented in `backlog-stepwise-qa`.
+**Status:** Dockerfile, compose service, static coverage, and AHADPI5 runtime smoke validation are implemented in `backlog-stepwise-qa`.
 **Files:** `Dockerfile`, `docker-compose.yml`, `.dockerignore`, `tests/test_docker_compose_static.py`, `README.md`, `docs/BACKLOG.md`.
-**Activation:** run `docker compose up --build`, then open `http://127.0.0.1:8501/?ticker=XLK`.
-**Behavior:** builds a Python 3.12 Streamlit container, exposes port `8501`, defaults to yfinance for free local data, mounts `.streamlit/` and `data/`, writes container state to `data/state.json`, and adds an HTTP healthcheck.
-**Residual risk:** static tests verify scaffold contents; Docker runtime build was attempted locally but Docker Desktop/daemon was unavailable, so runtime container startup still needs validation on a Docker-enabled machine.
+**Activation:** run `docker compose up --build`, then open `http://127.0.0.1:8501/?ticker=XLK`; if `8501` is already occupied, set `DASHBOARD_HOST_PORT=18501` and open `http://127.0.0.1:18501/?ticker=XLK`.
+**Behavior:** builds a Python 3.12 Streamlit container, exposes container port `8501`, defaults to yfinance for free local data, supports a configurable host port through `DASHBOARD_HOST_PORT`, mounts `.streamlit/` and `data/`, writes container state to `data/state.json`, and adds an HTTP healthcheck.
+**Evidence:** AHADPI5 has Docker Engine 29.4.1 and Docker Compose v5.1.3 available. Runtime validation used a conflict-free host port so the live `sector-dashboard` service on `8501` was not interrupted.
+**Residual risk:** local Windows Docker Desktop/daemon is still unavailable, so Windows-local container startup remains unvalidated on this workstation.
 
 - **B-142** Unit tests for data/indicators/flow/scoring — DONE in `backlog-stepwise-qa`; pytest harness covers pure modules before provider integration.
 #### B-143 · Parallel indicator computations — IMPLEMENTED

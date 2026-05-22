@@ -3,7 +3,7 @@ services:
     build: .
     image: sector-momentum-dashboard:dev
     ports:
-      - "8501:8501"
+      - "${DASHBOARD_HOST_PORT:-8501}:8501"
     environment:
       OHLCV_PROVIDER: ${OHLCV_PROVIDER:-yfinance}
       FLOW_STUB_MODE: ${FLOW_STUB_MODE:-true}

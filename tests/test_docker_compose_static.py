@@ -22,7 +22,7 @@ def test_docker_compose_maps_port_and_persists_local_state():
 
     assert "sector-dashboard:" in text
     assert "build: ." in text
-    assert '"8501:8501"' in text
+    assert '"${DASHBOARD_HOST_PORT:-8501}:8501"' in text
     assert "OHLCV_PROVIDER: ${OHLCV_PROVIDER:-yfinance}" in text
     assert "STATE_FILE: ${STATE_FILE:-/app/data/state.json}" in text
     assert "./.streamlit:/app/.streamlit:ro" in text
