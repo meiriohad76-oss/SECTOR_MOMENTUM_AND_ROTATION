@@ -78,6 +78,12 @@ B-130 adds a read-only analyzer section inside the Streamlit app:
 - Weights can be decimals (`0.25`) or percents (`25%` or `25`). If no valid weights are present, analysis falls back to market value weights, then equal weights.
 - Unknown tickers are reported as missing instead of crashing. Uploaded files are analyzed in memory; named portfolios can be saved locally to `data/saved_inputs.json`, which is ignored by git and Docker. The app does not connect to broker accounts.
 - B-131 adds a local P&L tracker in the same section. If holdings include `shares` and `cost_basis`, the dashboard joins them to already-loaded latest closes and shows cost, value, unrealized P&L, P&L %, and missing-input diagnostics. Broker sync remains config pending; no broker API calls are made.
+- Broker readiness can be checked without connecting to a broker or printing secrets:
+
+```bash
+./.venv/bin/python scripts/check_broker_config.py --provider alpaca
+./.venv/bin/python scripts/check_broker_config.py --provider ibkr
+```
 
 ## Personal trade-history backtest
 

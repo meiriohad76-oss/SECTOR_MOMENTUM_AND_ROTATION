@@ -313,9 +313,10 @@ Status legend:
 
 ### Portfolio features
 #### B-131 · P&L tracker — IMPLEMENTED / BROKER API CONFIG PENDING
-**Status:** local holdings-based unrealized P&L tracker is implemented in `backlog-stepwise-qa`; live broker API sync remains a credential/config integration layer.
-**Files:** `src/pl_tracker.py`, `tests/test_pl_tracker.py`, `app.py`, `tests/test_remaining_backlog_app_static.py`, `README.md`, `docs/BACKLOG.md`.
-**Behavior:** uploaded/saved holdings with shares and cost basis are joined to the dashboard's already-loaded prices, then surfaced as cost, value, unrealized P&L, P&L %, and missing-input diagnostics. No broker API calls, order placement, cloud sync, state-machine writes, or scoring changes were added.
+**Status:** local holdings-based unrealized P&L tracker and broker config diagnostics are implemented in `backlog-stepwise-qa`; live broker API sync remains a credential/account-scope integration layer.
+**Files:** `src/pl_tracker.py`, `src/broker_config.py`, `scripts/check_broker_config.py`, `tests/test_pl_tracker.py`, `tests/test_broker_config.py`, `tests/test_broker_config_script.py`, `app.py`, `tests/test_remaining_backlog_app_static.py`, `.streamlit/secrets.toml.example`, `README.md`, `docs/BACKLOG.md`.
+**Activation:** uploaded/saved holdings work without broker credentials. To check broker readiness without connecting, set `BROKER_PROVIDER=alpaca` or `BROKER_PROVIDER=ibkr` plus the matching secrets, then run `./.venv/bin/python scripts/check_broker_config.py --provider alpaca` or `./.venv/bin/python scripts/check_broker_config.py --provider ibkr`.
+**Behavior:** uploaded/saved holdings with shares and cost basis are joined to the dashboard's already-loaded prices, then surfaced as cost, value, unrealized P&L, P&L %, and missing-input diagnostics. Broker diagnostics report configured/missing field names only. No broker API calls, order placement, cloud sync, state-machine writes, or scoring changes were added.
 **Residual risk:** Alpaca/IBKR import adapters should be added only after broker credentials and account scope are available.
 
 #### B-132 · Backtest "your trades" — IMPLEMENTED
