@@ -4,6 +4,7 @@ import json
 import subprocess
 import sys
 
+from scripts import register_pwa_subscription
 from scripts import send_pwa_push_notifications
 
 
@@ -134,6 +135,47 @@ def test_pwa_push_script_docs_reference_dry_run_and_config():
     assert "VAPID_PRIVATE_KEY" in secrets_example
     assert "VAPID_CLAIM_EMAIL" in secrets_example
     assert "--dry-run" in backlog
+
+
+def test_register_pwa_subscription_script_reads_stdin_and_sanitizes_output(tmp_path, monkeypatch, capsys):
+    subscriptions_path = tmp_path / "subscriptions.json"
+    subscription = {
+        "endpoint": "https://push.example.test/sub",
+        "expirationTime": None,
+        "keys": {"p256dh": "public-browser-key", "auth": "browser-auth"},
+    }
+    monkeypatch.setattr(sys, "stdin", type("FakeStdin", (), {"read": lambda self: json.dumps(subscription)})())
+
+    exit_code = register_pwa_subscription.main(
+        [
+            "--subscriptions-path",
+            str(subscriptions_path),
+            "--label",
+            "ahad-phone",
+            "--captured-at",
+            "2026-05-22T12:45:00Z",
+        ]
+    )
+
+    output = json.loads(capsys.readouterr().out)
+    saved = json.loads(subscriptions_path.read_text(encoding="utf-8"))
+    assert exit_code == 0
+    assert output == {"pwa_subscription": "saved", "subscriptions": 1}
+    assert saved["subscriptions"][0]["label"] == "ahad-phone"
+    assert saved["subscriptions"][0]["keys"]["p256dh"] == "public-browser-key"
+    assert "browser-auth" not in json.dumps(output)
+
+
+def test_register_pwa_subscription_script_rejects_invalid_json_without_creating_file(tmp_path, monkeypatch, capsys):
+    subscriptions_path = tmp_path / "subscriptions.json"
+    monkeypatch.setattr(sys, "stdin", type("FakeStdin", (), {"read": lambda self: "{\"endpoint\": \"x\"}"})())
+
+    exit_code = register_pwa_subscription.main(["--subscriptions-path", str(subscriptions_path)])
+
+    output = json.loads(capsys.readouterr().out)
+    assert exit_code == 2
+    assert output == {"pwa_subscription": "invalid", "subscriptions": 0}
+    assert not subscriptions_path.exists()
 
 
 def test_pwa_push_script_runs_directly_from_repo_root():

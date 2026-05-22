@@ -174,6 +174,12 @@ The script writes `public/notification-feed.json` from recent HIGH severity tran
 
 The subscription file is ignored by git and Docker.
 
+To capture a browser subscription, open `public/pwa.html?vapid_public_key=PUBLIC_KEY`, use the subscribe control, then register the copied JSON locally:
+
+```bash
+./.venv/bin/python scripts/register_pwa_subscription.py --label ahad-phone < subscription.json
+```
+
 ## Quick start
 
 ### Windows (local)

@@ -8,6 +8,7 @@ VAPID keys and browser subscriptions are configured.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Callable, Iterable
@@ -70,6 +71,39 @@ def load_push_subscriptions(path: str | Path) -> list[dict]:
     if not isinstance(rows, list):
         return []
     return [row for row in rows if _valid_subscription(row)]
+
+
+def save_push_subscription(
+    path: str | Path,
+    subscription: dict,
+    *,
+    label: str = "",
+    captured_at: str | None = None,
+) -> dict[str, int | bool]:
+    """Merge one browser Push API subscription into the local subscription file."""
+    normalized = _normalize_subscription(subscription, label=label, captured_at=captured_at)
+    existing = load_push_subscriptions(path)
+    if not normalized:
+        return {"saved": False, "subscriptions": len(existing)}
+
+    rows: list[dict] = []
+    replaced = False
+    for row in existing:
+        if row.get("endpoint") == normalized["endpoint"]:
+            rows.append(normalized)
+            replaced = True
+        else:
+            rows.append(row)
+    if not replaced:
+        rows.append(normalized)
+
+    subscription_path = Path(path)
+    subscription_path.parent.mkdir(parents=True, exist_ok=True)
+    subscription_path.write_text(
+        json.dumps({"version": 1, "subscriptions": rows}, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return {"saved": True, "subscriptions": len(rows)}
 
 
 def write_notification_feed(
@@ -142,6 +176,29 @@ def _valid_subscription(value) -> bool:
         and keys.get("p256dh")
         and keys.get("auth")
     )
+
+
+def _normalize_subscription(
+    value,
+    *,
+    label: str = "",
+    captured_at: str | None = None,
+) -> dict | None:
+    if not _valid_subscription(value):
+        return None
+    row = {
+        "endpoint": str(value["endpoint"]),
+        "keys": {
+            "p256dh": str(value["keys"]["p256dh"]),
+            "auth": str(value["keys"]["auth"]),
+        },
+        "captured_at": captured_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+    }
+    if "expirationTime" in value:
+        row["expirationTime"] = value.get("expirationTime")
+    if label:
+        row["label"] = label
+    return row
 
 
 def _ticker_url(dashboard_url: str, ticker: str) -> str:

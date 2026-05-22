@@ -52,6 +52,58 @@ def test_load_push_subscriptions_ignores_invalid_rows(tmp_path):
     ]
 
 
+def test_save_push_subscription_merges_by_endpoint_without_duplicate_rows(tmp_path):
+    path = tmp_path / "subscriptions.json"
+    existing = {
+        "subscriptions": [
+            {
+                "endpoint": "https://push.example.test/old",
+                "keys": {"p256dh": "old-key", "auth": "old-auth"},
+                "label": "phone",
+            }
+        ]
+    }
+    path.write_text(json.dumps(existing), encoding="utf-8")
+
+    first = pwa_push.save_push_subscription(
+        path,
+        {
+            "endpoint": "https://push.example.test/new",
+            "keys": {"p256dh": "new-key", "auth": "new-auth"},
+        },
+        label="tablet",
+        captured_at="2026-05-22T12:30:00Z",
+    )
+    second = pwa_push.save_push_subscription(
+        path,
+        {
+            "endpoint": "https://push.example.test/new",
+            "keys": {"p256dh": "replacement-key", "auth": "replacement-auth"},
+        },
+        label="tablet-new",
+        captured_at="2026-05-22T12:31:00Z",
+    )
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert first == {"saved": True, "subscriptions": 2}
+    assert second == {"saved": True, "subscriptions": 2}
+    assert [row["endpoint"] for row in payload["subscriptions"]] == [
+        "https://push.example.test/old",
+        "https://push.example.test/new",
+    ]
+    assert payload["subscriptions"][1]["label"] == "tablet-new"
+    assert payload["subscriptions"][1]["captured_at"] == "2026-05-22T12:31:00Z"
+
+
+def test_save_push_subscription_rejects_invalid_subscription(tmp_path):
+    path = tmp_path / "subscriptions.json"
+
+    result = pwa_push.save_push_subscription(path, {"endpoint": "missing-keys"})
+
+    assert result == {"saved": False, "subscriptions": 0}
+    assert not path.exists()
+
+
 def test_write_notification_feed_serializes_installable_pwa_payload(tmp_path):
     path = tmp_path / "notification-feed.json"
 

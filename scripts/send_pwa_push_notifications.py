@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import tomllib
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,9 +26,18 @@ SUBSCRIPTIONS_PATH = ROOT / "data" / "pwa_push_subscriptions.json"
 
 
 def _resolve_config(name: str) -> str | None:
-    from src.alerts import _resolve_secret
-
-    return _resolve_secret(name) or os.environ.get(name)
+    value = os.environ.get(name)
+    if value:
+        return value.strip()
+    secrets_path = ROOT / ".streamlit" / "secrets.toml"
+    if not secrets_path.exists():
+        return None
+    try:
+        payload = tomllib.loads(secrets_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+    secret = payload.get(name)
+    return str(secret).strip() if secret else None
 
 
 def _config_label(value: str | None) -> str:

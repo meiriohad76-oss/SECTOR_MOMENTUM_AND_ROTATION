@@ -29,6 +29,9 @@ def test_public_pwa_assets_are_static_and_do_not_expose_live_dashboard_state():
     assert '"name": "Sector Momentum Alerts"' in manifest
     assert "self.addEventListener('push'" in service_worker
     assert "notification-feed.json" in pwa_page
+    assert "pushManager.subscribe" in pwa_page
+    assert "vapid_public_key" in pwa_page
+    assert "subscription-output" in pwa_page
     assert '"notifications": []' in feed
     combined = "\n".join([manifest, service_worker, pwa_page, feed]).lower()
     assert "api_key" not in combined
