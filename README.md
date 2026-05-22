@@ -166,7 +166,15 @@ B-121 adds static PWA assets and a push-notification sender seam:
 ./.venv/bin/python scripts/send_pwa_push_notifications.py
 ```
 
-The script writes `public/notification-feed.json` from recent HIGH severity transitions and can send Web Push notifications once `VAPID_PRIVATE_KEY`, `VAPID_CLAIM_EMAIL`, optional `PWA_DASHBOARD_URL`, and local browser subscriptions in `data/pwa_push_subscriptions.json` are configured. Check readiness without sending or rewriting the feed file:
+Generate a local VAPID key pair first:
+
+```bash
+./.venv/bin/python scripts/generate_vapid_keys.py --claim-email ops@example.com
+```
+
+Store the printed `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, and `VAPID_CLAIM_EMAIL` values in Streamlit secrets or environment variables. The private key path defaults to `data/vapid_private_key.pem`, which is ignored by git and Docker.
+
+The sender script writes `public/notification-feed.json` from recent HIGH severity transitions and can send Web Push notifications once `VAPID_PRIVATE_KEY`, `VAPID_CLAIM_EMAIL`, optional `PWA_DASHBOARD_URL`, and local browser subscriptions in `data/pwa_push_subscriptions.json` are configured. Check readiness without sending or rewriting the feed file:
 
 ```bash
 ./.venv/bin/python scripts/send_pwa_push_notifications.py --dry-run
@@ -178,6 +186,12 @@ To capture a browser subscription, open `public/pwa.html?vapid_public_key=PUBLIC
 
 ```bash
 ./.venv/bin/python scripts/register_pwa_subscription.py --label ahad-phone < subscription.json
+```
+
+Check all optional integration readiness in one sanitized command:
+
+```bash
+./.venv/bin/python scripts/check_ops_readiness.py
 ```
 
 ## Quick start

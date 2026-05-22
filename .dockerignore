@@ -35,6 +35,7 @@ data/logs/
 data/run_journal/
 data/saved_inputs.json
 data/pwa_push_subscriptions.json
+data/vapid_private_key.pem
 public/feeds/
 *.duckdb
 *.parquet

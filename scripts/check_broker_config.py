@@ -13,12 +13,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.broker_config import broker_config_status
+from src.config_resolver import resolve_config_value
 
 
 def _resolve_config(name: str) -> str | None:
-    from src.alerts import _resolve_secret
-
-    return _resolve_secret(name) or os.environ.get(name)
+    return resolve_config_value(name) or os.environ.get(name)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

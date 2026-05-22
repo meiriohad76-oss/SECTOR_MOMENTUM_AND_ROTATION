@@ -7,7 +7,7 @@ B-152 keeps the public root separate from the dashboard:
 - Public root: `https://ahaddashboards.uk` and `https://www.ahaddashboards.uk` -> `http://localhost:8500`
 - Protected dashboard: `https://dashboard.ahaddashboards.uk` -> `http://localhost:8501`
 
-Serve the static `public/` directory with `systemd/methodology-landing.service`, then route the root hostnames to that static service. Keep Cloudflare Access on the dashboard hostname so the live Streamlit app stays private while the methodology overview is public.
+Serve the static `public/` directory with `systemd/methodology-landing.service` or the non-sudo `systemd/user/methodology-landing.service`, then route the root hostnames to that static service. Keep Cloudflare Access on the dashboard hostname so the live Streamlit app stays private while the methodology overview is public.
 
 This gives you a public URL like `https://dashboard.yourdomain.com` that:
 - Routes traffic securely through Cloudflare (no inbound port-forward on your router)

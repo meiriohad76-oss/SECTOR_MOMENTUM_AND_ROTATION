@@ -9,7 +9,8 @@ B-152 adds a static public landing page under `public/`. It is separate from the
 - `public/assets/methodology.css` is the page stylesheet.
 - `public/assets/methodology-preview.png` is a static visual preview.
 - `public/robots.txt`, `public/sitemap.xml`, and `public/_headers` are static-hosting support files.
-- `systemd/methodology-landing.service` serves `public/` on `127.0.0.1:8500` when hosting from the Pi.
+- `systemd/methodology-landing.service` serves `public/` on `127.0.0.1:8500` when hosting from the Pi with root systemd.
+- `systemd/user/methodology-landing.service` serves the same directory without sudo under the current Pi user.
 
 ## Route Split
 
@@ -34,6 +35,19 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8500/
 ```
 
 Expected: `200`.
+
+For AHADPI5-style non-sudo user services:
+
+```bash
+cd /home/ahad/SECTOR_MOMENTUM_AND_ROTATION
+mkdir -p ~/.config/systemd/user
+cp systemd/user/methodology-landing.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now methodology-landing.service
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8500/feeds/transitions.rss
+```
+
+Expected: `200` with RSS XML content after B-122 feed artifacts have been generated.
 
 ## Cloudflare Validation
 

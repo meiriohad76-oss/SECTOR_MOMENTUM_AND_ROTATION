@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 
 import requests
 
+from .config_resolver import resolve_config_value
+
 HIGH_SEVERITY_STATES = {"EXIT", "BEARISH_STAGE_4"}
 EASTERN_TZ = ZoneInfo("America/New_York")
 DISCORD_MATTERMOST_WEBHOOKS = {
@@ -19,21 +21,7 @@ DISCORD_MATTERMOST_WEBHOOKS = {
 
 
 def _resolve_secret(name: str) -> Optional[str]:
-    try:
-        import streamlit as st  # type: ignore
-        from streamlit.errors import StreamlitSecretNotFoundError  # type: ignore
-
-        if hasattr(st, "secrets"):
-            try:
-                value = st.secrets.get(name)
-                if value:
-                    return str(value).strip()
-            except (KeyError, StreamlitSecretNotFoundError):
-                pass
-    except ImportError:
-        pass
-    value = os.environ.get(name)
-    return value.strip() if value else None
+    return resolve_config_value(name)
 
 
 def format_transition_alert(transition: dict) -> str:

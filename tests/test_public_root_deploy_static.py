@@ -29,12 +29,17 @@ def test_cloudflare_docs_separate_public_root_from_dashboard():
 
 def test_static_landing_service_template_serves_public_directory():
     service = (ROOT / "systemd" / "methodology-landing.service").read_text(encoding="utf-8")
+    user_service = (ROOT / "systemd" / "user" / "methodology-landing.service").read_text(encoding="utf-8")
 
     assert "Description=Public Methodology Landing Page" in service
     assert "WorkingDirectory=/home/meiri/sector-rotation-dashboard" in service
     assert "python3 -m http.server 8500" in service
     assert "--directory public" in service
     assert "127.0.0.1" in service
+    assert "WorkingDirectory=%h/SECTOR_MOMENTUM_AND_ROTATION" in user_service
+    assert "python3 -m http.server 8500" in user_service
+    assert "--directory public" in user_service
+    assert "User=" not in user_service
 
 
 def test_readme_and_backlog_document_public_landing():

@@ -71,3 +71,11 @@ def test_broker_config_script_runs_directly_from_repo_root():
 
     assert result.returncode == 0
     assert json.loads(result.stdout)["provider"] == "alpaca"
+
+
+def test_broker_config_script_uses_lightweight_config_resolver():
+    check_broker_config = _script_module()
+    source = (check_broker_config.ROOT / "scripts" / "check_broker_config.py").read_text(encoding="utf-8")
+
+    assert "src.config_resolver" in source
+    assert "src.alerts" not in source

@@ -133,6 +133,7 @@ def test_pwa_push_script_docs_reference_dry_run_and_config():
     assert "scripts/send_pwa_push_notifications.py --dry-run" in readme
     assert "without sending or rewriting the feed file" in readme
     assert "VAPID_PRIVATE_KEY" in secrets_example
+    assert "VAPID_PUBLIC_KEY" in secrets_example
     assert "VAPID_CLAIM_EMAIL" in secrets_example
     assert "--dry-run" in backlog
 
