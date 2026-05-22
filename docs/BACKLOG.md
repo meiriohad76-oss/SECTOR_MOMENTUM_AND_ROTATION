@@ -161,7 +161,8 @@ Status legend:
 - Compare to 60/40 SPY/AGG + equal-weight 11-sector benchmark
 - Acceptance gates: OOS Sharpe ≥ 0.7, max DD ≤ 75% of benchmark
 **Output:** manual summary report, full methodology report, simulation metadata, notebook inspection guide, equity chart artifact, and `docs/backtest_states.csv` methodology-state artifact for B-132 personal trade-history alignment; dashboard Backtest Lab reads the summary/equity artifacts when present and renders normalized equity plus drawdown views.
-**Residual risk:** refresh long-window evidence after provider keys/data availability changes or provider schemas change.
+**Provider evidence:** Massive short live-data smoke was validated locally and on AHADPI5 on 2026-05-22 with `OHLCV_PROVIDER=massive python scripts/run_backtest.py --live-smoke --smoke-period 2mo`; all 14 required B-011 tickers were available and no artifacts were written.
+**Residual risk:** refresh long-window evidence after provider schemas change or material data availability changes.
 
 ## Implemented with config / live-validation pending
 
@@ -201,6 +202,7 @@ Status legend:
 **Files:** `src/fred_data.py`, `src/macro.py`, `tests/test_fred_data.py`, `tests/test_macro.py`.
 **Series:** `INDPRO`, `T10Y2Y`, `T10Y3M`, `UNRATE`, `NFCI`, `RECPROUSM156N`, `BAMLH0A0HYM2`.
 **Impact:** upgrades cycle phase from coarse 2-signal fallback to a tested FRED-backed Stovall/Fidelity-style 4-phase classifier once the free key is configured.
+**Current config:** `FRED_API_KEY` was not present in the ignored local Streamlit secrets file copied to AHADPI5 on 2026-05-22; live validation still needs the free FRED key.
 
 ### B-023 · Click-through from cards/alerts/RRG → drill-down — IMPLEMENTED
 **Status:** Native Streamlit drill buttons and `?ticker=...` deep links are implemented in `backlog-stepwise-qa`.

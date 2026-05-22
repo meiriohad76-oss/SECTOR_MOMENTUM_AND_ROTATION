@@ -13,6 +13,49 @@ The user asked to pause and keep a clean continuation point.
 - Initial handoff commit: `f8c7122f9f3a2886d6d271178ff536d9a6b452e1 docs: add backlog completion pause handoff`
 - GitHub push verified after the handoff update: `origin/backlog-stepwise-qa` reached `40f34587e13c7e8259312024115eb04878979ef8`.
 - Pi deployment verified on 2026-05-22: `/home/ahad/SECTOR_MOMENTUM_AND_ROTATION` reached `40f34587e13c7e8259312024115eb04878979ef8`.
+- Follow-up Pi evidence commit: `01f2be43db900a799fe7c0ac9f0dae3f240854fe docs: record pi deploy evidence`.
+
+## 2026-05-22 Massive Configuration Follow-Up
+
+Massive was configured in the local ignored Streamlit secrets file at `.streamlit/secrets.toml`, then copied to the Pi repo at:
+
+```text
+/home/ahad/SECTOR_MOMENTUM_AND_ROTATION/.streamlit/secrets.toml
+```
+
+The Pi secrets directory was created with mode `700`, and `secrets.toml` was set to mode `600`. No secret values were printed or committed.
+
+Local validation from `C:\Users\meiri\momentum and flow`:
+
+```powershell
+$env:OHLCV_PROVIDER='massive'; python scripts/run_backtest.py --live-smoke --smoke-period 2mo
+```
+
+Result:
+
+```text
+Live backtest smoke passed for 14 tickers with provider=massive period=2mo; artifacts were not written.
+```
+
+Pi validation from `/home/ahad/SECTOR_MOMENTUM_AND_ROTATION`:
+
+```bash
+OHLCV_PROVIDER=massive ./.venv/bin/python scripts/run_backtest.py --live-smoke --smoke-period 2mo
+```
+
+Result:
+
+```text
+Live backtest smoke passed for 14 tickers with provider=massive period=2mo; artifacts were not written.
+```
+
+Earlier failed Pi smoke root cause: the Massive key existed only on the Windows checkout, not on AHADPI5. Without the copied `.streamlit/secrets.toml`, direct Pi script runs could not resolve `MASSIVE_API_KEY` and the Massive API returned `401`.
+
+Current config status checked on 2026-05-22:
+
+- Massive: configured locally and on AHADPI5; B-011 short live OHLCV smoke passed on both.
+- FRED: not configured in the local secrets file copied to AHADPI5; `fetch_fred(start_date="2024-01-01")` returned `0` series.
+- FINRA: no FINRA key/client setting was present in the local secrets file.
 
 ## What Was Implemented In The Latest Code Commit
 
@@ -111,7 +154,7 @@ Result: exit `0`.
 - Code review was not run for this final slice because the subagent thread pool was already full.
 - B-121 live push delivery needs VAPID/subscription configuration.
 - B-131 broker sync needs broker API credentials and a separate import/sync design.
-- B-011 long-window evidence should be refreshed after provider keys/data availability changes.
+- B-011 Massive short live-data smoke is verified locally and on AHADPI5; long-window backtest evidence should still be refreshed after provider schemas or data availability change.
 - B-021/B-022/B-120/B-123/B-140/B-152 still have environment-level live validation or deployment configuration pending.
 
 ## Recommended Resume Steps

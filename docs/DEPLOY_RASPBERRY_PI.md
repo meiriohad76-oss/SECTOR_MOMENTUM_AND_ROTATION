@@ -54,6 +54,36 @@ From another machine on your LAN, open `http://<pi-ip>:8501`. You should see the
 
 `Ctrl+C` to stop. Now we install it as a service so it runs on boot.
 
+## Configure local secrets
+
+Provider keys are intentionally not committed. Put Pi-local secrets in `.streamlit/secrets.toml` under the repo root and keep the file readable only by the service user:
+
+```bash
+cd ~/sector-rotation-dashboard
+mkdir -p .streamlit
+chmod 700 .streamlit
+nano .streamlit/secrets.toml
+chmod 600 .streamlit/secrets.toml
+```
+
+For Massive OHLCV validation, set:
+
+```toml
+MASSIVE_API_KEY = "..."
+```
+
+Validate without writing backtest artifacts:
+
+```bash
+OHLCV_PROVIDER=massive ./.venv/bin/python scripts/run_backtest.py --live-smoke --smoke-period 2mo
+```
+
+Expected success:
+
+```text
+Live backtest smoke passed for 14 tickers with provider=massive period=2mo; artifacts were not written.
+```
+
 ## Auto-start with systemd
 
 The repo ships a service unit at `systemd/sector-dashboard.service`. Install it:
