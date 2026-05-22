@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 import math
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -389,3 +390,177 @@ def threshold_review_candidates(
             }
         )
     return sorted(candidates, key=lambda row: abs(float(row["forward_return"])), reverse=True)
+
+
+def debrief_outcome_rows(records: Sequence[DecisionDebrief]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for record in records:
+        for horizon, outcome in record.outcomes.items():
+            rows.append(
+                {
+                    "run_id": record.run_id,
+                    "started_at_utc": record.started_at_utc,
+                    "ticker": record.ticker,
+                    "action": record.action,
+                    "decision_type": record.decision_type,
+                    "state": record.state,
+                    "s_score": _float_value(record.s_score),
+                    "f_score": _float_value(record.f_score),
+                    "rationale": record.rationale,
+                    "horizon": horizon,
+                    "days": outcome.days,
+                    "status": outcome.status,
+                    "start_date": outcome.start_date,
+                    "end_date": outcome.end_date,
+                    "start_price": outcome.start_price,
+                    "end_price": outcome.end_price,
+                    "forward_return": outcome.forward_return,
+                    "max_drawdown": outcome.max_drawdown,
+                    "hit": outcome.hit,
+                }
+            )
+    return rows
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _format_percent(value: Any) -> str:
+    number = _float_value(value)
+    if number is None:
+        return "-"
+    return f"{number * 100:.1f}%"
+
+
+def _format_table_cell(value: Any) -> str:
+    if value is None:
+        return "-"
+    text = str(value).replace("\r", " ").replace("\n", " ").replace("|", "\\|")
+    return text.strip() or "-"
+
+
+def _markdown_table(headers: Sequence[str], rows: Sequence[Sequence[Any]]) -> str:
+    header_line = "| " + " | ".join(_format_table_cell(header) for header in headers) + " |"
+    separator = "| " + " | ".join("---" for _ in headers) + " |"
+    body = ["| " + " | ".join(_format_table_cell(value) for value in row) + " |" for row in rows]
+    return "\n".join([header_line, separator, *body])
+
+
+def build_debrief_markdown_report(
+    records: Sequence[DecisionDebrief],
+    *,
+    summary_rows: Sequence[Mapping[str, Any]] | None = None,
+    macro_rows: Sequence[Mapping[str, Any]] | None = None,
+    candidate_rows: Sequence[Mapping[str, Any]] | None = None,
+    generated_at_utc: str | None = None,
+) -> str:
+    summaries = list(summary_rows) if summary_rows is not None else summarize_debriefs(list(records))
+    macro_summaries = (
+        list(macro_rows)
+        if macro_rows is not None
+        else summarize_debriefs_by_macro_condition(list(records), horizon="4w")
+    )
+    candidates = (
+        list(candidate_rows)
+        if candidate_rows is not None
+        else threshold_review_candidates(list(records), horizon="4w", min_abs_return=0.02)
+    )
+    outcome_rows = debrief_outcome_rows(records)
+    available_rows = [row for row in outcome_rows if row["forward_return"] is not None and row["hit"] is not None]
+
+    lines = [
+        "# Run Debrief Report",
+        "",
+        f"Generated: {generated_at_utc or _utc_timestamp()}",
+        "",
+        "Methodology debrief export is analysis-only; it does not change live scoring, alerts, provider behavior, or recommendations.",
+        "",
+        f"Decisions analyzed: {len(records)}",
+        f"Outcome rows: {len(outcome_rows)}",
+        f"Matured outcome rows: {len(available_rows)}",
+        "",
+        "## Outcome Summary",
+        "",
+    ]
+
+    if summaries:
+        lines.append(
+            _markdown_table(
+                ["Action", "Horizon", "Decisions", "Matured", "Hit Rate", "Avg Forward Return"],
+                [
+                    [
+                        row.get("action"),
+                        row.get("horizon"),
+                        row.get("decision_count"),
+                        row.get("available_count"),
+                        _format_percent(row.get("hit_rate")),
+                        _format_percent(row.get("average_forward_return")),
+                    ]
+                    for row in summaries
+                ],
+            )
+        )
+    else:
+        lines.append("No matured outcome summary is available yet.")
+
+    lines.extend(["", "## Macro-Conditioned Outcomes", ""])
+    if macro_summaries:
+        lines.append(
+            _markdown_table(
+                [
+                    "Macro Group",
+                    "Macro",
+                    "Series",
+                    "Condition",
+                    "Action",
+                    "Horizon",
+                    "Decisions",
+                    "Matured",
+                    "Hit Rate",
+                    "Avg Forward Return",
+                    "Avg Max Drawdown",
+                ],
+                [
+                    [
+                        row.get("macro_group"),
+                        row.get("macro_label"),
+                        row.get("macro_series"),
+                        row.get("macro_condition"),
+                        row.get("action"),
+                        row.get("horizon"),
+                        row.get("decision_count"),
+                        row.get("available_count"),
+                        _format_percent(row.get("hit_rate")),
+                        _format_percent(row.get("average_forward_return")),
+                        _format_percent(row.get("average_max_drawdown")),
+                    ]
+                    for row in macro_summaries
+                ],
+            )
+        )
+    else:
+        lines.append("No macro-conditioned matured outcomes are available yet.")
+
+    lines.extend(["", "## Threshold Review Candidates", ""])
+    if candidates:
+        lines.append(
+            _markdown_table(
+                ["Ticker", "Action", "Horizon", "Forward Return", "State", "Rationale"],
+                [
+                    [
+                        row.get("ticker"),
+                        row.get("action"),
+                        row.get("horizon"),
+                        _format_percent(row.get("forward_return")),
+                        row.get("state"),
+                        row.get("rationale"),
+                    ]
+                    for row in candidates
+                ],
+            )
+        )
+    else:
+        lines.append("No threshold review candidates met the export threshold.")
+
+    return "\n".join(lines).rstrip() + "\n"

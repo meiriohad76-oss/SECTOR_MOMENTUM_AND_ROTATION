@@ -4,8 +4,10 @@ import pandas as pd
 import pytest
 
 from src.run_debrief import (
+    build_debrief_markdown_report,
     compute_forward_outcomes,
     debrief_journal,
+    debrief_outcome_rows,
     summarize_debriefs,
     summarize_debriefs_by_macro_condition,
     threshold_review_candidates,
@@ -344,3 +346,91 @@ def test_summarize_debriefs_and_threshold_review_candidates(tmp_path):
             "rationale": "failed buy",
         }
     ]
+
+
+def test_debrief_outcome_rows_flatten_records_for_report_export(tmp_path):
+    db_path = tmp_path / "runs.sqlite"
+    append_run(
+        db_path,
+        RunRecord(run_id="run-001", started_at_utc="2026-01-02T12:00:00Z", universe_count=1),
+        scored_rows=[
+            ScoredSnapshotRecord(ticker="XLK", state="STAGE_2_BULLISH", s_score=0.9, f_score=0.4),
+        ],
+        decisions=[
+            DecisionRecord(decision_type="bluf", ticker="XLK", action="BUY", rationale="winner"),
+        ],
+    )
+    records = debrief_journal(
+        db_path,
+        {"XLK": _ohlcv_from_closes("2026-01-02", [100, 101, 102, 103, 104, 110])},
+        windows={"1w": 5},
+    )
+
+    rows = debrief_outcome_rows(records)
+
+    assert rows == [
+        {
+            "run_id": "run-001",
+            "started_at_utc": "2026-01-02T12:00:00Z",
+            "ticker": "XLK",
+            "action": "BUY",
+            "decision_type": "bluf",
+            "state": "STAGE_2_BULLISH",
+            "s_score": pytest.approx(0.9),
+            "f_score": pytest.approx(0.4),
+            "rationale": "winner",
+            "horizon": "1w",
+            "days": 5,
+            "status": "available",
+            "start_date": "2026-01-02",
+            "end_date": "2026-01-09",
+            "start_price": pytest.approx(100.0),
+            "end_price": pytest.approx(110.0),
+            "forward_return": pytest.approx(0.10),
+            "max_drawdown": pytest.approx(0.0),
+            "hit": True,
+        }
+    ]
+
+
+def test_build_debrief_markdown_report_includes_summary_and_candidates(tmp_path):
+    db_path = tmp_path / "runs.sqlite"
+    append_run(
+        db_path,
+        RunRecord(run_id="run-001", started_at_utc="2026-01-02T12:00:00Z", universe_count=3),
+        scored_rows=[
+            ScoredSnapshotRecord(ticker="XLK", state="STAGE_2_BULLISH", s_score=0.9, f_score=0.4),
+            ScoredSnapshotRecord(ticker="XLY", state="STAGE_2_BULLISH", s_score=0.8, f_score=0.2),
+            ScoredSnapshotRecord(ticker="XLE", state="EXIT", s_score=-0.4, f_score=-0.5),
+        ],
+        decisions=[
+            DecisionRecord(decision_type="bluf", ticker="XLK", action="BUY", rationale="winner"),
+            DecisionRecord(decision_type="bluf", ticker="XLY", action="BUY", rationale="failed buy"),
+            DecisionRecord(decision_type="bluf", ticker="XLE", action="EXIT", rationale="risk off"),
+        ],
+    )
+    records = debrief_journal(
+        db_path,
+        {
+            "XLK": _ohlcv_from_closes("2026-01-02", [100, 101, 102, 103, 104, 110]),
+            "XLY": _ohlcv_from_closes("2026-01-02", [100, 99, 98, 97, 96, 94]),
+            "XLE": _ohlcv_from_closes("2026-01-02", [100, 99, 98, 97, 96, 92]),
+        },
+        windows={"1w": 5},
+    )
+
+    report = build_debrief_markdown_report(
+        records,
+        summary_rows=summarize_debriefs(records),
+        candidate_rows=threshold_review_candidates(records, horizon="1w", min_abs_return=0.02),
+        generated_at_utc="2026-02-01T00:00:00Z",
+    )
+
+    assert report.startswith("# Run Debrief Report")
+    assert "Generated: 2026-02-01T00:00:00Z" in report
+    assert "Decisions analyzed: 3" in report
+    assert "Methodology debrief export is analysis-only" in report
+    assert "| Action | Horizon | Decisions | Matured | Hit Rate | Avg Forward Return |" in report
+    assert "| BUY | 1w | 2 | 2 | 50.0% | 2.0% |" in report
+    assert "## Threshold Review Candidates" in report
+    assert "| XLY | BUY | 1w | -6.0% | STAGE_2_BULLISH | failed buy |" in report

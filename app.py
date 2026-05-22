@@ -71,7 +71,9 @@ from src.preferences import (
     sparkline_mode,
 )
 from src.run_debrief import (
+    build_debrief_markdown_report,
     debrief_journal,
+    debrief_outcome_rows,
     summarize_debriefs,
     summarize_debriefs_by_macro_condition,
     threshold_review_candidates,
@@ -1952,9 +1954,19 @@ def render_debrief_lab():
 
     try:
         records = debrief_journal(DEFAULT_JOURNAL_PATH, ohlcv, limit=100)
-        summary = _debrief_summary_frame(summarize_debriefs(records))
-        macro_summary = _debrief_macro_frame(summarize_debriefs_by_macro_condition(records, horizon="4w"))
-        candidates = _debrief_candidate_frame(threshold_review_candidates(records, horizon="4w", min_abs_return=0.02))
+        summary_rows = summarize_debriefs(records)
+        macro_rows = summarize_debriefs_by_macro_condition(records, horizon="4w")
+        candidate_rows = threshold_review_candidates(records, horizon="4w", min_abs_return=0.02)
+        outcome_rows = debrief_outcome_rows(records)
+        report_markdown = build_debrief_markdown_report(
+            records,
+            summary_rows=summary_rows,
+            macro_rows=macro_rows,
+            candidate_rows=candidate_rows,
+        )
+        summary = _debrief_summary_frame(summary_rows)
+        macro_summary = _debrief_macro_frame(macro_rows)
+        candidates = _debrief_candidate_frame(candidate_rows)
     except Exception as exc:
         st.warning(f"Run debrief unavailable: {exc}")
         return
@@ -1969,6 +1981,24 @@ def render_debrief_lab():
             """
         )
         return
+
+    export_left, export_right = st.columns(2)
+    with export_left:
+        st.download_button(
+            "Download outcome CSV",
+            data=pd.DataFrame(outcome_rows).to_csv(index=False),
+            file_name="run_debrief_outcomes.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    with export_right:
+        st.download_button(
+            "Download Markdown report",
+            data=report_markdown,
+            file_name="run_debrief_report.md",
+            mime="text/markdown",
+            use_container_width=True,
+        )
 
     st.dataframe(summary, hide_index=True, use_container_width=True)
     if not macro_summary.empty:

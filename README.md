@@ -66,7 +66,7 @@ The report uses the historical methodology target builder as the strategy path, 
 
 ## Run debrief lab
 
-B-153 records dashboard methodology runs in the local SQLite journal at `data/run_journal/runs.sqlite`, then the Debrief lab joins saved decisions to already-loaded OHLCV to calculate matured forward outcomes. B-155 adds macro-conditioned summaries from the journaled `fred_macro_snapshot`, so the dashboard can compare hit rate, average forward return, and average max drawdown by FRED series trend without fetching data or changing the recommendation logic.
+B-153 records dashboard methodology runs in the local SQLite journal at `data/run_journal/runs.sqlite`, then the Debrief lab joins saved decisions to already-loaded OHLCV to calculate matured forward outcomes. The lab can export a flat outcome CSV and a Markdown debrief report for offline review. B-155 adds macro-conditioned summaries from the journaled `fred_macro_snapshot`, so the dashboard can compare hit rate, average forward return, and average max drawdown by FRED series trend without fetching data or changing the recommendation logic.
 
 ## Portfolio analyzer
 

@@ -16,6 +16,9 @@ def test_app_surfaces_run_debrief_without_fetching_data_inside_section():
     assert "def render_debrief_lab():" in app_source
     assert "DEFAULT_JOURNAL_PATH" in debrief_source
     assert "debrief_journal(DEFAULT_JOURNAL_PATH, ohlcv" in debrief_source
+    assert "debrief_outcome_rows(records)" in debrief_source
+    assert "build_debrief_markdown_report(" in debrief_source
+    assert "st.download_button(" in debrief_source
     assert "summarize_debriefs(records)" in debrief_source
     assert "summarize_debriefs_by_macro_condition(records" in debrief_source
     assert "threshold_review_candidates(records" in debrief_source

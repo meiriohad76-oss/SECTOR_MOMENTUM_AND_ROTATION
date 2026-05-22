@@ -11,11 +11,12 @@ B-153 is split into small slices:
 1. B-153.1 creates an append-only local run journal with pure Python helpers and deterministic tests.
 2. B-153.2 wires the Streamlit scoring path to save one run snapshot after scoring and state-machine decisions.
 3. B-153.3 adds a debrief engine that joins saved decisions to forward returns at 1w, 4w, 13w, and 26w.
-4. B-153.4 surfaces debrief summaries in the dashboard and leaves richer exported reports as future polish.
+4. B-153.4 surfaces debrief summaries in the dashboard.
+5. B-153.5 exports flat outcome CSV rows and a Markdown debrief report for offline review.
 
 ## Architecture
 
-Use a local SQLite database at `data/run_journal/runs.sqlite`. The database is gitignored and owned by the deployed machine, similar to `state.json`. The first slice keeps all code in `src/run_journal.py` and avoids Streamlit, network calls, provider fetches, and app imports. The second slice adds pure conversion helpers plus a small Streamlit call after BLUF/state-machine scoring so dashboard runs are journaled without changing scoring behavior. The third slice adds a pure debrief engine in `src/run_debrief.py` that accepts already-loaded OHLCV and computes forward outcomes without fetching data or importing Streamlit. The fourth slice adds a dashboard Debrief lab that reads the local journal and already-loaded OHLCV to show hit-rate summaries and threshold-review candidates.
+Use a local SQLite database at `data/run_journal/runs.sqlite`. The database is gitignored and owned by the deployed machine, similar to `state.json`. The first slice keeps all code in `src/run_journal.py` and avoids Streamlit, network calls, provider fetches, and app imports. The second slice adds pure conversion helpers plus a small Streamlit call after BLUF/state-machine scoring so dashboard runs are journaled without changing scoring behavior. The third slice adds a pure debrief engine in `src/run_debrief.py` that accepts already-loaded OHLCV and computes forward outcomes without fetching data or importing Streamlit. The fourth slice adds a dashboard Debrief lab that reads the local journal and already-loaded OHLCV to show hit-rate summaries and threshold-review candidates. The fifth slice uses the same already-loaded debrief records to export flat outcome rows and a Markdown report for offline review.
 
 The journal stores:
 
@@ -42,3 +43,4 @@ The journal is append-only by `run_id`; duplicate run ids are rejected. It never
 - Missing ticker, missing price, no baseline, and insufficient future data produce unavailable outcomes instead of crashing.
 - Debrief summaries can report hit rate and average forward return by action and horizon, with failed recommendations exposed as threshold-review candidates.
 - The dashboard surfaces debrief summaries without fetching new market data or blocking render when the local journal is empty or unavailable.
+- The dashboard exports debrief outcome rows and a Markdown report without exposing secrets or changing live recommendation logic.
