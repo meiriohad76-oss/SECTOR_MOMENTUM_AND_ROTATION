@@ -44,6 +44,7 @@ data/state.json
 data_cache/
 data/feeds/
 data/logs/
+data/provider_snapshots/
 data/run_journal/
 data/saved_inputs.json
 data/pwa_push_subscriptions.json

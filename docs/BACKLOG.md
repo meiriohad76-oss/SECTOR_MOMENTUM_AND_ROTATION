@@ -276,9 +276,21 @@ Status legend:
 ### B-160 · Massive evidence gate for live promotion — 💡 RESEARCHED, NOT BUILT
 **Purpose:** promote Massive-derived criteria only if B-159 shows durable improvement and no data-leakage issue.
 **Scope:** convert validated Massive historical findings into explicit candidate changes for Pillar 7 weights, thresholds, provider-flow features, or alert/veto rules.
-**Current gate:** blocked by the 2026-05-22 B-159 report because no Massive-derived variant earned a `candidate` label and trade-tape/block-trade sweeps lack historical as-of snapshots.
+**Current gate:** blocked by the 2026-05-22 B-159 report because no Massive-derived variant earned a `candidate` label. B-161 now provides the snapshot store/replay foundation, but B-162 still needs to populate enough historical as-of snapshots and run provider-flow variants before promotion can be considered.
 **Acceptance:** the promotion plan cites the B-159 report, includes before/after backtest tables, deterministic tests for threshold behavior, live-provider failure-mode tests, and documentation of the activation flags or configuration required.
 **Safety:** no Massive/provider-flow rule can enter live scoring, veto logic, alerts, recommendations, or dashboard decision text until the B-159 evidence gate passes and is reviewed.
+
+### B-161 · Massive historical as-of provider snapshot store — IMPLEMENTED
+**Status:** B-161 is implemented as an offline SQLite snapshot store and capture helper for later historical replay.
+**Files:** `src/provider_snapshots.py`, `scripts/capture_massive_provider_snapshots.py`, `tests/test_provider_snapshots.py`, `tests/test_capture_massive_provider_snapshots_script.py`, `.gitignore`.
+**Behavior:** provider snapshots are stored under ignored local data paths by default, keyed by provider, dataset, ticker, and as-of date. Replay helpers return only the latest snapshot whose as-of date is less than or equal to the requested rebalance date, so future snapshots cannot leak into historical decisions. A capture CLI can save Massive `/v3/trades` payloads for one or more tickers without printing secrets.
+**Safety:** storage/replay only; no live scoring, state-machine behavior, provider-flow behavior, alerts, vetoes, recommendations, broker behavior, or Pillar 7 weights change.
+
+### B-162 · Massive provider-flow historical backtest variants — 🎯 NEXT SESSION
+**Purpose:** use B-161 snapshots to backtest Massive trade-tape/block-trade criteria as true historical as-of provider-flow variants.
+**Scope:** define a snapshot population window, preserve any provider response pagination/status/request metadata needed for offline audit, replay snapshots at each methodology rebalance, sweep provider-flow thresholds such as block-trade upside ratio, and update the Massive validation report with candidate/needs-more-testing/do-not-promote labels.
+**Acceptance:** tests prove replayed provider-flow features use only snapshots available as of each rebalance date; the report includes snapshot coverage, missing-date handling, threshold sweep results, and before/after OOS metrics versus the B-159 baseline.
+**Safety:** research only until B-160; no provider-flow rule can change live behavior or dashboard recommendations from B-162 alone.
 
 ---
 

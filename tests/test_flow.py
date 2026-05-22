@@ -332,6 +332,36 @@ def test_fetch_massive_stock_trades_uses_key_and_trade_endpoint(monkeypatch):
     assert calls[0][1]["timeout"] == 7
 
 
+def test_fetch_massive_stock_trades_can_apply_end_date_bound(monkeypatch):
+    calls = []
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"results": []}
+
+    def fake_get(url, **kwargs):
+        calls.append((url, kwargs))
+        return FakeResponse()
+
+    monkeypatch.setattr(flow, "_resolve_secret", lambda name: "secret" if name == "MASSIVE_API_KEY" else None)
+    monkeypatch.setattr(flow.requests, "get", fake_get)
+
+    trades = flow._fetch_massive_stock_trades(
+        "xlk",
+        start_date="2026-05-19",
+        end_date="2026-05-20",
+        limit=50,
+        timeout=7,
+    )
+
+    assert trades == []
+    assert calls[0][1]["params"]["timestamp.gte"] == "2026-05-19"
+    assert calls[0][1]["params"]["timestamp.lt"] == "2026-05-20"
+
+
 def test_block_trade_upside_ratio_uses_massive_provider_when_enabled(monkeypatch):
     monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", False, raising=False)
     monkeypatch.setattr(

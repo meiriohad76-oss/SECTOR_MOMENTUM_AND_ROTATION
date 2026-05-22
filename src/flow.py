@@ -377,6 +377,7 @@ def block_trade_upside_ratio_from_massive_trades(trades: list[dict]) -> Optional
 def _fetch_massive_stock_trades(
     ticker: str,
     start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     limit: int = 5_000,
     timeout: int = 20,
 ) -> list[dict]:
@@ -390,6 +391,8 @@ def _fetch_massive_stock_trades(
     }
     if start_date:
         params["timestamp.gte"] = start_date
+    if end_date:
+        params["timestamp.lt"] = end_date
     response = requests.get(
         MASSIVE_STOCK_TRADES_URL_TEMPLATE.format(ticker=str(ticker).upper()),
         params=params,
