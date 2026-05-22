@@ -1,18 +1,43 @@
 """View preference helpers for the dashboard."""
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime, timezone
+import json
+from pathlib import Path
 from collections.abc import MutableMapping
+from typing import Mapping
 
 
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_PREFERENCE_PROFILES_PATH = ROOT / "data" / "preference_profiles.json"
 BLUF_MODES = ("Verdict", "Compact", "Hidden")
 DENSITY_MODES = ("Comfortable", "Compact")
 SPARKLINE_STYLES = ("Filled", "Line", "Off")
 PALETTE_OPTIONS = ("Default", "Solarized", "Nord", "Mono")
+STORE_VERSION = 1
 
 DEFAULT_BLUF_MODE = "Verdict"
 DEFAULT_DENSITY = "Comfortable"
 DEFAULT_SPARKLINE_STYLE = "Filled"
 DEFAULT_PALETTE = "Default"
+
+
+@dataclass(frozen=True)
+class PreferenceProfile:
+    name: str
+    bluf_mode: str
+    view_density: str
+    sparkline_style: str
+    color_palette: str
+    updated_at: str
+
+
+@dataclass(frozen=True)
+class PreferenceProfileSaveResult:
+    ok: bool
+    message: str
+    profile: PreferenceProfile | None = None
 
 _PALETTE_TOKENS = {
     ("solarized", "dark"): {
@@ -147,6 +172,75 @@ def initialize_preferences(session_state: MutableMapping) -> None:
     )
 
 
+def load_preference_profiles(path: str | Path | None = None) -> list[PreferenceProfile]:
+    store_path = _profile_store_path(path)
+    if not store_path.exists():
+        return []
+    try:
+        payload = json.loads(store_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(payload, dict):
+        return []
+    items = payload.get("profiles", [])
+    if not isinstance(items, list):
+        return []
+
+    profiles: list[PreferenceProfile] = []
+    for item in items:
+        profile = _preference_profile_from_payload(item)
+        if profile is not None:
+            profiles.append(profile)
+    return sorted(profiles, key=lambda profile: profile.name.casefold())
+
+
+def save_preference_profile(
+    name: str,
+    preferences: Mapping,
+    path: str | Path | None = None,
+    now: str | None = None,
+) -> PreferenceProfileSaveResult:
+    clean_name = _clean_profile_name(name)
+    if clean_name is None:
+        return PreferenceProfileSaveResult(False, "name is required")
+
+    profile = PreferenceProfile(
+        name=clean_name,
+        bluf_mode=_normalize(preferences.get("bluf_mode"), BLUF_MODES, DEFAULT_BLUF_MODE),
+        view_density=_normalize(preferences.get("view_density"), DENSITY_MODES, DEFAULT_DENSITY),
+        sparkline_style=_normalize(
+            preferences.get("sparkline_style"),
+            SPARKLINE_STYLES,
+            DEFAULT_SPARKLINE_STYLE,
+        ),
+        color_palette=_normalize(preferences.get("color_palette"), PALETTE_OPTIONS, DEFAULT_PALETTE),
+        updated_at=now or _utc_now(),
+    )
+    existing = [item for item in load_preference_profiles(path) if item.name.casefold() != clean_name.casefold()]
+    existing.append(profile)
+    _write_preference_profiles(existing, path)
+    return PreferenceProfileSaveResult(True, f"saved profile {clean_name}", profile)
+
+
+def delete_preference_profile(name: str, path: str | Path | None = None) -> bool:
+    clean_name = _clean_profile_name(name)
+    if clean_name is None:
+        return False
+    profiles = load_preference_profiles(path)
+    keep = [profile for profile in profiles if profile.name.casefold() != clean_name.casefold()]
+    if len(keep) == len(profiles):
+        return False
+    _write_preference_profiles(keep, path)
+    return True
+
+
+def apply_preference_profile(session_state: MutableMapping, profile: PreferenceProfile) -> None:
+    session_state["bluf_mode"] = profile.bluf_mode
+    session_state["view_density"] = profile.view_density
+    session_state["sparkline_style"] = profile.sparkline_style
+    session_state["color_palette"] = profile.color_palette
+
+
 def density_class(value: str) -> str:
     density = _normalize(value, DENSITY_MODES, DEFAULT_DENSITY)
     return f"density-{density.lower()}"
@@ -178,3 +272,54 @@ def palette_css_variables(value: str, theme: str) -> str:
         return ""
     declarations = "\n".join(f"  {name}: {token_value};" for name, token_value in tokens.items())
     return f"\n:root {{\n{declarations}\n}}\n"
+
+
+def _preference_profile_from_payload(payload) -> PreferenceProfile | None:
+    if not isinstance(payload, dict):
+        return None
+    name = _clean_profile_name(payload.get("name"))
+    if name is None:
+        return None
+    return PreferenceProfile(
+        name=name,
+        bluf_mode=_normalize(payload.get("bluf_mode"), BLUF_MODES, DEFAULT_BLUF_MODE),
+        view_density=_normalize(payload.get("view_density"), DENSITY_MODES, DEFAULT_DENSITY),
+        sparkline_style=_normalize(payload.get("sparkline_style"), SPARKLINE_STYLES, DEFAULT_SPARKLINE_STYLE),
+        color_palette=_normalize(payload.get("color_palette"), PALETTE_OPTIONS, DEFAULT_PALETTE),
+        updated_at=str(payload.get("updated_at") or ""),
+    )
+
+
+def _write_preference_profiles(profiles: list[PreferenceProfile], path: str | Path | None) -> None:
+    store_path = _profile_store_path(path)
+    store_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": STORE_VERSION,
+        "profiles": [
+            {
+                "name": profile.name,
+                "bluf_mode": profile.bluf_mode,
+                "view_density": profile.view_density,
+                "sparkline_style": profile.sparkline_style,
+                "color_palette": profile.color_palette,
+                "updated_at": profile.updated_at,
+            }
+            for profile in sorted(profiles, key=lambda item: item.name.casefold())
+        ],
+    }
+    tmp_path = store_path.with_suffix(store_path.suffix + ".tmp")
+    tmp_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    tmp_path.replace(store_path)
+
+
+def _clean_profile_name(name) -> str | None:
+    cleaned = str(name or "").strip()
+    return cleaned[:80] if cleaned else None
+
+
+def _profile_store_path(path: str | Path | None = None) -> Path:
+    return Path(path) if path is not None else DEFAULT_PREFERENCE_PROFILES_PATH
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")

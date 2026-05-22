@@ -36,6 +36,8 @@ data/feeds/
 data/logs/
 data/run_journal/
 data/saved_inputs.json
+data/preference_profiles.json
+data/preference_profiles.json.tmp
 data/pwa_push_subscriptions.json
 data/vapid_private_key.pem
 public/feeds/

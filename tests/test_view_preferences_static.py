@@ -10,12 +10,53 @@ def test_view_preferences_are_initialized_and_rendered_near_header():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
     assert "initialize_preferences(st.session_state)" in app_source
+    assert 'PREFERENCE_PROFILES_PATH = APP_ROOT / "data" / "preference_profiles.json"' in app_source
+    assert "load_preference_profiles(PREFERENCE_PROFILES_PATH)" in app_source
+    assert "apply_preference_profile(st.session_state" in app_source
+    assert "save_preference_profile(" in app_source
+    assert "delete_preference_profile(" in app_source
     assert '_render_timed("render_header_controls", render_header_controls)' in app_source
     assert '_render_timed("render_view_preferences", render_view_preferences)' in app_source
     assert app_source.index('_render_timed("render_header_controls", render_header_controls)') < app_source.index(
         '_render_timed("render_view_preferences", render_view_preferences)'
     )
     assert "render_bluf()" in app_source
+
+
+def test_preference_profile_actions_use_callbacks_not_post_widget_mutation():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    start = app_source.index("def render_view_preferences():")
+    end = app_source.index("def render_header_controls():")
+    section = app_source[start:end]
+
+    assert "on_click=_load_preference_profile" in section
+    assert "on_click=_save_preference_profile" in section
+    assert "on_click=_delete_preference_profile" in section
+    assert 'if st.button("Load"' not in section
+    assert 'if st.button("Save"' not in section
+    assert 'if st.button("Delete"' not in section
+    assert "st.rerun()" not in section
+
+
+def test_preference_profile_ui_has_no_data_scoring_or_alert_side_effects():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    start = app_source.index("def render_view_preferences():")
+    end = app_source.index("def render_header_controls():")
+    section = app_source[start:end]
+
+    assert "fetch_ohlcv(" not in section
+    assert "fetch_ohlcv_result(" not in section
+    assert "compute_composite(" not in section
+    assert "apply_state_machine(" not in section
+    assert "send_transition_alerts(" not in section
+    assert "append_dashboard_run(" not in section
+    assert "save_watchlist(" not in section
+    assert "save_portfolio(" not in section
+    assert "requests." not in section
+    assert "log_event(" not in section
+    assert "webpush" not in section.lower()
+    assert "subscription" not in section.lower()
+    assert "LOG_SHIP" not in section
 
 
 def test_app_uses_preferences_for_bluf_density_and_sparklines():

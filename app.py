@@ -62,11 +62,15 @@ from src.preferences import (
     DENSITY_MODES,
     PALETTE_OPTIONS,
     SPARKLINE_STYLES,
+    apply_preference_profile,
+    delete_preference_profile,
     density_class,
     initialize_preferences,
     is_compact_bluf,
+    load_preference_profiles,
     palette_css_variables,
     palette_key,
+    save_preference_profile,
     should_render_bluf,
     sparkline_mode,
 )
@@ -332,6 +336,7 @@ BACKTEST_EQUITY_PATH = APP_ROOT / "docs" / "backtest_equity.csv"
 BACKTEST_STATES_PATH = APP_ROOT / "docs" / "backtest_states.csv"
 BACKTEST_METADATA_PATH = APP_ROOT / "docs" / "backtest_metadata.json"
 SAVED_INPUTS_PATH = APP_ROOT / "data" / "saved_inputs.json"
+PREFERENCE_PROFILES_PATH = APP_ROOT / "data" / "preference_profiles.json"
 LOAD_WATCHLIST_LABEL = "LOAD WATCHLIST"
 DELETE_WATCHLIST_LABEL = "DELETE WATCHLIST"
 SAVE_WATCHLIST_LABEL = "SAVE WATCHLIST"
@@ -674,6 +679,48 @@ def render_header():
 
 def render_view_preferences():
     with st.expander("VIEW OPTIONS", expanded=False):
+        def _load_preference_profile(profile_name: str) -> None:
+            profile = next(
+                (item for item in load_preference_profiles(PREFERENCE_PROFILES_PATH) if item.name == profile_name),
+                None,
+            )
+            if profile is None:
+                st.session_state.preference_profile_error = "profile unavailable"
+                st.session_state.pop("preference_profile_message", None)
+                return
+            apply_preference_profile(st.session_state, profile)
+            st.session_state.preference_profile_message = f"loaded profile {profile.name}"
+            st.session_state.pop("preference_profile_error", None)
+
+        def _save_preference_profile() -> None:
+            result = save_preference_profile(
+                st.session_state.get("preference_profile_name", ""),
+                {
+                    "bluf_mode": st.session_state.bluf_mode,
+                    "view_density": st.session_state.view_density,
+                    "sparkline_style": st.session_state.sparkline_style,
+                    "color_palette": st.session_state.color_palette,
+                },
+                path=PREFERENCE_PROFILES_PATH,
+            )
+            if not result.ok:
+                st.session_state.preference_profile_error = result.message
+                st.session_state.pop("preference_profile_message", None)
+                return
+            st.session_state.preference_profile_message = result.message
+            st.session_state.pop("preference_profile_error", None)
+            if result.profile is not None:
+                st.session_state.preference_profile_choice = result.profile.name
+
+        def _delete_preference_profile(profile_name: str) -> None:
+            if delete_preference_profile(profile_name, path=PREFERENCE_PROFILES_PATH):
+                st.session_state.preference_profile_message = f"deleted profile {profile_name}"
+                st.session_state.pop("preference_profile_error", None)
+            else:
+                st.session_state.preference_profile_error = "profile unavailable"
+                st.session_state.pop("preference_profile_message", None)
+            st.session_state.pop("preference_profile_choice", None)
+
         c1, c2, c3, c4 = st.columns(4)
         with c1:
             st.radio(
@@ -703,6 +750,52 @@ def render_view_preferences():
                 horizontal=True,
                 key="color_palette",
             )
+        profiles = load_preference_profiles(PREFERENCE_PROFILES_PATH)
+        profile_names = [profile.name for profile in profiles]
+        profile_by_name = {profile.name: profile for profile in profiles}
+        selected_value = st.session_state.get("preference_profile_choice")
+        if selected_value and selected_value not in profile_by_name and "preference_profile_choice" in st.session_state:
+            del st.session_state["preference_profile_choice"]
+        p1, p2, p3, p4, p5 = st.columns([2, 2, 1, 1, 1])
+        with p1:
+            selected_profile_name = st.selectbox(
+                "Profile",
+                profile_names or ["No saved profiles"],
+                key="preference_profile_choice",
+                disabled=not profile_names,
+            )
+        selected_profile = profile_by_name.get(selected_profile_name)
+        with p2:
+            profile_name = st.text_input("Name", key="preference_profile_name", placeholder="Review desk")
+        with p3:
+            st.button(
+                "Load",
+                key="preference_profile_load",
+                disabled=selected_profile is None,
+                use_container_width=True,
+                on_click=_load_preference_profile,
+                args=(selected_profile_name,),
+            )
+        with p4:
+            st.button(
+                "Save",
+                key="preference_profile_save",
+                use_container_width=True,
+                on_click=_save_preference_profile,
+            )
+        with p5:
+            st.button(
+                "Delete",
+                key="preference_profile_delete",
+                disabled=selected_profile is None,
+                use_container_width=True,
+                on_click=_delete_preference_profile,
+                args=(selected_profile_name,),
+            )
+        if st.session_state.get("preference_profile_error"):
+            st.warning(st.session_state.preference_profile_error)
+        elif st.session_state.get("preference_profile_message"):
+            st.caption(st.session_state.preference_profile_message)
 
 
 def render_header_controls():

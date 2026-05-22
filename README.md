@@ -144,7 +144,7 @@ B-116 adds a subtle dashed 30-week moving-average reference line to pick-card sp
 
 ## Custom palettes
 
-B-117 adds a `Palette` preference in `VIEW OPTIONS`. Choose `Default`, `Solarized`, `Nord`, or `Mono`; the choice sets CSS tokens only and works alongside the existing dark/light toggle.
+B-117 adds a `Palette` preference in `VIEW OPTIONS`. Choose `Default`, `Solarized`, `Nord`, or `Mono`; the choice sets CSS tokens only and works alongside the existing dark/light toggle. B-025 also lets you save, load, and delete named local view profiles for BLUF mode, density, sparkline style, and palette in `data/preference_profiles.json`.
 
 ## Component docs
 

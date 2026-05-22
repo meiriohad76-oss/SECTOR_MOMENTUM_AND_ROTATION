@@ -116,3 +116,92 @@ def test_solarized_muted_tokens_clear_small_text_contrast_floor():
         for text_token in ("--muted", "--muted-2"):
             for surface_token in ("--bg", "--panel"):
                 assert _contrast_ratio(tokens[text_token], tokens[surface_token]) >= 4.5
+
+
+def test_preference_profiles_are_saved_normalized_and_overwritten(tmp_path):
+    store_path = tmp_path / "preference_profiles.json"
+
+    result = preferences.save_preference_profile(
+        " Desk ",
+        {
+            "bluf_mode": "compact",
+            "view_density": "compact",
+            "sparkline_style": "line",
+            "color_palette": "nord",
+        },
+        path=store_path,
+        now="2026-05-22T10:00:00Z",
+    )
+    overwritten = preferences.save_preference_profile(
+        "desk",
+        {
+            "bluf_mode": "invalid",
+            "view_density": "Comfortable",
+            "sparkline_style": "Off",
+            "color_palette": "Mono",
+        },
+        path=store_path,
+        now="2026-05-22T11:00:00Z",
+    )
+
+    profiles = preferences.load_preference_profiles(store_path)
+    assert result.ok is True
+    assert overwritten.ok is True
+    assert len(profiles) == 1
+    assert profiles[0].name == "desk"
+    assert profiles[0].bluf_mode == "Verdict"
+    assert profiles[0].view_density == "Comfortable"
+    assert profiles[0].sparkline_style == "Off"
+    assert profiles[0].color_palette == "Mono"
+    assert profiles[0].updated_at == "2026-05-22T11:00:00Z"
+
+
+def test_preference_profiles_apply_and_delete_by_name(tmp_path):
+    store_path = tmp_path / "preference_profiles.json"
+    preferences.save_preference_profile(
+        "Review",
+        {
+            "bluf_mode": "Hidden",
+            "view_density": "Compact",
+            "sparkline_style": "Off",
+            "color_palette": "Solarized",
+        },
+        path=store_path,
+        now="2026-05-22T10:00:00Z",
+    )
+    profile = preferences.load_preference_profiles(store_path)[0]
+    session = {}
+
+    preferences.apply_preference_profile(session, profile)
+    deleted = preferences.delete_preference_profile("review", path=store_path)
+
+    assert session == {
+        "bluf_mode": "Hidden",
+        "view_density": "Compact",
+        "sparkline_style": "Off",
+        "color_palette": "Solarized",
+    }
+    assert deleted is True
+    assert preferences.load_preference_profiles(store_path) == []
+
+
+def test_preference_profile_store_handles_missing_corrupt_and_invalid_inputs(tmp_path):
+    store_path = tmp_path / "preference_profiles.json"
+    assert preferences.load_preference_profiles(store_path) == []
+
+    store_path.write_text("{bad json", encoding="utf-8")
+    assert preferences.load_preference_profiles(store_path) == []
+
+    no_name = preferences.save_preference_profile("", {"bluf_mode": "Hidden"}, path=store_path)
+    assert no_name.ok is False
+    assert preferences.delete_preference_profile("", path=store_path) is False
+
+
+def test_preference_profile_path_is_ignored_by_git_and_docker_contexts():
+    gitignore = preferences.ROOT.joinpath(".gitignore").read_text(encoding="utf-8")
+    dockerignore = preferences.ROOT.joinpath(".dockerignore").read_text(encoding="utf-8")
+
+    assert "data/preference_profiles.json" in gitignore
+    assert "data/preference_profiles.json.tmp" in gitignore
+    assert "data/preference_profiles.json" in dockerignore
+    assert "data/preference_profiles.json.tmp" in dockerignore

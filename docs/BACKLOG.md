@@ -241,10 +241,11 @@ Status legend:
 **Deferred:** custom component bridge and animated fetching state remain future polish.
 
 ### B-025 · TweaksPanel parity (BLUF Compact / Hidden modes) — IMPLEMENTED
-**Status:** Native Streamlit `VIEW OPTIONS` expander is implemented near the header.
-**Files:** `src/preferences.py`, `app.py`, `src/visuals.py`, `static/style.css`, `tests/test_preferences.py`, `tests/test_visuals.py`, `tests/test_view_preferences_static.py`.
-**Controls:** BLUF mode (`Verdict`, `Compact`, `Hidden`), density (`Comfortable`, `Compact`), and sparkline style (`Filled`, `Line`, `Off`).
-**Deferred:** custom floating React-style panel, persisted user profiles, and additional palettes remain future preference work.
+**Status:** Native Streamlit `VIEW OPTIONS` expander and local preference profiles are implemented near the header.
+**Files:** `src/preferences.py`, `app.py`, `src/visuals.py`, `static/style.css`, `.gitignore`, `.dockerignore`, `tests/test_preferences.py`, `tests/test_visuals.py`, `tests/test_view_preferences_static.py`.
+**Controls:** BLUF mode (`Verdict`, `Compact`, `Hidden`), density (`Comfortable`, `Compact`), sparkline style (`Filled`, `Line`, `Off`), palette, and save/load/delete named local preference profiles.
+**Behavior:** preference profiles persist to ignored local JSON at `data/preference_profiles.json`; profiles store only display preferences and do not fetch data, mutate scoring, write the state machine, send alerts, or expose secrets.
+**Deferred:** custom floating React-style panel and additional palettes remain future preference polish.
 
 ### B-026 · Empty + loading state design — IMPLEMENTED
 **Status:** dashboard-native empty and loading states are implemented in `backlog-stepwise-qa`.
