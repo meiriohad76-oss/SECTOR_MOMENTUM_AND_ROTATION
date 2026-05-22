@@ -31,7 +31,7 @@ from src.data import fetch_ohlcv_result, _select_ohlcv_provider
 from src.flow import compute_flow_signals, flow_composite_z, STUB_MODE
 from src.indicators import compute_all_indicators
 from src.macro import assess_regime
-from src.macro_tiles import MACRO_CONTEXT_SYMBOLS, macro_tile_rows, session_range_tile
+from src.macro_tiles import MACRO_CONTEXT_SYMBOLS, fred_macro_snapshot, fred_macro_tile_groups, macro_tile_rows, session_range_tile
 from src.navigation import initialize_drill_ticker, select_drill_ticker
 from src.personal_trades import (
     TradeInputResult,
@@ -439,12 +439,13 @@ def _current_git_sha() -> str | None:
     return result.stdout.strip() or None
 
 
-def _record_dashboard_run(scored_df, bluf_payload, regime_obj, transitions_rows, ohlcv_payload) -> None:
+def _record_dashboard_run(scored_df, bluf_payload, regime_obj, transitions_rows, ohlcv_payload, fred_snapshot) -> None:
     metadata = {
         "phase": regime_obj.phase_hint,
         "risk_on": regime_obj.risk_on,
         "fred_used": regime_obj.fred_used,
         "regime_note": regime_obj.note,
+        "fred_macro_snapshot": fred_snapshot,
         "transition_count_14d": len(transitions_rows),
         "benchmarks": {"us": BENCH["US"], "tbill": BENCH["TBILL"]},
         "missing_ohlcv": sorted(set(DATA_SYMBOLS) - set(ohlcv_payload)),
@@ -603,7 +604,7 @@ def _build_bluf(scored_df: pd.DataFrame):
 
 bluf = _build_bluf(scored)
 transitions = recent_transitions(n=14)
-_record_dashboard_run(scored, bluf, regime, transitions, ohlcv)
+_record_dashboard_run(scored, bluf, regime, transitions, ohlcv, fred_macro_snapshot(_fred_data))
 
 # Phase index for the phase bar
 PHASE_IDX = {"EARLY": 0, "MID": 1, "LATE": 2, "RECESSION": 3, "UNKNOWN": -1}
@@ -828,6 +829,23 @@ def render_status():
           <div class="tile-sub">{_esc(row['change'])} Â· {_esc(row['subtitle'])}</div>
         </div>
         """
+    fred_macro_groups_html = ""
+    for group in fred_macro_tile_groups(_fred_data):
+        rows_html = ""
+        for row in group["rows"]:
+            rows_html += f"""
+            <div class="tile macro-tile fred-macro-tile">
+              <div class="tile-label">{_esc(row['label'])}<span class="tile-delta">{_esc(row['series_id'])}</span></div>
+              <div class="tile-value {row['tone']}">{_esc(row['value'])}</div>
+              <div class="tile-sub">{_esc(row['change'])} / {_esc(row['subtitle'])}</div>
+            </div>
+            """
+        fred_macro_groups_html += f"""
+        <div class="fred-macro-group">
+          <div class="fred-macro-group-label">{_esc(group['group'])}</div>
+          <div class="fred-macro-grid">{rows_html}</div>
+        </div>
+        """
 
     html = f"""
     <section class="section">
@@ -871,6 +889,10 @@ def render_status():
         {session_tile_html}
         {macro_tiles_html}
 
+      </div>
+      <div class="fred-macro-context">
+        <div class="fred-macro-title">Expanded FRED macro context</div>
+        {fred_macro_groups_html}
       </div>
     </section>
     """

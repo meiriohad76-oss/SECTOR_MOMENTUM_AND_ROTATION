@@ -108,7 +108,7 @@ Do not wire these into the app without a fresh lookup via `fred/series/search`.
 
 ## Recommended Implementation Order
 
-1. Add a read-only FRED macro context expansion with grouped tiles and no scoring changes.
-2. Log the expanded macro snapshot into the B-153 run journal so the debrief engine can compare macro conditions with later outcomes.
+1. Add a read-only FRED macro context expansion with grouped tiles and no scoring changes. Implemented in B-154.
+2. Log the expanded macro snapshot into the B-153 run journal so the debrief engine can compare macro conditions with later outcomes. Implemented in B-154.
 3. Add B-011 backtest variants that test whether any new macro features improve decisions.
 4. Only promote validated features into scoring or veto logic after backtest evidence beats the current methodology.

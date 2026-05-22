@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.macro_tiles import MACRO_CONTEXT_SYMBOLS, macro_tile_rows, session_range_tile
+from src.macro_tiles import (
+    MACRO_CONTEXT_SYMBOLS,
+    fred_macro_snapshot,
+    fred_macro_tile_groups,
+    macro_tile_rows,
+    session_range_tile,
+)
 
 
 def _frame(values):
@@ -78,3 +84,68 @@ def test_session_range_tile_rejects_non_finite_latest_values():
     assert row["value"] == "DATA PENDING"
     assert row["change"] == "-"
     assert row["tone"] == "warn"
+
+
+def test_fred_macro_tile_groups_format_read_only_context():
+    fred = {
+        "DGS10": pd.Series([4.4, 4.6], index=pd.date_range("2026-05-01", periods=2)),
+        "T10Y2Y": pd.Series([0.2, 0.5], index=pd.date_range("2026-05-01", periods=2)),
+        "CPIAUCSL": pd.Series(
+            [320.0, *([324.0] * 11), 330.0],
+            index=pd.date_range("2025-04-01", periods=13, freq="MS"),
+        ),
+        "WALCL": pd.Series([6700000.0], index=pd.date_range("2026-05-01", periods=1)),
+        "CFNAI": pd.Series([-0.1, 0.2], index=pd.date_range("2026-05-01", periods=2)),
+        "ICSA": pd.Series([230000.0, 210000.0], index=pd.date_range("2026-05-01", periods=2)),
+        "BAMLH0A0HYM2": pd.Series([3.1, 2.8], index=pd.date_range("2026-05-01", periods=2)),
+        "DCOILWTICO": pd.Series([100.0, 112.2], index=pd.date_range("2026-05-01", periods=2)),
+    }
+
+    groups = fred_macro_tile_groups(fred)
+
+    assert [group["group"] for group in groups] == [
+        "Rates",
+        "Inflation",
+        "Liquidity",
+        "Growth",
+        "Credit",
+        "Commodities",
+    ]
+    rates = groups[0]["rows"]
+    assert rates[0]["label"] == "10Y yield"
+    assert rates[0]["value"] == "4.60%"
+    assert rates[0]["change"] == "+0.20 pp"
+    assert rates[1]["label"] == "2s10s"
+    assert rates[1]["value"] == "0.50%"
+    assert groups[1]["rows"][0]["label"] == "CPI"
+    assert groups[1]["rows"][0]["change"] == "+3.1% YoY"
+    assert groups[2]["rows"][0]["value"] == "6.70T"
+    assert groups[3]["rows"][0]["tone"] == "up"
+    assert groups[4]["rows"][0]["tone"] == "up"
+    assert groups[5]["rows"][0]["value"] == "112.20"
+
+
+def test_fred_macro_tile_groups_use_data_pending_for_missing_series():
+    groups = fred_macro_tile_groups({})
+
+    assert groups[0]["rows"][0]["value"] == "DATA PENDING"
+    assert groups[0]["rows"][0]["change"] == "-"
+    assert groups[0]["rows"][0]["tone"] == "warn"
+
+
+def test_fred_macro_snapshot_is_clean_journal_metadata():
+    fred = {
+        "DGS10": pd.Series([4.6], index=pd.to_datetime(["2026-05-21"])),
+        "CPIAUCSL": pd.Series([330.0], index=pd.to_datetime(["2026-04-01"])),
+    }
+
+    snapshot = fred_macro_snapshot(fred)
+
+    assert snapshot["DGS10"] == {
+        "label": "10Y yield",
+        "group": "Rates",
+        "latest_date": "2026-05-21",
+        "latest_value": 4.6,
+    }
+    assert snapshot["CPIAUCSL"]["group"] == "Inflation"
+    assert "T10Y2Y" not in snapshot

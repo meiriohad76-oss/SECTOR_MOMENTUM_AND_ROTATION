@@ -61,9 +61,9 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         name="Market state",
         section="Decision surface",
         render_function="render_status",
-        data_inputs=("regime", "transition rows", "macro OHLCV"),
-        states=("risk-on", "risk-off", "data pending"),
-        qa=("macro tile tests", "session range tests"),
+        data_inputs=("regime", "transition rows", "macro OHLCV", "FRED macro snapshot"),
+        states=("risk-on", "risk-off", "data pending", "expanded FRED context"),
+        qa=("macro tile tests", "session range tests", "run-journal static tests"),
     ),
     ComponentDoc(
         name="Alerts",
