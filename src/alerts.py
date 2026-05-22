@@ -12,6 +12,10 @@ import requests
 
 HIGH_SEVERITY_STATES = {"EXIT", "BEARISH_STAGE_4"}
 EASTERN_TZ = ZoneInfo("America/New_York")
+DISCORD_MATTERMOST_WEBHOOKS = {
+    "discord": ("DISCORD_WEBHOOK_URL", "content"),
+    "mattermost": ("MATTERMOST_WEBHOOK_URL", "text"),
+}
 
 
 def _resolve_secret(name: str) -> Optional[str]:
@@ -149,6 +153,30 @@ def send_low_severity_email_digest(
     return True
 
 
+def discord_mattermost_webhook_status() -> dict[str, bool]:
+    return {
+        name: bool(_resolve_secret(secret_name))
+        for name, (secret_name, _payload_key) in DISCORD_MATTERMOST_WEBHOOKS.items()
+    }
+
+
+def send_discord_mattermost_test_alert(text: str, timeout: int = 5) -> dict[str, str]:
+    results: dict[str, str] = {}
+    for name, (secret_name, payload_key) in DISCORD_MATTERMOST_WEBHOOKS.items():
+        webhook_url = _resolve_secret(secret_name)
+        if not webhook_url:
+            results[name] = "skipped"
+            continue
+        try:
+            response = requests.post(webhook_url, json={payload_key: text}, timeout=timeout)
+            response.raise_for_status()
+        except requests.RequestException:
+            results[name] = "failed"
+        else:
+            results[name] = "sent"
+    return results
+
+
 def send_transition_alerts(transitions: list[dict], timeout: int = 5) -> None:
     if not transitions:
         return
@@ -157,8 +185,6 @@ def send_transition_alerts(transitions: list[dict], timeout: int = 5) -> None:
     telegram_token = _resolve_secret("TELEGRAM_BOT_TOKEN")
     telegram_chat_id = _resolve_secret("TELEGRAM_CHAT_ID")
     slack_webhook_url = _resolve_secret("SLACK_WEBHOOK_URL")
-    discord_webhook_url = _resolve_secret("DISCORD_WEBHOOK_URL")
-    mattermost_webhook_url = _resolve_secret("MATTERMOST_WEBHOOK_URL")
 
     if telegram_token and telegram_chat_id:
         try:
@@ -182,24 +208,4 @@ def send_transition_alerts(transitions: list[dict], timeout: int = 5) -> None:
         except requests.RequestException:
             pass
 
-    if discord_webhook_url:
-        try:
-            response = requests.post(
-                discord_webhook_url,
-                json={"content": text},
-                timeout=timeout,
-            )
-            response.raise_for_status()
-        except requests.RequestException:
-            pass
-
-    if mattermost_webhook_url:
-        try:
-            response = requests.post(
-                mattermost_webhook_url,
-                json={"text": text},
-                timeout=timeout,
-            )
-            response.raise_for_status()
-        except requests.RequestException:
-            pass
+    send_discord_mattermost_test_alert(text, timeout=timeout)

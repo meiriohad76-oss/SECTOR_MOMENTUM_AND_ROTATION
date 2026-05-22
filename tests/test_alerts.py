@@ -89,6 +89,60 @@ def test_send_transition_alerts_posts_to_discord_and_mattermost(monkeypatch):
     assert calls[1][1]["timeout"] == 6
 
 
+def test_discord_mattermost_webhook_status_reports_config_without_urls(monkeypatch):
+    def fake_secret(name):
+        values = {
+            "DISCORD_WEBHOOK_URL": "https://discord.test/webhook",
+            "MATTERMOST_WEBHOOK_URL": "https://mattermost.test/hooks/abc",
+        }
+        return values.get(name)
+
+    monkeypatch.setattr(alerts, "_resolve_secret", fake_secret)
+
+    status = alerts.discord_mattermost_webhook_status()
+
+    assert status == {"discord": True, "mattermost": True}
+    assert "discord.test" not in repr(status)
+    assert "mattermost.test" not in repr(status)
+
+
+def test_send_discord_mattermost_test_alert_posts_only_those_channels(monkeypatch):
+    calls = []
+
+    def fake_secret(name):
+        values = {
+            "TELEGRAM_BOT_TOKEN": "telegram-token",
+            "TELEGRAM_CHAT_ID": "12345",
+            "SLACK_WEBHOOK_URL": "https://hooks.slack.test/abc",
+            "DISCORD_WEBHOOK_URL": "https://discord.test/webhook",
+            "MATTERMOST_WEBHOOK_URL": "https://mattermost.test/hooks/abc",
+        }
+        return values.get(name)
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+    def fake_post(url, **kwargs):
+        calls.append((url, kwargs))
+        return FakeResponse()
+
+    monkeypatch.setattr(alerts, "_resolve_secret", fake_secret)
+    monkeypatch.setattr(alerts.requests, "post", fake_post)
+
+    result = alerts.send_discord_mattermost_test_alert("B-123 smoke", timeout=4)
+
+    assert result == {"discord": "sent", "mattermost": "sent"}
+    assert [call[0] for call in calls] == [
+        "https://discord.test/webhook",
+        "https://mattermost.test/hooks/abc",
+    ]
+    assert calls[0][1]["json"] == {"content": "B-123 smoke"}
+    assert calls[1][1]["json"] == {"text": "B-123 smoke"}
+    assert all("telegram" not in call[0] for call in calls)
+    assert all("slack" not in call[0] for call in calls)
+
+
 def test_send_transition_alerts_ignores_discord_mattermost_request_errors(monkeypatch):
     def fake_secret(name):
         values = {

@@ -190,12 +190,12 @@ Status legend:
 **Residual risk:** tests verify artifact generation, formatting, and public-copy output; external feed hosting/subscription smoke is still environment dependent. iCal line folding and corrupted-date hardening remain future compatibility polish.
 
 ### B-123 · Discord / Mattermost webhooks — IMPLEMENTED / WEBHOOK CONFIG PENDING
-**Status:** Discord and Mattermost transition webhook routes are implemented in `backlog-stepwise-qa`; live validation awaits webhook URLs.
-**Files:** `src/alerts.py`, `tests/test_alerts.py`, `.streamlit/secrets.toml.example`, `README.md`.
-**Activation:** leave `DISCORD_WEBHOOK_URL` and `MATTERMOST_WEBHOOK_URL` unset to disable network calls. Configure either URL in Streamlit secrets or environment variables to enable delivery.
-**Behavior:** after `apply_state_machine()` persists transitions, configured Discord and Mattermost webhooks receive the same transition text as Slack. Discord uses the normal `content` payload; Mattermost uses the Slack-compatible `text` payload. Provider failures are swallowed so scoring remains non-blocking.
+**Status:** Discord and Mattermost transition webhook routes plus a no-secret-leak smoke script are implemented in `backlog-stepwise-qa`; live validation awaits webhook URLs.
+**Files:** `src/alerts.py`, `scripts/smoke_discord_mattermost_webhooks.py`, `tests/test_alerts.py`, `tests/test_discord_mattermost_smoke_script.py`, `.streamlit/secrets.toml.example`, `README.md`.
+**Activation:** leave `DISCORD_WEBHOOK_URL` and `MATTERMOST_WEBHOOK_URL` unset to disable network calls. Configure either URL in Streamlit secrets or environment variables, validate config presence with `./.venv/bin/python scripts/smoke_discord_mattermost_webhooks.py --dry-run`, then send an explicit synthetic message with `./.venv/bin/python scripts/smoke_discord_mattermost_webhooks.py --send-test`.
+**Behavior:** after `apply_state_machine()` persists transitions, configured Discord and Mattermost webhooks receive the same transition text as Slack. Discord uses the normal `content` payload; Mattermost uses the Slack-compatible `text` payload. Provider failures are swallowed so scoring remains non-blocking. The smoke script checks or tests only Discord/Mattermost and does not print webhook URLs.
 **Evidence:** `docs/superpowers/plans/2026-05-21-b123-discord-mattermost-webhooks.md`.
-**Residual risk:** unit tests mock webhook delivery; live provider validation remains a configuration task.
+**Residual risk:** unit tests mock webhook delivery; live provider validation remains a configuration task until webhook URLs are added.
 
 ### B-022 · FRED macro overlay — IMPLEMENTED / PI LIVE VALIDATED
 **Status:** FRED-backed macro classifier and deterministic tests implemented in `backlog-stepwise-qa`; live validation passed on AHADPI5 after `FRED_API_KEY` was configured.
