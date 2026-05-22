@@ -42,3 +42,18 @@ def test_backlog_references_non_sudo_user_timers():
     assert "systemd/user/sector-email-digest.service" in backlog
     assert "systemd/user/sector-transition-feeds.service" in backlog
     assert "non-sudo user timer" in backlog
+
+
+def test_backlog_records_user_timer_live_validation_evidence():
+    backlog = (ROOT / "docs" / "BACKLOG.md").read_text(encoding="utf-8")
+    email_start = backlog.index("### B-120")
+    email_section = backlog[email_start:backlog.index("### B-122", email_start)]
+    feed_start = backlog.index("### B-122")
+    feed_section = backlog[feed_start:backlog.index("### B-123", feed_start)]
+
+    assert "USER TIMER LIVE VALIDATED / SMTP CONFIG PENDING" in email_section
+    assert "sector-email-digest.timer" in email_section
+    assert "email_digest=skipped" in email_section
+    assert "USER TIMER LIVE VALIDATED / PUBLIC ROUTE PENDING" in feed_section
+    assert "sector-transition-feeds.timer" in feed_section
+    assert "items=32" in feed_section
