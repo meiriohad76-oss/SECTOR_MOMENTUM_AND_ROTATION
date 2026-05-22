@@ -52,6 +52,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    if args.limit < 0:
+        print("error: limit must be non-negative", file=sys.stderr)
+        return 2
     transitions = list(reversed(recent_transitions(n=args.limit)))
     items = feed_items_from_transitions(transitions)
     feed_url = args.feed_url or _feed_url_from_public_base(args.public_base_url)

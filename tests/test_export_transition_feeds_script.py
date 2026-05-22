@@ -28,6 +28,19 @@ def test_export_transition_feeds_script_writes_rss_and_ical(tmp_path, monkeypatc
     assert "transitions.ics" in out
 
 
+def test_export_transition_feeds_rejects_negative_limit_before_reading_state(tmp_path, monkeypatch, capsys):
+    def fail_recent_transitions(n=500):
+        raise AssertionError("negative limit should be rejected before reading state")
+
+    monkeypatch.setattr(export_transition_feeds, "recent_transitions", fail_recent_transitions)
+
+    exit_code = export_transition_feeds.main(["--output-dir", str(tmp_path), "--limit", "-1"])
+
+    assert exit_code == 2
+    assert "limit must be non-negative" in capsys.readouterr().err
+    assert not (tmp_path / "transitions.rss").exists()
+
+
 def test_export_transition_feeds_script_can_publish_static_feed_copies(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(
         export_transition_feeds,
@@ -89,3 +102,4 @@ def test_backlog_records_transition_feed_external_public_validation():
     assert "HTTP/2 200" in section
     assert "application/x-rss+xml" in section
     assert "BEGIN:VCALENDAR" in section
+    assert "iCal line folding, malformed-date filtering, and negative `--limit` validation are implemented" in section

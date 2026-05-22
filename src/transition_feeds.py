@@ -28,16 +28,37 @@ def _compact_date(value: str) -> str:
     return "".join(ch for ch in value if ch.isdigit()) or "undated"
 
 
-def _transition_datetime(value: str) -> datetime:
+def _parse_transition_date(value: str):
     try:
-        date_value = datetime.strptime(value, "%Y-%m-%d").date()
+        return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError:
-        date_value = datetime(1970, 1, 1).date()
+        return None
+
+
+def _transition_datetime(value: str) -> datetime:
+    date_value = _parse_transition_date(value) or datetime(1970, 1, 1).date()
     return datetime.combine(date_value, time.min, tzinfo=timezone.utc)
 
 
 def _ical_escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace(";", r"\;").replace(",", r"\,").replace("\n", r"\n")
+
+
+def _fold_ical_line(line: str, *, limit: int = 75) -> list[str]:
+    if len(line.encode("utf-8")) <= limit:
+        return [line]
+    folded: list[str] = []
+    current = ""
+    for char in line:
+        candidate = f"{current}{char}"
+        if current and len(candidate.encode("utf-8")) > limit:
+            folded.append(current)
+            current = f" {char}"
+        else:
+            current = candidate
+    if current:
+        folded.append(current)
+    return folded
 
 
 def feed_items_from_transitions(transitions: Iterable[Mapping[str, object]]) -> list[TransitionFeedItem]:
@@ -47,6 +68,8 @@ def feed_items_from_transitions(transitions: Iterable[Mapping[str, object]]) -> 
         from_state = str(transition.get("from", "UNKNOWN"))
         to_state = str(transition.get("to", "UNKNOWN"))
         date = str(transition.get("date", ""))
+        if _parse_transition_date(date) is None:
+            continue
         title = f"{ticker} transitioned {from_state} -> {to_state}"
         uid = f"transition-{_compact_date(date)}-{_slug(ticker)}-{_slug(from_state)}-{_slug(to_state)}"
         items.append(
@@ -131,4 +154,5 @@ def ical_calendar(items: Iterable[TransitionFeedItem], *, generated_at: datetime
             ]
         )
     lines.append("END:VCALENDAR")
-    return "\r\n".join(lines) + "\r\n"
+    folded_lines = [folded for line in lines for folded in _fold_ical_line(line)]
+    return "\r\n".join(folded_lines) + "\r\n"

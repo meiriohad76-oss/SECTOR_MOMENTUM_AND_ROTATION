@@ -18,6 +18,19 @@ def test_feed_items_from_transitions_normalizes_and_sorts_newest_first():
     assert items[0].uid == "transition-20260521-xlk-warning-stage-2-bullish"
 
 
+def test_feed_items_from_transitions_skip_malformed_transition_dates():
+    transitions = [
+        {"ticker": "XLK", "from": "HOLD", "to": "WARNING", "date": "2026-13-40"},
+        {"ticker": "XLF", "from": "HOLD", "to": "WARNING", "date": ""},
+        {"ticker": "XLV", "from": "HOLD", "to": "WARNING", "date": "2026-05-21"},
+    ]
+
+    items = feed_items_from_transitions(transitions)
+
+    assert [item.ticker for item in items] == ["XLV"]
+    assert items[0].uid == "transition-20260521-xlv-hold-warning"
+
+
 def test_rss_feed_xml_escapes_text_and_includes_items():
     items = feed_items_from_transitions(
         [{"ticker": "XL&K", "from": "HOLD", "to": "WARNING", "date": "2026-05-20"}]
@@ -53,3 +66,22 @@ def test_ical_calendar_emits_all_day_events_chronologically():
     assert "DTSTART;VALUE=DATE:20260521" in calendar
     assert calendar.index("DTSTART;VALUE=DATE:20260520") < calendar.index("DTSTART;VALUE=DATE:20260521")
     assert calendar.endswith("END:VCALENDAR\r\n")
+
+
+def test_ical_calendar_folds_long_content_lines_for_strict_clients():
+    items = feed_items_from_transitions(
+        [
+            {
+                "ticker": "XLK",
+                "from": "HOLD",
+                "to": "VERY_LONG_STAGE_NAME_WITH_A_DETAILED_REASON_THAT_EXCEEDS_ICAL_LINE_LENGTH",
+                "date": "2026-05-21",
+            }
+        ]
+    )
+
+    calendar = ical_calendar(items, generated_at=datetime(2026, 5, 21, 12, 0, tzinfo=timezone.utc))
+    content_lines = calendar.rstrip("\r\n").split("\r\n")
+
+    assert "\r\n " in calendar
+    assert all(len(line.encode("utf-8")) <= 75 for line in content_lines)
