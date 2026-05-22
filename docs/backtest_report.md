@@ -42,15 +42,15 @@
 
 ## In-Sample / Out-of-Sample
 
-OOS starts: 2015-01-01
+OOS starts: 2024-01-05
 
 | Window | Total Return | CAGR | Sharpe | Max Drawdown | Annualized Turnover |
 |---|---:|---:|---:|---:|---:|
 | Methodology full period | 102.19% | 9.32% | 0.59 | -30.09% | 2379.45% |
-| Methodology in-sample | 0.00% | 0.00% | 0.00 | 0.00% | 0.00% |
-| Methodology out-of-sample | 102.19% | 9.32% | 0.59 | -30.09% | 2379.45% |
-| 60/40 out-of-sample | 81.36% | 7.83% | 0.68 | -22.22% | 57.78% |
-| Equal-weight sectors out-of-sample | 114.79% | 10.16% | 0.62 | -36.87% | 84.62% |
+| Methodology in-sample | 43.23% | 6.71% | 0.43 | -30.09% | 2232.15% |
+| Methodology out-of-sample | 41.17% | 15.69% | 1.11 | -14.88% | 2724.20% |
+| 60/40 out-of-sample | 32.82% | 12.75% | 1.24 | -11.88% | 38.25% |
+| Equal-weight sectors out-of-sample | 38.77% | 14.86% | 1.15 | -16.16% | 70.11% |
 
 ## Macro Condition Variants
 
@@ -58,17 +58,17 @@ Analysis-only exposure filters from historical macro series. Positive deltas mea
 
 | Variant | Series | Condition | Active Rebalances | Return Delta | Sharpe Delta | Drawdown Delta |
 |---|---|---|---:|---:|---:|---:|
-| Stress rising defensive | STLFSI4 | rising | 213 | -18.76% | 0.19 | 17.28% |
-| Curve falling defensive | T10Y2Y | falling | 180 | -80.25% | -0.33 | 7.90% |
-| HY spread rising defensive | BAMLH0A0HYM2 | rising | 69 | -21.64% | -0.06 | 0.00% |
+| HY spread rising defensive | BAMLH0A0HYM2 | rising | 63 | -27.53% | -0.08 | 0.00% |
+| Stress rising defensive | STLFSI4 | rising | 207 | -87.68% | -0.37 | 4.04% |
+| Curve falling defensive | T10Y2Y | falling | 198 | -50.84% | -0.13 | 11.25% |
 
 ## Acceptance Gates
 
-- Out-of-sample Sharpe: FAIL (value 0.5863, threshold 0.7000)
+- Out-of-sample Sharpe: PASS (value 1.1112, threshold 0.7000)
   Evidence: strategy OOS Sharpe >= 0.70
-- Max drawdown: FAIL (value 0.3009, threshold 0.2766)
-  Evidence: absolute strategy OOS drawdown <= 75% of equal-weight OOS drawdown (0.3687)
-- Annualized turnover: FAIL (value 23.7945, threshold 3.0000)
+- Max drawdown: FAIL (value 0.1488, threshold 0.1212)
+  Evidence: absolute strategy OOS drawdown <= 75% of equal-weight OOS drawdown (0.1616)
+- Annualized turnover: FAIL (value 27.2420, threshold 3.0000)
   Evidence: strategy OOS annualized turnover <= 300%
 - State transitions per ticker-year: FAIL (value 9.8523, threshold 4.0000)
   Evidence: historical state transitions per ticker-year <= 4.0

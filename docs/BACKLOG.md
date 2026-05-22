@@ -255,8 +255,8 @@ Status legend:
 ### B-157 · Full FRED historical validation report — IMPLEMENTED
 **Status:** B-157 is implemented and live-run on AHADPI5 with Massive OHLCV plus configured FRED history.
 **Files:** `src/backtest.py`, `scripts/run_backtest.py`, `tests/test_backtest.py`, `tests/test_run_backtest_script.py`, `docs/fred_macro_validation_report.md`, `docs/fred_macro_validation_summary.csv`, `docs/backtest_metadata.json`.
-**Evidence:** `OHLCV_PROVIDER=massive ./.venv/bin/python scripts/run_backtest.py --macro-variants` on AHADPI5 generated the dated FRED validation report at 2026-05-22T07:02:22Z. The run used Massive OHLCV from 2018-06-19 to 2026-05-21, 414 methodology rebalances, and 20 returned FRED series.
-**Result:** no FRED macro rule is promoted. `STLFSI4` stress-rising and `T10Y2Y` curve-falling defensive variants are labeled `needs more testing`; `BAMLH0A0HYM2` HY-spread-rising defensive is labeled `do not promote`. No variant earned a `candidate` label.
+**Evidence:** `OHLCV_PROVIDER=massive ./.venv/bin/python scripts/run_backtest.py --macro-variants` on AHADPI5 generated the dated FRED validation report at 2026-05-22T07:22:03Z. The corrected run bypassed the OHLCV cache, fetched all 14 required tickers from Massive, used Massive OHLCV from 2018-06-19 to 2026-05-21, applied conservative FRED availability lags, used a 2024-01-05 walk-forward OOS split because the fixed 2015 split predates available Massive history, and returned 20 FRED series.
+**Result:** no FRED macro rule is promoted. `BAMLH0A0HYM2` HY-spread-rising, `STLFSI4` stress-rising, and `T10Y2Y` curve-falling defensive variants are all labeled `needs more testing`. No variant earned a `candidate` label.
 **Safety:** research only; no scoring, state-machine, alert, provider-flow, veto, recommendation, broker, or criteria-value changes.
 
 ### B-158 · FRED evidence gate for live promotion — 💡 RESEARCHED, NOT BUILT
