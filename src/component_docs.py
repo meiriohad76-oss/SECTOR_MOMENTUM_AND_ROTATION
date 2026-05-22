@@ -149,9 +149,9 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         name="Debrief lab",
         section="Research",
         render_function="render_debrief_lab",
-        data_inputs=("local run journal", "loaded OHLCV"),
-        states=("matured outcomes", "no outcomes", "threshold candidates"),
-        qa=("run debrief tests", "dashboard static tests"),
+        data_inputs=("local run journal", "loaded OHLCV", "FRED macro snapshot metadata"),
+        states=("matured outcomes", "macro-conditioned outcomes", "no outcomes", "threshold candidates"),
+        qa=("run debrief tests", "dashboard static tests", "macro debrief tests"),
     ),
     ComponentDoc(
         name="Full matrix",

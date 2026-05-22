@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 import pandas as pd
 
@@ -42,6 +43,7 @@ class DecisionDebrief:
     s_score: float | None
     f_score: float | None
     outcomes: dict[str, ForwardOutcome]
+    run_metadata: Mapping[str, Any] = field(default_factory=dict)
     payload: Mapping[str, Any] = field(default_factory=dict)
 
 
@@ -165,6 +167,56 @@ def _score_by_ticker(details: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]
     return {str(row["ticker"]).upper(): row for row in details.get("scores", []) if row.get("ticker")}
 
 
+def _float_value(value: Any) -> float | None:
+    if value is None:
+        return None
+    if hasattr(value, "item"):
+        try:
+            value = value.item()
+        except (TypeError, ValueError):
+            pass
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(out):
+        return None
+    return out
+
+
+def _macro_snapshot(record: DecisionDebrief) -> dict[str, Mapping[str, Any]]:
+    snapshot = record.run_metadata.get("fred_macro_snapshot")
+    if not isinstance(snapshot, Mapping):
+        return {}
+    return {
+        str(series_id).upper(): entry
+        for series_id, entry in snapshot.items()
+        if isinstance(entry, Mapping)
+    }
+
+
+def _macro_condition(entry: Mapping[str, Any]) -> str:
+    delta = _float_value(entry.get("delta"))
+    if delta is not None:
+        if math.isclose(delta, 0.0, abs_tol=0.0001):
+            return "flat"
+        return "rising" if delta > 0 else "falling"
+
+    yoy = _float_value(entry.get("yoy_pct"))
+    if yoy is not None:
+        if math.isclose(yoy, 0.0, abs_tol=0.0001):
+            return "yoy_flat"
+        return "yoy_positive" if yoy > 0 else "yoy_negative"
+
+    return "level_available"
+
+
+def _mean(values: Sequence[float]) -> float | None:
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
 def debrief_run_details(
     details: Mapping[str, Any],
     ohlcv: Mapping[str, pd.DataFrame],
@@ -198,6 +250,7 @@ def debrief_run_details(
                     ohlcv,
                     windows=windows,
                 ),
+                run_metadata=run.get("metadata", {}),
                 payload=decision.get("payload", {}),
             )
         )
@@ -239,6 +292,72 @@ def summarize_debriefs(records: list[DecisionDebrief]) -> list[dict[str, Any]]:
                     if available
                     else None
                 ),
+            }
+        )
+    return rows
+
+
+def summarize_debriefs_by_macro_condition(
+    records: list[DecisionDebrief],
+    horizon: str = "4w",
+    series_ids: Sequence[str] | None = None,
+) -> list[dict[str, Any]]:
+    selected_series = tuple(str(series_id).upper() for series_id in series_ids) if series_ids else None
+    buckets: dict[tuple[str, str, str, str, str, str], dict[str, Any]] = {}
+    for record in records:
+        outcome = record.outcomes.get(horizon)
+        if outcome is None:
+            continue
+        snapshot = _macro_snapshot(record)
+        if not snapshot:
+            continue
+
+        series_to_scan = selected_series or tuple(sorted(snapshot))
+        for series_id in series_to_scan:
+            entry = snapshot.get(series_id)
+            if entry is None:
+                continue
+            group = str(entry.get("group") or "Macro")
+            label = str(entry.get("label") or series_id)
+            condition = _macro_condition(entry)
+            key = (series_id, group, label, condition, record.action, str(horizon))
+            bucket = buckets.setdefault(
+                key,
+                {
+                    "decision_count": 0,
+                    "hits": 0,
+                    "available_returns": [],
+                    "available_drawdowns": [],
+                },
+            )
+            bucket["decision_count"] += 1
+            if outcome.forward_return is None or outcome.hit is None:
+                continue
+            bucket["available_returns"].append(float(outcome.forward_return))
+            if outcome.max_drawdown is not None:
+                bucket["available_drawdowns"].append(float(outcome.max_drawdown))
+            if outcome.hit:
+                bucket["hits"] += 1
+
+    rows: list[dict[str, Any]] = []
+    for (series_id, group, label, condition, action, horizon_name), bucket in sorted(buckets.items()):
+        available_returns = bucket["available_returns"]
+        available_count = len(available_returns)
+        if available_count == 0:
+            continue
+        rows.append(
+            {
+                "macro_series": series_id,
+                "macro_group": group,
+                "macro_label": label,
+                "macro_condition": condition,
+                "action": action,
+                "horizon": horizon_name,
+                "decision_count": bucket["decision_count"],
+                "available_count": available_count,
+                "hit_rate": (bucket["hits"] / available_count) if available_count else None,
+                "average_forward_return": _mean(available_returns),
+                "average_max_drawdown": _mean(bucket["available_drawdowns"]),
             }
         )
     return rows

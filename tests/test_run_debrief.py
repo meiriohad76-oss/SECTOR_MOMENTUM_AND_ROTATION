@@ -7,6 +7,7 @@ from src.run_debrief import (
     compute_forward_outcomes,
     debrief_journal,
     summarize_debriefs,
+    summarize_debriefs_by_macro_condition,
     threshold_review_candidates,
 )
 from src.run_journal import DecisionRecord, RunRecord, ScoredSnapshotRecord, append_run
@@ -186,6 +187,112 @@ def test_debrief_journal_joins_decisions_scores_and_forward_returns(tmp_path):
     assert records[1].action == "EXIT"
     assert records[1].outcomes["1w"].forward_return == pytest.approx(-0.08)
     assert records[1].outcomes["1w"].hit is True
+
+
+def test_macro_condition_summary_uses_fred_snapshot_metadata(tmp_path):
+    db_path = tmp_path / "runs.sqlite"
+    append_run(
+        db_path,
+        RunRecord(
+            run_id="run-001",
+            started_at_utc="2026-01-02T12:00:00Z",
+            universe_count=1,
+            metadata={
+                "fred_macro_snapshot": {
+                    "T10Y2Y": {
+                        "label": "2s10s",
+                        "group": "Rates",
+                        "latest_date": "2026-01-02",
+                        "latest_value": 0.40,
+                        "delta": 0.05,
+                    }
+                }
+            },
+        ),
+        scored_rows=[ScoredSnapshotRecord(ticker="XLK", state="STAGE_2_BULLISH", s_score=0.9, f_score=0.4)],
+        decisions=[DecisionRecord(decision_type="bluf", ticker="XLK", action="BUY", rationale="curve rising")],
+    )
+    append_run(
+        db_path,
+        RunRecord(
+            run_id="run-002",
+            started_at_utc="2026-01-05T12:00:00Z",
+            universe_count=1,
+            metadata={
+                "fred_macro_snapshot": {
+                    "T10Y2Y": {
+                        "label": "2s10s",
+                        "group": "Rates",
+                        "latest_date": "2026-01-05",
+                        "latest_value": 0.30,
+                        "delta": -0.10,
+                    }
+                }
+            },
+        ),
+        scored_rows=[ScoredSnapshotRecord(ticker="XLY", state="STAGE_2_BULLISH", s_score=0.8, f_score=0.2)],
+        decisions=[DecisionRecord(decision_type="bluf", ticker="XLY", action="BUY", rationale="curve falling")],
+    )
+    records = debrief_journal(
+        db_path,
+        {
+            "XLK": _ohlcv_from_closes("2026-01-02", [100, 101, 102, 103, 104, 110]),
+            "XLY": _ohlcv_from_closes("2026-01-05", [100, 99, 98, 97, 96, 94]),
+        },
+        windows={"1w": 5},
+    )
+
+    assert records[0].run_metadata["fred_macro_snapshot"]["T10Y2Y"]["delta"] == pytest.approx(0.05)
+    assert records[1].run_metadata["fred_macro_snapshot"]["T10Y2Y"]["delta"] == pytest.approx(-0.10)
+
+    summary = summarize_debriefs_by_macro_condition(records, horizon="1w", series_ids=("T10Y2Y",))
+    rows = {(row["macro_series"], row["macro_condition"], row["action"]): row for row in summary}
+
+    rising_buy = rows[("T10Y2Y", "rising", "BUY")]
+    falling_buy = rows[("T10Y2Y", "falling", "BUY")]
+    assert rising_buy["macro_group"] == "Rates"
+    assert rising_buy["macro_label"] == "2s10s"
+    assert rising_buy["decision_count"] == 1
+    assert rising_buy["available_count"] == 1
+    assert rising_buy["hit_rate"] == pytest.approx(1.0)
+    assert rising_buy["average_forward_return"] == pytest.approx(0.10)
+    assert falling_buy["decision_count"] == 1
+    assert falling_buy["available_count"] == 1
+    assert falling_buy["hit_rate"] == pytest.approx(0.0)
+    assert falling_buy["average_forward_return"] == pytest.approx(-0.06)
+
+
+def test_macro_condition_summary_suppresses_unmatured_outcomes(tmp_path):
+    db_path = tmp_path / "runs.sqlite"
+    append_run(
+        db_path,
+        RunRecord(
+            run_id="run-001",
+            started_at_utc="2026-01-02T12:00:00Z",
+            universe_count=1,
+            metadata={
+                "fred_macro_snapshot": {
+                    "T10Y2Y": {
+                        "label": "2s10s",
+                        "group": "Rates",
+                        "latest_date": "2026-01-02",
+                        "latest_value": 0.40,
+                        "delta": 0.05,
+                    }
+                }
+            },
+        ),
+        scored_rows=[ScoredSnapshotRecord(ticker="XLK", state="STAGE_2_BULLISH", s_score=0.9, f_score=0.4)],
+        decisions=[DecisionRecord(decision_type="bluf", ticker="XLK", action="BUY", rationale="still maturing")],
+    )
+    records = debrief_journal(
+        db_path,
+        {"XLK": _ohlcv_from_closes("2026-01-02", [100, 101, 102])},
+        windows={"1w": 5},
+    )
+
+    assert records[0].outcomes["1w"].status == "insufficient_history"
+    assert summarize_debriefs_by_macro_condition(records, horizon="1w", series_ids=("T10Y2Y",)) == []
 
 
 def test_summarize_debriefs_and_threshold_review_candidates(tmp_path):

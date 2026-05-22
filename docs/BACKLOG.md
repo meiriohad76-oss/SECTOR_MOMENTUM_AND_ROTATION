@@ -211,6 +211,12 @@ Status legend:
 **Behavior:** the dashboard renders grouped FRED rows for rates, inflation, liquidity, growth, credit, and commodities from the already-cached FRED payload; the FRED fetch list now covers every grouped context series. Missing series render as `DATA PENDING`. The same JSON-safe snapshot is stored in run-journal metadata as `fred_macro_snapshot` for later debrief/backtest analysis.
 **Safety:** read-only context only; no scoring, state-machine, alert, provider-flow, or veto logic changes.
 
+### B-155 · Macro-conditioned debrief summaries — IMPLEMENTED
+**Status:** FRED snapshot metadata is now used by the B-153 debrief engine to summarize recommendation outcomes by macro condition.
+**Files:** `src/run_debrief.py`, `tests/test_run_debrief.py`, `app.py`, `tests/test_run_debrief_dashboard_static.py`, `src/component_docs.py`, `README.md`, `docs/FRED_DATA_OPPORTUNITIES.md`, `docs/superpowers/plans/2026-05-22-b155-macro-conditioned-debrief.md`.
+**Behavior:** each debrief record carries run metadata, and `summarize_debriefs_by_macro_condition()` buckets matured outcomes by FRED series, group, label, condition (`rising`, `falling`, `flat`, or YoY sign fallback), action, and horizon. The dashboard Debrief lab shows an optional Macro-conditioned outcomes table when journaled runs contain `fred_macro_snapshot` metadata.
+**Safety:** analysis-only; no scoring, state-machine, alerting, provider fetching, credential handling, or recommendation logic changes.
+
 ### B-023 · Click-through from cards/alerts/RRG → drill-down — IMPLEMENTED
 **Status:** Native Streamlit drill buttons and `?ticker=...` deep links are implemented in `backlog-stepwise-qa`.
 **Files:** `src/navigation.py`, `app.py`, `tests/test_navigation.py`, `README.md`.

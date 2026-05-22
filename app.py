@@ -70,7 +70,12 @@ from src.preferences import (
     should_render_bluf,
     sparkline_mode,
 )
-from src.run_debrief import debrief_journal, summarize_debriefs, threshold_review_candidates
+from src.run_debrief import (
+    debrief_journal,
+    summarize_debriefs,
+    summarize_debriefs_by_macro_condition,
+    threshold_review_candidates,
+)
 from src.run_journal import DEFAULT_JOURNAL_PATH, append_dashboard_run, dashboard_run_fingerprint
 from src.saved_inputs import (
     delete_saved_input,
@@ -1894,6 +1899,45 @@ def _debrief_candidate_frame(rows: list[dict]) -> pd.DataFrame:
     return frame
 
 
+def _debrief_macro_frame(rows: list[dict]) -> pd.DataFrame:
+    if not rows:
+        return pd.DataFrame()
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        return frame
+    rename = {
+        "macro_group": "Macro Group",
+        "macro_label": "Macro",
+        "macro_series": "Series",
+        "macro_condition": "Condition",
+        "action": "Action",
+        "horizon": "Horizon",
+        "decision_count": "Decisions",
+        "available_count": "Matured",
+        "hit_rate": "Hit Rate",
+        "average_forward_return": "Avg Forward Return",
+        "average_max_drawdown": "Avg Max Drawdown",
+    }
+    frame = frame.rename(columns=rename)
+    for column in ["Hit Rate", "Avg Forward Return", "Avg Max Drawdown"]:
+        if column in frame:
+            frame[column] = frame[column].map(lambda value: "-" if pd.isna(value) else f"{float(value) * 100:.1f}%")
+    display_columns = [
+        "Macro Group",
+        "Macro",
+        "Series",
+        "Condition",
+        "Action",
+        "Horizon",
+        "Decisions",
+        "Matured",
+        "Hit Rate",
+        "Avg Forward Return",
+        "Avg Max Drawdown",
+    ]
+    return frame[[column for column in display_columns if column in frame.columns]]
+
+
 def render_debrief_lab():
     _md(
         """
@@ -1909,6 +1953,7 @@ def render_debrief_lab():
     try:
         records = debrief_journal(DEFAULT_JOURNAL_PATH, ohlcv, limit=100)
         summary = _debrief_summary_frame(summarize_debriefs(records))
+        macro_summary = _debrief_macro_frame(summarize_debriefs_by_macro_condition(records, horizon="4w"))
         candidates = _debrief_candidate_frame(threshold_review_candidates(records, horizon="4w", min_abs_return=0.02))
     except Exception as exc:
         st.warning(f"Run debrief unavailable: {exc}")
@@ -1926,6 +1971,9 @@ def render_debrief_lab():
         return
 
     st.dataframe(summary, hide_index=True, use_container_width=True)
+    if not macro_summary.empty:
+        with st.expander("Macro-conditioned outcomes", expanded=False):
+            st.dataframe(macro_summary, hide_index=True, use_container_width=True)
     if candidates.empty:
         _md(
             """

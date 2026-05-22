@@ -23,7 +23,7 @@ A Streamlit dashboard that monitors **83+ instruments across US sectors, US indu
 - A **ticker comparison view** for reviewing 2-4 scored tickers side by side from the current methodology snapshot.
 - **Pick-card sparklines with a 30-week MA reference line** when enough weekly history is loaded.
 - **Custom dashboard palettes**: Default, Solarized, Nord, and Mono layered over the existing dark/light theme.
-- **Expanded FRED macro context** with read-only rates, inflation, liquidity, growth, credit, and commodity tiles when `FRED_API_KEY` is configured; the same snapshot is stored in the local run journal for debrief/backtest analysis.
+- **Expanded FRED macro context** with read-only rates, inflation, liquidity, growth, credit, and commodity tiles when `FRED_API_KEY` is configured; the same snapshot is stored in the local run journal and used for macro-conditioned debrief summaries.
 - A static **PWA alert shell** for HIGH severity transition notifications once VAPID keys and browser subscriptions are configured.
 - A generated **component-doc inventory** that documents each Streamlit render section, its inputs, UI states, and QA coverage in a Storybook-style reference panel.
 - A **single-page Streamlit app** (`app.py`) with two sections:
@@ -55,6 +55,10 @@ The manual runner uses `OHLCV_PROVIDER=auto`: it prefers Massive aggregate bars 
 
 The runner writes `docs/backtest_report.md` when market data downloads successfully. Treat that report as manual evidence, not a replacement for the deterministic test suite.
 The report uses the historical methodology target builder as the strategy path, then compares it with 60/40 and equal-weight sector benchmarks. It includes strategy metrics, benchmark comparison, 3/5/10 bps cost sensitivity, historical simulation evidence, in-sample / out-of-sample metrics, and acceptance-gate status with the evidence/rule behind each gate. The simulation evidence records rebalance count, state ticker coverage, selected ticker count, state transition count, and state transitions per ticker-year. Acceptance gates use out-of-sample metrics by default, with 2015-01-01 as the current OOS boundary, and the state-transition gate now uses the simulated historical states instead of a placeholder. The runner also writes `docs/backtest_methodology_report.md`, `docs/backtest_equity.csv`, `docs/backtest_states.csv`, and `docs/backtest_metadata.json`; the dashboard's Backtest Lab section displays the summary report, normalized equity chart, and drawdown chart only when the metadata hashes match the artifact files. Use `notebooks/backtest_methodology_report.ipynb` as a lightweight artifact inspection guide. These are manual research artifacts, not live-edge claims.
+
+## Run debrief lab
+
+B-153 records dashboard methodology runs in the local SQLite journal at `data/run_journal/runs.sqlite`, then the Debrief lab joins saved decisions to already-loaded OHLCV to calculate matured forward outcomes. B-155 adds macro-conditioned summaries from the journaled `fred_macro_snapshot`, so the dashboard can compare hit rate, average forward return, and average max drawdown by FRED series trend without fetching data or changing the recommendation logic.
 
 ## Portfolio analyzer
 

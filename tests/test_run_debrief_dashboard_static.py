@@ -12,11 +12,12 @@ def test_app_surfaces_run_debrief_without_fetching_data_inside_section():
     end = app_source.index("def render_footer():")
     debrief_source = app_source[start:end]
 
-    assert "from src.run_debrief import debrief_journal, summarize_debriefs, threshold_review_candidates" in app_source
+    assert "summarize_debriefs_by_macro_condition" in app_source
     assert "def render_debrief_lab():" in app_source
     assert "DEFAULT_JOURNAL_PATH" in debrief_source
     assert "debrief_journal(DEFAULT_JOURNAL_PATH, ohlcv" in debrief_source
     assert "summarize_debriefs(records)" in debrief_source
+    assert "summarize_debriefs_by_macro_condition(records" in debrief_source
     assert "threshold_review_candidates(records" in debrief_source
     assert "fetch_ohlcv(" not in debrief_source
     assert "st.warning(" in debrief_source

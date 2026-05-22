@@ -22,6 +22,8 @@ FRED_NOTE=INDPRO YoY +1.4%; curve +0.49
 
 B-154 expands the same cached FRED fetch list to include the grouped read-only context series below, then stores a JSON-safe `fred_macro_snapshot` in the local run journal for later debrief/backtest analysis.
 
+B-155 uses that journaled snapshot in the debrief engine to bucket matured recommendation outcomes by FRED macro condition. This remains analysis-only and does not change scoring, alerts, state transitions, or provider fetches.
+
 ## Useful API Capabilities
 
 - `fred/series/observations`: fetch the observation history for specific known series IDs.
@@ -112,5 +114,6 @@ Do not wire these into the app without a fresh lookup via `fred/series/search`.
 
 1. Add a read-only FRED macro context expansion with grouped tiles and no scoring changes. Implemented in B-154.
 2. Log the expanded macro snapshot into the B-153 run journal so the debrief engine can compare macro conditions with later outcomes. Implemented in B-154.
-3. Add B-011 backtest variants that test whether any new macro features improve decisions.
-4. Only promote validated features into scoring or veto logic after backtest evidence beats the current methodology.
+3. Summarize matured B-153 debrief outcomes by journaled FRED macro condition. Implemented in B-155.
+4. Add B-011 backtest variants that test whether any new macro features improve decisions.
+5. Only promote validated features into scoring or veto logic after backtest evidence beats the current methodology.
