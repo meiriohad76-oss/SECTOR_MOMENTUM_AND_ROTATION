@@ -1,6 +1,6 @@
 # Massive Historical Provider-Data Validation Report
 
-Generated UTC: 2026-05-22T08:17:08.482585Z
+Generated UTC: 2026-05-22T08:38:25.045740Z
 Ticket: B-159
 
 No Massive-derived rule is promoted into live scoring, veto logic, alerts, recommendations, provider-flow behavior, Pillar 7 weights, or broker behavior by this report.
@@ -34,15 +34,15 @@ No Massive-derived rule is promoted into live scoring, veto logic, alerts, recom
 
 ## Historical Coverage By Ticker
 
-- yfinance: AGG:-; BIL:-; SPY:-; XLB:-; XLC:-; XLE:-; XLF:-; XLI:-; XLK:-; XLP:-; XLRE:-; XLU:-; XLV:-; XLY:-
+- yfinance: AGG:2003-09-29->2026-05-21(5698); BIL:2007-05-30->2026-05-21(4776); SPY:1993-01-29->2026-05-21(8385); XLB:1998-12-22->2026-05-21(6895); XLC:2018-06-19->2026-05-21(1992); XLE:1998-12-22->2026-05-21(6895); XLF:1998-12-22->2026-05-21(6895); XLI:1998-12-22->2026-05-21(6895); XLK:1998-12-22->2026-05-21(6895); XLP:1998-12-22->2026-05-21(6895); XLRE:2015-10-08->2026-05-21(2670); XLU:1998-12-22->2026-05-21(6895); XLV:1998-12-22->2026-05-21(6895); XLY:1998-12-22->2026-05-21(6895)
 - massive: AGG:2016-05-24->2026-05-21(2513); BIL:2016-05-24->2026-05-21(2513); SPY:2016-05-24->2026-05-21(2513); XLB:2016-05-24->2026-05-21(2513); XLC:2018-06-19->2026-05-21(1992); XLE:2016-05-24->2026-05-21(2513); XLF:2016-05-24->2026-05-21(2513); XLI:2016-05-24->2026-05-21(2513); XLK:2016-05-24->2026-05-21(2513); XLP:2016-05-24->2026-05-21(2513); XLRE:2016-05-24->2026-05-21(2513); XLU:2016-05-24->2026-05-21(2513); XLV:2016-05-24->2026-05-21(2513); XLY:2016-05-24->2026-05-21(2513)
 
 ## Baseline Vs Massive OHLCV
 
 | Variant | Provider | Status | Coverage | Tickers | CAGR Delta | Sharpe Delta | Drawdown Delta | OOS CAGR Delta | OOS Sharpe Delta | OOS Drawdown Delta | Label |
 |---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|
-| Default/yfinance OHLCV baseline | yfinance | missing_required_prices | - to - | 0 | - | - | - | - | - | - | needs more testing |
-| Massive aggregate OHLCV | massive | available | 2018-06-19 to 2026-05-21 | 14 | - | - | - | - | - | - | needs more testing |
+| Default/yfinance OHLCV baseline | yfinance | available | 2018-06-19 to 2026-05-21 | 14 | 0.00% | 0.00 | 0.00% | 0.00% | 0.00 | 0.00% | needs more testing |
+| Massive aggregate OHLCV | massive | available | 2018-06-19 to 2026-05-21 | 14 | -0.15% | -0.01 | -0.38% | 0.22% | 0.03 | 1.57% | needs more testing |
 
 ## Provider-Derived Criteria Sweeps
 
