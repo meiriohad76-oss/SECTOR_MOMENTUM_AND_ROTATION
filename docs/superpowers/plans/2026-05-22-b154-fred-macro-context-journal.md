@@ -46,5 +46,38 @@
 ### Task 3: Documentation, QA, And Deploy
 
 - [x] Update docs to describe B-154 and emphasize no scoring changes.
-- [ ] Run `python -m pytest -q`, `python -m compileall app.py src scripts`, and `git diff --check`.
-- [ ] Commit, push to `origin/backlog-stepwise-qa`, pull on AHADPI5, run focused tests, full tests, FRED live fetch, service smoke, and record any handoff evidence.
+- [x] Run `python -m pytest -q`, `python -m compileall app.py src scripts`, and `git diff --check`.
+- [x] Commit, push to `origin/backlog-stepwise-qa`, pull on AHADPI5, run focused tests, full tests, FRED live fetch, service smoke, and record any handoff evidence.
+
+## Completion Evidence
+
+Local verification:
+
+```text
+python -m pytest tests/test_fred_data.py tests/test_macro_tiles.py tests/test_macro_tiles_app_static.py tests/test_run_journal_app_static.py tests/test_component_docs.py -q -> 19 passed
+python -m compileall app.py src scripts -> exit 0
+git diff --check -> exit 0
+python -m pytest -q -> 363 passed
+```
+
+GitHub/code commit:
+
+```text
+152b7af3176f830e0449cdcfd00a9a8bba143c88 fix: fetch expanded fred context series
+```
+
+AHADPI5 verification at `/home/ahad/SECTOR_MOMENTUM_AND_ROTATION`:
+
+```text
+git rev-parse HEAD -> 152b7af3176f830e0449cdcfd00a9a8bba143c88
+focused pytest -> 19 passed
+full pytest -> 363 passed
+FRED_AVAILABLE=yes
+FRED_SERIES_COUNT=20
+FRED_SNAPSHOT_COUNT=15
+FRED_GROUP_COUNT=6
+systemctl is-active sector-dashboard -> active
+OLD_PID=567977
+NEW_PID=604098
+dashboard HTTP smoke -> 200
+```

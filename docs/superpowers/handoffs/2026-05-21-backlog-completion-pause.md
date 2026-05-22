@@ -78,6 +78,31 @@ dashboard HTTP smoke -> 200
 
 Additional FRED expansion research was recorded in `docs/FRED_DATA_OPPORTUNITIES.md`.
 
+## 2026-05-22 B-154 FRED Macro Context Follow-Up
+
+B-154 added read-only grouped FRED macro context and stores the same JSON-safe snapshot in B-153 run-journal metadata under `fred_macro_snapshot`. This does not change scoring, alerts, state-machine transitions, provider-flow logic, or veto logic.
+
+Verified code commit:
+
+```text
+152b7af3176f830e0449cdcfd00a9a8bba143c88 fix: fetch expanded fred context series
+```
+
+AHADPI5 evidence:
+
+```text
+focused pytest -> 19 passed
+full pytest -> 363 passed
+FRED_AVAILABLE=yes
+FRED_SERIES_COUNT=20
+FRED_SNAPSHOT_COUNT=15
+FRED_GROUP_COUNT=6
+systemctl is-active sector-dashboard -> active
+OLD_PID=567977
+NEW_PID=604098
+dashboard HTTP smoke -> 200
+```
+
 ## What Was Implemented In The Latest Code Commit
 
 - B-121 PWA push notifications:
