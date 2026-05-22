@@ -250,6 +250,34 @@ Status legend:
 
 ---
 
+## Evidence-gated research backlog
+
+### B-157 · Full FRED historical validation report — 🎯 NEXT SESSION
+**Purpose:** run a real historical FRED + market backtest and analyze actual results before changing criteria values.
+**Scope:** execute `python scripts/run_backtest.py --macro-variants` with configured FRED data and the full available market history; compare the baseline methodology against the curve-falling, high-yield-spread-rising, and stress-rising defensive variants.
+**Acceptance:** save a dated report with data windows, provider configuration, variant rows, CAGR, Sharpe, max drawdown, turnover, hit-rate, trade count, and an out-of-sample or walk-forward split. Each tested macro rule must be labeled `do not promote`, `candidate`, or `needs more testing`.
+**Safety:** research only; no scoring, state-machine, alert, provider-flow, veto, recommendation, broker, or criteria-value changes.
+
+### B-158 · FRED evidence gate for live promotion — 💡 RESEARCHED, NOT BUILT
+**Purpose:** promote FRED-derived criteria only if B-157 shows robust historical improvement over the current methodology.
+**Scope:** define the exact criteria values, macro filters, or veto rules to change from the B-157 evidence; add deterministic tests, documentation, and A/B comparison against the current methodology.
+**Acceptance:** the implementation plan cites the B-157 report, lists the evidence thresholds used for promotion, includes regression coverage for both promoted and rejected rules, and documents rollback behavior.
+**Safety:** no FRED macro rule can enter live scoring, veto logic, alerts, recommendations, or dashboard decision text until the B-157 evidence gate passes and is reviewed.
+
+### B-159 · Massive historical provider-data backtest variants — 🎯 NEXT SESSION
+**Purpose:** use Massive (formerly Polygon) historical data to validate algorithm improvements and criteria values the same way B-157 validates FRED macro rules.
+**Scope:** compare default/yfinance OHLCV backtests against Massive aggregate bars, then evaluate any timestamped Massive provider features that can be aligned as-of, such as trade-tape or block-trade signals.
+**Acceptance:** save a dated report that documents which Massive endpoints/data sets were actually available, the historical coverage by ticker/date, baseline-vs-Massive metric differences, parameter sweeps for provider-derived criteria, and leakage/survivorship controls.
+**Safety:** provider-backed historical flow remains neutral unless timestamped as-of provider snapshots exist; no Massive-derived rule can change live scoring, vetoes, alerts, recommendations, or Pillar 7 weights from this ticket alone.
+
+### B-160 · Massive evidence gate for live promotion — 💡 RESEARCHED, NOT BUILT
+**Purpose:** promote Massive-derived criteria only if B-159 shows durable improvement and no data-leakage issue.
+**Scope:** convert validated Massive historical findings into explicit candidate changes for Pillar 7 weights, thresholds, provider-flow features, or alert/veto rules.
+**Acceptance:** the promotion plan cites the B-159 report, includes before/after backtest tables, deterministic tests for threshold behavior, live-provider failure-mode tests, and documentation of the activation flags or configuration required.
+**Safety:** no Massive/provider-flow rule can enter live scoring, veto logic, alerts, recommendations, or dashboard decision text until the B-159 evidence gate passes and is reviewed.
+
+---
+
 ## Completed v3+ ideas
 
 ### Universe & data
@@ -371,4 +399,4 @@ Resolved for this backlog pass:
 
 ## Last updated
 
-2026-05-21, backlog completion sweep.
+2026-05-22, added evidence-gated FRED and Massive validation backlog.
