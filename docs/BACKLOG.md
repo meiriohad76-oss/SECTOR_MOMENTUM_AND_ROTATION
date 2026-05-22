@@ -197,12 +197,13 @@ Status legend:
 **Evidence:** `docs/superpowers/plans/2026-05-21-b123-discord-mattermost-webhooks.md`.
 **Residual risk:** unit tests mock webhook delivery; live provider validation remains a configuration task.
 
-### B-022 · FRED macro overlay — IMPLEMENTED / KEY PENDING
-**Status:** FRED-backed macro classifier and deterministic tests implemented in `backlog-stepwise-qa`; live validation awaits `FRED_API_KEY`.
+### B-022 · FRED macro overlay — IMPLEMENTED / PI LIVE VALIDATED
+**Status:** FRED-backed macro classifier and deterministic tests implemented in `backlog-stepwise-qa`; live validation passed on AHADPI5 after `FRED_API_KEY` was configured.
 **Files:** `src/fred_data.py`, `src/macro.py`, `tests/test_fred_data.py`, `tests/test_macro.py`.
 **Series:** `INDPRO`, `T10Y2Y`, `T10Y3M`, `UNRATE`, `NFCI`, `RECPROUSM156N`, `BAMLH0A0HYM2`.
 **Impact:** upgrades cycle phase from coarse 2-signal fallback to a tested FRED-backed Stovall/Fidelity-style 4-phase classifier once the free key is configured.
-**Current config:** `FRED_API_KEY` was not present in the ignored local Streamlit secrets file copied to AHADPI5 on 2026-05-22; live validation still needs the free FRED key.
+**Evidence:** AHADPI5 fetched all 7 current FRED series on 2026-05-22 and returned `FRED_PHASE=MID` with note `INDPRO YoY +1.4%; curve +0.49`.
+**Expansion candidates:** see `docs/FRED_DATA_OPPORTUNITIES.md` for additional rates, inflation, liquidity, growth, credit, stress, and commodity series validated or triaged from FRED.
 
 ### B-023 · Click-through from cards/alerts/RRG → drill-down — IMPLEMENTED
 **Status:** Native Streamlit drill buttons and `?ticker=...` deep links are implemented in `backlog-stepwise-qa`.

@@ -64,8 +64,19 @@ Earlier failed Pi smoke root cause: the Massive key existed only on the Windows 
 Current config status checked on 2026-05-22:
 
 - Massive: configured locally and on AHADPI5; B-011 short live OHLCV smoke passed on both.
-- FRED: not configured in the local secrets file copied to AHADPI5; `fetch_fred(start_date="2024-01-01")` returned `0` series.
+- FRED: configured on AHADPI5; `fetch_fred(start_date="2024-01-01")` returned all 7 current B-022 series and the macro classifier returned `FRED_PHASE=MID`.
 - FINRA: no FINRA key/client setting was present in the local secrets file.
+
+After the FRED key was added on AHADPI5, the deployed service was restarted and verified:
+
+```text
+OLD_PID=517927
+NEW_PID=567977
+systemctl is-active sector-dashboard -> active
+dashboard HTTP smoke -> 200
+```
+
+Additional FRED expansion research was recorded in `docs/FRED_DATA_OPPORTUNITIES.md`.
 
 ## What Was Implemented In The Latest Code Commit
 
@@ -165,7 +176,7 @@ Result: exit `0`.
 - B-121 live push delivery needs VAPID/subscription configuration.
 - B-131 broker sync needs broker API credentials and a separate import/sync design.
 - B-011 Massive short live-data smoke is verified locally and on AHADPI5; long-window backtest evidence should still be refreshed after provider schemas or data availability change.
-- B-021/B-022/B-120/B-123/B-140/B-152 still have environment-level live validation or deployment configuration pending.
+- B-021/B-120/B-123/B-140/B-152 still have environment-level live validation or deployment configuration pending.
 
 ## Recommended Resume Steps
 

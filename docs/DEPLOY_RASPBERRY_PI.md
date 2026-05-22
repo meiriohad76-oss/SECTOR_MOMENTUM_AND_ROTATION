@@ -72,6 +72,12 @@ For Massive OHLCV validation, set:
 MASSIVE_API_KEY = "..."
 ```
 
+For FRED macro validation, set:
+
+```toml
+FRED_API_KEY = "..."
+```
+
 Validate without writing backtest artifacts:
 
 ```bash
