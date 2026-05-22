@@ -76,13 +76,16 @@ def test_transition_feed_publish_docs_keep_generated_static_feeds_ignored():
     assert "public/feeds/transitions.rss" in deploy_docs
 
 
-def test_backlog_records_transition_feed_pi_artifact_validation_without_public_overclaim():
+def test_backlog_records_transition_feed_external_public_validation():
     root = export_transition_feeds.ROOT
     backlog = (root / "docs" / "BACKLOG.md").read_text(encoding="utf-8")
     start = backlog.index("### B-122")
     section = backlog[start:backlog.index("### B-123", start)]
 
-    assert "USER TIMER + LOCAL PUBLIC SERVICE LIVE VALIDATED / CLOUDFLARE DNS PENDING" in section
+    assert "USER TIMER + EXTERNAL PUBLIC FEEDS LIVE VALIDATED" in section
     assert "items=32" in section
     assert "RSS8500_HTTP=200" in section
-    assert "Could not resolve host" in section
+    assert "https://www.ahaddashboards.uk/feeds/transitions.rss" in section
+    assert "HTTP/2 200" in section
+    assert "application/x-rss+xml" in section
+    assert "BEGIN:VCALENDAR" in section
