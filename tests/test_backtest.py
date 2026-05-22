@@ -316,6 +316,58 @@ def test_run_cost_scenarios_returns_metrics_by_bps():
     assert scenarios.loc[0.0, "total_return"] > scenarios.loc[10.0, "total_return"]
 
 
+def test_macro_condition_mask_uses_past_observations_only():
+    dates = pd.bdate_range("2024-01-01", periods=6)
+    target_index = pd.DatetimeIndex([dates[1], dates[3], dates[5]])
+    series = pd.Series([1.0, 0.5], index=[dates[0], dates[4]])
+
+    mask = backtest.macro_condition_mask(
+        series,
+        target_index,
+        condition="falling",
+        lookback_periods=1,
+    )
+
+    assert mask.to_dict() == {
+        dates[1]: False,
+        dates[3]: False,
+        dates[5]: True,
+    }
+
+
+def test_evaluate_macro_condition_variants_compares_defensive_filter():
+    dates = pd.bdate_range("2024-01-01", periods=5)
+    prices = pd.DataFrame({"AAA": [100.0, 110.0, 121.0, 60.5, 60.5]}, index=dates)
+    target_weights = pd.DataFrame({"AAA": [1.0, 1.0]}, index=[dates[0], dates[2]])
+    macro_data = {"T10Y2Y": pd.Series([1.0, 0.5], index=[dates[0], dates[2]])}
+
+    summary = backtest.evaluate_macro_condition_variants(
+        prices,
+        target_weights,
+        macro_data,
+        rules=[
+            backtest.MacroVariantRule(
+                name="Curve falling defensive",
+                series_id="T10Y2Y",
+                condition="falling",
+                exposure_multiplier=0.0,
+            )
+        ],
+        transaction_cost_bps=0.0,
+        periods_per_year=252,
+    )
+
+    assert list(summary["variant"]) == ["Curve falling defensive"]
+    row = summary.iloc[0]
+    assert row["series_id"] == "T10Y2Y"
+    assert row["condition"] == "falling"
+    assert row["active_rebalances"] == 1
+    assert row["exposure_multiplier"] == pytest.approx(0.0)
+    assert row["variant_total_return"] > row["baseline_total_return"]
+    assert row["total_return_delta"] > 0.0
+    assert row["max_drawdown_delta"] > 0.0
+
+
 def test_evaluate_acceptance_gates_compares_oos_to_equal_weight_benchmark():
     report = backtest.evaluate_acceptance_gates(
         strategy_metrics={
@@ -486,6 +538,53 @@ def test_format_backtest_report_includes_benchmarks_costs_and_gates():
     assert "| State transitions per ticker-year | 2.75 |" in text
     assert "## Acceptance Gates" in text
     assert "Out-of-sample Sharpe: PASS" in text
+
+
+def test_format_backtest_report_includes_macro_variant_table():
+    strategy_metrics = {
+        "total_return": 0.24,
+        "cagr": 0.12,
+        "sharpe": 0.91,
+        "sortino": 1.30,
+        "max_drawdown": -0.18,
+        "calmar": 0.67,
+        "annualized_turnover": 1.20,
+    }
+    macro_variants = pd.DataFrame(
+        [
+            {
+                "variant": "Curve falling defensive",
+                "series_id": "T10Y2Y",
+                "condition": "falling",
+                "active_rebalances": 4,
+                "baseline_total_return": 0.24,
+                "variant_total_return": 0.30,
+                "total_return_delta": 0.06,
+                "baseline_sharpe": 0.91,
+                "variant_sharpe": 1.10,
+                "sharpe_delta": 0.19,
+                "baseline_max_drawdown": -0.18,
+                "variant_max_drawdown": -0.12,
+                "max_drawdown_delta": 0.06,
+            }
+        ]
+    )
+
+    text = backtest.format_backtest_report(
+        strategy_metrics=strategy_metrics,
+        benchmark_metrics={"Methodology": strategy_metrics},
+        cost_scenarios=pd.DataFrame(
+            {"cagr": [0.12], "sharpe": [0.91], "max_drawdown": [-0.18]},
+            index=pd.Index([5.0], name="cost_bps"),
+        ),
+        gates={"all_passed": True},
+        macro_variant_summary=macro_variants,
+    )
+
+    assert "## Macro Condition Variants" in text
+    assert "Curve falling defensive" in text
+    assert "T10Y2Y" in text
+    assert "| Curve falling defensive | T10Y2Y | falling | 4 | 6.00% | 0.19 | 6.00% |" in text
 
 
 def test_format_methodology_report_includes_research_narrative_sections():

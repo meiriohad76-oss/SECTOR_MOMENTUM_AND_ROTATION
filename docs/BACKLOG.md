@@ -217,6 +217,12 @@ Status legend:
 **Behavior:** each debrief record carries run metadata, and `summarize_debriefs_by_macro_condition()` buckets matured outcomes by FRED series, group, label, condition (`rising`, `falling`, `flat`, or YoY sign fallback), action, and horizon. The dashboard Debrief lab shows an optional Macro-conditioned outcomes table when journaled runs contain `fred_macro_snapshot` metadata.
 **Safety:** analysis-only; no scoring, state-machine, alerting, provider fetching, credential handling, or recommendation logic changes.
 
+### B-156 · FRED macro backtest variants — IMPLEMENTED
+**Status:** opt-in B-011 macro-conditioned exposure variants are implemented in `backlog-stepwise-qa`.
+**Files:** `src/backtest.py`, `scripts/run_backtest.py`, `tests/test_backtest.py`, `tests/test_run_backtest_script.py`, `README.md`, `docs/FRED_DATA_OPPORTUNITIES.md`, `docs/superpowers/plans/2026-05-22-b156-fred-macro-backtest-variants.md`.
+**Behavior:** `python scripts/run_backtest.py --macro-variants` fetches historical FRED series when configured and adds analysis-only variant rows for curve-falling, high-yield-spread-rising, and stress-rising defensive filters. The variant engine aligns macro observations with forward-fill only, so later macro releases cannot affect earlier rebalance decisions. Normal manual backtests do not fetch FRED unless the flag is used.
+**Safety:** research/reporting only; no live scoring, state-machine, alerting, provider-flow, veto, portfolio, or broker behavior changes.
+
 ### B-023 · Click-through from cards/alerts/RRG → drill-down — IMPLEMENTED
 **Status:** Native Streamlit drill buttons and `?ticker=...` deep links are implemented in `backlog-stepwise-qa`.
 **Files:** `src/navigation.py`, `app.py`, `tests/test_navigation.py`, `README.md`.

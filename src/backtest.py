@@ -6,7 +6,7 @@ writes. It accepts already-loaded prices and target weights.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -33,6 +33,16 @@ class HistoricalSignalTargets:
     target_weights: pd.DataFrame
     states: pd.DataFrame
     snapshots: dict[pd.Timestamp, pd.DataFrame]
+
+
+@dataclass(frozen=True)
+class MacroVariantRule:
+    name: str
+    series_id: str
+    condition: str
+    exposure_multiplier: float = 0.0
+    threshold: float = 0.0
+    lookback_periods: int = 1
 
 
 ScoreSnapshotFn = Callable[[dict[str, pd.DataFrame], str, str, str], pd.DataFrame]
@@ -367,6 +377,154 @@ def run_cost_scenarios(
     return pd.DataFrame(rows).set_index("cost_bps")
 
 
+def _clean_macro_series(series: pd.Series) -> pd.Series:
+    values = pd.to_numeric(series, errors="coerce").dropna()
+    values.index = pd.to_datetime(values.index)
+    if values.index.tz is not None:
+        values.index = values.index.tz_convert(None)
+    values = values.sort_index()
+    if not values.index.is_unique:
+        values = values.groupby(level=0).last()
+    return values
+
+
+def _macro_condition_values(
+    series: pd.Series,
+    condition: str,
+    threshold: float,
+    lookback_periods: int,
+) -> pd.Series:
+    lookback = int(_finite_scalar("lookback_periods", lookback_periods))
+    if lookback <= 0:
+        raise ValueError("lookback_periods must be positive")
+    threshold_value = _finite_scalar("threshold", threshold)
+    normalized = str(condition).strip().lower()
+    if normalized in {"rising", "falling", "flat"}:
+        delta = series.diff(lookback)
+        if normalized == "rising":
+            return delta > threshold_value
+        if normalized == "falling":
+            return delta < -threshold_value
+        return delta.abs() <= threshold_value
+    if normalized == "above":
+        return series > threshold_value
+    if normalized == "below":
+        return series < threshold_value
+    if normalized == "positive":
+        return series > 0.0
+    if normalized == "negative":
+        return series < 0.0
+    raise ValueError(f"unsupported macro condition: {condition}")
+
+
+def macro_condition_mask(
+    series: pd.Series,
+    target_index: pd.DatetimeIndex | Sequence[pd.Timestamp],
+    condition: str,
+    threshold: float = 0.0,
+    lookback_periods: int = 1,
+) -> pd.Series:
+    values = _clean_macro_series(series)
+    target_dates = pd.DatetimeIndex(pd.to_datetime(target_index))
+    if target_dates.tz is not None:
+        target_dates = target_dates.tz_convert(None)
+    if values.empty or len(target_dates) == 0:
+        return pd.Series(False, index=target_dates, dtype=bool)
+
+    condition_values = _macro_condition_values(values, condition, threshold, lookback_periods).fillna(False)
+    aligned_index = condition_values.index.union(target_dates).sort_values()
+    aligned = condition_values.reindex(aligned_index).ffill().reindex(target_dates).fillna(False)
+    return aligned.astype(bool)
+
+
+def _macro_adjusted_targets(
+    target_weights: pd.DataFrame,
+    mask: pd.Series,
+    exposure_multiplier: float,
+) -> pd.DataFrame:
+    multiplier = _finite_scalar("exposure_multiplier", exposure_multiplier)
+    if multiplier < 0 or multiplier > 1:
+        raise ValueError("exposure_multiplier must be between 0 and 1")
+    adjusted = target_weights.copy()
+    adjusted.index = pd.to_datetime(adjusted.index)
+    aligned_mask = mask.reindex(adjusted.index).fillna(False).astype(bool)
+    adjusted.loc[aligned_mask] = adjusted.loc[aligned_mask] * multiplier
+    return adjusted
+
+
+def _variant_metric_row(
+    rule: MacroVariantRule,
+    mask: pd.Series,
+    baseline_metrics: dict[str, float],
+    variant_metrics: dict[str, float],
+) -> dict[str, float | int | str]:
+    return {
+        "variant": rule.name,
+        "series_id": rule.series_id,
+        "condition": rule.condition,
+        "threshold": float(rule.threshold),
+        "lookback_periods": int(rule.lookback_periods),
+        "exposure_multiplier": float(rule.exposure_multiplier),
+        "active_rebalances": int(mask.sum()),
+        "baseline_total_return": float(baseline_metrics["total_return"]),
+        "variant_total_return": float(variant_metrics["total_return"]),
+        "total_return_delta": float(variant_metrics["total_return"] - baseline_metrics["total_return"]),
+        "baseline_sharpe": float(baseline_metrics["sharpe"]),
+        "variant_sharpe": float(variant_metrics["sharpe"]),
+        "sharpe_delta": float(variant_metrics["sharpe"] - baseline_metrics["sharpe"]),
+        "baseline_max_drawdown": float(baseline_metrics["max_drawdown"]),
+        "variant_max_drawdown": float(variant_metrics["max_drawdown"]),
+        "max_drawdown_delta": float(variant_metrics["max_drawdown"] - baseline_metrics["max_drawdown"]),
+    }
+
+
+def evaluate_macro_condition_variants(
+    prices: pd.DataFrame,
+    target_weights: pd.DataFrame,
+    macro_data: dict[str, pd.Series],
+    rules: Sequence[MacroVariantRule],
+    transaction_cost_bps: float = 5.0,
+    periods_per_year: int = TRADING_DAYS_PER_YEAR,
+) -> pd.DataFrame:
+    if not rules:
+        return pd.DataFrame()
+    baseline = run_weight_backtest(
+        prices,
+        target_weights,
+        transaction_cost_bps=transaction_cost_bps,
+        periods_per_year=periods_per_year,
+    )
+    rows = []
+    for rule in rules:
+        series = macro_data.get(rule.series_id)
+        if series is None:
+            continue
+        mask = macro_condition_mask(
+            series,
+            target_weights.index,
+            condition=rule.condition,
+            threshold=rule.threshold,
+            lookback_periods=rule.lookback_periods,
+        )
+        if not bool(mask.any()):
+            continue
+        adjusted_targets = _macro_adjusted_targets(
+            target_weights,
+            mask,
+            exposure_multiplier=rule.exposure_multiplier,
+        )
+        variant = run_weight_backtest(
+            prices,
+            adjusted_targets,
+            transaction_cost_bps=transaction_cost_bps,
+            periods_per_year=periods_per_year,
+        )
+        rows.append(_variant_metric_row(rule, mask, baseline.metrics, variant.metrics))
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows).sort_values(["sharpe_delta", "total_return_delta"], ascending=False).reset_index(drop=True)
+
+
 def _required_metric(metrics: dict[str, float], key: str, label: str) -> float:
     if key not in metrics:
         raise ValueError(f"{label} missing required key: {key}")
@@ -626,6 +784,36 @@ def _cost_sensitivity_table(cost_scenarios: pd.DataFrame) -> list[str]:
     return lines
 
 
+def _macro_variant_table(macro_variant_summary: pd.DataFrame) -> list[str]:
+    required = {
+        "variant",
+        "series_id",
+        "condition",
+        "active_rebalances",
+        "total_return_delta",
+        "sharpe_delta",
+        "max_drawdown_delta",
+    }
+    missing = required.difference(macro_variant_summary.columns)
+    if missing:
+        raise ValueError("macro_variant_summary missing required columns: " + ", ".join(sorted(missing)))
+    lines = [
+        "| Variant | Series | Condition | Active Rebalances | Return Delta | Sharpe Delta | Drawdown Delta |",
+        "|---|---|---|---:|---:|---:|---:|",
+    ]
+    for _, row in macro_variant_summary.iterrows():
+        lines.append(
+            f"| {row['variant']} | "
+            f"{row['series_id']} | "
+            f"{row['condition']} | "
+            f"{int(row['active_rebalances'])} | "
+            f"{_percent(_finite_scalar('macro variant total_return_delta', row['total_return_delta']))} | "
+            f"{_number(_finite_scalar('macro variant sharpe_delta', row['sharpe_delta']))} | "
+            f"{_percent(_finite_scalar('macro variant max_drawdown_delta', row['max_drawdown_delta']))} |"
+        )
+    return lines
+
+
 def _window_metrics_table(window_metrics: dict[str, dict[str, float]]) -> list[str]:
     lines = ["| Window | Total Return | CAGR | Sharpe | Max Drawdown | Annualized Turnover |"]
     lines.append("|---|---:|---:|---:|---:|---:|")
@@ -670,6 +858,7 @@ def format_backtest_report(
     gates: dict[str, dict | bool],
     window_metrics: Optional[dict[str, dict[str, float]]] = None,
     simulation_summary: Optional[dict[str, int | float | str | None]] = None,
+    macro_variant_summary: Optional[pd.DataFrame] = None,
     oos_start: str | pd.Timestamp = "2015-01-01",
     title: str = "Backtest Report",
 ) -> str:
@@ -688,6 +877,14 @@ def format_backtest_report(
         lines.append(f"OOS starts: {pd.Timestamp(oos_start).date().isoformat()}")
         lines.append("")
         lines.extend(_window_metrics_table(window_metrics))
+    if macro_variant_summary is not None and not macro_variant_summary.empty:
+        lines.extend(["", "## Macro Condition Variants", ""])
+        lines.append(
+            "Analysis-only exposure filters from historical macro series. "
+            "Positive deltas mean the variant beat the baseline methodology metric."
+        )
+        lines.append("")
+        lines.extend(_macro_variant_table(macro_variant_summary))
     lines.extend(["", "## Acceptance Gates", ""])
     lines.extend(format_gate_report(gates).splitlines()[2:])
     return "\n".join(lines).rstrip() + "\n"
@@ -699,6 +896,7 @@ def format_methodology_report(
     gates: dict[str, dict | bool],
     window_metrics: dict[str, dict[str, float]],
     simulation_summary: dict[str, int | float | str | None],
+    macro_variant_summary: Optional[pd.DataFrame] = None,
     title: str = "Historical Methodology Backtest Report",
 ) -> str:
     lines = [
@@ -744,6 +942,9 @@ def format_methodology_report(
     lines.extend(_benchmark_table(benchmark_metrics))
     lines.extend(["", "### In-Sample / Out-of-Sample", ""])
     lines.extend(_window_metrics_table(window_metrics))
+    if macro_variant_summary is not None and not macro_variant_summary.empty:
+        lines.extend(["", "### Macro Condition Variants", ""])
+        lines.extend(_macro_variant_table(macro_variant_summary))
     lines.extend(["", "## Acceptance Gates", ""])
     lines.extend(format_gate_report(gates).splitlines()[2:])
     lines.extend(

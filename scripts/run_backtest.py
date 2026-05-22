@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 import sys
 
+import pandas as pd
+
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -14,6 +16,7 @@ if str(ROOT) not in sys.path:
 
 from src import backtest
 from src.data import fetch_ohlcv
+from src.fred_data import fetch_fred
 
 
 REPORT_PATH = ROOT / "docs" / "backtest_report.md"
@@ -37,6 +40,26 @@ SECTOR_BENCHMARK_TICKERS = [
 REQUIRED_TICKERS = sorted({"AGG", "BIL", "SPY", *SECTOR_BENCHMARK_TICKERS})
 DEFAULT_OHLCV_PROVIDER = "auto"
 DEFAULT_LIVE_SMOKE_PERIOD = "2mo"
+MACRO_VARIANT_RULES = (
+    backtest.MacroVariantRule(
+        name="Curve falling defensive",
+        series_id="T10Y2Y",
+        condition="falling",
+        exposure_multiplier=0.0,
+    ),
+    backtest.MacroVariantRule(
+        name="HY spread rising defensive",
+        series_id="BAMLH0A0HYM2",
+        condition="rising",
+        exposure_multiplier=0.0,
+    ),
+    backtest.MacroVariantRule(
+        name="Stress rising defensive",
+        series_id="STLFSI4",
+        condition="rising",
+        exposure_multiplier=0.0,
+    ),
+)
 
 
 def _sha256_bytes(payload: bytes) -> str:
@@ -82,6 +105,7 @@ def _write_artifacts(
     states,
     required_tickers: list[str],
     simulation_summary: dict | None = None,
+    macro_variant_summary=None,
 ) -> None:
     report_bytes = report.encode("utf-8")
     methodology_report_bytes = methodology_report.encode("utf-8")
@@ -101,6 +125,7 @@ def _write_artifacts(
         "states_rows": int(len(states)),
         "states_columns": list(states.columns),
         "simulation_summary": simulation_summary or {},
+        "macro_variant_summary": _frame_records(macro_variant_summary),
     }
 
     metadata_bytes = (json.dumps(metadata, indent=2, sort_keys=True) + "\n").encode("utf-8")
@@ -128,11 +153,37 @@ def _parser() -> argparse.ArgumentParser:
         default=DEFAULT_LIVE_SMOKE_PERIOD,
         help=f"Market-data period for --live-smoke (default: {DEFAULT_LIVE_SMOKE_PERIOD}).",
     )
+    parser.add_argument(
+        "--macro-variants",
+        action="store_true",
+        help="Fetch FRED and include analysis-only macro-conditioned exposure variants in the report.",
+    )
     return parser
 
 
 def _provider() -> str:
     return os.environ.get("OHLCV_PROVIDER", DEFAULT_OHLCV_PROVIDER)
+
+
+def _frame_records(frame) -> list[dict]:
+    if frame is None or getattr(frame, "empty", True):
+        return []
+    return json.loads(frame.to_json(orient="records"))
+
+
+def _build_macro_variant_summary(*, enabled: bool, prices, target_weights):
+    if not enabled:
+        return pd.DataFrame()
+    fred_data = fetch_fred(start_date="2003-01-01")
+    if not fred_data:
+        return pd.DataFrame()
+    return backtest.evaluate_macro_condition_variants(
+        prices,
+        target_weights,
+        fred_data,
+        rules=MACRO_VARIANT_RULES,
+        transaction_cost_bps=5.0,
+    )
 
 
 def _download_prices(period: str, provider: str):
@@ -212,6 +263,11 @@ def main(argv: list[str] | None = None) -> int:
             methodology_targets.target_weights,
             cost_bps_values=[3, 5, 10],
         )
+        macro_variant_summary = _build_macro_variant_summary(
+            enabled=bool(args.macro_variants),
+            prices=prices[strategy_columns],
+            target_weights=methodology_targets.target_weights,
+        )
         methodology_oos_metrics = methodology_windows["Out-of-sample"]
         sector_oos_metrics = sector_windows["Out-of-sample"]
         gates = backtest.evaluate_acceptance_gates(
@@ -240,6 +296,7 @@ def main(argv: list[str] | None = None) -> int:
                 "Equal-weight sectors out-of-sample": sector_oos_metrics,
             },
             simulation_summary=simulation_summary,
+            macro_variant_summary=macro_variant_summary,
             title="Manual Backtest Smoke Report",
         )
         methodology_report = backtest.format_methodology_report(
@@ -258,6 +315,7 @@ def main(argv: list[str] | None = None) -> int:
                 "Equal-weight sectors out-of-sample": sector_oos_metrics,
             },
             simulation_summary=simulation_summary,
+            macro_variant_summary=macro_variant_summary,
         )
         equity = backtest.equity_frame(
             {
@@ -273,6 +331,7 @@ def main(argv: list[str] | None = None) -> int:
             methodology_targets.states,
             REQUIRED_TICKERS,
             simulation_summary=simulation_summary,
+            macro_variant_summary=macro_variant_summary,
         )
     except Exception as exc:
         print(f"Manual backtest data validation failed: {exc}")

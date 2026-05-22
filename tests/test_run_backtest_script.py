@@ -17,6 +17,109 @@ def test_run_backtest_artifact_paths_are_repo_root_anchored():
     assert run_backtest.METADATA_PATH == run_backtest.ROOT / "docs" / "backtest_metadata.json"
 
 
+def test_run_backtest_parser_exposes_macro_variants_flag():
+    args = run_backtest._parser().parse_args(["--macro-variants"])
+
+    assert args.macro_variants is True
+
+
+def test_run_backtest_builds_macro_variant_summary_only_when_enabled(monkeypatch):
+    calls = []
+    prices = pd.DataFrame({"AAA": [100.0, 110.0, 121.0]}, index=pd.bdate_range("2024-01-01", periods=3))
+    target_weights = pd.DataFrame({"AAA": [1.0]}, index=[prices.index[0]])
+    macro_summary = pd.DataFrame(
+        [{"variant": "Curve falling defensive", "series_id": "T10Y2Y", "condition": "falling"}]
+    )
+
+    def fake_fetch_fred(start_date):
+        calls.append(start_date)
+        return {"T10Y2Y": pd.Series([1.0, 0.5], index=prices.index[:2])}
+
+    def fake_evaluate_macro_condition_variants(prices_arg, target_weights_arg, macro_data, rules, transaction_cost_bps):
+        assert prices_arg is prices
+        assert target_weights_arg is target_weights
+        assert "T10Y2Y" in macro_data
+        assert rules == run_backtest.MACRO_VARIANT_RULES
+        assert transaction_cost_bps == pytest.approx(5.0)
+        return macro_summary
+
+    monkeypatch.setattr(run_backtest, "fetch_fred", fake_fetch_fred)
+    monkeypatch.setattr(
+        run_backtest.backtest,
+        "evaluate_macro_condition_variants",
+        fake_evaluate_macro_condition_variants,
+    )
+
+    disabled = run_backtest._build_macro_variant_summary(
+        enabled=False,
+        prices=prices,
+        target_weights=target_weights,
+    )
+    enabled = run_backtest._build_macro_variant_summary(
+        enabled=True,
+        prices=prices,
+        target_weights=target_weights,
+    )
+
+    assert disabled.empty
+    assert enabled.equals(macro_summary)
+    assert calls == ["2003-01-01"]
+
+
+def test_run_backtest_writes_macro_variant_summary_to_metadata(monkeypatch, tmp_path, ohlcv_frame_factory):
+    macro_summary = pd.DataFrame(
+        [
+            {
+                "variant": "Curve falling defensive",
+                "series_id": "T10Y2Y",
+                "condition": "falling",
+                "active_rebalances": 2,
+                "total_return_delta": 0.04,
+                "sharpe_delta": 0.20,
+                "max_drawdown_delta": 0.03,
+            }
+        ]
+    )
+
+    def fake_fetch(tickers, period, provider):
+        return {
+            ticker: ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0005)
+            for ticker in tickers
+        }
+
+    def fake_build_historical_methodology_targets(ohlcv, rebalance_dates, phase):
+        del ohlcv, phase
+        rebalance_dates = pd.DatetimeIndex(rebalance_dates)
+        weights = pd.DataFrame({"XLK": [1.0] * len(rebalance_dates)}, index=rebalance_dates)
+        return backtest.HistoricalSignalTargets(
+            target_weights=weights,
+            states=pd.DataFrame({"XLK": ["HOLD"] * len(rebalance_dates)}, index=rebalance_dates),
+            snapshots={},
+        )
+
+    monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
+    monkeypatch.setattr(run_backtest, "METHODOLOGY_REPORT_PATH", tmp_path / "backtest_methodology_report.md")
+    monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "STATES_PATH", tmp_path / "backtest_states.csv")
+    monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
+    monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
+    monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
+    monkeypatch.setattr(
+        run_backtest.backtest,
+        "build_historical_methodology_targets",
+        fake_build_historical_methodology_targets,
+    )
+    monkeypatch.setattr(run_backtest, "_build_macro_variant_summary", lambda **kwargs: macro_summary)
+
+    assert run_backtest.main(["--macro-variants"]) == 0
+
+    report = run_backtest.REPORT_PATH.read_text(encoding="utf-8")
+    metadata = json.loads(run_backtest.METADATA_PATH.read_text(encoding="utf-8"))
+    assert "## Macro Condition Variants" in report
+    assert metadata["macro_variant_summary"][0]["variant"] == "Curve falling defensive"
+    assert metadata["macro_variant_summary"][0]["total_return_delta"] == pytest.approx(0.04)
+
+
 def test_run_backtest_returns_manual_data_error_when_required_prices_missing(monkeypatch, tmp_path):
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
     monkeypatch.setattr(run_backtest, "METHODOLOGY_REPORT_PATH", tmp_path / "backtest_methodology_report.md")
@@ -181,6 +284,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
+    monkeypatch.setattr(run_backtest, "_build_macro_variant_summary", lambda **kwargs: pd.DataFrame())
     monkeypatch.setattr(
         run_backtest.backtest,
         "build_historical_methodology_targets",
@@ -218,6 +322,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     assert "State transitions per ticker-year" in report
     assert "## In-Sample / Out-of-Sample" in report
     assert "Out-of-sample" in report
+    assert "## Macro Condition Variants" not in report
     assert run_backtest.METHODOLOGY_REPORT_PATH.exists()
     methodology_report = run_backtest.METHODOLOGY_REPORT_PATH.read_text(encoding="utf-8")
     assert "Historical Methodology Backtest Report" in methodology_report
@@ -242,6 +347,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     assert metadata["required_tickers"] == expected_tickers
     assert metadata["simulation_summary"]["state_transition_count"] == 2
     assert metadata["simulation_summary"]["state_transitions_per_ticker_year"] > 0.0
+    assert metadata["macro_variant_summary"] == []
     assert "Methodology" in metadata["equity_columns"]
     assert metadata["states_columns"] == ["XLK", "XLF"]
 

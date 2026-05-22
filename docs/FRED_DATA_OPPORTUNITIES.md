@@ -24,6 +24,8 @@ B-154 expands the same cached FRED fetch list to include the grouped read-only c
 
 B-155 uses that journaled snapshot in the debrief engine to bucket matured recommendation outcomes by FRED macro condition. This remains analysis-only and does not change scoring, alerts, state transitions, or provider fetches.
 
+B-156 adds opt-in B-011 macro backtest variants. `python scripts/run_backtest.py --macro-variants` fetches historical FRED observations when the key is configured, aligns each series to rebalance dates without lookahead, and compares defensive exposure filters against the baseline methodology.
+
 ## Useful API Capabilities
 
 - `fred/series/observations`: fetch the observation history for specific known series IDs.
@@ -115,5 +117,5 @@ Do not wire these into the app without a fresh lookup via `fred/series/search`.
 1. Add a read-only FRED macro context expansion with grouped tiles and no scoring changes. Implemented in B-154.
 2. Log the expanded macro snapshot into the B-153 run journal so the debrief engine can compare macro conditions with later outcomes. Implemented in B-154.
 3. Summarize matured B-153 debrief outcomes by journaled FRED macro condition. Implemented in B-155.
-4. Add B-011 backtest variants that test whether any new macro features improve decisions.
+4. Add B-011 backtest variants that test whether any new macro features improve decisions. Implemented in B-156.
 5. Only promote validated features into scoring or veto logic after backtest evidence beats the current methodology.
