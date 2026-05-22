@@ -335,10 +335,28 @@ def test_macro_condition_mask_uses_past_observations_only():
     }
 
 
+def test_macro_condition_mask_applies_availability_lag_before_rebalance_use():
+    dates = pd.bdate_range("2024-01-01", periods=8)
+    series = pd.Series([1.0, 0.5], index=[dates[0], dates[2]])
+
+    mask = backtest.macro_condition_mask(
+        series,
+        pd.DatetimeIndex([dates[3], dates[7]]),
+        condition="falling",
+        lookback_periods=1,
+        availability_lag_days=5,
+    )
+
+    assert mask.to_dict() == {
+        dates[3]: False,
+        dates[7]: True,
+    }
+
+
 def test_evaluate_macro_condition_variants_compares_defensive_filter():
     dates = pd.bdate_range("2024-01-01", periods=5)
-    prices = pd.DataFrame({"AAA": [100.0, 110.0, 121.0, 60.5, 60.5]}, index=dates)
-    target_weights = pd.DataFrame({"AAA": [1.0, 1.0]}, index=[dates[0], dates[2]])
+    prices = pd.DataFrame({"AAA": [100.0, 110.0, 121.0, 133.1, 66.55]}, index=dates)
+    target_weights = pd.DataFrame({"AAA": [1.0, 1.0]}, index=[dates[0], dates[3]])
     macro_data = {"T10Y2Y": pd.Series([1.0, 0.5], index=[dates[0], dates[2]])}
 
     summary = backtest.evaluate_macro_condition_variants(
@@ -351,6 +369,7 @@ def test_evaluate_macro_condition_variants_compares_defensive_filter():
                 series_id="T10Y2Y",
                 condition="falling",
                 exposure_multiplier=0.0,
+                availability_lag_days=1,
             )
         ],
         transaction_cost_bps=0.0,
@@ -361,6 +380,7 @@ def test_evaluate_macro_condition_variants_compares_defensive_filter():
     row = summary.iloc[0]
     assert row["series_id"] == "T10Y2Y"
     assert row["condition"] == "falling"
+    assert row["availability_lag_days"] == 1
     assert row["active_rebalances"] == 1
     assert row["exposure_multiplier"] == pytest.approx(0.0)
     assert row["variant_total_return"] > row["baseline_total_return"]

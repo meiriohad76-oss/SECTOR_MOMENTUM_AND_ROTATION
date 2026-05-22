@@ -274,12 +274,13 @@ def fetch_ohlcv_result(
     period: str = "3y",
     interval: str = "1d",
     provider: str | None = None,
+    use_cache: bool = True,
 ) -> OhlcvFetchResult:
     """Fetch OHLCV and return provider/cache metadata for operator status UI."""
     tickers = list(dict.fromkeys(tickers))  # de-dup preserving order
     provider_name = _select_ohlcv_provider(provider)
     cached: dict[str, pd.DataFrame] = {}
-    if ohlcv_cache_enabled():
+    if use_cache and ohlcv_cache_enabled():
         try:
             cached = read_cached_ohlcv(tickers, period=period, interval=interval)
         except Exception:
@@ -291,14 +292,14 @@ def fetch_ohlcv_result(
             fetched = _fetch_massive_ohlcv(missing, period=period, interval=interval)
         else:
             fetched = _fetch_yfinance_ohlcv(missing, period=period, interval=interval)
-        if fetched and ohlcv_cache_enabled():
+        if fetched and use_cache and ohlcv_cache_enabled():
             try:
                 write_cached_ohlcv(fetched, provider=provider_name, interval=interval)
             except Exception:
                 pass
     stale_cached: dict[str, pd.DataFrame] = {}
     provider_misses = [ticker for ticker in missing if ticker not in fetched and str(ticker).upper() not in fetched]
-    if provider_name == "yfinance" and provider_misses and ohlcv_cache_enabled():
+    if provider_name == "yfinance" and provider_misses and use_cache and ohlcv_cache_enabled():
         try:
             stale_cached = read_cached_ohlcv(
                 provider_misses,

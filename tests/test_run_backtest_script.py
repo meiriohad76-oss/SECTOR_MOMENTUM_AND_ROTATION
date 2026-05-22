@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -41,12 +42,20 @@ def test_run_backtest_builds_macro_variant_summary_only_when_enabled(monkeypatch
         calls.append(start_date)
         return {"T10Y2Y": pd.Series([1.0, 0.5], index=prices.index[:2])}
 
-    def fake_evaluate_macro_condition_variants(prices_arg, target_weights_arg, macro_data, rules, transaction_cost_bps):
+    def fake_evaluate_macro_condition_variants(
+        prices_arg,
+        target_weights_arg,
+        macro_data,
+        rules,
+        transaction_cost_bps,
+        oos_start,
+    ):
         assert prices_arg is prices
         assert target_weights_arg is target_weights
         assert "T10Y2Y" in macro_data
         assert rules == run_backtest.MACRO_VARIANT_RULES
         assert transaction_cost_bps == pytest.approx(5.0)
+        assert oos_start == "2015-01-01"
         return macro_summary
 
     monkeypatch.setattr(run_backtest, "fetch_fred", fake_fetch_fred)
@@ -70,6 +79,18 @@ def test_run_backtest_builds_macro_variant_summary_only_when_enabled(monkeypatch
     assert disabled.empty
     assert enabled.equals(macro_summary)
     assert calls == ["2003-01-01"]
+
+
+def test_validation_split_falls_back_when_default_oos_is_before_data():
+    rebalances = pd.bdate_range("2018-01-05", periods=100)
+
+    split_date, method = run_backtest._resolve_validation_split(
+        rebalances,
+        preferred_oos_start="2015-01-01",
+    )
+
+    assert split_date == rebalances[70]
+    assert "walk-forward fallback" in method
 
 
 def test_run_backtest_writes_macro_variant_summary_to_metadata(monkeypatch, tmp_path, ohlcv_frame_factory):
@@ -111,7 +132,20 @@ def test_run_backtest_writes_macro_variant_summary_to_metadata(monkeypatch, tmp_
     monkeypatch.setattr(run_backtest, "FRED_VALIDATION_REPORT_PATH", tmp_path / "fred_macro_validation_report.md")
     monkeypatch.setattr(run_backtest, "FRED_VALIDATION_SUMMARY_PATH", tmp_path / "fred_macro_validation_summary.csv")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
-    monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
+    monkeypatch.setattr(
+        run_backtest,
+        "fetch_ohlcv_result",
+        lambda tickers, period, provider, use_cache=True: SimpleNamespace(
+            data=fake_fetch(tickers, period, provider),
+            provider="massive",
+            fetched=tuple(tickers),
+            fresh_cache_hits=(),
+            stale_cache_hits=(),
+            missing=(),
+            warnings=(),
+            used_stale_cache=False,
+        ),
+    )
     monkeypatch.setattr(
         run_backtest.backtest,
         "build_historical_methodology_targets",
@@ -204,7 +238,20 @@ def test_run_backtest_writes_fred_validation_report_when_macro_variants_enabled(
     monkeypatch.setattr(run_backtest, "FRED_VALIDATION_REPORT_PATH", tmp_path / "fred_macro_validation_report.md")
     monkeypatch.setattr(run_backtest, "FRED_VALIDATION_SUMMARY_PATH", tmp_path / "fred_macro_validation_summary.csv")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
-    monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
+    monkeypatch.setattr(
+        run_backtest,
+        "fetch_ohlcv_result",
+        lambda tickers, period, provider, use_cache=True: SimpleNamespace(
+            data=fake_fetch(tickers, period, provider),
+            provider="massive",
+            fetched=tuple(tickers),
+            fresh_cache_hits=(),
+            stale_cache_hits=(),
+            missing=(),
+            warnings=(),
+            used_stale_cache=False,
+        ),
+    )
     monkeypatch.setattr(run_backtest, "_resolved_provider", lambda provider: "massive")
     monkeypatch.setattr(run_backtest, "_fred_config_status", lambda macro_data: "configured")
     monkeypatch.setattr(
@@ -224,6 +271,8 @@ def test_run_backtest_writes_fred_validation_report_when_macro_variants_enabled(
     assert "Requested OHLCV provider: auto" in validation_report
     assert "Resolved OHLCV provider: massive" in validation_report
     assert "FRED status: configured" in validation_report
+    assert "Cache policy: bypassed for B-157 validation" in validation_report
+    assert "Fetched tickers: 14" in validation_report
     assert "Curve falling defensive" in validation_report
     assert "needs more testing" in validation_report
     assert "No FRED macro rule is promoted into live scoring" in validation_report
@@ -231,6 +280,8 @@ def test_run_backtest_writes_fred_validation_report_when_macro_variants_enabled(
     assert metadata["fred_validation_report_sha256"] == run_backtest._sha256_bytes(
         run_backtest.FRED_VALIDATION_REPORT_PATH.read_bytes()
     )
+    assert metadata["ohlcv_source"]["cache_policy"] == "bypassed"
+    assert metadata["ohlcv_source"]["fetched_count"] == 14
 
 
 def test_run_backtest_returns_manual_data_error_when_required_prices_missing(monkeypatch, tmp_path):
@@ -386,8 +437,8 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
         },
     ]
 
-    def fake_split_backtest_metrics(result):
-        split_calls.append(result)
+    def fake_split_backtest_metrics(result, oos_start="2015-01-01"):
+        split_calls.append((result, oos_start))
         return split_results[len(split_calls) - 1]
 
     monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")

@@ -15,7 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src import backtest
-from src.data import _select_ohlcv_provider, fetch_ohlcv
+from src.data import _select_ohlcv_provider, fetch_ohlcv, fetch_ohlcv_result
 from src.fred_data import fetch_fred
 
 
@@ -48,18 +48,21 @@ MACRO_VARIANT_RULES = (
         series_id="T10Y2Y",
         condition="falling",
         exposure_multiplier=0.0,
+        availability_lag_days=1,
     ),
     backtest.MacroVariantRule(
         name="HY spread rising defensive",
         series_id="BAMLH0A0HYM2",
         condition="rising",
         exposure_multiplier=0.0,
+        availability_lag_days=1,
     ),
     backtest.MacroVariantRule(
         name="Stress rising defensive",
         series_id="STLFSI4",
         condition="rising",
         exposure_multiplier=0.0,
+        availability_lag_days=7,
     ),
 )
 
@@ -110,6 +113,7 @@ def _write_artifacts(
     macro_variant_summary=None,
     fred_validation_report: str | None = None,
     fred_validation_summary=None,
+    ohlcv_source: dict | None = None,
 ) -> None:
     report_bytes = report.encode("utf-8")
     methodology_report_bytes = methodology_report.encode("utf-8")
@@ -130,6 +134,7 @@ def _write_artifacts(
         "states_columns": list(states.columns),
         "simulation_summary": simulation_summary or {},
         "macro_variant_summary": _frame_records(macro_variant_summary),
+        "ohlcv_source": ohlcv_source or {},
     }
     payloads = {
         REPORT_PATH: report_bytes,
@@ -181,13 +186,47 @@ def _frame_records(frame) -> list[dict]:
     return json.loads(frame.to_json(orient="records"))
 
 
+def _resolve_validation_split(
+    target_index,
+    preferred_oos_start: str = "2015-01-01",
+    min_side_rebalances: int = 20,
+    fallback_fraction: float = 0.70,
+) -> tuple[pd.Timestamp, str]:
+    dates = pd.DatetimeIndex(pd.to_datetime(target_index)).dropna().sort_values().unique()
+    preferred = pd.Timestamp(preferred_oos_start)
+    if len(dates) == 0:
+        return preferred, "configured split unavailable because there are no rebalances"
+    in_sample_count = int((dates < preferred).sum())
+    oos_count = int((dates >= preferred).sum())
+    if in_sample_count >= min_side_rebalances and oos_count >= min_side_rebalances:
+        return preferred, f"configured OOS start with {in_sample_count} in-sample and {oos_count} OOS rebalances"
+    if len(dates) >= min_side_rebalances * 2:
+        raw_position = int(len(dates) * fallback_fraction)
+        position = min(max(raw_position, min_side_rebalances), len(dates) - min_side_rebalances)
+        split = pd.Timestamp(dates[position])
+        return (
+            split,
+            (
+                "walk-forward fallback because configured OOS start would leave "
+                f"{in_sample_count} in-sample and {oos_count} OOS rebalances"
+            ),
+        )
+    return (
+        preferred,
+        (
+            "configured split retained but validation sample is thin "
+            f"({in_sample_count} in-sample, {oos_count} OOS rebalances)"
+        ),
+    )
+
+
 def _fetch_macro_data(enabled: bool) -> dict[str, pd.Series]:
     if not enabled:
         return {}
     return fetch_fred(start_date="2003-01-01")
 
 
-def _build_macro_variant_summary(*, enabled: bool, prices, target_weights, macro_data=None):
+def _build_macro_variant_summary(*, enabled: bool, prices, target_weights, macro_data=None, oos_start="2015-01-01"):
     if not enabled:
         return pd.DataFrame()
     fred_data = macro_data if macro_data is not None else _fetch_macro_data(enabled=True)
@@ -199,6 +238,7 @@ def _build_macro_variant_summary(*, enabled: bool, prices, target_weights, macro
         fred_data,
         rules=MACRO_VARIANT_RULES,
         transaction_cost_bps=5.0,
+        oos_start=oos_start,
     )
 
 
@@ -253,19 +293,65 @@ def _int_text(value) -> str:
         return "-"
 
 
+def _ohlcv_source_metadata(fetch_result, cache_policy: str) -> dict:
+    if fetch_result is None:
+        return {
+            "cache_policy": "normal",
+            "provider": "",
+            "fetched_count": 0,
+            "fresh_cache_hit_count": 0,
+            "stale_cache_hit_count": 0,
+            "missing_count": 0,
+            "warnings": [],
+        }
+    return {
+        "cache_policy": cache_policy,
+        "provider": str(getattr(fetch_result, "provider", "")),
+        "fetched_count": int(len(getattr(fetch_result, "fetched", ()))),
+        "fresh_cache_hit_count": int(len(getattr(fetch_result, "fresh_cache_hits", ()))),
+        "stale_cache_hit_count": int(len(getattr(fetch_result, "stale_cache_hits", ()))),
+        "missing_count": int(len(getattr(fetch_result, "missing", ()))),
+        "fetched": list(getattr(fetch_result, "fetched", ())),
+        "fresh_cache_hits": list(getattr(fetch_result, "fresh_cache_hits", ())),
+        "stale_cache_hits": list(getattr(fetch_result, "stale_cache_hits", ())),
+        "missing": list(getattr(fetch_result, "missing", ())),
+        "warnings": list(getattr(fetch_result, "warnings", ())),
+    }
+
+
+def _ohlcv_source_lines(source: dict | None) -> list[str]:
+    if not source:
+        return ["- Cache policy: normal dashboard/manual fetch path"]
+    policy = source.get("cache_policy", "normal")
+    label = "bypassed for B-157 validation" if policy == "bypassed" else str(policy)
+    lines = [
+        f"- Cache policy: {label}",
+        f"- Source provider: {source.get('provider', '-')}",
+        f"- Fetched tickers: {source.get('fetched_count', 0)}",
+        f"- Fresh cache hits: {source.get('fresh_cache_hit_count', 0)}",
+        f"- Stale cache hits: {source.get('stale_cache_hit_count', 0)}",
+        f"- Missing tickers: {source.get('missing_count', 0)}",
+    ]
+    warnings = source.get("warnings") or []
+    if warnings:
+        lines.append("- Warnings: " + " | ".join(str(item) for item in warnings))
+    return lines
+
+
 def _fred_validation_variant_table(macro_variant_summary: pd.DataFrame) -> list[str]:
     if macro_variant_summary is None or macro_variant_summary.empty:
         return [
             "No macro variant rows were produced. Do not promote any FRED macro rule from this run.",
         ]
     lines = [
-        "| Variant | Series | Label | Active OOS | CAGR Delta | Sharpe Delta | Drawdown Delta | OOS CAGR Delta | OOS Sharpe Delta | OOS Drawdown Delta | Turnover Delta | Hit-Rate Delta | Trade Count Delta |",
-        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Variant | Series | Lag Days | Label | Active OOS | CAGR Delta | Sharpe Delta | Drawdown Delta | OOS CAGR Delta | OOS Sharpe Delta | OOS Drawdown Delta | Turnover Delta | Hit-Rate Delta | Trade Count Delta |",
+        "|---|---|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for _, row in macro_variant_summary.iterrows():
         lines.append(
             f"| {row.get('variant', '-')} | "
             f"{row.get('series_id', '-')} | "
+            f"{_int_text(row.get('availability_lag_days'))} | "
             f"{row.get('promotion_label', 'needs more testing')} | "
             f"{_int_text(row.get('active_oos_rebalances'))} | "
             f"{_pct(row.get('cagr_delta'))} | "
@@ -292,6 +378,8 @@ def _format_fred_validation_report(
     fred_status: str,
     generated_at_utc: str,
     oos_start: str = "2015-01-01",
+    validation_split_method: str = "configured",
+    ohlcv_source: dict | None = None,
 ) -> str:
     price_start, price_end, price_rows = _index_window(prices.index)
     rebalance_start, rebalance_end, rebalance_count = _index_window(target_weights.index)
@@ -312,15 +400,28 @@ def _format_fred_validation_report(
         f"- Resolved OHLCV provider: {resolved_provider}",
         f"- FRED status: {fred_status}",
         f"- OOS start: {pd.Timestamp(oos_start).date().isoformat()}",
+        f"- Validation split: {validation_split_method}",
         "",
         "## Data Windows",
         "",
         f"- Market prices: {price_start} to {price_end} ({price_rows} rows, {len(prices.columns)} tickers)",
         f"- Methodology rebalances: {rebalance_start} to {rebalance_end} ({rebalance_count} rows)",
         "",
-        "## FRED Series Windows",
+        "## OHLCV Source Evidence",
         "",
     ]
+    lines.extend(_ohlcv_source_lines(ohlcv_source))
+    lines.extend(
+        [
+            "",
+        ]
+    )
+    lines.extend(
+        [
+        "## FRED Series Windows",
+        "",
+        ]
+    )
     lines.extend(_macro_windows(macro_data))
     lines.extend(
         [
@@ -347,10 +448,20 @@ def _format_fred_validation_report(
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _download_prices(period: str, provider: str):
-    ohlcv = fetch_ohlcv(REQUIRED_TICKERS, period=period, provider=provider)
+def _download_prices(period: str, provider: str, use_cache: bool = True):
+    fetch_result = None
+    if use_cache:
+        ohlcv = fetch_ohlcv(REQUIRED_TICKERS, period=period, provider=provider)
+    else:
+        fetch_result = fetch_ohlcv_result(
+            REQUIRED_TICKERS,
+            period=period,
+            provider=provider,
+            use_cache=False,
+        )
+        ohlcv = fetch_result.data
     prices = backtest.close_matrix_from_ohlcv(ohlcv).loc["2003-01-01":]
-    return ohlcv, prices
+    return ohlcv, prices, fetch_result
 
 
 def _validate_required_prices(prices) -> list[str]:
@@ -360,7 +471,7 @@ def _validate_required_prices(prices) -> list[str]:
 def _run_live_smoke(period: str) -> int:
     provider = _provider()
     try:
-        _, prices = _download_prices(period=period, provider=provider)
+        _, prices, _ = _download_prices(period=period, provider=provider)
     except Exception as exc:
         print(f"Manual backtest data download failed: {exc}")
         return 2
@@ -381,7 +492,12 @@ def main(argv: list[str] | None = None) -> int:
         return _run_live_smoke(args.smoke_period)
     requested_provider = _provider()
     try:
-        ohlcv, prices = _download_prices(period="max", provider=requested_provider)
+        validation_mode = bool(args.macro_variants)
+        ohlcv, prices, ohlcv_fetch_result = _download_prices(
+            period="max",
+            provider=requested_provider,
+            use_cache=not validation_mode,
+        )
     except Exception as exc:
         print(f"Manual backtest data download failed: {exc}")
         return 2
@@ -400,6 +516,9 @@ def main(argv: list[str] | None = None) -> int:
         if not strategy_columns:
             raise ValueError("methodology target builder produced no target columns")
         simulation_summary = backtest.historical_simulation_summary(methodology_targets)
+        validation_oos_start, validation_split_method = _resolve_validation_split(
+            methodology_targets.target_weights.index
+        )
         methodology_result = backtest.run_weight_backtest(
             prices[strategy_columns],
             methodology_targets.target_weights,
@@ -417,9 +536,18 @@ def main(argv: list[str] | None = None) -> int:
             sector_targets,
             transaction_cost_bps=5.0,
         )
-        methodology_windows = backtest.split_backtest_metrics(methodology_result)
-        sixty_forty_windows = backtest.split_backtest_metrics(sixty_forty_result)
-        sector_windows = backtest.split_backtest_metrics(sector_result)
+        methodology_windows = backtest.split_backtest_metrics(
+            methodology_result,
+            oos_start=validation_oos_start,
+        )
+        sixty_forty_windows = backtest.split_backtest_metrics(
+            sixty_forty_result,
+            oos_start=validation_oos_start,
+        )
+        sector_windows = backtest.split_backtest_metrics(
+            sector_result,
+            oos_start=validation_oos_start,
+        )
         cost_scenarios = backtest.run_cost_scenarios(
             prices[strategy_columns],
             methodology_targets.target_weights,
@@ -431,6 +559,7 @@ def main(argv: list[str] | None = None) -> int:
             prices=prices[strategy_columns],
             target_weights=methodology_targets.target_weights,
             macro_data=macro_data,
+            oos_start=validation_oos_start,
         )
         fred_validation_report = None
         fred_validation_summary = None
@@ -445,6 +574,9 @@ def main(argv: list[str] | None = None) -> int:
                 resolved_provider=_resolved_provider(requested_provider),
                 fred_status=_fred_config_status(macro_data),
                 generated_at_utc=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                oos_start=validation_oos_start,
+                validation_split_method=validation_split_method,
+                ohlcv_source=_ohlcv_source_metadata(ohlcv_fetch_result, cache_policy="bypassed"),
             )
         methodology_oos_metrics = methodology_windows["Out-of-sample"]
         sector_oos_metrics = sector_windows["Out-of-sample"]
@@ -476,6 +608,7 @@ def main(argv: list[str] | None = None) -> int:
             simulation_summary=simulation_summary,
             macro_variant_summary=macro_variant_summary,
             title="Manual Backtest Smoke Report",
+            oos_start=validation_oos_start,
         )
         methodology_report = backtest.format_methodology_report(
             strategy_metrics=methodology_result.metrics,
@@ -495,6 +628,10 @@ def main(argv: list[str] | None = None) -> int:
             simulation_summary=simulation_summary,
             macro_variant_summary=macro_variant_summary,
         )
+        ohlcv_source = _ohlcv_source_metadata(
+            ohlcv_fetch_result,
+            cache_policy="bypassed" if validation_mode else "normal",
+        )
         equity = backtest.equity_frame(
             {
                 "Methodology": methodology_result,
@@ -512,6 +649,7 @@ def main(argv: list[str] | None = None) -> int:
             macro_variant_summary=macro_variant_summary,
             fred_validation_report=fred_validation_report,
             fred_validation_summary=fred_validation_summary,
+            ohlcv_source=ohlcv_source,
         )
     except Exception as exc:
         print(f"Manual backtest data validation failed: {exc}")

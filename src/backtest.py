@@ -43,6 +43,7 @@ class MacroVariantRule:
     exposure_multiplier: float = 0.0
     threshold: float = 0.0
     lookback_periods: int = 1
+    availability_lag_days: int = 0
 
 
 ScoreSnapshotFn = Callable[[dict[str, pd.DataFrame], str, str, str], pd.DataFrame]
@@ -457,6 +458,7 @@ def macro_condition_mask(
     condition: str,
     threshold: float = 0.0,
     lookback_periods: int = 1,
+    availability_lag_days: int = 0,
 ) -> pd.Series:
     values = _clean_macro_series(series)
     target_dates = pd.DatetimeIndex(pd.to_datetime(target_index))
@@ -465,7 +467,13 @@ def macro_condition_mask(
     if values.empty or len(target_dates) == 0:
         return pd.Series(False, index=target_dates, dtype=bool)
 
+    lag_days = int(_finite_scalar("availability_lag_days", availability_lag_days))
+    if lag_days < 0:
+        raise ValueError("availability_lag_days must be non-negative")
     condition_values = _macro_condition_values(values, condition, threshold, lookback_periods).fillna(False)
+    if lag_days:
+        condition_values = condition_values.copy()
+        condition_values.index = condition_values.index + pd.Timedelta(days=lag_days)
     aligned_index = condition_values.index.union(target_dates).sort_values()
     aligned = condition_values.reindex(aligned_index).ffill().reindex(target_dates).fillna(False)
     return aligned.astype(bool)
@@ -528,6 +536,7 @@ def _variant_metric_row(
         "condition": rule.condition,
         "threshold": float(rule.threshold),
         "lookback_periods": int(rule.lookback_periods),
+        "availability_lag_days": int(rule.availability_lag_days),
         "exposure_multiplier": float(rule.exposure_multiplier),
         "active_rebalances": int(mask.sum()),
         "active_in_sample_rebalances": int(active_in_sample.sum()),
@@ -614,6 +623,7 @@ def evaluate_macro_condition_variants(
             condition=rule.condition,
             threshold=rule.threshold,
             lookback_periods=rule.lookback_periods,
+            availability_lag_days=rule.availability_lag_days,
         )
         if not bool(mask.any()):
             continue
