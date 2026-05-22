@@ -259,11 +259,12 @@ Status legend:
 **Result:** no FRED macro rule is promoted. `BAMLH0A0HYM2` HY-spread-rising, `STLFSI4` stress-rising, and `T10Y2Y` curve-falling defensive variants are all labeled `needs more testing`. No variant earned a `candidate` label.
 **Safety:** research only; no scoring, state-machine, alert, provider-flow, veto, recommendation, broker, or criteria-value changes.
 
-### B-158 · FRED evidence gate for live promotion — 💡 RESEARCHED, NOT BUILT
+### B-158 · FRED evidence gate for live promotion — IMPLEMENTED / BLOCKED NO CANDIDATES
 **Purpose:** promote FRED-derived criteria only if a future B-157-style validation shows robust historical improvement over the current methodology.
-**Scope:** define the exact criteria values, macro filters, or veto rules to change from the B-157 evidence; add deterministic tests, documentation, and A/B comparison against the current methodology.
-**Current gate:** blocked by the 2026-05-22 B-157 report because no tested rule earned a `candidate` label.
-**Acceptance:** the implementation plan cites a validation report with at least one `candidate`, lists the evidence thresholds used for promotion, includes regression coverage for both promoted and rejected rules, and documents rollback behavior.
+**Status:** fail-closed evidence-gate tooling is implemented through `python scripts/evaluate_evidence_gates.py`; the current gate report is `docs/evidence_gate_report.md`.
+**Files:** `src/evidence_gates.py`, `scripts/evaluate_evidence_gates.py`, `tests/test_evidence_gates.py`, `tests/test_evaluate_evidence_gates_script.py`, `docs/evidence_gate_report.md`, `docs/superpowers/plans/2026-05-22-b158-b160-evidence-gates.md`.
+**Current gate:** blocked by the 2026-05-22 B-157 report because no tested rule earned a `candidate` label. The gate report records `blocked_no_candidates` for B-158 and lists all unready FRED variants.
+**Acceptance:** future promotion still requires a validation report with at least one `candidate`, deterministic tests for promoted/rejected rules, rollback documentation, and a separate reviewed promotion patch.
 **Safety:** no FRED macro rule can enter live scoring, veto logic, alerts, recommendations, or dashboard decision text until the B-157 evidence gate passes and is reviewed.
 
 ### B-159 · Massive historical provider-data backtest variants — IMPLEMENTED
@@ -273,11 +274,12 @@ Status legend:
 **Result:** no Massive-derived rule is promoted. Massive aggregate OHLCV is documented as available research evidence with small OOS deltas versus yfinance/default (`+0.22pp` OOS CAGR, `+0.03` OOS Sharpe, `+1.57pp` OOS drawdown), but the provider comparison remains labeled `needs more testing`. Massive trade-tape/block-trade threshold sweeps at `1.0`, `1.25`, and `1.5` are all labeled `do not promote` because no persisted timestamped as-of snapshots exist for historical rebalances.
 **Safety:** research only; provider-backed historical flow remains neutral unless timestamped as-of provider snapshots exist. No Massive-derived rule changes live scoring, state-machine behavior, provider-flow behavior, vetoes, alerts, recommendations, broker behavior, or Pillar 7 weights from this ticket.
 
-### B-160 · Massive evidence gate for live promotion — 💡 RESEARCHED, NOT BUILT
+### B-160 · Massive evidence gate for live promotion — IMPLEMENTED / BLOCKED NO CANDIDATES
 **Purpose:** promote Massive-derived criteria only if B-159 shows durable improvement and no data-leakage issue.
-**Scope:** convert validated Massive historical findings into explicit candidate changes for Pillar 7 weights, thresholds, provider-flow features, or alert/veto rules.
-**Current gate:** blocked by the 2026-05-22 B-159 report because no Massive-derived variant earned a `candidate` label. B-161/B-162 now provide the snapshot store and replayable provider-flow research path, but promotion still needs enough historical as-of snapshot coverage plus candidate-grade validation evidence.
-**Acceptance:** the promotion plan cites the B-159 report, includes before/after backtest tables, deterministic tests for threshold behavior, live-provider failure-mode tests, and documentation of the activation flags or configuration required.
+**Status:** fail-closed evidence-gate tooling is implemented through `python scripts/evaluate_evidence_gates.py`; the current gate report is `docs/evidence_gate_report.md`.
+**Files:** `src/evidence_gates.py`, `scripts/evaluate_evidence_gates.py`, `tests/test_evidence_gates.py`, `tests/test_evaluate_evidence_gates_script.py`, `docs/evidence_gate_report.md`, `docs/superpowers/plans/2026-05-22-b158-b160-evidence-gates.md`.
+**Current gate:** blocked by the 2026-05-22 B-159 report because no Massive-derived variant earned a `candidate` label. B-161/B-162 now provide the snapshot store and replayable provider-flow research path, but promotion still needs enough historical as-of snapshot coverage plus candidate-grade validation evidence. The gate report records `blocked_no_candidates` for B-160.
+**Acceptance:** future promotion still requires candidate-grade validation evidence, before/after backtest tables, deterministic threshold and provider-failure tests, activation-flag documentation, rollback documentation, and a separate reviewed promotion patch.
 **Safety:** no Massive/provider-flow rule can enter live scoring, veto logic, alerts, recommendations, or dashboard decision text until the B-159 evidence gate passes and is reviewed.
 
 ### B-161 · Massive historical as-of provider snapshot store — IMPLEMENTED
