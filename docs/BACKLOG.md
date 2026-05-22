@@ -208,7 +208,7 @@ Status legend:
 ### B-154 · Expanded FRED macro context + journal snapshot — IMPLEMENTED
 **Status:** read-only grouped FRED macro context and B-153 journal metadata snapshot are implemented in `backlog-stepwise-qa`.
 **Files:** `src/macro_tiles.py`, `app.py`, `static/style.css`, `tests/test_macro_tiles.py`, `tests/test_macro_tiles_app_static.py`, `tests/test_run_journal_app_static.py`, `docs/FRED_DATA_OPPORTUNITIES.md`, `docs/superpowers/plans/2026-05-22-b154-fred-macro-context-journal.md`.
-**Behavior:** the dashboard renders grouped FRED rows for rates, inflation, liquidity, growth, credit, and commodities from the already-cached FRED payload. Missing series render as `DATA PENDING`. The same JSON-safe snapshot is stored in run-journal metadata as `fred_macro_snapshot` for later debrief/backtest analysis.
+**Behavior:** the dashboard renders grouped FRED rows for rates, inflation, liquidity, growth, credit, and commodities from the already-cached FRED payload; the FRED fetch list now covers every grouped context series. Missing series render as `DATA PENDING`. The same JSON-safe snapshot is stored in run-journal metadata as `fred_macro_snapshot` for later debrief/backtest analysis.
 **Safety:** read-only context only; no scoring, state-machine, alert, provider-flow, or veto logic changes.
 
 ### B-023 · Click-through from cards/alerts/RRG → drill-down — IMPLEMENTED

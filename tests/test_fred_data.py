@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pandas as pd
 
 from src import fred_data
+from src.macro_tiles import FRED_CONTEXT_GROUPS
 
 
 def test_resolve_api_key_prefers_environment(monkeypatch):
@@ -17,6 +18,16 @@ def test_resolve_api_key_prefers_environment(monkeypatch):
     )
 
     assert fred_data._resolve_api_key() == "env-secret"
+
+
+def test_fred_series_cover_expanded_macro_context():
+    context_series = {
+        item["id"]
+        for group in FRED_CONTEXT_GROUPS
+        for item in group["series"]
+    }
+
+    assert context_series.issubset(fred_data.FRED_SERIES)
 
 
 def test_fetch_fred_uses_injected_client_and_skips_bad_series(monkeypatch):

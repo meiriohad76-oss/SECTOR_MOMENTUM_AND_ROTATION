@@ -29,11 +29,24 @@ import pandas as pd
 FRED_SERIES = {
     "T10Y2Y": "Yield curve 10Y - 2Y",
     "T10Y3M": "Yield curve 10Y - 3M",
+    "DGS10": "10-Year Treasury yield",
     "INDPRO": "Industrial Production Index",
     "UNRATE": "Unemployment Rate",
     "NFCI":   "Chicago Fed Financial Conditions",
     "RECPROUSM156N": "Recession Probability (smoothed)",
     "BAMLH0A0HYM2":  "HY credit spread (OAS)",
+    "CPIAUCSL": "Consumer Price Index",
+    "PCEPILFE": "Core PCE price index",
+    "T10YIE": "10-Year breakeven inflation",
+    "WALCL": "Fed total assets",
+    "M2SL": "M2 money supply",
+    "CFNAI": "Chicago Fed National Activity Index",
+    "ICSA": "Initial claims",
+    "UMCSENT": "University of Michigan consumer sentiment",
+    "BAMLC0A0CM": "Corporate credit spread (OAS)",
+    "STLFSI4": "St. Louis Fed Financial Stress Index",
+    "DCOILWTICO": "WTI crude oil price",
+    "DHHNGSP": "Henry Hub natural gas price",
 }
 
 

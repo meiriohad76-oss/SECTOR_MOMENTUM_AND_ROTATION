@@ -3,7 +3,7 @@
 Date checked: 2026-05-22
 Runtime checked: AHADPI5, `/home/ahad/SECTOR_MOMENTUM_AND_ROTATION`
 
-The FRED key is configured on AHADPI5 and the current B-022 macro overlay fetched all 7 configured series successfully:
+The FRED key is configured on AHADPI5. The original B-022 macro classifier fetched all 7 classifier series successfully:
 
 - `BAMLH0A0HYM2` - high-yield OAS
 - `INDPRO` - industrial production
@@ -19,6 +19,8 @@ The current live macro classifier returned:
 FRED_PHASE=MID
 FRED_NOTE=INDPRO YoY +1.4%; curve +0.49
 ```
+
+B-154 expands the same cached FRED fetch list to include the grouped read-only context series below, then stores a JSON-safe `fred_macro_snapshot` in the local run journal for later debrief/backtest analysis.
 
 ## Useful API Capabilities
 

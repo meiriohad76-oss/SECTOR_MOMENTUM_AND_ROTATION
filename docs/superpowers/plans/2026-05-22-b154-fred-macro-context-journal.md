@@ -12,7 +12,9 @@
 
 ## File Structure
 
+- Modify `src/fred_data.py`: expand the cached FRED fetch list so it covers all grouped context series.
 - Modify `src/macro_tiles.py`: add FRED context groups, pure snapshot formatting, and tile-row helpers.
+- Modify `tests/test_fred_data.py`: verify expanded context series are included in `FRED_SERIES`.
 - Modify `tests/test_macro_tiles.py`: cover FRED tile formatting, missing data, and snapshot values.
 - Modify `app.py`: render read-only FRED macro tiles and include `fred_macro_snapshot` in journal metadata.
 - Modify `tests/test_macro_tiles_app_static.py`: ensure app renders FRED macro context without changing scoring inputs.
@@ -27,6 +29,12 @@
 - [x] Run `python -m pytest tests/test_macro_tiles.py -q` and confirm failures are missing imports/functions.
 - [x] Implement pure helpers in `src/macro_tiles.py` using existing `pandas.Series` inputs and no network calls.
 - [x] Re-run `python -m pytest tests/test_macro_tiles.py -q`.
+
+### Task 1.5: FRED Fetch Coverage
+
+- [x] Write failing test in `tests/test_fred_data.py` proving every grouped context series is in `FRED_SERIES`.
+- [x] Expand `src/fred_data.py` to fetch all grouped read-only context series.
+- [x] Re-run `python -m pytest tests/test_fred_data.py tests/test_macro_tiles.py -q`.
 
 ### Task 2: Dashboard Rendering And Journal Metadata
 
