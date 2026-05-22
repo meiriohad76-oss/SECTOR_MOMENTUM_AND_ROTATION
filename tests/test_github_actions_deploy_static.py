@@ -41,3 +41,13 @@ def test_github_actions_pi_deploy_docs_reference_required_secrets():
     assert "backlog-stepwise-qa" in text
     assert "self-hosted" in text
     assert "sector-pi" in text
+
+
+def test_backlog_records_live_validated_pi_deploy_status():
+    text = (ROOT / "docs" / "BACKLOG.md").read_text(encoding="utf-8")
+    start = text.index("#### B-140")
+    section = text[start:text.index("#### B-141", start)]
+
+    assert "IMPLEMENTED / LIVE VALIDATED" in section
+    assert "GitHub Actions run `26285814872` completed successfully" in section
+    assert "SECRETS CONFIG PENDING" not in section
