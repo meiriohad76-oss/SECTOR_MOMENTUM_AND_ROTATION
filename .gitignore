@@ -27,6 +27,7 @@ Thumbs.db
 # --- Streamlit / app local state ---
 .streamlit/secrets.toml
 .streamlit/secrets.toml.bak.*
+.streamlit/secrets.toml.save
 state.json
 data/state.json
 *.log
@@ -55,3 +56,4 @@ public/feeds/
 # --- Streamlit secrets (API keys etc.) ---
 .streamlit/secrets.toml
 .streamlit/secrets.toml.bak.*
+.streamlit/secrets.toml.save

@@ -12,6 +12,7 @@ ENV/
 
 .streamlit/secrets.toml
 .streamlit/secrets.toml.bak.*
+.streamlit/secrets.toml.save
 .env
 .env.*
 *.pem
