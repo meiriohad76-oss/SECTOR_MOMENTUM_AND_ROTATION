@@ -15,6 +15,14 @@ Set these repository secrets in GitHub:
 | `PI_REPO_PATH` | `/home/ahad/SECTOR_MOMENTUM_AND_ROTATION` | Existing checkout on the Pi. |
 | `PI_SERVICE_NAME` | `sector-dashboard` | Optional; defaults to `sector-dashboard` when unset. |
 
+Before saving values in GitHub, you can export the same names locally and run a no-secret-output preflight:
+
+```bash
+python scripts/check_pi_deploy_config.py
+```
+
+The preflight prints only configured/missing secret names. It does not print the private key, known-hosts line, host value, or repo path.
+
 ## What The Workflow Does
 
 On push to `backlog-stepwise-qa`, the workflow SSHes to the Pi and runs:
