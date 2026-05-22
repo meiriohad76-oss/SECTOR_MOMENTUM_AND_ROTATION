@@ -74,3 +74,14 @@ def test_transition_feed_publish_docs_keep_generated_static_feeds_ignored():
     assert "public/feeds/" in dockerignore
     assert "--publish-dir public/feeds" in readme
     assert "public/feeds/transitions.rss" in deploy_docs
+
+
+def test_backlog_records_transition_feed_pi_artifact_validation_without_public_overclaim():
+    root = export_transition_feeds.ROOT
+    backlog = (root / "docs" / "BACKLOG.md").read_text(encoding="utf-8")
+    start = backlog.index("### B-122")
+    section = backlog[start:backlog.index("### B-123", start)]
+
+    assert "PI ARTIFACTS VALIDATED / PUBLIC ROUTE PENDING" in section
+    assert "items=32" in section
+    assert "HTTP `200` alone is not accepted as public feed proof" in section

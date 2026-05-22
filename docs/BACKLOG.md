@@ -181,13 +181,13 @@ Status legend:
 **Evidence:** `docs/superpowers/plans/2026-05-21-b120-email-digest.md`.
 **Residual risk:** unit tests mock SMTP; live SMTP validation and timer installation remain environment configuration tasks.
 
-### B-122 · RSS / iCal feed of state transitions — IMPLEMENTED / PUBLISH CONFIG PENDING
-**Status:** RSS and iCal transition feed generation plus optional static-public feed copies are implemented in `backlog-stepwise-qa`; external subscription validation is left to deployment configuration.
+### B-122 · RSS / iCal feed of state transitions — IMPLEMENTED / PI ARTIFACTS VALIDATED / PUBLIC ROUTE PENDING
+**Status:** RSS and iCal transition feed generation plus optional static-public feed copies are implemented in `backlog-stepwise-qa`; Pi artifact generation and public-copy writing are live-validated, while external Cloudflare/feed subscription validation remains deployment configuration.
 **Files:** `src/transition_feeds.py`, `scripts/export_transition_feeds.py`, `tests/test_transition_feeds.py`, `tests/test_export_transition_feeds_script.py`, `.gitignore`, `.dockerignore`, `README.md`, `docs/DEPLOY_RASPBERRY_PI.md`.
 **Activation:** run `./.venv/bin/python scripts/export_transition_feeds.py` on the Pi. Generated files are `data/feeds/transitions.rss` and `data/feeds/transitions.ics`. To publish through the static public service, add `--publish-dir public/feeds --public-base-url https://www.ahaddashboards.uk/feeds/`.
 **Behavior:** reads the persisted transition log, normalizes transition feed items, writes RSS 2.0 newest-first items and iCal all-day events, escapes XML/iCal text, and can mirror generated feed files into a gitignored public static directory.
-**Evidence:** `docs/superpowers/plans/2026-05-21-b122-transition-feeds.md`.
-**Residual risk:** tests verify artifact generation, formatting, and public-copy output; external feed hosting/subscription smoke is still environment dependent. iCal line folding and corrupted-date hardening remain future compatibility polish.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b122-transition-feeds.md`; AHADPI5 ran `./.venv/bin/python scripts/export_transition_feeds.py --publish-dir public/feeds --public-base-url https://www.ahaddashboards.uk/feeds/` on 2026-05-22 and wrote `data/feeds/transitions.rss`, `data/feeds/transitions.ics`, `public/feeds/transitions.rss`, and `public/feeds/transitions.ics` with `items=32`.
+**Residual risk:** external feed hosting/subscription smoke is still environment dependent. AHADPI5 port `8080` currently serves a Uvicorn HTML fallback for `/feeds/...`, so HTTP `200` alone is not accepted as public feed proof; final validation requires the public route to serve RSS XML and iCal text from `public/feeds`. iCal line folding and corrupted-date hardening remain future compatibility polish.
 
 ### B-123 · Discord / Mattermost webhooks — IMPLEMENTED / WEBHOOK CONFIG PENDING
 **Status:** Discord and Mattermost transition webhook routes plus a no-secret-leak smoke script are implemented in `backlog-stepwise-qa`; live validation awaits webhook URLs.
