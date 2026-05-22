@@ -17,6 +17,8 @@ def test_pi_deploy_workflow_uses_ssh_secrets_and_branch_trigger():
     assert "PI_SSH_KEY: ${{ secrets.PI_SSH_KEY }}" in text
     assert "PI_KNOWN_HOSTS: ${{ secrets.PI_KNOWN_HOSTS }}" in text
     assert "PI_REPO_PATH: ${{ secrets.PI_REPO_PATH }}" in text
+    assert "runs-on: [self-hosted, sector-pi]" in text
+    assert "ubuntu-latest" not in text
 
 
 def test_pi_deploy_workflow_fast_forwards_tests_and_smokes_service():
@@ -37,3 +39,5 @@ def test_github_actions_pi_deploy_docs_reference_required_secrets():
     for secret in ("PI_HOST", "PI_USER", "PI_SSH_KEY", "PI_KNOWN_HOSTS", "PI_REPO_PATH", "PI_SERVICE_NAME"):
         assert secret in text
     assert "backlog-stepwise-qa" in text
+    assert "self-hosted" in text
+    assert "sector-pi" in text

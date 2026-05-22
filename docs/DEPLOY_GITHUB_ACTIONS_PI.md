@@ -1,6 +1,6 @@
 # GitHub Actions Auto-Deploy To The Pi
 
-This repo includes `.github/workflows/deploy-pi.yml` for automatic deployment to the Raspberry Pi whenever `backlog-stepwise-qa` is pushed, plus manual runs through GitHub Actions `workflow_dispatch`.
+This repo includes `.github/workflows/deploy-pi.yml` for automatic deployment to the Raspberry Pi whenever `backlog-stepwise-qa` is pushed, plus manual runs through GitHub Actions `workflow_dispatch`. The workflow targets the repo self-hosted runner labeled `sector-pi` on AHADPI5 so the deploy does not require exposing raw SSH to the public internet.
 
 ## Required GitHub Secrets
 
@@ -25,7 +25,7 @@ The preflight prints only configured/missing secret names. It does not print the
 
 ## What The Workflow Does
 
-On push to `backlog-stepwise-qa`, the workflow SSHes to the Pi and runs:
+On push to `backlog-stepwise-qa`, the self-hosted `sector-pi` runner SSHes to the Pi and runs:
 
 ```bash
 cd "$PI_REPO_PATH"
@@ -40,10 +40,11 @@ If tests pass, it terminates the current Streamlit service `MainPID` so systemd 
 
 ## Pi Requirements
 
+- The repo self-hosted runner is online on AHADPI5 with the `sector-pi` label.
 - The Pi checkout already exists at `PI_REPO_PATH`.
 - The Pi repo can pull from GitHub without an interactive prompt.
 - The `.venv` exists and has `requirements.txt` installed.
 - The SSH user can read the repo and terminate the Streamlit service process.
-- GitHub Actions can reach `PI_HOST` over SSH.
+- The runner can reach `PI_HOST` over SSH. With the runner on AHADPI5, the LAN IP is sufficient.
 
-If the Pi is only reachable on the home LAN, keep using manual SSH deploys until you expose SSH through a secure tunnel or self-hosted runner. Do not open raw SSH to the internet without firewall and key-only hardening.
+If you later remove the self-hosted runner and switch back to GitHub-hosted runners, `PI_HOST` must become a GitHub-reachable SSH endpoint through a secure tunnel or VPN. Do not open raw SSH to the internet without firewall and key-only hardening.
