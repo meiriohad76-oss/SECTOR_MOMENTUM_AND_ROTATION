@@ -1,8 +1,22 @@
 from __future__ import annotations
 
+import sys
+from types import SimpleNamespace
+
 import pandas as pd
 
 from src import fred_data
+
+
+def test_resolve_api_key_prefers_environment(monkeypatch):
+    monkeypatch.setenv("FRED_API_KEY", "env-secret")
+    monkeypatch.setitem(
+        sys.modules,
+        "streamlit",
+        SimpleNamespace(secrets={"FRED_API_KEY": "streamlit-secret"}),
+    )
+
+    assert fred_data._resolve_api_key() == "env-secret"
 
 
 def test_fetch_fred_uses_injected_client_and_skips_bad_series(monkeypatch):
@@ -30,6 +44,7 @@ def test_fetch_fred_uses_injected_client_and_skips_bad_series(monkeypatch):
 
 def test_fetch_fred_returns_empty_without_key(monkeypatch):
     monkeypatch.delenv("FRED_API_KEY", raising=False)
+    monkeypatch.setattr(fred_data, "_resolve_api_key", lambda: None)
 
     def fail_factory(api_key):
         raise AssertionError("missing key should not build a FRED client")

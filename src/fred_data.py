@@ -38,7 +38,11 @@ FRED_SERIES = {
 
 
 def _resolve_api_key() -> Optional[str]:
-    """Pull the FRED API key from Streamlit secrets first, fall back to env var."""
+    """Pull the FRED API key from env first, then Streamlit secrets."""
+    key = os.environ.get("FRED_API_KEY")
+    if key:
+        return key.strip()
+
     # Try Streamlit secrets - lazy import so module usable without streamlit
     try:
         import streamlit as st  # type: ignore
@@ -51,9 +55,7 @@ def _resolve_api_key() -> Optional[str]:
                 pass
     except Exception:
         pass
-    # Fall back to env var
-    key = os.environ.get("FRED_API_KEY")
-    return key.strip() if key else None
+    return None
 
 
 def fred_available() -> bool:
