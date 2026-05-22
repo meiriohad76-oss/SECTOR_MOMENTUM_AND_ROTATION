@@ -164,7 +164,21 @@ cd ~/sector-rotation-dashboard
 ./.venv/bin/python scripts/send_email_digest.py --dry-run
 ```
 
-Install the timer:
+Install the timer without sudo on AHADPI5-style user services:
+
+```bash
+cd ~/SECTOR_MOMENTUM_AND_ROTATION
+mkdir -p ~/.config/systemd/user
+cp systemd/user/sector-email-digest.service ~/.config/systemd/user/
+cp systemd/user/sector-email-digest.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now sector-email-digest.timer
+systemctl --user list-timers sector-email-digest.timer
+```
+
+The user unit assumes the checkout is at `~/SECTOR_MOMENTUM_AND_ROTATION`. If your checkout path differs, edit `WorkingDirectory=` and `ExecStart=` in `~/.config/systemd/user/sector-email-digest.service`.
+
+Alternatively, install the root-level system timer:
 
 ```bash
 sudo cp systemd/sector-email-digest.service /etc/systemd/system/
@@ -188,6 +202,20 @@ cd ~/sector-rotation-dashboard
 ```
 
 This writes `data/feeds/transitions.rss`, `data/feeds/transitions.ics`, `public/feeds/transitions.rss`, and `public/feeds/transitions.ics`. The generated files are ignored by git and Docker packaging. If you do not expose the public landing service, omit `--publish-dir` and sync `data/feeds/` with your preferred hosting target instead.
+
+To keep the artifacts fresh without sudo, install the user timer:
+
+```bash
+cd ~/SECTOR_MOMENTUM_AND_ROTATION
+mkdir -p ~/.config/systemd/user
+cp systemd/user/sector-transition-feeds.service ~/.config/systemd/user/
+cp systemd/user/sector-transition-feeds.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now sector-transition-feeds.timer
+systemctl --user list-timers sector-transition-feeds.timer
+```
+
+The transition-feed timer exports every 15 minutes into `data/feeds/` and `public/feeds/`. Public validation is complete only when the external route serves RSS XML from `/feeds/transitions.rss` and iCal text from `/feeds/transitions.ics`.
 
 ## Resource notes
 
