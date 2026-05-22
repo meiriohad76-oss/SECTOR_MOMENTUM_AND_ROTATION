@@ -141,11 +141,26 @@ python -m compileall app.py src scripts -> exit 0
 git diff --check -> exit 0
 ```
 
-- [ ] **Step 3: Review, push, deploy, and verify Pi**
+- [x] **Step 3: Review, push, deploy, and verify Pi**
 
 Required:
 
 ```powershell
 git push origin backlog-stepwise-qa
 ssh -i "$env:USERPROFILE\.ssh\codex_ahadpi_ed25519" -o BatchMode=yes -o ConnectTimeout=8 ahad@10.100.102.18 'cd /home/ahad/SECTOR_MOMENTUM_AND_ROTATION && git pull --ff-only origin backlog-stepwise-qa && ./.venv/bin/python -m pytest tests/test_backtest.py tests/test_run_backtest_script.py -q && ./.venv/bin/python -m pytest -q && systemctl is-active sector-dashboard && curl -s -o /dev/null -w "%{http_code}" --max-time 8 "http://127.0.0.1:8501/?ticker=XLK"'
+```
+
+Observed:
+
+```text
+git push origin backlog-stepwise-qa -> 8fa9f5c..0390c95
+AHADPI5 git pull --ff-only -> fast-forwarded to 0390c95f5f894d7b183cd4c8595ab3334334b542
+Pi affected pytest -> 56 passed
+Pi full pytest -> 371 passed
+systemctl is-active sector-dashboard -> active
+dashboard HTTP smoke before restart -> 200
+OLD_PID=617229
+NEW_PID=639012
+ActiveState/SubState -> active/running
+dashboard HTTP smoke after restart -> 200
 ```

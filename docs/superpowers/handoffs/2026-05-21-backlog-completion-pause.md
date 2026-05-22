@@ -151,6 +151,46 @@ ActiveState/SubState -> active/running
 dashboard HTTP smoke -> 200
 ```
 
+## 2026-05-22 B-156 FRED Macro Backtest Variants Follow-Up
+
+B-156 added opt-in B-011 macro-conditioned exposure variant analysis through `python scripts/run_backtest.py --macro-variants`. Normal manual backtest runs do not fetch FRED. The feature is research/reporting only and does not change live scoring, state-machine transitions, alerts, provider-flow logic, veto logic, portfolio behavior, or broker behavior.
+
+Verified code commit:
+
+```text
+0390c95f5f894d7b183cd4c8595ab3334334b542 feat: add fred macro backtest variants
+```
+
+Local evidence from `C:\Users\meiri\momentum and flow`:
+
+```text
+Initial RED -> missing macro_condition_mask/evaluate_macro_condition_variants/report keyword/runner flag/FRED helper
+focused macro variant tests -> 5 passed
+affected pytest -> 56 passed
+review subagent found metadata omission
+metadata regression RED -> IndexError because macro_variant_summary metadata was empty
+metadata regression GREEN -> 1 passed
+review subagent re-check -> no remaining issues found
+python -m pytest tests/test_backtest.py tests/test_run_backtest_script.py -q -> 56 passed
+python -m pytest -q -> 371 passed
+python -m compileall app.py src scripts -> exit 0
+git diff --check -> exit 0
+```
+
+AHADPI5 evidence:
+
+```text
+git pull --ff-only origin backlog-stepwise-qa -> fast-forwarded to 0390c95f5f894d7b183cd4c8595ab3334334b542
+focused pytest -> 56 passed
+full pytest -> 371 passed
+systemctl is-active sector-dashboard -> active
+dashboard HTTP smoke before restart -> 200
+OLD_PID=617229
+NEW_PID=639012
+ActiveState/SubState -> active/running
+dashboard HTTP smoke after restart -> 200
+```
+
 ## What Was Implemented In The Latest Code Commit
 
 - B-121 PWA push notifications:
