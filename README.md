@@ -288,7 +288,13 @@ cd /home/ahad/SECTOR_MOMENTUM_AND_ROTATION
 ./.venv/bin/python scripts/export_transition_feeds.py
 ```
 
-The script writes `data/feeds/transitions.rss` and `data/feeds/transitions.ics` and prints the generated paths. These files are gitignored local artifacts; publish or sync them separately if you want external feed readers to subscribe.
+The script writes `data/feeds/transitions.rss` and `data/feeds/transitions.ics` and prints the generated paths. To publish feed copies through the static public service, run:
+
+```bash
+./.venv/bin/python scripts/export_transition_feeds.py --publish-dir public/feeds --public-base-url https://www.ahaddashboards.uk/feeds/
+```
+
+The generated `data/feeds/` and `public/feeds/` artifacts are gitignored local outputs.
 
 Dashboard deep links support `?ticker=XLK`; the app opens with that ticker selected in the per-ticker drill-down.
 

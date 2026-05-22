@@ -176,6 +176,19 @@ systemctl list-timers sector-email-digest.timer
 
 Adjust the `User=`, `Group=`, and `WorkingDirectory=` values in `/etc/systemd/system/sector-email-digest.service` if your Pi user or checkout path differs. The timer runs at `08:00 America/New_York`; without SMTP secrets or eligible LOW-severity transitions, the job exits cleanly with `email_digest=skipped`.
 
+## Optional: publish transition RSS and iCal feeds
+
+B-122 can write local feed artifacts and optional static copies under `public/feeds/`, which are served by the public methodology landing service when that service is enabled:
+
+```bash
+cd ~/sector-rotation-dashboard
+./.venv/bin/python scripts/export_transition_feeds.py \
+  --publish-dir public/feeds \
+  --public-base-url https://www.ahaddashboards.uk/feeds/
+```
+
+This writes `data/feeds/transitions.rss`, `data/feeds/transitions.ics`, `public/feeds/transitions.rss`, and `public/feeds/transitions.ics`. The generated files are ignored by git and Docker packaging. If you do not expose the public landing service, omit `--publish-dir` and sync `data/feeds/` with your preferred hosting target instead.
+
 ## Resource notes
 
 On a Pi 4 with 4 GB RAM and the full 67-ticker universe:

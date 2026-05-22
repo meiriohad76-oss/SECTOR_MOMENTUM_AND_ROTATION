@@ -26,3 +26,51 @@ def test_export_transition_feeds_script_writes_rss_and_ical(tmp_path, monkeypatc
     assert "transition_feeds=written" in out
     assert "transitions.rss" in out
     assert "transitions.ics" in out
+
+
+def test_export_transition_feeds_script_can_publish_static_feed_copies(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(
+        export_transition_feeds,
+        "recent_transitions",
+        lambda n=500: [
+            {"ticker": "XLK", "from": "HOLD", "to": "WARNING", "date": "2026-05-21"},
+        ],
+    )
+    local_dir = tmp_path / "data" / "feeds"
+    publish_dir = tmp_path / "public" / "feeds"
+
+    exit_code = export_transition_feeds.main(
+        [
+            "--output-dir",
+            str(local_dir),
+            "--publish-dir",
+            str(publish_dir),
+            "--public-base-url",
+            "https://example.test/feeds/",
+        ]
+    )
+
+    assert exit_code == 0
+    assert (local_dir / "transitions.rss").exists()
+    assert (local_dir / "transitions.ics").exists()
+    assert (publish_dir / "transitions.rss").exists()
+    assert (publish_dir / "transitions.ics").exists()
+    assert "<link>https://example.test/feeds/transitions.rss</link>" in (
+        publish_dir / "transitions.rss"
+    ).read_text(encoding="utf-8")
+    out = capsys.readouterr().out
+    assert f"published_rss={publish_dir / 'transitions.rss'}" in out
+    assert f"published_ics={publish_dir / 'transitions.ics'}" in out
+
+
+def test_transition_feed_publish_docs_keep_generated_static_feeds_ignored():
+    root = export_transition_feeds.ROOT
+    gitignore = (root / ".gitignore").read_text(encoding="utf-8")
+    dockerignore = (root / ".dockerignore").read_text(encoding="utf-8")
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    deploy_docs = (root / "docs" / "DEPLOY_RASPBERRY_PI.md").read_text(encoding="utf-8")
+
+    assert "public/feeds/" in gitignore
+    assert "public/feeds/" in dockerignore
+    assert "--publish-dir public/feeds" in readme
+    assert "public/feeds/transitions.rss" in deploy_docs
