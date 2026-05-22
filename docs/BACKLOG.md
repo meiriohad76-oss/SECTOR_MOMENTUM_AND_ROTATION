@@ -252,16 +252,18 @@ Status legend:
 
 ## Evidence-gated research backlog
 
-### B-157 · Full FRED historical validation report — 🎯 NEXT SESSION
-**Purpose:** run a real historical FRED + market backtest and analyze actual results before changing criteria values.
-**Scope:** execute `python scripts/run_backtest.py --macro-variants` with configured FRED data and the full available market history; compare the baseline methodology against the curve-falling, high-yield-spread-rising, and stress-rising defensive variants.
-**Acceptance:** save a dated report with data windows, provider configuration, variant rows, CAGR, Sharpe, max drawdown, turnover, hit-rate, trade count, and an out-of-sample or walk-forward split. Each tested macro rule must be labeled `do not promote`, `candidate`, or `needs more testing`.
+### B-157 · Full FRED historical validation report — IMPLEMENTED
+**Status:** B-157 is implemented and live-run on AHADPI5 with Massive OHLCV plus configured FRED history.
+**Files:** `src/backtest.py`, `scripts/run_backtest.py`, `tests/test_backtest.py`, `tests/test_run_backtest_script.py`, `docs/fred_macro_validation_report.md`, `docs/fred_macro_validation_summary.csv`, `docs/backtest_metadata.json`.
+**Evidence:** `OHLCV_PROVIDER=massive ./.venv/bin/python scripts/run_backtest.py --macro-variants` on AHADPI5 generated the dated FRED validation report at 2026-05-22T07:02:22Z. The run used Massive OHLCV from 2018-06-19 to 2026-05-21, 414 methodology rebalances, and 20 returned FRED series.
+**Result:** no FRED macro rule is promoted. `STLFSI4` stress-rising and `T10Y2Y` curve-falling defensive variants are labeled `needs more testing`; `BAMLH0A0HYM2` HY-spread-rising defensive is labeled `do not promote`. No variant earned a `candidate` label.
 **Safety:** research only; no scoring, state-machine, alert, provider-flow, veto, recommendation, broker, or criteria-value changes.
 
 ### B-158 · FRED evidence gate for live promotion — 💡 RESEARCHED, NOT BUILT
-**Purpose:** promote FRED-derived criteria only if B-157 shows robust historical improvement over the current methodology.
+**Purpose:** promote FRED-derived criteria only if a future B-157-style validation shows robust historical improvement over the current methodology.
 **Scope:** define the exact criteria values, macro filters, or veto rules to change from the B-157 evidence; add deterministic tests, documentation, and A/B comparison against the current methodology.
-**Acceptance:** the implementation plan cites the B-157 report, lists the evidence thresholds used for promotion, includes regression coverage for both promoted and rejected rules, and documents rollback behavior.
+**Current gate:** blocked by the 2026-05-22 B-157 report because no tested rule earned a `candidate` label.
+**Acceptance:** the implementation plan cites a validation report with at least one `candidate`, lists the evidence thresholds used for promotion, includes regression coverage for both promoted and rejected rules, and documents rollback behavior.
 **Safety:** no FRED macro rule can enter live scoring, veto logic, alerts, recommendations, or dashboard decision text until the B-157 evidence gate passes and is reviewed.
 
 ### B-159 · Massive historical provider-data backtest variants — 🎯 NEXT SESSION

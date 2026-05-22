@@ -118,6 +118,6 @@ Do not wire these into the app without a fresh lookup via `fred/series/search`.
 2. Log the expanded macro snapshot into the B-153 run journal so the debrief engine can compare macro conditions with later outcomes. Implemented in B-154.
 3. Summarize matured B-153 debrief outcomes by journaled FRED macro condition. Implemented in B-155.
 4. Add B-011 backtest variants that test whether any new macro features improve decisions. Implemented in B-156.
-5. Run the full real historical FRED + market macro-variant report and review the actual results. Tracked as B-157.
-6. Only promote validated FRED features into scoring, veto logic, alerts, or recommendations after the B-157 evidence beats the current methodology. Tracked as B-158.
+5. Run the full real historical FRED + market macro-variant report and review the actual results. Implemented in B-157; the 2026-05-22 AHADPI5 run produced no `candidate` rule.
+6. Only promote validated FRED features into scoring, veto logic, alerts, or recommendations after a future evidence run beats the current methodology. Tracked as B-158 and currently blocked by the B-157 result.
 7. Mirror the same evidence-first process for Massive historical OHLCV and timestamped provider data before changing Massive-derived criteria. Tracked as B-159 and B-160.
