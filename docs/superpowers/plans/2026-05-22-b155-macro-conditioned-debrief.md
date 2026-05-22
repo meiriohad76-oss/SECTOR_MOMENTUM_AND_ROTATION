@@ -119,7 +119,7 @@ python -m compileall app.py src scripts -> exit 0
 git diff --check -> exit 0
 ```
 
-- [ ] **Step 3: Push and verify on AHADPI5**
+- [x] **Step 3: Push and verify on AHADPI5**
 
 Required commands:
 
@@ -128,6 +128,35 @@ git push origin backlog-stepwise-qa
 ssh -i "$env:USERPROFILE\.ssh\codex_ahadpi_ed25519" -o BatchMode=yes -o ConnectTimeout=8 ahad@10.100.102.18 'cd /home/ahad/SECTOR_MOMENTUM_AND_ROTATION && git pull --ff-only origin backlog-stepwise-qa && ./.venv/bin/python -m pytest tests/test_run_debrief.py tests/test_run_debrief_dashboard_static.py tests/test_component_docs.py -q && ./.venv/bin/python -m pytest -q && systemctl is-active sector-dashboard && curl -s -o /dev/null -w "%{http_code}" --max-time 8 "http://127.0.0.1:8501/?ticker=XLK"'
 ```
 
-- [ ] **Step 4: Record final evidence**
+Observed:
+
+```text
+git push origin backlog-stepwise-qa -> a6543c9..298bb90
+AHADPI5 git pull --ff-only -> fast-forwarded to 298bb90f4f04949d24a152a679401b53c8707ccd
+Pi focused pytest -> 13 passed
+Pi full pytest -> 365 passed
+systemctl is-active sector-dashboard -> active
+dashboard HTTP smoke before restart -> 200
+```
+
+The first non-sudo service restart smoke checked too early while systemd was still `activating`:
+
+```text
+OLD_PID=604098
+NEW_PID=0
+system state -> activating
+dashboard HTTP smoke -> 000
+```
+
+Follow-up status showed systemd completed the restart, and the fresh process served the dashboard:
+
+```text
+NEW_PID=617229
+git rev-parse HEAD -> 298bb90f4f04949d24a152a679401b53c8707ccd
+ActiveState/SubState -> active/running
+dashboard HTTP smoke -> 200
+```
+
+- [x] **Step 4: Record final evidence**
 
 Update this plan and the handoff with commit SHA, local QA, Pi QA, service status, and dashboard HTTP smoke result.

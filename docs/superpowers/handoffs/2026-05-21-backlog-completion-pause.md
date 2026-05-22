@@ -103,6 +103,54 @@ NEW_PID=604098
 dashboard HTTP smoke -> 200
 ```
 
+## 2026-05-22 B-155 Macro-Conditioned Debrief Follow-Up
+
+B-155 added analysis-only macro-conditioned debrief summaries from the journaled `fred_macro_snapshot` metadata. This does not change scoring, alerts, state-machine transitions, provider fetching, credential handling, or recommendation logic.
+
+Verified code commit:
+
+```text
+298bb90f4f04949d24a152a679401b53c8707ccd feat: add macro-conditioned debrief summaries
+```
+
+Local evidence from `C:\Users\meiri\momentum and flow`:
+
+```text
+python -m pytest tests/test_run_debrief.py::test_macro_condition_summary_suppresses_unmatured_outcomes -q -> RED before fix, then targeted GREEN
+python -m pytest tests/test_run_debrief.py tests/test_run_debrief_dashboard_static.py tests/test_component_docs.py -q -> 13 passed
+python -m pytest -q -> 365 passed
+python -m compileall app.py src scripts -> exit 0
+git diff --check -> exit 0
+review subagent re-check -> no remaining issues found
+```
+
+AHADPI5 evidence:
+
+```text
+git pull --ff-only origin backlog-stepwise-qa -> fast-forwarded to 298bb90f4f04949d24a152a679401b53c8707ccd
+focused pytest -> 13 passed
+full pytest -> 365 passed
+systemctl is-active sector-dashboard -> active
+dashboard HTTP smoke before restart -> 200
+```
+
+The non-sudo restart path killed the old Streamlit `MainPID`, but the first smoke ran while systemd was still `activating`:
+
+```text
+OLD_PID=604098
+NEW_PID=0
+dashboard HTTP smoke -> 000
+```
+
+Follow-up status showed the restart completed and the new process served the deployed commit:
+
+```text
+NEW_PID=617229
+git rev-parse HEAD -> 298bb90f4f04949d24a152a679401b53c8707ccd
+ActiveState/SubState -> active/running
+dashboard HTTP smoke -> 200
+```
+
 ## What Was Implemented In The Latest Code Commit
 
 - B-121 PWA push notifications:
