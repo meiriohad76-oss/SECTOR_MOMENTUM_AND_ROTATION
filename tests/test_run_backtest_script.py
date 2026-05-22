@@ -22,12 +22,157 @@ def test_run_backtest_artifact_paths_are_repo_root_anchored():
     assert run_backtest.FRED_VALIDATION_SUMMARY_PATH == (
         run_backtest.ROOT / "docs" / "fred_macro_validation_summary.csv"
     )
+    assert run_backtest.MASSIVE_VALIDATION_REPORT_PATH == (
+        run_backtest.ROOT / "docs" / "massive_provider_validation_report.md"
+    )
+    assert run_backtest.MASSIVE_VALIDATION_SUMMARY_PATH == (
+        run_backtest.ROOT / "docs" / "massive_provider_validation_summary.csv"
+    )
 
 
 def test_run_backtest_parser_exposes_macro_variants_flag():
     args = run_backtest._parser().parse_args(["--macro-variants"])
 
     assert args.macro_variants is True
+
+
+def test_run_backtest_parser_exposes_massive_variants_flag():
+    args = run_backtest._parser().parse_args(["--massive-variants"])
+
+    assert args.massive_variants is True
+
+
+def test_build_massive_provider_validation_summary_compares_default_and_massive_without_cache(
+    monkeypatch,
+    ohlcv_frame_factory,
+):
+    calls = []
+
+    def fake_fetch_ohlcv_result(tickers, period, provider, use_cache=True):
+        calls.append(
+            {
+                "tickers": list(tickers),
+                "period": period,
+                "provider": provider,
+                "use_cache": use_cache,
+            }
+        )
+        daily_return = 0.0012 if provider == "massive" else 0.0008
+        return SimpleNamespace(
+            data={
+                ticker: ohlcv_frame_factory(days=80, start_price=100.0, daily_return=daily_return)
+                for ticker in tickers
+            },
+            provider=provider,
+            fetched=tuple(tickers),
+            fresh_cache_hits=(),
+            stale_cache_hits=(),
+            missing=(),
+            warnings=(),
+            used_stale_cache=False,
+        )
+
+    def fake_build_historical_methodology_targets(ohlcv, rebalance_dates, phase):
+        del ohlcv, phase
+        rebalance_dates = pd.DatetimeIndex(rebalance_dates)
+        weights = pd.DataFrame({"XLK": [1.0] * len(rebalance_dates)}, index=rebalance_dates)
+        return backtest.HistoricalSignalTargets(
+            target_weights=weights,
+            states=pd.DataFrame({"XLK": ["HOLD"] * len(rebalance_dates)}, index=rebalance_dates),
+            snapshots={},
+        )
+
+    monkeypatch.setattr(run_backtest, "fetch_ohlcv_result", fake_fetch_ohlcv_result)
+    monkeypatch.setattr(
+        run_backtest.backtest,
+        "build_historical_methodology_targets",
+        fake_build_historical_methodology_targets,
+    )
+
+    summary = run_backtest._build_massive_provider_validation_summary(
+        enabled=True,
+        oos_start="2020-02-03",
+    )
+
+    provider_rows = summary[summary["row_type"] == "provider_comparison"].reset_index(drop=True)
+    feature_rows = summary[summary["row_type"] == "provider_feature_sweep"].reset_index(drop=True)
+    assert provider_rows["provider"].tolist() == ["yfinance", "massive"]
+    assert provider_rows["ticker_count"].tolist() == [14, 14]
+    assert provider_rows["coverage_start"].tolist() == ["2020-01-01", "2020-01-01"]
+    assert provider_rows.loc[1, "oos_sharpe_delta_vs_yfinance"] >= 0.0
+    assert provider_rows.loc[1, "endpoint"] == "https://api.massive.com/v2/aggs/ticker/{ticker}/range/1/day/{from}/{to}"
+    assert set(feature_rows["threshold"].dropna().astype(float).tolist()) == {1.0, 1.25, 1.5}
+    assert set(feature_rows["promotion_label"].tolist()) == {"do not promote"}
+    assert all(feature_rows["status"].str.contains("unavailable_no_historical_asof_snapshots"))
+    assert calls == [
+        {
+            "tickers": run_backtest.REQUIRED_TICKERS,
+            "period": "max",
+            "provider": "yfinance",
+            "use_cache": False,
+        },
+        {
+            "tickers": run_backtest.REQUIRED_TICKERS,
+            "period": "max",
+            "provider": "massive",
+            "use_cache": False,
+        },
+    ]
+
+
+def test_build_massive_provider_validation_summary_reuses_precomputed_massive_row(monkeypatch):
+    calls = []
+
+    def fake_fetch_ohlcv_result(tickers, period, provider, use_cache=True):
+        calls.append(provider)
+        return SimpleNamespace(
+            data={},
+            provider=provider,
+            fetched=(),
+            fresh_cache_hits=(),
+            stale_cache_hits=(),
+            missing=tuple(tickers),
+            warnings=(),
+            used_stale_cache=False,
+        )
+
+    precomputed_massive = {
+        "row_type": "provider_comparison",
+        "variant": "Massive aggregate OHLCV",
+        "provider": "massive",
+        "endpoint": "https://api.massive.com/v2/aggs/ticker/{ticker}/range/1/day/{from}/{to}",
+        "status": "available",
+        "coverage_start": "2020-01-01",
+        "coverage_end": "2020-04-21",
+        "coverage_rows": 80,
+        "ticker_count": 14,
+        "missing_count": 0,
+        "missing_tickers": "",
+        "coverage_by_ticker": "XLK:2020-01-01->2020-04-21(80)",
+        "cagr": 0.12,
+        "sharpe": 1.1,
+        "max_drawdown": -0.02,
+        "annualized_turnover": 0.5,
+        "oos_cagr": 0.10,
+        "oos_sharpe": 0.9,
+        "oos_max_drawdown": -0.02,
+        "oos_annualized_turnover": 0.5,
+        "promotion_label": "needs more testing",
+        "notes": "reused main Massive validation run",
+    }
+
+    monkeypatch.setattr(run_backtest, "fetch_ohlcv_result", fake_fetch_ohlcv_result)
+
+    summary = run_backtest._build_massive_provider_validation_summary(
+        enabled=True,
+        oos_start="2020-02-03",
+        precomputed_provider_rows=[precomputed_massive],
+    )
+
+    provider_rows = summary[summary["row_type"] == "provider_comparison"].reset_index(drop=True)
+    assert provider_rows["provider"].tolist() == ["yfinance", "massive"]
+    assert str(provider_rows.loc[1, "notes"]).startswith("reused main Massive validation run")
+    assert calls == ["yfinance"]
 
 
 def test_run_backtest_builds_macro_variant_summary_only_when_enabled(monkeypatch):
@@ -282,6 +427,148 @@ def test_run_backtest_writes_fred_validation_report_when_macro_variants_enabled(
     )
     assert metadata["ohlcv_source"]["cache_policy"] == "bypassed"
     assert metadata["ohlcv_source"]["fetched_count"] == 14
+
+
+def test_run_backtest_writes_massive_validation_report_when_massive_variants_enabled(
+    monkeypatch,
+    tmp_path,
+    ohlcv_frame_factory,
+):
+    fetch_calls = []
+    massive_summary = pd.DataFrame(
+        [
+            {
+                "row_type": "provider_comparison",
+                "variant": "Default/yfinance OHLCV baseline",
+                "provider": "yfinance",
+                "endpoint": "yfinance.download",
+                "status": "available",
+                "coverage_start": "2020-01-01",
+                "coverage_end": "2020-02-25",
+                "coverage_rows": 40,
+                "ticker_count": 14,
+                "missing_count": 0,
+                "oos_cagr": 0.10,
+                "oos_sharpe": 0.80,
+                "oos_max_drawdown": -0.03,
+                "oos_cagr_delta_vs_yfinance": 0.0,
+                "oos_sharpe_delta_vs_yfinance": 0.0,
+                "oos_max_drawdown_delta_vs_yfinance": 0.0,
+                "promotion_label": "needs more testing",
+                "notes": "baseline comparison row",
+            },
+            {
+                "row_type": "provider_comparison",
+                "variant": "Massive aggregate OHLCV",
+                "provider": "massive",
+                "endpoint": "https://api.massive.com/v2/aggs/ticker/{ticker}/range/1/day/{from}/{to}",
+                "status": "available",
+                "coverage_start": "2020-01-01",
+                "coverage_end": "2020-02-25",
+                "coverage_rows": 40,
+                "ticker_count": 14,
+                "missing_count": 0,
+                "oos_cagr": 0.11,
+                "oos_sharpe": 0.90,
+                "oos_max_drawdown": -0.02,
+                "oos_cagr_delta_vs_yfinance": 0.01,
+                "oos_sharpe_delta_vs_yfinance": 0.10,
+                "oos_max_drawdown_delta_vs_yfinance": 0.01,
+                "promotion_label": "needs more testing",
+                "notes": "provider source evidence only",
+            },
+            {
+                "row_type": "provider_feature_sweep",
+                "variant": "Block-trade upside ratio >= 1.25",
+                "provider": "massive",
+                "endpoint": "https://api.massive.com/v3/trades/{ticker}",
+                "status": "unavailable_no_historical_asof_snapshots",
+                "threshold": 1.25,
+                "promotion_label": "do not promote",
+                "notes": "current trade-tape endpoint is not a historical as-of signal source",
+            },
+        ]
+    )
+
+    def fake_fetch_result(tickers, period, provider, use_cache=True):
+        fetch_calls.append(
+            {
+                "tickers": list(tickers),
+                "period": period,
+                "provider": provider,
+                "use_cache": use_cache,
+            }
+        )
+        return SimpleNamespace(
+            data={
+                ticker: ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0005)
+                for ticker in tickers
+            },
+            provider="massive",
+            fetched=tuple(tickers),
+            fresh_cache_hits=(),
+            stale_cache_hits=(),
+            missing=(),
+            warnings=(),
+            used_stale_cache=False,
+        )
+
+    def fake_build_historical_methodology_targets(ohlcv, rebalance_dates, phase):
+        del ohlcv, phase
+        rebalance_dates = pd.DatetimeIndex(rebalance_dates)
+        weights = pd.DataFrame({"XLK": [1.0] * len(rebalance_dates)}, index=rebalance_dates)
+        return backtest.HistoricalSignalTargets(
+            target_weights=weights,
+            states=pd.DataFrame({"XLK": ["HOLD"] * len(rebalance_dates)}, index=rebalance_dates),
+            snapshots={},
+        )
+
+    monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
+    monkeypatch.setattr(run_backtest, "METHODOLOGY_REPORT_PATH", tmp_path / "backtest_methodology_report.md")
+    monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "STATES_PATH", tmp_path / "backtest_states.csv")
+    monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
+    monkeypatch.setattr(run_backtest, "MASSIVE_VALIDATION_REPORT_PATH", tmp_path / "massive_report.md")
+    monkeypatch.setattr(run_backtest, "MASSIVE_VALIDATION_SUMMARY_PATH", tmp_path / "massive_summary.csv")
+    monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
+    monkeypatch.setattr(run_backtest, "fetch_ohlcv_result", fake_fetch_result)
+    monkeypatch.setattr(run_backtest, "_resolved_provider", lambda provider: "massive")
+    monkeypatch.setattr(
+        run_backtest.backtest,
+        "build_historical_methodology_targets",
+        fake_build_historical_methodology_targets,
+    )
+    monkeypatch.setattr(run_backtest, "_build_massive_provider_validation_summary", lambda **kwargs: massive_summary)
+
+    assert run_backtest.main(["--massive-variants"]) == 0
+
+    validation_report = run_backtest.MASSIVE_VALIDATION_REPORT_PATH.read_text(encoding="utf-8")
+    validation_summary = pd.read_csv(run_backtest.MASSIVE_VALIDATION_SUMMARY_PATH)
+    metadata = json.loads(run_backtest.METADATA_PATH.read_text(encoding="utf-8"))
+    assert "# Massive Historical Provider-Data Validation Report" in validation_report
+    assert "Requested OHLCV provider: auto" in validation_report
+    assert "Resolved OHLCV provider: massive" in validation_report
+    assert "CAGR Delta" in validation_report
+    assert "Drawdown Delta" in validation_report
+    assert "OOS CAGR Delta" in validation_report
+    assert "OOS Drawdown Delta" in validation_report
+    assert "Block-trade upside ratio >= 1.25" in validation_report
+    assert "No Massive-derived rule is promoted into live scoring" in validation_report
+    assert "provider-flow behavior" in validation_report
+    assert "broker behavior" in validation_report
+    assert validation_summary.loc[1, "provider"] == "massive"
+    assert validation_summary.loc[2, "promotion_label"] == "do not promote"
+    assert metadata["massive_validation_report_sha256"] == run_backtest._sha256_bytes(
+        run_backtest.MASSIVE_VALIDATION_REPORT_PATH.read_bytes()
+    )
+    assert metadata["massive_validation_summary"][1]["variant"] == "Massive aggregate OHLCV"
+    assert metadata["ohlcv_source"]["cache_policy"] == "bypassed"
+    assert fetch_calls[0] == {
+        "tickers": run_backtest.REQUIRED_TICKERS,
+        "period": "max",
+        "provider": "auto",
+        "use_cache": False,
+    }
 
 
 def test_run_backtest_returns_manual_data_error_when_required_prices_missing(monkeypatch, tmp_path):

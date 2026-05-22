@@ -26,6 +26,11 @@ STATES_PATH = ROOT / "docs" / "backtest_states.csv"
 METADATA_PATH = ROOT / "docs" / "backtest_metadata.json"
 FRED_VALIDATION_REPORT_PATH = ROOT / "docs" / "fred_macro_validation_report.md"
 FRED_VALIDATION_SUMMARY_PATH = ROOT / "docs" / "fred_macro_validation_summary.csv"
+MASSIVE_VALIDATION_REPORT_PATH = ROOT / "docs" / "massive_provider_validation_report.md"
+MASSIVE_VALIDATION_SUMMARY_PATH = ROOT / "docs" / "massive_provider_validation_summary.csv"
+MASSIVE_AGGS_ENDPOINT = "https://api.massive.com/v2/aggs/ticker/{ticker}/range/1/day/{from}/{to}"
+MASSIVE_TRADES_ENDPOINT = "https://api.massive.com/v3/trades/{ticker}"
+MASSIVE_BLOCK_TRADE_THRESHOLDS = (1.0, 1.25, 1.5)
 SECTOR_BENCHMARK_TICKERS = [
     "XLK",
     "XLF",
@@ -113,6 +118,8 @@ def _write_artifacts(
     macro_variant_summary=None,
     fred_validation_report: str | None = None,
     fred_validation_summary=None,
+    massive_validation_report: str | None = None,
+    massive_validation_summary=None,
     ohlcv_source: dict | None = None,
 ) -> None:
     report_bytes = report.encode("utf-8")
@@ -134,6 +141,7 @@ def _write_artifacts(
         "states_columns": list(states.columns),
         "simulation_summary": simulation_summary or {},
         "macro_variant_summary": _frame_records(macro_variant_summary),
+        "massive_validation_summary": _frame_records(massive_validation_summary),
         "ohlcv_source": ohlcv_source or {},
     }
     payloads = {
@@ -150,6 +158,14 @@ def _write_artifacts(
         fred_validation_summary_bytes = fred_validation_summary.to_csv(index=False).encode("utf-8")
         payloads[FRED_VALIDATION_SUMMARY_PATH] = fred_validation_summary_bytes
         metadata["fred_validation_summary_sha256"] = _sha256_bytes(fred_validation_summary_bytes)
+    if massive_validation_report is not None:
+        massive_validation_report_bytes = massive_validation_report.encode("utf-8")
+        payloads[MASSIVE_VALIDATION_REPORT_PATH] = massive_validation_report_bytes
+        metadata["massive_validation_report_sha256"] = _sha256_bytes(massive_validation_report_bytes)
+    if massive_validation_summary is not None:
+        massive_validation_summary_bytes = massive_validation_summary.to_csv(index=False).encode("utf-8")
+        payloads[MASSIVE_VALIDATION_SUMMARY_PATH] = massive_validation_summary_bytes
+        metadata["massive_validation_summary_sha256"] = _sha256_bytes(massive_validation_summary_bytes)
     metadata_bytes = (json.dumps(metadata, indent=2, sort_keys=True) + "\n").encode("utf-8")
     payloads[METADATA_PATH] = metadata_bytes
     staged = _stage_artifacts(payloads)
@@ -172,6 +188,11 @@ def _parser() -> argparse.ArgumentParser:
         "--macro-variants",
         action="store_true",
         help="Fetch FRED and include analysis-only macro-conditioned exposure variants in the report.",
+    )
+    parser.add_argument(
+        "--massive-variants",
+        action="store_true",
+        help="Compare default/yfinance and Massive historical provider data in a research-only report.",
     )
     return parser
 
@@ -240,6 +261,246 @@ def _build_macro_variant_summary(*, enabled: bool, prices, target_weights, macro
         transaction_cost_bps=5.0,
         oos_start=oos_start,
     )
+
+
+def _provider_endpoint(provider: str) -> str:
+    return MASSIVE_AGGS_ENDPOINT if provider == "massive" else "yfinance.download"
+
+
+def _coverage_by_ticker(ohlcv: dict[str, pd.DataFrame]) -> str:
+    parts = []
+    for ticker in REQUIRED_TICKERS:
+        frame = ohlcv.get(ticker)
+        if frame is None:
+            frame = ohlcv.get(str(ticker).upper())
+        if frame is None or frame.empty:
+            parts.append(f"{ticker}:-")
+            continue
+        start, end, count = _index_window(frame.index)
+        parts.append(f"{ticker}:{start}->{end}({count})")
+    return "; ".join(parts)
+
+
+def _empty_provider_validation_row(provider: str, status: str, notes: str) -> dict:
+    return {
+        "row_type": "provider_comparison",
+        "variant": "Massive aggregate OHLCV" if provider == "massive" else "Default/yfinance OHLCV baseline",
+        "provider": provider,
+        "endpoint": _provider_endpoint(provider),
+        "status": status,
+        "coverage_start": "-",
+        "coverage_end": "-",
+        "coverage_rows": 0,
+        "ticker_count": 0,
+        "missing_count": len(REQUIRED_TICKERS),
+        "missing_tickers": ", ".join(REQUIRED_TICKERS),
+        "coverage_by_ticker": "",
+        "cagr": None,
+        "sharpe": None,
+        "max_drawdown": None,
+        "annualized_turnover": None,
+        "oos_cagr": None,
+        "oos_sharpe": None,
+        "oos_max_drawdown": None,
+        "oos_annualized_turnover": None,
+        "cagr_delta_vs_yfinance": None,
+        "sharpe_delta_vs_yfinance": None,
+        "max_drawdown_delta_vs_yfinance": None,
+        "oos_cagr_delta_vs_yfinance": None,
+        "oos_sharpe_delta_vs_yfinance": None,
+        "oos_max_drawdown_delta_vs_yfinance": None,
+        "threshold": None,
+        "promotion_label": "needs more testing",
+        "notes": notes,
+    }
+
+
+def _provider_validation_row_from_backtest(
+    *,
+    provider: str,
+    ohlcv: dict[str, pd.DataFrame],
+    prices: pd.DataFrame,
+    result: backtest.BacktestResult,
+    oos_start: str | pd.Timestamp,
+    notes: str,
+) -> dict:
+    windows = backtest.split_backtest_metrics(result, oos_start=oos_start)
+    oos_metrics = windows["Out-of-sample"]
+    coverage_start, coverage_end, coverage_rows = _index_window(prices.index)
+    missing = _validate_required_prices(prices)
+    return {
+        "row_type": "provider_comparison",
+        "variant": "Massive aggregate OHLCV" if provider == "massive" else "Default/yfinance OHLCV baseline",
+        "provider": provider,
+        "endpoint": _provider_endpoint(provider),
+        "status": "available" if not missing else "missing_required_prices",
+        "coverage_start": coverage_start,
+        "coverage_end": coverage_end,
+        "coverage_rows": int(coverage_rows),
+        "ticker_count": int(len(prices.columns)),
+        "missing_count": int(len(missing)),
+        "missing_tickers": ", ".join(missing),
+        "coverage_by_ticker": _coverage_by_ticker(ohlcv),
+        "cagr": result.metrics["cagr"],
+        "sharpe": result.metrics["sharpe"],
+        "max_drawdown": result.metrics["max_drawdown"],
+        "annualized_turnover": result.metrics["annualized_turnover"],
+        "oos_cagr": oos_metrics["cagr"],
+        "oos_sharpe": oos_metrics["sharpe"],
+        "oos_max_drawdown": oos_metrics["max_drawdown"],
+        "oos_annualized_turnover": oos_metrics["annualized_turnover"],
+        "cagr_delta_vs_yfinance": None,
+        "sharpe_delta_vs_yfinance": None,
+        "max_drawdown_delta_vs_yfinance": None,
+        "oos_cagr_delta_vs_yfinance": None,
+        "oos_sharpe_delta_vs_yfinance": None,
+        "oos_max_drawdown_delta_vs_yfinance": None,
+        "threshold": None,
+        "promotion_label": "needs more testing",
+        "notes": notes,
+    }
+
+
+def _provider_validation_row(provider: str, oos_start: str | pd.Timestamp) -> dict:
+    try:
+        fetch_result = fetch_ohlcv_result(
+            REQUIRED_TICKERS,
+            period="max",
+            provider=provider,
+            use_cache=False,
+        )
+        ohlcv = fetch_result.data
+        prices = backtest.close_matrix_from_ohlcv(ohlcv).loc["2003-01-01":]
+        missing = _validate_required_prices(prices)
+        if missing:
+            row = _empty_provider_validation_row(
+                provider,
+                status="missing_required_prices",
+                notes="Provider returned data, but not enough aligned required tickers for a valid methodology run.",
+            )
+            row.update(
+                {
+                    "ticker_count": int(len(prices.columns)),
+                    "missing_count": int(len(missing)),
+                    "missing_tickers": ", ".join(missing),
+                    "coverage_by_ticker": _coverage_by_ticker(ohlcv),
+                }
+            )
+            return row
+        rebalance_dates = backtest.weekly_rebalance_dates(prices)
+        methodology_targets = backtest.build_historical_methodology_targets(
+            ohlcv,
+            rebalance_dates=rebalance_dates,
+            phase="MID",
+        )
+        strategy_columns = list(methodology_targets.target_weights.columns)
+        if not strategy_columns:
+            raise ValueError("methodology target builder produced no target columns")
+        result = backtest.run_weight_backtest(
+            prices[strategy_columns],
+            methodology_targets.target_weights,
+            transaction_cost_bps=5.0,
+        )
+        return _provider_validation_row_from_backtest(
+            provider=provider,
+            ohlcv=ohlcv,
+            prices=prices,
+            result=result,
+            oos_start=oos_start,
+            notes="Provider source comparison only; use B-160 before promoting any live rule.",
+        )
+    except Exception as exc:
+        return _empty_provider_validation_row(
+            provider,
+            status="error",
+            notes=f"Provider validation failed: {exc}",
+        )
+
+
+def _with_yfinance_deltas(rows: list[dict]) -> list[dict]:
+    baseline = next(
+        (row for row in rows if row.get("provider") == "yfinance" and row.get("status") == "available"),
+        None,
+    )
+    metrics = ["cagr", "sharpe", "max_drawdown", "oos_cagr", "oos_sharpe", "oos_max_drawdown"]
+    if baseline is None:
+        for row in rows:
+            if row.get("row_type") == "provider_comparison":
+                row["notes"] = str(row.get("notes", "")).rstrip() + " Default/yfinance comparison unavailable."
+        return rows
+    for row in rows:
+        if row.get("row_type") != "provider_comparison":
+            continue
+        for metric in metrics:
+            value = row.get(metric)
+            base = baseline.get(metric)
+            row[f"{metric}_delta_vs_yfinance"] = (
+                float(value) - float(base) if value is not None and base is not None else None
+            )
+    return rows
+
+
+def _massive_provider_feature_sweep_rows() -> list[dict]:
+    rows = []
+    for threshold in MASSIVE_BLOCK_TRADE_THRESHOLDS:
+        rows.append(
+            {
+                "row_type": "provider_feature_sweep",
+                "variant": f"Block-trade upside ratio >= {threshold:g}",
+                "provider": "massive",
+                "endpoint": MASSIVE_TRADES_ENDPOINT,
+                "status": "unavailable_no_historical_asof_snapshots",
+                "coverage_start": "-",
+                "coverage_end": "-",
+                "coverage_rows": 0,
+                "ticker_count": 0,
+                "missing_count": 0,
+                "missing_tickers": "",
+                "coverage_by_ticker": "",
+                "cagr": None,
+                "sharpe": None,
+                "max_drawdown": None,
+                "annualized_turnover": None,
+                "oos_cagr": None,
+                "oos_sharpe": None,
+                "oos_max_drawdown": None,
+                "oos_annualized_turnover": None,
+                "cagr_delta_vs_yfinance": None,
+                "sharpe_delta_vs_yfinance": None,
+                "max_drawdown_delta_vs_yfinance": None,
+                "oos_cagr_delta_vs_yfinance": None,
+                "oos_sharpe_delta_vs_yfinance": None,
+                "oos_max_drawdown_delta_vs_yfinance": None,
+                "threshold": float(threshold),
+                "promotion_label": "do not promote",
+                "notes": (
+                    "The current trade-tape endpoint can inform live provider flow, but this runner has no "
+                    "persisted timestamped as-of snapshots for historical rebalances."
+                ),
+            }
+        )
+    return rows
+
+
+def _build_massive_provider_validation_summary(
+    *,
+    enabled: bool,
+    oos_start="2015-01-01",
+    precomputed_provider_rows: list[dict] | None = None,
+) -> pd.DataFrame:
+    if not enabled:
+        return pd.DataFrame()
+    precomputed = {
+        str(row.get("provider", "")).lower(): dict(row)
+        for row in (precomputed_provider_rows or [])
+        if row.get("row_type") == "provider_comparison"
+    }
+    rows = []
+    for provider in ("yfinance", "massive"):
+        rows.append(precomputed.get(provider) or _provider_validation_row(provider, oos_start=oos_start))
+    rows = _with_yfinance_deltas(rows)
+    rows.extend(_massive_provider_feature_sweep_rows())
+    return pd.DataFrame(rows)
 
 
 def _resolved_provider(provider: str) -> str:
@@ -319,11 +580,11 @@ def _ohlcv_source_metadata(fetch_result, cache_policy: str) -> dict:
     }
 
 
-def _ohlcv_source_lines(source: dict | None) -> list[str]:
+def _ohlcv_source_lines(source: dict | None, validation_ticket: str = "B-157") -> list[str]:
     if not source:
         return ["- Cache policy: normal dashboard/manual fetch path"]
     policy = source.get("cache_policy", "normal")
-    label = "bypassed for B-157 validation" if policy == "bypassed" else str(policy)
+    label = f"bypassed for {validation_ticket} validation" if policy == "bypassed" else str(policy)
     lines = [
         f"- Cache policy: {label}",
         f"- Source provider: {source.get('provider', '-')}",
@@ -410,7 +671,7 @@ def _format_fred_validation_report(
         "## OHLCV Source Evidence",
         "",
     ]
-    lines.extend(_ohlcv_source_lines(ohlcv_source))
+    lines.extend(_ohlcv_source_lines(ohlcv_source, validation_ticket="B-157"))
     lines.extend(
         [
             "",
@@ -443,6 +704,169 @@ def _format_fred_validation_report(
             "## Decision",
             "",
             "Use B-158 only for variants labeled `candidate` after review. Leave all other rules out of live behavior.",
+        ]
+    )
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _massive_provider_comparison_table(summary: pd.DataFrame) -> list[str]:
+    rows = summary[summary.get("row_type") == "provider_comparison"] if not summary.empty else pd.DataFrame()
+    if rows.empty:
+        return ["No provider comparison rows were produced. Do not promote any Massive-derived rule from this run."]
+    lines = [
+        "| Variant | Provider | Status | Coverage | Tickers | CAGR Delta | Sharpe Delta | Drawdown Delta | OOS CAGR Delta | OOS Sharpe Delta | OOS Drawdown Delta | Label |",
+        "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|",
+    ]
+    for _, row in rows.iterrows():
+        coverage = f"{row.get('coverage_start', '-')} to {row.get('coverage_end', '-')}"
+        lines.append(
+            f"| {row.get('variant', '-')} | "
+            f"{row.get('provider', '-')} | "
+            f"{row.get('status', '-')} | "
+            f"{coverage} | "
+            f"{_int_text(row.get('ticker_count'))} | "
+            f"{_pct(row.get('cagr_delta_vs_yfinance'))} | "
+            f"{_num(row.get('sharpe_delta_vs_yfinance'))} | "
+            f"{_pct(row.get('max_drawdown_delta_vs_yfinance'))} | "
+            f"{_pct(row.get('oos_cagr_delta_vs_yfinance'))} | "
+            f"{_num(row.get('oos_sharpe_delta_vs_yfinance'))} | "
+            f"{_pct(row.get('oos_max_drawdown_delta_vs_yfinance'))} | "
+            f"{row.get('promotion_label', 'needs more testing')} |"
+        )
+    return lines
+
+
+def _massive_feature_sweep_table(summary: pd.DataFrame) -> list[str]:
+    rows = summary[summary.get("row_type") == "provider_feature_sweep"] if not summary.empty else pd.DataFrame()
+    if rows.empty:
+        return ["No provider-derived criteria sweeps were produced. Do not promote any Massive-derived rule."]
+    lines = [
+        "| Variant | Endpoint | Status | Threshold | Label | Notes |",
+        "|---|---|---|---:|---|---|",
+    ]
+    for _, row in rows.iterrows():
+        lines.append(
+            f"| {row.get('variant', '-')} | "
+            f"{row.get('endpoint', '-')} | "
+            f"{row.get('status', '-')} | "
+            f"{_num(row.get('threshold'))} | "
+            f"{row.get('promotion_label', 'do not promote')} | "
+            f"{row.get('notes', '')} |"
+        )
+    return lines
+
+
+def _massive_coverage_lines(summary: pd.DataFrame) -> list[str]:
+    rows = summary[summary.get("row_type") == "provider_comparison"] if not summary.empty else pd.DataFrame()
+    if rows.empty:
+        return ["- No historical OHLCV coverage rows were produced."]
+    lines = []
+    for _, row in rows.iterrows():
+        detail = str(row.get("coverage_by_ticker") or "").strip()
+        if not detail:
+            detail = f"{row.get('coverage_start', '-')} to {row.get('coverage_end', '-')}"
+        lines.append(f"- {row.get('provider', '-')}: {detail}")
+    return lines
+
+
+def _massive_endpoint_lines(summary: pd.DataFrame) -> list[str]:
+    endpoints = []
+    if summary is not None and not summary.empty:
+        for endpoint in summary["endpoint"].dropna().astype(str):
+            if endpoint and endpoint not in endpoints:
+                endpoints.append(endpoint)
+    if not endpoints:
+        endpoints = ["yfinance.download", MASSIVE_AGGS_ENDPOINT, MASSIVE_TRADES_ENDPOINT]
+    return [f"- {endpoint}" for endpoint in endpoints]
+
+
+def _format_massive_provider_validation_report(
+    *,
+    massive_validation_summary: pd.DataFrame,
+    prices: pd.DataFrame,
+    target_weights: pd.DataFrame,
+    requested_provider: str,
+    resolved_provider: str,
+    generated_at_utc: str,
+    oos_start: str = "2015-01-01",
+    validation_split_method: str = "configured",
+    ohlcv_source: dict | None = None,
+) -> str:
+    price_start, price_end, price_rows = _index_window(prices.index)
+    rebalance_start, rebalance_end, rebalance_count = _index_window(target_weights.index)
+    lines = [
+        "# Massive Historical Provider-Data Validation Report",
+        "",
+        f"Generated UTC: {generated_at_utc}",
+        "Ticket: B-159",
+        "",
+        (
+            "No Massive-derived rule is promoted into live scoring, veto logic, alerts, "
+            "recommendations, provider-flow behavior, Pillar 7 weights, or broker behavior by this report."
+        ),
+        "",
+        "## Provider Configuration",
+        "",
+        f"- Requested OHLCV provider: {requested_provider}",
+        f"- Resolved OHLCV provider: {resolved_provider}",
+        f"- OOS start: {pd.Timestamp(oos_start).date().isoformat()}",
+        f"- Validation split: {validation_split_method}",
+        "",
+        "## Data Sets And Endpoints Checked",
+        "",
+    ]
+    lines.extend(_massive_endpoint_lines(massive_validation_summary))
+    lines.extend(
+        [
+            "",
+            "## Main Run Data Windows",
+            "",
+            f"- Market prices: {price_start} to {price_end} ({price_rows} rows, {len(prices.columns)} tickers)",
+            f"- Methodology rebalances: {rebalance_start} to {rebalance_end} ({rebalance_count} rows)",
+            "",
+            "## OHLCV Source Evidence",
+            "",
+        ]
+    )
+    lines.extend(_ohlcv_source_lines(ohlcv_source, validation_ticket="B-159"))
+    lines.extend(
+        [
+            "",
+            "## Historical Coverage By Ticker",
+            "",
+        ]
+    )
+    lines.extend(_massive_coverage_lines(massive_validation_summary))
+    lines.extend(
+        [
+            "",
+            "## Baseline Vs Massive OHLCV",
+            "",
+        ]
+    )
+    lines.extend(_massive_provider_comparison_table(massive_validation_summary))
+    lines.extend(
+        [
+            "",
+            "## Provider-Derived Criteria Sweeps",
+            "",
+        ]
+    )
+    lines.extend(_massive_feature_sweep_table(massive_validation_summary))
+    lines.extend(
+        [
+            "",
+            "## Leakage And Survivorship Controls",
+            "",
+            "- Validation OHLCV fetches bypass the local cache so provider evidence is fresh for the report run.",
+            "- yfinance and Massive provider rows are fetched separately and compared as data-source evidence, not as live rules.",
+            "- Historical methodology targets are built from OHLCV sliced through each rebalance date.",
+            "- Massive trade-tape/block-trade sweeps are labeled `do not promote` until timestamped as-of snapshots exist.",
+            "- Use B-160 before any Massive-derived criterion changes scoring, alerts, vetoes, recommendations, provider-flow behavior, Pillar 7 weights, or broker behavior.",
+            "",
+            "## Decision",
+            "",
+            "Treat B-159 as research evidence only. Promote only through B-160 after review and deterministic tests.",
         ]
     )
     return "\n".join(lines).rstrip() + "\n"
@@ -492,7 +916,7 @@ def main(argv: list[str] | None = None) -> int:
         return _run_live_smoke(args.smoke_period)
     requested_provider = _provider()
     try:
-        validation_mode = bool(args.macro_variants)
+        validation_mode = bool(args.macro_variants or args.massive_variants)
         ohlcv, prices, ohlcv_fetch_result = _download_prices(
             period="max",
             provider=requested_provider,
@@ -563,6 +987,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         fred_validation_report = None
         fred_validation_summary = None
+        massive_validation_report = None
+        massive_validation_summary = None
         if args.macro_variants:
             fred_validation_summary = macro_variant_summary
             fred_validation_report = _format_fred_validation_report(
@@ -573,6 +999,37 @@ def main(argv: list[str] | None = None) -> int:
                 requested_provider=requested_provider,
                 resolved_provider=_resolved_provider(requested_provider),
                 fred_status=_fred_config_status(macro_data),
+                generated_at_utc=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                oos_start=validation_oos_start,
+                validation_split_method=validation_split_method,
+                ohlcv_source=_ohlcv_source_metadata(ohlcv_fetch_result, cache_policy="bypassed"),
+            )
+        if args.massive_variants:
+            precomputed_provider_rows = []
+            if ohlcv_fetch_result is not None:
+                main_provider = str(getattr(ohlcv_fetch_result, "provider", "")).lower()
+                if main_provider in {"massive", "yfinance"}:
+                    precomputed_provider_rows.append(
+                        _provider_validation_row_from_backtest(
+                            provider=main_provider,
+                            ohlcv=ohlcv,
+                            prices=prices,
+                            result=methodology_result,
+                            oos_start=validation_oos_start,
+                            notes="Reused the main validation-mode backtest run to avoid duplicate provider scoring.",
+                        )
+                    )
+            massive_validation_summary = _build_massive_provider_validation_summary(
+                enabled=True,
+                oos_start=validation_oos_start,
+                precomputed_provider_rows=precomputed_provider_rows,
+            )
+            massive_validation_report = _format_massive_provider_validation_report(
+                massive_validation_summary=massive_validation_summary,
+                prices=prices[strategy_columns],
+                target_weights=methodology_targets.target_weights,
+                requested_provider=requested_provider,
+                resolved_provider=_resolved_provider(requested_provider),
                 generated_at_utc=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 oos_start=validation_oos_start,
                 validation_split_method=validation_split_method,
@@ -649,6 +1106,8 @@ def main(argv: list[str] | None = None) -> int:
             macro_variant_summary=macro_variant_summary,
             fred_validation_report=fred_validation_report,
             fred_validation_summary=fred_validation_summary,
+            massive_validation_report=massive_validation_report,
+            massive_validation_summary=massive_validation_summary,
             ohlcv_source=ohlcv_source,
         )
     except Exception as exc:
@@ -657,6 +1116,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Wrote {REPORT_PATH}")
     if args.macro_variants:
         print(f"Wrote {FRED_VALIDATION_REPORT_PATH}")
+    if args.massive_variants:
+        print(f"Wrote {MASSIVE_VALIDATION_REPORT_PATH}")
     return 0
 
 

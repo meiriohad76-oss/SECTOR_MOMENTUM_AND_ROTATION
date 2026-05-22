@@ -56,14 +56,6 @@ provider-backed historical flow is neutral until as-of provider snapshots exist,
 | 60/40 out-of-sample | 32.82% | 12.75% | 1.24 | -11.88% | 38.25% |
 | Equal-weight sectors out-of-sample | 38.77% | 14.86% | 1.15 | -16.16% | 70.11% |
 
-### Macro Condition Variants
-
-| Variant | Series | Condition | Active Rebalances | Return Delta | Sharpe Delta | Drawdown Delta |
-|---|---|---|---:|---:|---:|---:|
-| HY spread rising defensive | BAMLH0A0HYM2 | rising | 63 | -27.53% | -0.08 | 0.00% |
-| Stress rising defensive | STLFSI4 | rising | 207 | -87.68% | -0.37 | 4.04% |
-| Curve falling defensive | T10Y2Y | falling | 198 | -50.84% | -0.13 | 11.25% |
-
 ## Acceptance Gates
 
 - Out-of-sample Sharpe: PASS (value 1.1112, threshold 0.7000)

@@ -266,15 +266,17 @@ Status legend:
 **Acceptance:** the implementation plan cites a validation report with at least one `candidate`, lists the evidence thresholds used for promotion, includes regression coverage for both promoted and rejected rules, and documents rollback behavior.
 **Safety:** no FRED macro rule can enter live scoring, veto logic, alerts, recommendations, or dashboard decision text until the B-157 evidence gate passes and is reviewed.
 
-### B-159 · Massive historical provider-data backtest variants — 🎯 NEXT SESSION
-**Purpose:** use Massive (formerly Polygon) historical data to validate algorithm improvements and criteria values the same way B-157 validates FRED macro rules.
-**Scope:** compare default/yfinance OHLCV backtests against Massive aggregate bars, then evaluate any timestamped Massive provider features that can be aligned as-of, such as trade-tape or block-trade signals.
-**Acceptance:** save a dated report that documents which Massive endpoints/data sets were actually available, the historical coverage by ticker/date, baseline-vs-Massive metric differences, parameter sweeps for provider-derived criteria, and leakage/survivorship controls.
-**Safety:** provider-backed historical flow remains neutral unless timestamped as-of provider snapshots exist; no Massive-derived rule can change live scoring, vetoes, alerts, recommendations, or Pillar 7 weights from this ticket alone.
+### B-159 · Massive historical provider-data backtest variants — IMPLEMENTED
+**Status:** B-159 is implemented as an opt-in research report through `python scripts/run_backtest.py --massive-variants`.
+**Files:** `scripts/run_backtest.py`, `tests/test_run_backtest_script.py`, `docs/massive_provider_validation_report.md`, `docs/massive_provider_validation_summary.csv`, `docs/backtest_metadata.json`.
+**Evidence:** `OHLCV_PROVIDER=massive python scripts/run_backtest.py --massive-variants` generated the dated Massive validation report at 2026-05-22T08:00:48Z. The run bypassed the OHLCV cache, fetched all 14 required tickers from Massive, used Massive OHLCV through 2026-05-21, and used the same 2024-01-05 walk-forward OOS split as B-157 because the fixed 2015 split predates the aligned Massive history. The local yfinance comparison row is recorded as `missing_required_prices` because yfinance failed with SSL/provider download errors on this Windows run; the report therefore does not claim a completed yfinance-vs-Massive metric delta.
+**Result:** no Massive-derived rule is promoted. Massive aggregate OHLCV is documented as available research evidence, but baseline deltas remain unavailable until a working yfinance/default comparison run succeeds. Massive trade-tape/block-trade threshold sweeps at `1.0`, `1.25`, and `1.5` are all labeled `do not promote` because no persisted timestamped as-of snapshots exist for historical rebalances.
+**Safety:** research only; provider-backed historical flow remains neutral unless timestamped as-of provider snapshots exist. No Massive-derived rule changes live scoring, state-machine behavior, provider-flow behavior, vetoes, alerts, recommendations, broker behavior, or Pillar 7 weights from this ticket.
 
 ### B-160 · Massive evidence gate for live promotion — 💡 RESEARCHED, NOT BUILT
 **Purpose:** promote Massive-derived criteria only if B-159 shows durable improvement and no data-leakage issue.
 **Scope:** convert validated Massive historical findings into explicit candidate changes for Pillar 7 weights, thresholds, provider-flow features, or alert/veto rules.
+**Current gate:** blocked by the 2026-05-22 B-159 report because no Massive-derived variant earned a `candidate` label, the local yfinance/default comparison was unavailable, and trade-tape/block-trade sweeps lack historical as-of snapshots.
 **Acceptance:** the promotion plan cites the B-159 report, includes before/after backtest tables, deterministic tests for threshold behavior, live-provider failure-mode tests, and documentation of the activation flags or configuration required.
 **Safety:** no Massive/provider-flow rule can enter live scoring, veto logic, alerts, recommendations, or dashboard decision text until the B-159 evidence gate passes and is reviewed.
 
