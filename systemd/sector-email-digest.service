@@ -1,0 +1,19 @@
+# Sector Rotation Email Digest - systemd one-shot unit
+#
+# Install with:
+#   sudo cp systemd/sector-email-digest.service /etc/systemd/system/
+#
+# Adjust User=, Group=, and WorkingDirectory= if your Pi user/path differ.
+
+[Unit]
+Description=Sector Rotation Email Digest
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=meiri
+Group=meiri
+WorkingDirectory=/home/meiri/sector-rotation-dashboard
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/meiri/sector-rotation-dashboard/.venv/bin/python scripts/send_email_digest.py

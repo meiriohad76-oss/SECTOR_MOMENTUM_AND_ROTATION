@@ -273,7 +273,13 @@ cd /home/ahad/SECTOR_MOMENTUM_AND_ROTATION
 ./.venv/bin/python scripts/send_email_digest.py
 ```
 
-For 08:00 ET delivery from cron, set `CRON_TZ=America/New_York` and run the command at `0 8 * * *`. With no SMTP settings or no LOW-severity transitions, the script exits cleanly with `email_digest=skipped`.
+Check the digest input without sending email:
+
+```bash
+./.venv/bin/python scripts/send_email_digest.py --dry-run
+```
+
+For 08:00 ET delivery from cron, set `CRON_TZ=America/New_York` and run the command at `0 8 * * *`. For systemd, install `systemd/sector-email-digest.service` and `systemd/sector-email-digest.timer` on the Pi. With no SMTP settings or no LOW-severity transitions, the script exits cleanly with `email_digest=skipped`.
 
 B-122 adds local RSS and iCal feed artifact generation from the same transition log:
 

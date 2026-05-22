@@ -174,12 +174,12 @@ Status legend:
 **Deferred:** Pushover, retry/backoff, dedup, and macro-channel alerts remain future backlog work.
 
 ### B-120 · Email digest at 08:00 ET — IMPLEMENTED / SMTP CONFIG PENDING
-**Status:** LOW-severity daily email digest helpers and script entry point are implemented in `backlog-stepwise-qa`; live delivery awaits SMTP secrets and a Pi cron/systemd schedule.
-**Files:** `src/alerts.py`, `src/scoring.py`, `scripts/send_email_digest.py`, `tests/test_alerts.py`, `tests/test_scoring.py`, `tests/test_email_digest_script.py`, `.streamlit/secrets.toml.example`, `README.md`.
-**Activation:** leave `SMTP_HOST` and/or `EMAIL_DIGEST_TO` unset to disable network calls. Configure SMTP secrets, then schedule `./.venv/bin/python scripts/send_email_digest.py` for `08:00 America/New_York`.
+**Status:** LOW-severity daily email digest helpers, script entry point, dry-run diagnostics, and Pi systemd timer templates are implemented in `backlog-stepwise-qa`; live delivery awaits SMTP secrets and timer installation.
+**Files:** `src/alerts.py`, `src/scoring.py`, `scripts/send_email_digest.py`, `systemd/sector-email-digest.service`, `systemd/sector-email-digest.timer`, `tests/test_alerts.py`, `tests/test_scoring.py`, `tests/test_email_digest_script.py`, `.streamlit/secrets.toml.example`, `README.md`, `docs/DEPLOY_RASPBERRY_PI.md`.
+**Activation:** leave `SMTP_HOST` and/or `EMAIL_DIGEST_TO` unset to disable network calls. Configure SMTP secrets, validate with `./.venv/bin/python scripts/send_email_digest.py --dry-run`, then enable `sector-email-digest.timer` for `08:00 America/New_York`.
 **Behavior:** the digest filters yesterday's transitions in US/Eastern time, excludes immediate HIGH states (`EXIT`, `BEARISH_STAGE_4`), sends one plain-text email when configured, and returns `email_digest=skipped` when there is nothing to send or SMTP is unavailable.
 **Evidence:** `docs/superpowers/plans/2026-05-21-b120-email-digest.md`.
-**Residual risk:** unit tests mock SMTP; live SMTP validation and scheduler enablement remain environment configuration tasks.
+**Residual risk:** unit tests mock SMTP; live SMTP validation and timer installation remain environment configuration tasks.
 
 ### B-122 · RSS / iCal feed of state transitions — IMPLEMENTED / PUBLISH CONFIG PENDING
 **Status:** RSS and iCal transition feed generation is implemented in `backlog-stepwise-qa`; public publishing/sync is left to deployment configuration.

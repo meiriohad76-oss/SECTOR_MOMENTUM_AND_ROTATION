@@ -155,6 +155,27 @@ Append:
 
 This hits the dashboard at 22:00 daily, which forces a state-machine pass.
 
+## Optional: schedule the 08:00 ET email digest
+
+B-120 ships a LOW-severity digest script and a systemd timer template. Before enabling the timer, configure the SMTP values in `.streamlit/secrets.toml`, then run a no-send diagnostic:
+
+```bash
+cd ~/sector-rotation-dashboard
+./.venv/bin/python scripts/send_email_digest.py --dry-run
+```
+
+Install the timer:
+
+```bash
+sudo cp systemd/sector-email-digest.service /etc/systemd/system/
+sudo cp systemd/sector-email-digest.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now sector-email-digest.timer
+systemctl list-timers sector-email-digest.timer
+```
+
+Adjust the `User=`, `Group=`, and `WorkingDirectory=` values in `/etc/systemd/system/sector-email-digest.service` if your Pi user or checkout path differs. The timer runs at `08:00 America/New_York`; without SMTP secrets or eligible LOW-severity transitions, the job exits cleanly with `email_digest=skipped`.
+
 ## Resource notes
 
 On a Pi 4 with 4 GB RAM and the full 67-ticker universe:
