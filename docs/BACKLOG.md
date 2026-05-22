@@ -167,10 +167,10 @@ Status legend:
 ## Implemented with config / live-validation pending
 
 ### B-021 · Telegram / Slack alerting on state transitions — IMPLEMENTED / KEYS PENDING
-**Status:** Telegram bot and Slack webhook channels are implemented in `backlog-stepwise-qa`; live validation awaits alert secrets.
-**Files:** `src/alerts.py`, `src/scoring.py`, `tests/test_alerts.py`, `tests/test_scoring.py`, `.streamlit/secrets.toml.example`, `README.md`.
-**Activation:** leave `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and `SLACK_WEBHOOK_URL` unset to disable network calls. Configure Telegram and/or Slack secrets to enable delivery.
-**Behavior:** `apply_state_machine()` persists `state.json` and the transition log before sending alerts. Provider failures are swallowed so scoring does not fail because an alert endpoint is down.
+**Status:** Telegram bot and Slack webhook channels plus a no-secret-leak smoke script are implemented in `backlog-stepwise-qa`; live validation awaits alert secrets.
+**Files:** `src/alerts.py`, `src/scoring.py`, `scripts/smoke_telegram_slack_alerts.py`, `tests/test_alerts.py`, `tests/test_scoring.py`, `tests/test_telegram_slack_smoke_script.py`, `.streamlit/secrets.toml.example`, `README.md`.
+**Activation:** leave `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and `SLACK_WEBHOOK_URL` unset to disable network calls. Configure Telegram and/or Slack secrets, validate config presence with `./.venv/bin/python scripts/smoke_telegram_slack_alerts.py --dry-run`, then send an explicit synthetic message with `./.venv/bin/python scripts/smoke_telegram_slack_alerts.py --send-test`.
+**Behavior:** `apply_state_machine()` persists `state.json` and the transition log before sending alerts. Provider failures are swallowed so scoring does not fail because an alert endpoint is down. The smoke script checks or tests only Telegram/Slack and does not print bot tokens, chat IDs, or webhook URLs.
 **Deferred:** Pushover, retry/backoff, dedup, and macro-channel alerts remain future backlog work.
 
 ### B-120 · Email digest at 08:00 ET — IMPLEMENTED / SMTP CONFIG PENDING

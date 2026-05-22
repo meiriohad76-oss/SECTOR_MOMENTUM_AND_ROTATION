@@ -153,6 +153,48 @@ def send_low_severity_email_digest(
     return True
 
 
+def telegram_slack_alert_status() -> dict[str, bool]:
+    telegram_token = _resolve_secret("TELEGRAM_BOT_TOKEN")
+    telegram_chat_id = _resolve_secret("TELEGRAM_CHAT_ID")
+    slack_webhook_url = _resolve_secret("SLACK_WEBHOOK_URL")
+    return {"telegram": bool(telegram_token and telegram_chat_id), "slack": bool(slack_webhook_url)}
+
+
+def send_telegram_slack_test_alert(text: str, timeout: int = 5) -> dict[str, str]:
+    results: dict[str, str] = {}
+    telegram_token = _resolve_secret("TELEGRAM_BOT_TOKEN")
+    telegram_chat_id = _resolve_secret("TELEGRAM_CHAT_ID")
+    slack_webhook_url = _resolve_secret("SLACK_WEBHOOK_URL")
+
+    if telegram_token and telegram_chat_id:
+        try:
+            response = requests.post(
+                f"https://api.telegram.org/bot{telegram_token}/sendMessage",
+                json={"chat_id": telegram_chat_id, "text": text},
+                timeout=timeout,
+            )
+            response.raise_for_status()
+        except requests.RequestException:
+            results["telegram"] = "failed"
+        else:
+            results["telegram"] = "sent"
+    else:
+        results["telegram"] = "skipped"
+
+    if slack_webhook_url:
+        try:
+            response = requests.post(slack_webhook_url, json={"text": text}, timeout=timeout)
+            response.raise_for_status()
+        except requests.RequestException:
+            results["slack"] = "failed"
+        else:
+            results["slack"] = "sent"
+    else:
+        results["slack"] = "skipped"
+
+    return results
+
+
 def discord_mattermost_webhook_status() -> dict[str, bool]:
     return {
         name: bool(_resolve_secret(secret_name))
@@ -182,30 +224,5 @@ def send_transition_alerts(transitions: list[dict], timeout: int = 5) -> None:
         return
 
     text = _alert_text(transitions)
-    telegram_token = _resolve_secret("TELEGRAM_BOT_TOKEN")
-    telegram_chat_id = _resolve_secret("TELEGRAM_CHAT_ID")
-    slack_webhook_url = _resolve_secret("SLACK_WEBHOOK_URL")
-
-    if telegram_token and telegram_chat_id:
-        try:
-            response = requests.post(
-                f"https://api.telegram.org/bot{telegram_token}/sendMessage",
-                json={"chat_id": telegram_chat_id, "text": text},
-                timeout=timeout,
-            )
-            response.raise_for_status()
-        except requests.RequestException:
-            pass
-
-    if slack_webhook_url:
-        try:
-            response = requests.post(
-                slack_webhook_url,
-                json={"text": text},
-                timeout=timeout,
-            )
-            response.raise_for_status()
-        except requests.RequestException:
-            pass
-
+    send_telegram_slack_test_alert(text, timeout=timeout)
     send_discord_mattermost_test_alert(text, timeout=timeout)

@@ -285,6 +285,13 @@ B-123 adds a Discord/Mattermost-only smoke script so webhook configuration can b
 ./.venv/bin/python scripts/smoke_discord_mattermost_webhooks.py --send-test
 ```
 
+B-021 Telegram/Slack validation is kept separate:
+
+```bash
+./.venv/bin/python scripts/smoke_telegram_slack_alerts.py --dry-run
+./.venv/bin/python scripts/smoke_telegram_slack_alerts.py --send-test
+```
+
 B-120 adds an optional LOW-severity email digest for transitions from the previous US/Eastern day. Configure `SMTP_HOST`, optional `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `EMAIL_DIGEST_FROM`, and comma-separated `EMAIL_DIGEST_TO`, then schedule:
 
 ```bash
