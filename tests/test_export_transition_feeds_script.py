@@ -82,6 +82,7 @@ def test_backlog_records_transition_feed_pi_artifact_validation_without_public_o
     start = backlog.index("### B-122")
     section = backlog[start:backlog.index("### B-123", start)]
 
-    assert "USER TIMER LIVE VALIDATED / PUBLIC ROUTE PENDING" in section
+    assert "USER TIMER + LOCAL PUBLIC SERVICE LIVE VALIDATED / CLOUDFLARE DNS PENDING" in section
     assert "items=32" in section
-    assert "HTTP `200` alone is not accepted as public feed proof" in section
+    assert "RSS8500_HTTP=200" in section
+    assert "Could not resolve host" in section

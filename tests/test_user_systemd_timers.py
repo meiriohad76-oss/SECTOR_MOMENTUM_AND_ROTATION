@@ -54,6 +54,6 @@ def test_backlog_records_user_timer_live_validation_evidence():
     assert "USER TIMER LIVE VALIDATED / SMTP CONFIG PENDING" in email_section
     assert "sector-email-digest.timer" in email_section
     assert "email_digest=skipped" in email_section
-    assert "USER TIMER LIVE VALIDATED / PUBLIC ROUTE PENDING" in feed_section
+    assert "USER TIMER + LOCAL PUBLIC SERVICE LIVE VALIDATED / CLOUDFLARE DNS PENDING" in feed_section
     assert "sector-transition-feeds.timer" in feed_section
     assert "items=32" in feed_section
