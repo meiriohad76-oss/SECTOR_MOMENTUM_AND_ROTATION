@@ -53,7 +53,7 @@ def test_pwa_push_script_dry_run_reports_config_without_sending(tmp_path, monkey
     assert payload["vapid_private_key"] == "missing"
     assert payload["vapid_claim_email"] == "missing"
     assert "private" not in json.dumps(payload).lower().replace("vapid_private_key", "")
-    assert feed_path.exists()
+    assert not feed_path.exists()
 
 
 def test_pwa_push_script_uses_config_and_cli_paths_for_send(tmp_path, monkeypatch, capsys):
@@ -130,6 +130,7 @@ def test_pwa_push_script_docs_reference_dry_run_and_config():
     secrets_example = (root / ".streamlit" / "secrets.toml.example").read_text(encoding="utf-8")
 
     assert "scripts/send_pwa_push_notifications.py --dry-run" in readme
+    assert "without sending or rewriting the feed file" in readme
     assert "VAPID_PRIVATE_KEY" in secrets_example
     assert "VAPID_CLAIM_EMAIL" in secrets_example
     assert "--dry-run" in backlog

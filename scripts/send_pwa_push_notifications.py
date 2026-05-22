@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.pwa_push import (  # noqa: E402
+    build_push_notifications,
     load_push_subscriptions,
     send_web_push_notifications,
     write_notification_feed,
@@ -48,12 +49,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     transitions = recent_transitions(n=args.limit)
     dashboard_url = args.dashboard_url or _resolve_config("PWA_DASHBOARD_URL") or "/"
-    feed_count = write_notification_feed(transitions, args.feed_path, dashboard_url=dashboard_url)
 
     subscriptions = load_push_subscriptions(args.subscriptions_path)
     private_key = _resolve_config("VAPID_PRIVATE_KEY")
     claim_email = _resolve_config("VAPID_CLAIM_EMAIL")
     claims = {"sub": f"mailto:{claim_email}"} if claim_email else None
+    feed_count = len(build_push_notifications(transitions, dashboard_url=dashboard_url))
     payload = {
         "feed_notifications": feed_count,
         "subscriptions": len(subscriptions),
@@ -64,6 +65,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"pwa_push": "dry_run", **payload}, sort_keys=True))
         return 0
 
+    feed_count = write_notification_feed(transitions, args.feed_path, dashboard_url=dashboard_url)
+    payload["feed_notifications"] = feed_count
     summary = send_web_push_notifications(
         transitions,
         subscriptions,
