@@ -160,7 +160,13 @@ B-121 adds static PWA assets and a push-notification sender seam:
 ./.venv/bin/python scripts/send_pwa_push_notifications.py
 ```
 
-The script writes `public/notification-feed.json` from recent HIGH severity transitions and can send Web Push notifications once `VAPID_PRIVATE_KEY`, `VAPID_CLAIM_EMAIL`, optional `PWA_DASHBOARD_URL`, and local browser subscriptions in `data/pwa_push_subscriptions.json` are configured. The subscription file is ignored by git and Docker.
+The script writes `public/notification-feed.json` from recent HIGH severity transitions and can send Web Push notifications once `VAPID_PRIVATE_KEY`, `VAPID_CLAIM_EMAIL`, optional `PWA_DASHBOARD_URL`, and local browser subscriptions in `data/pwa_push_subscriptions.json` are configured. Check readiness without sending:
+
+```bash
+./.venv/bin/python scripts/send_pwa_push_notifications.py --dry-run
+```
+
+The subscription file is ignored by git and Docker.
 
 ## Quick start
 

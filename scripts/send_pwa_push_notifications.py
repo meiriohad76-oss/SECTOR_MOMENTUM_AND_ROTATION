@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -22,27 +23,60 @@ FEED_PATH = ROOT / "public" / "notification-feed.json"
 SUBSCRIPTIONS_PATH = ROOT / "data" / "pwa_push_subscriptions.json"
 
 
-def main() -> int:
-    transitions = recent_transitions(n=100)
-    dashboard_url = os.environ.get("PWA_DASHBOARD_URL", "/")
-    feed_count = write_notification_feed(transitions, FEED_PATH, dashboard_url=dashboard_url)
+def _resolve_config(name: str) -> str | None:
+    from src.alerts import _resolve_secret
 
-    subscriptions = load_push_subscriptions(SUBSCRIPTIONS_PATH)
-    private_key = os.environ.get("VAPID_PRIVATE_KEY")
-    claim_email = os.environ.get("VAPID_CLAIM_EMAIL")
+    return _resolve_secret(name) or os.environ.get(name)
+
+
+def _config_label(value: str | None) -> str:
+    return "configured" if value else "missing"
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Write and optionally send HIGH severity PWA push notifications.")
+    parser.add_argument("--dry-run", action="store_true", help="write the feed and report config without sending push")
+    parser.add_argument("--feed-path", default=str(FEED_PATH), help="notification feed JSON path")
+    parser.add_argument("--subscriptions-path", default=str(SUBSCRIPTIONS_PATH), help="browser subscriptions JSON path")
+    parser.add_argument("--dashboard-url", default="", help="dashboard URL for notification click-throughs")
+    parser.add_argument("--limit", type=int, default=100, help="maximum recent transition rows to inspect")
+    parser.add_argument("--timeout", type=int, default=10, help="Web Push timeout in seconds")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    transitions = recent_transitions(n=args.limit)
+    dashboard_url = args.dashboard_url or _resolve_config("PWA_DASHBOARD_URL") or "/"
+    feed_count = write_notification_feed(transitions, args.feed_path, dashboard_url=dashboard_url)
+
+    subscriptions = load_push_subscriptions(args.subscriptions_path)
+    private_key = _resolve_config("VAPID_PRIVATE_KEY")
+    claim_email = _resolve_config("VAPID_CLAIM_EMAIL")
     claims = {"sub": f"mailto:{claim_email}"} if claim_email else None
+    payload = {
+        "feed_notifications": feed_count,
+        "subscriptions": len(subscriptions),
+        "vapid_private_key": _config_label(private_key),
+        "vapid_claim_email": _config_label(claim_email),
+    }
+    if args.dry_run:
+        print(json.dumps({"pwa_push": "dry_run", **payload}, sort_keys=True))
+        return 0
+
     summary = send_web_push_notifications(
         transitions,
         subscriptions,
         vapid_private_key=private_key,
         vapid_claims=claims,
         dashboard_url=dashboard_url,
+        timeout=args.timeout,
     )
     print(
         json.dumps(
             {
                 "pwa_push": "ok" if summary.sent else "skipped",
-                "feed_notifications": feed_count,
+                **payload,
                 "attempted": summary.attempted,
                 "sent": summary.sent,
                 "failed": summary.failed,

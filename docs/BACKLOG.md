@@ -305,9 +305,9 @@ Status legend:
 
 ### Notifications & integrations
 #### B-121 · Push notifications for HIGH severity (mobile install via PWA) — IMPLEMENTED / VAPID CONFIG PENDING
-**Status:** static PWA alert shell, service worker, high-severity notification feed writer, and best-effort Web Push sender seam are implemented in `backlog-stepwise-qa`; live browser push delivery awaits VAPID keys and subscription capture.
-**Files:** `src/pwa_push.py`, `scripts/send_pwa_push_notifications.py`, `public/pwa.html`, `public/pwa-sw.js`, `public/manifest.webmanifest`, `public/notification-feed.json`, `tests/test_pwa_push.py`, `tests/test_remaining_backlog_app_static.py`, `.gitignore`, `.dockerignore`, `README.md`, `docs/BACKLOG.md`.
-**Activation:** configure `VAPID_PRIVATE_KEY`, `VAPID_CLAIM_EMAIL`, optional `PWA_DASHBOARD_URL`, and local browser subscriptions in `data/pwa_push_subscriptions.json`; then run `./.venv/bin/python scripts/send_pwa_push_notifications.py` after dashboard state transitions are recorded.
+**Status:** static PWA alert shell, service worker, high-severity notification feed writer, dry-run config diagnostics, and best-effort Web Push sender seam are implemented in `backlog-stepwise-qa`; live browser push delivery awaits VAPID keys and subscription capture.
+**Files:** `src/pwa_push.py`, `scripts/send_pwa_push_notifications.py`, `public/pwa.html`, `public/pwa-sw.js`, `public/manifest.webmanifest`, `public/notification-feed.json`, `tests/test_pwa_push.py`, `tests/test_pwa_push_script.py`, `tests/test_remaining_backlog_app_static.py`, `.gitignore`, `.dockerignore`, `.streamlit/secrets.toml.example`, `README.md`, `docs/BACKLOG.md`.
+**Activation:** configure `VAPID_PRIVATE_KEY`, `VAPID_CLAIM_EMAIL`, optional `PWA_DASHBOARD_URL`, and local browser subscriptions in `data/pwa_push_subscriptions.json`; validate without sending via `./.venv/bin/python scripts/send_pwa_push_notifications.py --dry-run`, then run `./.venv/bin/python scripts/send_pwa_push_notifications.py` after dashboard state transitions are recorded.
 **Behavior:** only `EXIT` and `BEARISH_STAGE_4` transitions produce HIGH-severity payloads. The public PWA assets contain no API keys, local state files, run-journal content, or account data.
 **Residual risk:** browser subscription capture and production VAPID delivery still require environment configuration and mobile-browser validation.
 
