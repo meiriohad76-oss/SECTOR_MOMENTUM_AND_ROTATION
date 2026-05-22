@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
 from src import backtest
 from src.data import _select_ohlcv_provider, fetch_ohlcv, fetch_ohlcv_result
 from src.fred_data import fetch_fred
+from src import provider_snapshots
 
 
 REPORT_PATH = ROOT / "docs" / "backtest_report.md"
@@ -31,6 +32,7 @@ MASSIVE_VALIDATION_SUMMARY_PATH = ROOT / "docs" / "massive_provider_validation_s
 MASSIVE_AGGS_ENDPOINT = "https://api.massive.com/v2/aggs/ticker/{ticker}/range/1/day/{from}/{to}"
 MASSIVE_TRADES_ENDPOINT = "https://api.massive.com/v3/trades/{ticker}"
 MASSIVE_BLOCK_TRADE_THRESHOLDS = (1.0, 1.25, 1.5)
+MASSIVE_PROVIDER_FLOW_MIN_ACTIVE_OOS = 20
 SECTOR_BENCHMARK_TICKERS = [
     "XLK",
     "XLF",
@@ -194,6 +196,14 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Compare default/yfinance and Massive historical provider data in a research-only report.",
     )
+    parser.add_argument(
+        "--provider-snapshot-db",
+        default=str(provider_snapshots.DEFAULT_SNAPSHOT_DB_PATH),
+        help=(
+            "SQLite provider snapshot DB for --massive-variants provider-flow replay "
+            f"(default: {provider_snapshots.DEFAULT_SNAPSHOT_DB_PATH})."
+        ),
+    )
     return parser
 
 
@@ -310,6 +320,18 @@ def _empty_provider_validation_row(provider: str, status: str, notes: str) -> di
         "oos_sharpe_delta_vs_yfinance": None,
         "oos_max_drawdown_delta_vs_yfinance": None,
         "threshold": None,
+        "snapshot_rebalance_count": 0,
+        "snapshot_required_decisions": 0,
+        "snapshot_available_count": 0,
+        "snapshot_missing_count": 0,
+        "snapshot_neutral_missing_count": 0,
+        "snapshot_unusable_count": 0,
+        "snapshot_passing_count": 0,
+        "snapshot_below_threshold_count": 0,
+        "snapshot_coverage_pct": None,
+        "snapshot_audit_metadata_count": 0,
+        "active_rebalances": 0,
+        "active_oos_rebalances": 0,
         "promotion_label": "needs more testing",
         "notes": notes,
     }
@@ -356,6 +378,18 @@ def _provider_validation_row_from_backtest(
         "oos_sharpe_delta_vs_yfinance": None,
         "oos_max_drawdown_delta_vs_yfinance": None,
         "threshold": None,
+        "snapshot_rebalance_count": 0,
+        "snapshot_required_decisions": 0,
+        "snapshot_available_count": 0,
+        "snapshot_missing_count": 0,
+        "snapshot_neutral_missing_count": 0,
+        "snapshot_unusable_count": 0,
+        "snapshot_passing_count": 0,
+        "snapshot_below_threshold_count": 0,
+        "snapshot_coverage_pct": None,
+        "snapshot_audit_metadata_count": 0,
+        "active_rebalances": 0,
+        "active_oos_rebalances": 0,
         "promotion_label": "needs more testing",
         "notes": notes,
     }
@@ -440,45 +474,304 @@ def _with_yfinance_deltas(rows: list[dict]) -> list[dict]:
     return rows
 
 
+def _empty_provider_flow_sweep_row(
+    threshold: float,
+    *,
+    notes: str,
+    ticker_count: int = 0,
+    missing_tickers: str = "",
+    coverage_by_ticker: str = "",
+    snapshot_rebalance_count: int = 0,
+    snapshot_required_decisions: int = 0,
+    snapshot_missing_count: int = 0,
+) -> dict:
+    return {
+        "row_type": "provider_feature_sweep",
+        "variant": f"Block-trade upside ratio >= {threshold:g}",
+        "provider": "massive",
+        "endpoint": MASSIVE_TRADES_ENDPOINT,
+        "status": "unavailable_no_historical_asof_snapshots",
+        "coverage_start": "-",
+        "coverage_end": "-",
+        "coverage_rows": 0,
+        "ticker_count": int(ticker_count),
+        "missing_count": int(snapshot_missing_count),
+        "missing_tickers": missing_tickers,
+        "coverage_by_ticker": coverage_by_ticker,
+        "cagr": None,
+        "sharpe": None,
+        "max_drawdown": None,
+        "annualized_turnover": None,
+        "oos_cagr": None,
+        "oos_sharpe": None,
+        "oos_max_drawdown": None,
+        "oos_annualized_turnover": None,
+        "cagr_delta_vs_yfinance": None,
+        "sharpe_delta_vs_yfinance": None,
+        "max_drawdown_delta_vs_yfinance": None,
+        "oos_cagr_delta_vs_yfinance": None,
+        "oos_sharpe_delta_vs_yfinance": None,
+        "oos_max_drawdown_delta_vs_yfinance": None,
+        "threshold": float(threshold),
+        "snapshot_rebalance_count": int(snapshot_rebalance_count),
+        "snapshot_required_decisions": int(snapshot_required_decisions),
+        "snapshot_available_count": 0,
+        "snapshot_missing_count": int(snapshot_missing_count),
+        "snapshot_neutral_missing_count": int(snapshot_missing_count),
+        "snapshot_unusable_count": 0,
+        "snapshot_passing_count": 0,
+        "snapshot_below_threshold_count": 0,
+        "snapshot_coverage_pct": 0.0,
+        "snapshot_audit_metadata_count": 0,
+        "active_rebalances": 0,
+        "active_oos_rebalances": 0,
+        "promotion_label": "do not promote",
+        "notes": notes,
+    }
+
+
 def _massive_provider_feature_sweep_rows() -> list[dict]:
+    notes = (
+        "The current trade-tape endpoint can inform live provider flow, but this runner has no "
+        "persisted timestamped as-of snapshots for historical rebalances."
+    )
+    return [_empty_provider_flow_sweep_row(threshold, notes=notes) for threshold in MASSIVE_BLOCK_TRADE_THRESHOLDS]
+
+
+def _massive_provider_missing_snapshot_sweep_rows(
+    *,
+    decisions: list[dict],
+    target_weights: pd.DataFrame,
+    tickers: list[str],
+) -> list[dict]:
+    missing_tickers = ", ".join(sorted({item["ticker"] for item in decisions}))
+    coverage_by_ticker = _coverage_by_snapshot_ticker(decisions, tickers)
+    notes = (
+        "No stored Massive stock_trades snapshots were available as of the requested rebalances; "
+        "missing snapshots were neutral and did not change baseline weights. Research only; use B-160 before promotion."
+    )
+    return [
+        _empty_provider_flow_sweep_row(
+            threshold,
+            notes=notes,
+            ticker_count=len(tickers),
+            missing_tickers=missing_tickers,
+            coverage_by_ticker=coverage_by_ticker,
+            snapshot_rebalance_count=int(target_weights.shape[0]),
+            snapshot_required_decisions=len(decisions),
+            snapshot_missing_count=len(decisions),
+        )
+        for threshold in MASSIVE_BLOCK_TRADE_THRESHOLDS
+    ]
+
+
+def _snapshot_payload_has_audit_metadata(payload: dict) -> bool:
+    request = payload.get("request")
+    response = payload.get("response")
+    return isinstance(request, dict) and isinstance(response, dict)
+
+
+def _snapshot_ratio(record: provider_snapshots.ProviderSnapshotRecord) -> float | None:
+    return provider_snapshots.block_trade_upside_ratio_from_snapshot(record)
+
+
+def _provider_flow_promotion_label(row: dict) -> str:
+    if row.get("status") != "replayed_snapshots":
+        return "do not promote"
+    if int(row.get("active_oos_rebalances", 0)) < MASSIVE_PROVIDER_FLOW_MIN_ACTIVE_OOS:
+        return "needs more testing"
+    oos_sharpe_delta = float(row.get("oos_sharpe_delta_vs_yfinance") or 0.0)
+    oos_cagr_delta = float(row.get("oos_cagr_delta_vs_yfinance") or 0.0)
+    oos_drawdown_delta = float(row.get("oos_max_drawdown_delta_vs_yfinance") or 0.0)
+    full_sharpe_delta = float(row.get("sharpe_delta_vs_yfinance") or 0.0)
+    if (
+        oos_sharpe_delta >= 0.10
+        and oos_cagr_delta >= 0.0
+        and oos_drawdown_delta >= 0.0
+        and full_sharpe_delta >= 0.0
+    ):
+        return "candidate"
+    if oos_sharpe_delta <= 0.0 and oos_cagr_delta <= 0.0 and oos_drawdown_delta <= 0.0:
+        return "do not promote"
+    return "needs more testing"
+
+
+def _coverage_by_snapshot_ticker(decisions: list[dict], tickers: list[str]) -> str:
+    parts = []
+    for ticker in tickers:
+        as_of_values = sorted(
+            {str(item["snapshot_as_of"]) for item in decisions if item["ticker"] == ticker and item.get("snapshot_as_of")}
+        )
+        if not as_of_values:
+            parts.append(f"{ticker}:-")
+            continue
+        parts.append(f"{ticker}:{as_of_values[0]}->{as_of_values[-1]}({len(as_of_values)})")
+    return "; ".join(parts)
+
+
+def _provider_flow_decisions(
+    *,
+    snapshot_db_path: str | Path,
+    target_weights: pd.DataFrame,
+) -> list[dict]:
+    decisions = []
+    clean_targets = target_weights.copy()
+    clean_targets.index = pd.to_datetime(clean_targets.index)
+    for rebalance_date, weights in clean_targets.iterrows():
+        as_of = pd.Timestamp(rebalance_date).date().isoformat()
+        for ticker, weight in weights.items():
+            try:
+                numeric_weight = float(weight)
+            except (TypeError, ValueError):
+                continue
+            if numeric_weight <= 0.0:
+                continue
+            record = provider_snapshots.load_provider_snapshot_as_of(
+                snapshot_db_path,
+                provider="massive",
+                dataset="stock_trades",
+                ticker=str(ticker),
+                as_of=as_of,
+            )
+            if record is None:
+                decisions.append(
+                    {
+                        "rebalance_date": pd.Timestamp(rebalance_date),
+                        "ticker": str(ticker).upper(),
+                        "weight": numeric_weight,
+                        "ratio": None,
+                        "snapshot_as_of": None,
+                        "has_audit_metadata": False,
+                    }
+                )
+                continue
+            decisions.append(
+                {
+                    "rebalance_date": pd.Timestamp(rebalance_date),
+                    "ticker": record.ticker,
+                    "weight": numeric_weight,
+                    "ratio": _snapshot_ratio(record),
+                    "snapshot_as_of": record.as_of,
+                    "has_audit_metadata": _snapshot_payload_has_audit_metadata(record.payload),
+                }
+            )
+    return decisions
+
+
+def _provider_flow_metric_fields(
+    baseline: backtest.BacktestResult,
+    variant: backtest.BacktestResult,
+    oos_start: str | pd.Timestamp,
+) -> dict:
+    baseline_windows = backtest.split_backtest_metrics(baseline, oos_start=oos_start)
+    variant_windows = backtest.split_backtest_metrics(variant, oos_start=oos_start)
+    baseline_oos = baseline_windows["Out-of-sample"]
+    variant_oos = variant_windows["Out-of-sample"]
+    return {
+        "cagr": variant.metrics["cagr"],
+        "sharpe": variant.metrics["sharpe"],
+        "max_drawdown": variant.metrics["max_drawdown"],
+        "annualized_turnover": variant.metrics["annualized_turnover"],
+        "oos_cagr": variant_oos["cagr"],
+        "oos_sharpe": variant_oos["sharpe"],
+        "oos_max_drawdown": variant_oos["max_drawdown"],
+        "oos_annualized_turnover": variant_oos["annualized_turnover"],
+        "cagr_delta_vs_yfinance": variant.metrics["cagr"] - baseline.metrics["cagr"],
+        "sharpe_delta_vs_yfinance": variant.metrics["sharpe"] - baseline.metrics["sharpe"],
+        "max_drawdown_delta_vs_yfinance": variant.metrics["max_drawdown"] - baseline.metrics["max_drawdown"],
+        "oos_cagr_delta_vs_yfinance": variant_oos["cagr"] - baseline_oos["cagr"],
+        "oos_sharpe_delta_vs_yfinance": variant_oos["sharpe"] - baseline_oos["sharpe"],
+        "oos_max_drawdown_delta_vs_yfinance": variant_oos["max_drawdown"] - baseline_oos["max_drawdown"],
+    }
+
+
+def _build_massive_provider_flow_sweep_rows(
+    *,
+    snapshot_db_path: str | Path,
+    prices: pd.DataFrame | None,
+    target_weights: pd.DataFrame | None,
+    oos_start: str | pd.Timestamp,
+) -> list[dict]:
+    if prices is None or target_weights is None or getattr(prices, "empty", True) or getattr(target_weights, "empty", True):
+        return _massive_provider_feature_sweep_rows()
+    strategy_columns = [column for column in target_weights.columns if column in prices.columns]
+    if not strategy_columns:
+        return _massive_provider_feature_sweep_rows()
+    clean_prices = prices[strategy_columns].copy()
+    clean_targets = target_weights[strategy_columns].copy()
+    decisions = _provider_flow_decisions(snapshot_db_path=snapshot_db_path, target_weights=clean_targets)
+    required_count = len(decisions)
+    available = [item for item in decisions if item.get("snapshot_as_of")]
+    if not available:
+        return _massive_provider_missing_snapshot_sweep_rows(
+            decisions=decisions,
+            target_weights=clean_targets,
+            tickers=[str(item) for item in strategy_columns],
+        )
+
+    snapshot_asofs = sorted({str(item["snapshot_as_of"]) for item in available})
+    missing_tickers = sorted({item["ticker"] for item in decisions if not item.get("snapshot_as_of")})
+    active_rebalance_dates = {pd.Timestamp(item["rebalance_date"]).normalize() for item in available}
+    baseline = backtest.run_weight_backtest(clean_prices, clean_targets, transaction_cost_bps=5.0)
+    oos_date = pd.Timestamp(oos_start)
     rows = []
     for threshold in MASSIVE_BLOCK_TRADE_THRESHOLDS:
-        rows.append(
-            {
-                "row_type": "provider_feature_sweep",
-                "variant": f"Block-trade upside ratio >= {threshold:g}",
-                "provider": "massive",
-                "endpoint": MASSIVE_TRADES_ENDPOINT,
-                "status": "unavailable_no_historical_asof_snapshots",
-                "coverage_start": "-",
-                "coverage_end": "-",
-                "coverage_rows": 0,
-                "ticker_count": 0,
-                "missing_count": 0,
-                "missing_tickers": "",
-                "coverage_by_ticker": "",
-                "cagr": None,
-                "sharpe": None,
-                "max_drawdown": None,
-                "annualized_turnover": None,
-                "oos_cagr": None,
-                "oos_sharpe": None,
-                "oos_max_drawdown": None,
-                "oos_annualized_turnover": None,
-                "cagr_delta_vs_yfinance": None,
-                "sharpe_delta_vs_yfinance": None,
-                "max_drawdown_delta_vs_yfinance": None,
-                "oos_cagr_delta_vs_yfinance": None,
-                "oos_sharpe_delta_vs_yfinance": None,
-                "oos_max_drawdown_delta_vs_yfinance": None,
-                "threshold": float(threshold),
-                "promotion_label": "do not promote",
-                "notes": (
-                    "The current trade-tape endpoint can inform live provider flow, but this runner has no "
-                    "persisted timestamped as-of snapshots for historical rebalances."
-                ),
-            }
-        )
+        adjusted_targets = clean_targets.copy()
+        passing_count = 0
+        below_count = 0
+        unusable_count = 0
+        active_oos_dates = set()
+        for item in decisions:
+            ratio = item.get("ratio")
+            if not item.get("snapshot_as_of"):
+                continue
+            if pd.Timestamp(item["rebalance_date"]) >= oos_date:
+                active_oos_dates.add(pd.Timestamp(item["rebalance_date"]).normalize())
+            if ratio is None:
+                unusable_count += 1
+                continue
+            if float(ratio) >= float(threshold):
+                passing_count += 1
+                continue
+            below_count += 1
+            adjusted_targets.loc[item["rebalance_date"], item["ticker"]] = 0.0
+        variant = backtest.run_weight_backtest(clean_prices, adjusted_targets, transaction_cost_bps=5.0)
+        coverage_pct = len(available) / required_count if required_count else 0.0
+        row = {
+            "row_type": "provider_feature_sweep",
+            "variant": f"Block-trade upside ratio >= {threshold:g}",
+            "provider": "massive",
+            "endpoint": MASSIVE_TRADES_ENDPOINT,
+            "status": "replayed_snapshots",
+            "coverage_start": snapshot_asofs[0],
+            "coverage_end": snapshot_asofs[-1],
+            "coverage_rows": int(len(available)),
+            "ticker_count": int(len(strategy_columns)),
+            "missing_count": int(required_count - len(available)),
+            "missing_tickers": ", ".join(missing_tickers),
+            "coverage_by_ticker": _coverage_by_snapshot_ticker(decisions, [str(item) for item in strategy_columns]),
+            "threshold": float(threshold),
+            "snapshot_rebalance_count": int(clean_targets.shape[0]),
+            "snapshot_required_decisions": int(required_count),
+            "snapshot_available_count": int(len(available)),
+            "snapshot_missing_count": int(required_count - len(available)),
+            "snapshot_neutral_missing_count": int(required_count - len(available)),
+            "snapshot_unusable_count": int(unusable_count),
+            "snapshot_passing_count": int(passing_count),
+            "snapshot_below_threshold_count": int(below_count),
+            "snapshot_coverage_pct": float(coverage_pct),
+            "snapshot_audit_metadata_count": int(sum(1 for item in available if item.get("has_audit_metadata"))),
+            "active_rebalances": int(len(active_rebalance_dates)),
+            "active_oos_rebalances": int(len(active_oos_dates)),
+            "notes": (
+                "Replayed stored Massive stock_trades snapshots as of each rebalance; "
+                "missing snapshots were neutral and did not change baseline weights. "
+                "Research only; use B-160 before promotion."
+            ),
+        }
+        row.update(_provider_flow_metric_fields(baseline, variant, oos_start=oos_start))
+        row["promotion_label"] = _provider_flow_promotion_label(row)
+        rows.append(row)
     return rows
 
 
@@ -487,6 +780,9 @@ def _build_massive_provider_validation_summary(
     enabled: bool,
     oos_start="2015-01-01",
     precomputed_provider_rows: list[dict] | None = None,
+    prices: pd.DataFrame | None = None,
+    target_weights: pd.DataFrame | None = None,
+    snapshot_db_path: str | Path = provider_snapshots.DEFAULT_SNAPSHOT_DB_PATH,
 ) -> pd.DataFrame:
     if not enabled:
         return pd.DataFrame()
@@ -499,7 +795,14 @@ def _build_massive_provider_validation_summary(
     for provider in ("yfinance", "massive"):
         rows.append(precomputed.get(provider) or _provider_validation_row(provider, oos_start=oos_start))
     rows = _with_yfinance_deltas(rows)
-    rows.extend(_massive_provider_feature_sweep_rows())
+    rows.extend(
+        _build_massive_provider_flow_sweep_rows(
+            snapshot_db_path=snapshot_db_path,
+            prices=prices,
+            target_weights=target_weights,
+            oos_start=oos_start,
+        )
+    )
     return pd.DataFrame(rows)
 
 
@@ -741,8 +1044,8 @@ def _massive_feature_sweep_table(summary: pd.DataFrame) -> list[str]:
     if rows.empty:
         return ["No provider-derived criteria sweeps were produced. Do not promote any Massive-derived rule."]
     lines = [
-        "| Variant | Endpoint | Status | Threshold | Label | Notes |",
-        "|---|---|---|---:|---|---|",
+        "| Variant | Endpoint | Status | Threshold | Snapshot Coverage | Active OOS | OOS CAGR Delta | OOS Sharpe Delta | OOS Drawdown Delta | Label | Notes |",
+        "|---|---|---|---:|---:|---:|---:|---:|---:|---|---|",
     ]
     for _, row in rows.iterrows():
         lines.append(
@@ -750,8 +1053,40 @@ def _massive_feature_sweep_table(summary: pd.DataFrame) -> list[str]:
             f"{row.get('endpoint', '-')} | "
             f"{row.get('status', '-')} | "
             f"{_num(row.get('threshold'))} | "
+            f"{_pct(row.get('snapshot_coverage_pct'))} | "
+            f"{_int_text(row.get('active_oos_rebalances'))} | "
+            f"{_pct(row.get('oos_cagr_delta_vs_yfinance'))} | "
+            f"{_num(row.get('oos_sharpe_delta_vs_yfinance'))} | "
+            f"{_pct(row.get('oos_max_drawdown_delta_vs_yfinance'))} | "
             f"{row.get('promotion_label', 'do not promote')} | "
             f"{row.get('notes', '')} |"
+        )
+    return lines
+
+
+def _massive_provider_flow_snapshot_table(summary: pd.DataFrame) -> list[str]:
+    rows = summary[summary.get("row_type") == "provider_feature_sweep"] if not summary.empty else pd.DataFrame()
+    if rows.empty:
+        return ["No provider-flow snapshot replay rows were produced."]
+    lines = [
+        "| Variant | Status | Snapshot Window | Rebalances | Decisions | Snapshot Coverage | Missing Neutral | Passing | Below Threshold | Active OOS | Audit Metadata | Label |",
+        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|",
+    ]
+    for _, row in rows.iterrows():
+        window = f"{row.get('coverage_start', '-')} to {row.get('coverage_end', '-')}"
+        lines.append(
+            f"| {row.get('variant', '-')} | "
+            f"{row.get('status', '-')} | "
+            f"{window} | "
+            f"{_int_text(row.get('snapshot_rebalance_count'))} | "
+            f"{_int_text(row.get('snapshot_required_decisions'))} | "
+            f"{_pct(row.get('snapshot_coverage_pct'))} | "
+            f"{_int_text(row.get('snapshot_neutral_missing_count'))} | "
+            f"{_int_text(row.get('snapshot_passing_count'))} | "
+            f"{_int_text(row.get('snapshot_below_threshold_count'))} | "
+            f"{_int_text(row.get('active_oos_rebalances'))} | "
+            f"{_int_text(row.get('snapshot_audit_metadata_count'))} | "
+            f"{row.get('promotion_label', 'do not promote')} |"
         )
     return lines
 
@@ -798,7 +1133,7 @@ def _format_massive_provider_validation_report(
         "# Massive Historical Provider-Data Validation Report",
         "",
         f"Generated UTC: {generated_at_utc}",
-        "Ticket: B-159",
+        "Ticket: B-159/B-162",
         "",
         (
             "No Massive-derived rule is promoted into live scoring, veto logic, alerts, "
@@ -848,6 +1183,14 @@ def _format_massive_provider_validation_report(
     lines.extend(
         [
             "",
+            "## Provider-Flow Snapshot Replay Coverage",
+            "",
+        ]
+    )
+    lines.extend(_massive_provider_flow_snapshot_table(massive_validation_summary))
+    lines.extend(
+        [
+            "",
             "## Provider-Derived Criteria Sweeps",
             "",
         ]
@@ -861,12 +1204,13 @@ def _format_massive_provider_validation_report(
             "- Validation OHLCV fetches bypass the local cache so provider evidence is fresh for the report run.",
             "- yfinance and Massive provider rows are fetched separately and compared as data-source evidence, not as live rules.",
             "- Historical methodology targets are built from OHLCV sliced through each rebalance date.",
-            "- Massive trade-tape/block-trade sweeps are labeled `do not promote` until timestamped as-of snapshots exist.",
+            "- Massive trade-tape/block-trade sweeps replay only snapshots whose as-of date is on or before each rebalance.",
+            "- Missing provider-flow snapshots are counted and kept neutral rather than filled from current provider data.",
             "- Use B-160 before any Massive-derived criterion changes scoring, alerts, vetoes, recommendations, provider-flow behavior, Pillar 7 weights, or broker behavior.",
             "",
             "## Decision",
             "",
-            "Treat B-159 as research evidence only. Promote only through B-160 after review and deterministic tests.",
+            "Treat B-159/B-162 as research evidence only. Promote only through B-160 after review and deterministic tests.",
         ]
     )
     return "\n".join(lines).rstrip() + "\n"
@@ -1023,6 +1367,9 @@ def main(argv: list[str] | None = None) -> int:
                 enabled=True,
                 oos_start=validation_oos_start,
                 precomputed_provider_rows=precomputed_provider_rows,
+                prices=prices[strategy_columns],
+                target_weights=methodology_targets.target_weights,
+                snapshot_db_path=args.provider_snapshot_db,
             )
             massive_validation_report = _format_massive_provider_validation_report(
                 massive_validation_summary=massive_validation_summary,

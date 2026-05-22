@@ -276,7 +276,7 @@ Status legend:
 ### B-160 · Massive evidence gate for live promotion — 💡 RESEARCHED, NOT BUILT
 **Purpose:** promote Massive-derived criteria only if B-159 shows durable improvement and no data-leakage issue.
 **Scope:** convert validated Massive historical findings into explicit candidate changes for Pillar 7 weights, thresholds, provider-flow features, or alert/veto rules.
-**Current gate:** blocked by the 2026-05-22 B-159 report because no Massive-derived variant earned a `candidate` label. B-161 now provides the snapshot store/replay foundation, but B-162 still needs to populate enough historical as-of snapshots and run provider-flow variants before promotion can be considered.
+**Current gate:** blocked by the 2026-05-22 B-159 report because no Massive-derived variant earned a `candidate` label. B-161/B-162 now provide the snapshot store and replayable provider-flow research path, but promotion still needs enough historical as-of snapshot coverage plus candidate-grade validation evidence.
 **Acceptance:** the promotion plan cites the B-159 report, includes before/after backtest tables, deterministic tests for threshold behavior, live-provider failure-mode tests, and documentation of the activation flags or configuration required.
 **Safety:** no Massive/provider-flow rule can enter live scoring, veto logic, alerts, recommendations, or dashboard decision text until the B-159 evidence gate passes and is reviewed.
 
@@ -286,11 +286,12 @@ Status legend:
 **Behavior:** provider snapshots are stored under ignored local data paths by default, keyed by provider, dataset, ticker, and as-of date. Replay helpers return only the latest snapshot whose as-of date is less than or equal to the requested rebalance date, so future snapshots cannot leak into historical decisions. A capture CLI can save Massive `/v3/trades` payloads for one or more tickers without printing secrets.
 **Safety:** storage/replay only; no live scoring, state-machine behavior, provider-flow behavior, alerts, vetoes, recommendations, broker behavior, or Pillar 7 weights change.
 
-### B-162 · Massive provider-flow historical backtest variants — 🎯 NEXT SESSION
-**Purpose:** use B-161 snapshots to backtest Massive trade-tape/block-trade criteria as true historical as-of provider-flow variants.
-**Scope:** define a snapshot population window, preserve any provider response pagination/status/request metadata needed for offline audit, replay snapshots at each methodology rebalance, sweep provider-flow thresholds such as block-trade upside ratio, and update the Massive validation report with candidate/needs-more-testing/do-not-promote labels.
-**Acceptance:** tests prove replayed provider-flow features use only snapshots available as of each rebalance date; the report includes snapshot coverage, missing-date handling, threshold sweep results, and before/after OOS metrics versus the B-159 baseline.
-**Safety:** research only until B-160; no provider-flow rule can change live behavior or dashboard recommendations from B-162 alone.
+### B-162 · Massive provider-flow historical backtest variants — IMPLEMENTED
+**Status:** B-162 is implemented inside the opt-in `python scripts/run_backtest.py --massive-variants` research path. The runner now accepts `--provider-snapshot-db` and replays B-161 Massive `stock_trades` snapshots at each methodology rebalance.
+**Files:** `scripts/run_backtest.py`, `scripts/capture_massive_provider_snapshots.py`, `src/provider_snapshots.py`, `tests/test_run_backtest_script.py`, `tests/test_capture_massive_provider_snapshots_script.py`, `tests/test_provider_snapshots.py`, `docs/superpowers/plans/2026-05-22-b162-massive-provider-flow-replay.md`.
+**Behavior:** provider-flow sweeps use only snapshots whose `as_of` date is on or before the rebalance date, so future trade-tape snapshots cannot leak into historical decisions. Missing snapshots are counted and kept neutral rather than replaced with current provider data. Captured snapshots now include request/response audit metadata for the bounded Massive `/v3/trades` day query.
+**Result:** block-trade upside-ratio thresholds (`1.0`, `1.25`, `1.5`) now write snapshot coverage, missing-date handling, active-OOS counts, and before/after metrics into the Massive validation CSV/report when historical snapshots exist. Thin or absent snapshot coverage remains `needs more testing`/`do not promote`.
+**Safety:** research only until B-160; no provider-flow rule changes live scoring, state-machine behavior, veto logic, alerts, recommendations, broker behavior, Pillar 7 weights, or dashboard decision text from B-162 alone.
 
 ---
 

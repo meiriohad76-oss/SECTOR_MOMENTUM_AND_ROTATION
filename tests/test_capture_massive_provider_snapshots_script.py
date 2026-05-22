@@ -99,6 +99,21 @@ def test_capture_massive_provider_snapshots_stores_trade_payloads(monkeypatch, t
     assert xlk is not None
     assert xlk.payload["trades"] == [{"p": 100.0, "s": 100, "sip_timestamp": 1}]
     assert xlk.payload["source"] == "massive/v3/trades"
+    assert xlk.payload["request"] == {
+        "endpoint": "https://api.massive.com/v3/trades/{ticker}",
+        "ticker": "XLK",
+        "params": {
+            "limit": 25,
+            "order": "desc",
+            "sort": "timestamp",
+            "timestamp.gte": "2026-05-19",
+            "timestamp.lt": "2026-05-20",
+        },
+    }
+    assert xlk.payload["response"] == {
+        "result_count": 1,
+        "status": "captured",
+    }
     assert xlf is not None
     assert "Saved massive stock_trades snapshot for XLK as_of=2026-05-19 trades=1" in output
     assert "Bearer" not in output

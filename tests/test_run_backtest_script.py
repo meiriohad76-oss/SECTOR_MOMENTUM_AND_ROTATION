@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from src import backtest
+from src import provider_snapshots
 from scripts import run_backtest
 
 
@@ -173,6 +174,215 @@ def test_build_massive_provider_validation_summary_reuses_precomputed_massive_ro
     assert provider_rows["provider"].tolist() == ["yfinance", "massive"]
     assert str(provider_rows.loc[1, "notes"]).startswith("reused main Massive validation run")
     assert calls == ["yfinance"]
+
+
+def test_massive_provider_flow_sweeps_replay_snapshots_as_of_rebalance(tmp_path, monkeypatch):
+    db_path = tmp_path / "provider_snapshots.sqlite"
+    provider_snapshots.upsert_provider_snapshot(
+        db_path,
+        provider="massive",
+        dataset="stock_trades",
+        ticker="XLK",
+        as_of="2026-05-18",
+        payload={
+            "trades": [
+                {"p": 100.0, "s": 100, "sip_timestamp": 1, "correction": 0},
+                {"p": 99.0, "s": 3_000, "sip_timestamp": 2, "correction": 0},
+            ]
+        },
+        captured_at_utc="2026-05-18T21:00:00Z",
+    )
+    provider_snapshots.upsert_provider_snapshot(
+        db_path,
+        provider="massive",
+        dataset="stock_trades",
+        ticker="XLK",
+        as_of="2026-05-20",
+        payload={
+            "trades": [
+                {"p": 100.0, "s": 100, "sip_timestamp": 1, "correction": 0},
+                {"p": 101.0, "s": 3_000, "sip_timestamp": 2, "correction": 0},
+            ]
+        },
+        captured_at_utc="2026-05-20T21:00:00Z",
+    )
+    prices = pd.DataFrame(
+        {
+            "XLK": [100.0, 101.0, 99.0, 103.0],
+            "XLF": [100.0, 100.5, 100.2, 100.8],
+        },
+        index=pd.bdate_range("2026-05-19", periods=4),
+    )
+    target_weights = pd.DataFrame(
+        {"XLK": [0.5, 0.5], "XLF": [0.5, 0.5]},
+        index=pd.to_datetime(["2026-05-19", "2026-05-21"]),
+    )
+
+    def fail_provider_fetch(*args, **kwargs):
+        raise AssertionError("provider-flow replay must not call live provider fetches")
+
+    monkeypatch.setattr(run_backtest, "fetch_ohlcv_result", fail_provider_fetch)
+
+    rows = run_backtest._build_massive_provider_flow_sweep_rows(
+        snapshot_db_path=db_path,
+        prices=prices,
+        target_weights=target_weights,
+        oos_start="2026-05-20",
+    )
+
+    row = next(item for item in rows if item["threshold"] == pytest.approx(1.25))
+    assert row["row_type"] == "provider_feature_sweep"
+    assert row["status"] == "replayed_snapshots"
+    assert row["snapshot_rebalance_count"] == 2
+    assert row["snapshot_required_decisions"] == 4
+    assert row["snapshot_available_count"] == 2
+    assert row["snapshot_missing_count"] == 2
+    assert row["snapshot_neutral_missing_count"] == 2
+    assert row["snapshot_below_threshold_count"] == 1
+    assert row["snapshot_passing_count"] == 1
+    assert row["snapshot_coverage_pct"] == pytest.approx(0.5)
+    assert row["active_rebalances"] == 2
+    assert row["active_oos_rebalances"] == 1
+    assert row["coverage_start"] == "2026-05-18"
+    assert row["coverage_end"] == "2026-05-20"
+    assert row["promotion_label"] == "needs more testing"
+    assert "missing snapshots were neutral" in row["notes"]
+
+
+def test_massive_provider_flow_counts_active_oos_as_unique_rebalance_dates(tmp_path):
+    db_path = tmp_path / "provider_snapshots.sqlite"
+    for ticker in ("XLK", "XLF"):
+        provider_snapshots.upsert_provider_snapshot(
+            db_path,
+            provider="massive",
+            dataset="stock_trades",
+            ticker=ticker,
+            as_of="2026-05-20",
+            payload={
+                "trades": [
+                    {"p": 100.0, "s": 100, "sip_timestamp": 1, "correction": 0},
+                    {"p": 101.0, "s": 3_000, "sip_timestamp": 2, "correction": 0},
+                ]
+            },
+            captured_at_utc="2026-05-20T21:00:00Z",
+        )
+    prices = pd.DataFrame(
+        {
+            "XLK": [100.0, 101.0, 102.0],
+            "XLF": [100.0, 100.5, 101.0],
+        },
+        index=pd.bdate_range("2026-05-20", periods=3),
+    )
+    target_weights = pd.DataFrame(
+        {"XLK": [0.5], "XLF": [0.5]},
+        index=[pd.Timestamp("2026-05-21")],
+    )
+
+    rows = run_backtest._build_massive_provider_flow_sweep_rows(
+        snapshot_db_path=db_path,
+        prices=prices,
+        target_weights=target_weights,
+        oos_start="2026-05-20",
+    )
+
+    row = next(item for item in rows if item["threshold"] == pytest.approx(1.25))
+    assert row["snapshot_available_count"] == 2
+    assert row["active_rebalances"] == 1
+    assert row["active_oos_rebalances"] == 1
+
+
+def test_massive_provider_flow_reports_all_missing_snapshots_as_neutral(tmp_path):
+    prices = pd.DataFrame(
+        {
+            "XLK": [100.0, 101.0, 102.0, 103.0],
+            "XLF": [100.0, 100.5, 101.0, 101.5],
+        },
+        index=pd.bdate_range("2026-05-19", periods=4),
+    )
+    target_weights = pd.DataFrame(
+        {"XLK": [0.5, 0.5], "XLF": [0.5, 0.5]},
+        index=pd.to_datetime(["2026-05-19", "2026-05-21"]),
+    )
+
+    rows = run_backtest._build_massive_provider_flow_sweep_rows(
+        snapshot_db_path=tmp_path / "missing_provider_snapshots.sqlite",
+        prices=prices,
+        target_weights=target_weights,
+        oos_start="2026-05-20",
+    )
+
+    row = next(item for item in rows if item["threshold"] == pytest.approx(1.25))
+    assert row["status"] == "unavailable_no_historical_asof_snapshots"
+    assert row["snapshot_rebalance_count"] == 2
+    assert row["snapshot_required_decisions"] == 4
+    assert row["snapshot_available_count"] == 0
+    assert row["snapshot_missing_count"] == 4
+    assert row["snapshot_neutral_missing_count"] == 4
+    assert row["missing_tickers"] == "XLF, XLK"
+    assert row["snapshot_coverage_pct"] == pytest.approx(0.0)
+    assert row["promotion_label"] == "do not promote"
+    assert "missing snapshots were neutral" in row["notes"]
+
+
+def test_massive_provider_report_includes_snapshot_coverage_and_sweep_metrics():
+    prices = pd.DataFrame({"XLK": [100.0, 101.0]}, index=pd.bdate_range("2026-05-19", periods=2))
+    target_weights = pd.DataFrame({"XLK": [1.0]}, index=[pd.Timestamp("2026-05-19")])
+    summary = pd.DataFrame(
+        [
+            {
+                "row_type": "provider_comparison",
+                "variant": "Default/yfinance OHLCV baseline",
+                "provider": "yfinance",
+                "endpoint": "yfinance.download",
+                "status": "available",
+                "coverage_start": "2026-05-19",
+                "coverage_end": "2026-05-20",
+                "coverage_rows": 2,
+                "ticker_count": 1,
+                "promotion_label": "needs more testing",
+            },
+            {
+                "row_type": "provider_feature_sweep",
+                "variant": "Block-trade upside ratio >= 1.25",
+                "provider": "massive",
+                "endpoint": "https://api.massive.com/v3/trades/{ticker}",
+                "status": "replayed_snapshots",
+                "threshold": 1.25,
+                "coverage_start": "2026-05-18",
+                "coverage_end": "2026-05-20",
+                "snapshot_rebalance_count": 2,
+                "snapshot_required_decisions": 4,
+                "snapshot_available_count": 2,
+                "snapshot_missing_count": 2,
+                "snapshot_neutral_missing_count": 2,
+                "snapshot_coverage_pct": 0.5,
+                "active_oos_rebalances": 1,
+                "oos_cagr_delta_vs_yfinance": -0.01,
+                "oos_sharpe_delta_vs_yfinance": -0.10,
+                "oos_max_drawdown_delta_vs_yfinance": 0.00,
+                "promotion_label": "needs more testing",
+                "notes": "Replayed stored as-of snapshots; missing snapshots were neutral.",
+            },
+        ]
+    )
+
+    report = run_backtest._format_massive_provider_validation_report(
+        massive_validation_summary=summary,
+        prices=prices,
+        target_weights=target_weights,
+        requested_provider="auto",
+        resolved_provider="massive",
+        generated_at_utc="2026-05-22T12:00:00Z",
+        oos_start="2026-05-20",
+    )
+
+    assert "Ticket: B-159/B-162" in report
+    assert "## Provider-Flow Snapshot Replay Coverage" in report
+    assert "Snapshot Coverage" in report
+    assert "Missing Neutral" in report
+    assert "Active OOS" in report
+    assert "50.00%" in report
+    assert "missing snapshots were neutral" in report
 
 
 def test_run_backtest_builds_macro_variant_summary_only_when_enabled(monkeypatch):

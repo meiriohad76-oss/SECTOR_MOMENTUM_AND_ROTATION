@@ -51,6 +51,37 @@ def _fetch_massive_trades_for_snapshot(
     )
 
 
+def _snapshot_payload(
+    ticker: str,
+    *,
+    as_of: str,
+    limit: int,
+    trades: list[dict],
+) -> dict:
+    end_date = (date.fromisoformat(as_of) + timedelta(days=1)).isoformat()
+    return {
+        "source": "massive/v3/trades",
+        "ticker": ticker,
+        "as_of": as_of,
+        "request": {
+            "endpoint": flow.MASSIVE_STOCK_TRADES_URL_TEMPLATE,
+            "ticker": ticker,
+            "params": {
+                "limit": int(limit),
+                "order": "desc",
+                "sort": "timestamp",
+                "timestamp.gte": as_of,
+                "timestamp.lt": end_date,
+            },
+        },
+        "response": {
+            "result_count": len(trades),
+            "status": "captured",
+        },
+        "trades": trades,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv or [])
     tickers = [str(ticker).strip().upper() for ticker in args.ticker if str(ticker).strip()]
@@ -71,12 +102,7 @@ def main(argv: list[str] | None = None) -> int:
                 dataset="stock_trades",
                 ticker=ticker,
                 as_of=args.as_of,
-                payload={
-                    "source": "massive/v3/trades",
-                    "ticker": ticker,
-                    "as_of": args.as_of,
-                    "trades": trades,
-                },
+                payload=_snapshot_payload(ticker, as_of=args.as_of, limit=args.limit, trades=trades),
             )
             print(
                 f"Saved massive stock_trades snapshot for {ticker} "

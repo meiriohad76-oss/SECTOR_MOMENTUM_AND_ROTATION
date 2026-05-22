@@ -240,6 +240,12 @@ def _trades_from_payload(payload: Mapping[str, Any]) -> list[dict]:
     return [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
 
 
+def block_trade_upside_ratio_from_snapshot(snapshot: ProviderSnapshotRecord) -> float | None:
+    from .flow import block_trade_upside_ratio_from_massive_trades
+
+    return block_trade_upside_ratio_from_massive_trades(_trades_from_payload(snapshot.payload))
+
+
 def block_trade_upside_ratio_as_of(
     db_path: str | Path,
     *,
@@ -255,6 +261,4 @@ def block_trade_upside_ratio_as_of(
     )
     if snapshot is None:
         return None
-    from .flow import block_trade_upside_ratio_from_massive_trades
-
-    return block_trade_upside_ratio_from_massive_trades(_trades_from_payload(snapshot.payload))
+    return block_trade_upside_ratio_from_snapshot(snapshot)
