@@ -301,6 +301,26 @@ Status legend:
 **Result:** block-trade upside-ratio thresholds (`1.0`, `1.25`, `1.5`) now write snapshot coverage, missing-date handling, active-OOS counts, and before/after metrics into the Massive validation CSV/report when historical snapshots exist. Thin or absent snapshot coverage remains `needs more testing`/`do not promote`.
 **Safety:** research only until B-160; no provider-flow rule changes live scoring, state-machine behavior, veto logic, alerts, recommendations, broker behavior, Pillar 7 weights, or dashboard decision text from B-162 alone.
 
+### B-163 - 10-year walk-forward algorithm calibration backtest - PLANNED
+**Goal:** run a rigorous 10-year historical calibration loop that measures the baseline methodology's success rate for both positive momentum signals and negative momentum / avoid signals, tunes criteria values only inside walk-forward calibration windows, reruns the same historical evaluation with the calibrated candidate, and proves whether the calibrated candidate improves out-of-sample results.
+**Scope:** research-only follow-up to B-011, B-157, B-159, and B-162. This ticket produces calibration evidence and a candidate configuration, not a live scoring change.
+**Data requirements:** use 10 years of daily adjusted OHLCV for the methodology universe and benchmarks, preferring Massive when `MASSIVE_API_KEY` is configured and falling back to the existing cache/free provider path when needed. Persist data provenance, provider name, coverage windows, missing symbols, split/dividend adjustment assumptions, benchmark tickers, and provider cache hashes in metadata. FRED macro history and Massive provider-flow snapshots may be used only when aligned with point-in-time availability rules; otherwise they stay analysis-only segmentation fields.
+**Procedure:**
+1. Freeze the baseline algorithm configuration, including weights, thresholds, universe, rebalance cadence, state-machine inputs, and provider flags; write a reproducible config hash before any calibration starts.
+2. Build point-in-time historical features for every rebalance date without calling `app.py`, mutating `state.json`, or reading future market/provider/FRED values.
+3. Label positive momentum success across 4-week, 13-week, 26-week, and 52-week horizons using forward absolute return, forward excess return versus class benchmark, and drawdown after entry.
+4. Label negative momentum success across the same horizons using avoided underperformance, avoided drawdown, failed positive-momentum follow-through, and successful risk-off / reduce exposure decisions.
+5. Run the frozen baseline over the full 10-year window and record positive-signal and negative-signal success rates separately before any tuning.
+6. Split history into rolling walk-forward calibration and validation windows, with a final untouched out-of-sample holdout. No parameter may be selected using final holdout results.
+7. Calibrate thresholds and weights with deterministic grid or coarse-to-fine search over RRG inputs, trend/stage filters, cross-sectional momentum, relative strength, volatility/drawdown filters, provider-flow gates, and macro/veto thresholds where point-in-time data exists.
+8. Reject parameter sets with thin sample support, class/regime concentration, unstable fold results, excessive turnover, excessive state transitions per ticker-year, materially worse negative-signal behavior, or evidence of lookahead leakage.
+9. Rerun baseline and calibrated candidate on identical out-of-sample data, transaction-cost assumptions, rebalance dates, and universe coverage; compare the before/after results in one report.
+**Metrics:** positive hit rate, negative hit rate, precision/recall/F1 by signal direction, average forward absolute return, average forward excess return, drawdown avoided after negative signals, Sharpe/Sortino/Calmar, max drawdown, turnover, transaction-cost sensitivity, confusion matrices, calibration curves, fold stability, per-class breakdown, per-regime breakdown, and missing-data impact.
+**Initial promotion gates:** a candidate can be labeled `candidate` only if the final out-of-sample run improves the relevant success-rate target versus baseline, improves or preserves risk-adjusted return, does not worsen max drawdown beyond the predefined tolerance, does not degrade negative momentum / avoid-signal success, and passes minimum-observation and stability checks. If these gates fail, the result must be documented as `needs more testing` or `do not promote`.
+**Outputs:** `docs/calibration_10y_report.md`, `docs/calibration_10y_summary.csv`, `docs/calibration_10y_candidates.csv`, `docs/calibration_10y_metadata.json`, a frozen baseline config artifact, a calibrated candidate config artifact, and optional dashboard "Calibration Lab" artifact surfacing.
+**Definition of done:** deterministic tests cover no-lookahead feature construction, split integrity, positive and negative momentum labels, metric calculations, calibration search selection, rejection gates, report generation, metadata/provenance, and secret redaction. Manual QA includes baseline run, calibrated rerun, before/after report review, `python -m pytest -q`, `python -m compileall app.py src scripts`, `git diff --check`, and Pi/GitHub deploy verification when the implementation patch is pushed.
+**Safety:** no calibrated threshold, weight, veto, state-machine behavior, provider-flow rule, alert, recommendation, broker behavior, or dashboard decision text may enter production from this ticket alone. Live promotion requires a separate reviewed backlog ticket with a frozen candidate config, rollback plan, activation flag, and evidence-gate approval.
+
 ---
 
 ## Completed v3+ ideas
@@ -428,4 +448,4 @@ Resolved for this backlog pass:
 
 ## Last updated
 
-2026-05-22, added evidence-gated FRED and Massive validation backlog.
+2026-05-23, added B-163 10-year walk-forward calibration backtest backlog.
