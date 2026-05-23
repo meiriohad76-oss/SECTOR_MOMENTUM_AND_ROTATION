@@ -4,11 +4,23 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from time import perf_counter
+from time import perf_counter, time
 from typing import Any, Iterator
 
 
-VISUAL_STATE_KEYS = ("theme", "bluf_mode", "view_density", "sparkline_style", "color_palette")
+VISUAL_STATE_KEYS = (
+    "theme",
+    "bluf_mode",
+    "view_density",
+    "sparkline_style",
+    "color_palette",
+    "preference_profile_choice",
+    "preference_profile_name",
+    "preference_profile_error",
+    "preference_profile_message",
+)
+COMPUTE_SNAPSHOT_KEYS = ("ohlcv_result", "ohlcv", "fred_data", "regime", "scored", "created_at")
+DASHBOARD_COMPUTE_SNAPSHOT_TTL_SECONDS = 3600
 SESSION_STATE_KEYS = VISUAL_STATE_KEYS + (
     "klass",
     "drill_ticker",
@@ -73,6 +85,26 @@ def classify_rerun(
     if all(key in VISUAL_STATE_KEYS for key in changed):
         return RerunClassification("visual_only", changed)
     return RerunClassification("interactive", changed)
+
+
+def should_reuse_dashboard_compute(
+    classification: RerunClassification,
+    snapshot: Mapping[str, Any] | None,
+    *,
+    now: float | None = None,
+    max_age_seconds: int = DASHBOARD_COMPUTE_SNAPSHOT_TTL_SECONDS,
+) -> bool:
+    """Return whether a prior dashboard compute snapshot is safe to reuse."""
+    if classification.kind != "visual_only" or snapshot is None:
+        return False
+    if not all(key in snapshot for key in COMPUTE_SNAPSHOT_KEYS):
+        return False
+    try:
+        created_at = float(snapshot["created_at"])
+    except (TypeError, ValueError):
+        return False
+    age_seconds = (time() if now is None else now) - created_at
+    return 0 <= age_seconds <= max_age_seconds
 
 
 @dataclass

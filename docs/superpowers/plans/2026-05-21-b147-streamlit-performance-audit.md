@@ -151,3 +151,15 @@ Observed:
 - Pi focused verification: `./.venv/bin/python -m pytest tests/test_performance_audit.py tests/test_performance_audit_app_static.py -q` -> `9 passed in 0.05s`
 - Pi full verification: `./.venv/bin/python -m pytest -q` -> `314 passed in 5.02s`
 - Pi service smoke: `poll_1 active=active http=200`
+
+### Follow-up: Visual-only compute reuse
+
+After B-025 added local preference profiles and B-147 audit logs identified visual-only reruns, the dashboard gained a guarded reuse path:
+
+- `should_reuse_dashboard_compute()` returns true only for `visual_only` classifications with a complete session snapshot that is no older than the one-hour market-data cache TTL.
+- Local preference-profile control keys are classified as visual-only because they affect display preferences and local profile UI messages only.
+- The reusable dashboard snapshot includes `ohlcv_result`, `ohlcv`, `fred_data`, `regime`, `scored`, and `created_at`.
+- Header refresh/theme controls use Streamlit callbacks so cache clearing and theme mutation happen before the compute gate.
+- Visual-only reuse skips provider/FRED loading, indicator/flow/scoring work, `apply_state_machine()`, and run-journal recording; it still emits a `dashboard_performance_audit` event with `reused_compute_snapshot=True`.
+- Transition rows are refreshed as a small read-only state-file read so cross-session state changes remain visible.
+- Fresh initial runs, stale or incomplete snapshots, and interactive/data-affecting controls keep the normal compute path.

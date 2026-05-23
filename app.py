@@ -56,7 +56,7 @@ from src.portfolio import (
     parse_single_ticker,
     PortfolioInputResult,
 )
-from src.performance_audit import DashboardPerformanceAudit, classify_rerun, session_snapshot
+from src.performance_audit import DashboardPerformanceAudit, classify_rerun, session_snapshot, should_reuse_dashboard_compute
 from src.preferences import (
     BLUF_MODES,
     DENSITY_MODES,
@@ -383,6 +383,7 @@ _palette_css = palette_css_variables(st.session_state.color_palette, st.session_
 PERF_AUDIT = DashboardPerformanceAudit()
 _PERF_START_SNAPSHOT = session_snapshot(st.session_state)
 _PERF_RERUN = classify_rerun(st.session_state.get("performance_last_snapshot"), _PERF_START_SNAPSHOT)
+_REUSED_COMPUTE_SNAPSHOT = should_reuse_dashboard_compute(_PERF_RERUN, st.session_state.get("dashboard_compute_snapshot"))
 
 _md(
     f"<style>{_CSS}{_EXTRA}{_palette_css}</style>"
@@ -509,32 +510,51 @@ def _record_dashboard_run(scored_df, bluf_payload, regime_obj, transitions_rows,
         )
 
 
-loading_placeholder = st.empty()
-render_loading_state(loading_placeholder, "Loading market data", card_count=4)
-try:
-    with PERF_AUDIT.section("load_data"):
-        ohlcv_result = _load_data("3y")
-        render_provider_status_banner(ohlcv_result)
-        ohlcv = ohlcv_result.data
+if _REUSED_COMPUTE_SNAPSHOT:
+    with PERF_AUDIT.section("reuse_compute_snapshot"):
+        compute_snapshot = st.session_state["dashboard_compute_snapshot"]
+        ohlcv_result = compute_snapshot["ohlcv_result"]
+        ohlcv = compute_snapshot["ohlcv"]
+        _fred_data = compute_snapshot["fred_data"]
+        regime = compute_snapshot["regime"]
+        scored = compute_snapshot["scored"]
+    render_provider_status_banner(ohlcv_result)
+else:
+    loading_placeholder = st.empty()
+    render_loading_state(loading_placeholder, "Loading market data", card_count=4)
+    try:
+        with PERF_AUDIT.section("load_data"):
+            ohlcv_result = _load_data("3y")
+            render_provider_status_banner(ohlcv_result)
+            ohlcv = ohlcv_result.data
 
-    bench_ticker = BENCH["US"]
-    bil_ticker = BENCH["TBILL"]
-    if bench_ticker not in ohlcv or bil_ticker not in ohlcv:
-        st.error("Missing benchmark/T-bill data. Try the refresh button.")
-        st.stop()
-    with PERF_AUDIT.section("compute_signals"):
-        scoring_ohlcv = {t: ohlcv[t] for t in ALL_TICKERS if t in ohlcv}
+        bench_ticker = BENCH["US"]
+        bil_ticker = BENCH["TBILL"]
+        if bench_ticker not in ohlcv or bil_ticker not in ohlcv:
+            st.error("Missing benchmark/T-bill data. Try the refresh button.")
+            st.stop()
+        with PERF_AUDIT.section("compute_signals"):
+            scoring_ohlcv = {t: ohlcv[t] for t in ALL_TICKERS if t in ohlcv}
 
-        render_loading_state(loading_placeholder, "Computing indicators", card_count=4)
-        indicators_df = compute_all_indicators(scoring_ohlcv, bench_ticker, bil_ticker)
-        flow_df = compute_flow_signals(scoring_ohlcv)
-        flow_z = flow_composite_z(flow_df)
-        _fred_data = _load_fred()
-        regime = assess_regime(ohlcv[bench_ticker], ohlcv.get("^TNX"), ohlcv.get("^IRX"), fred_cache=_fred_data)
-        scored = compute_composite(indicators_df, flow_df, flow_z, phase=regime.phase_hint)
-        scored = apply_state_machine(scored)
-finally:
-    loading_placeholder.empty()
+            render_loading_state(loading_placeholder, "Computing indicators", card_count=4)
+            indicators_df = compute_all_indicators(scoring_ohlcv, bench_ticker, bil_ticker)
+            flow_df = compute_flow_signals(scoring_ohlcv)
+            flow_z = flow_composite_z(flow_df)
+            _fred_data = _load_fred()
+            regime = assess_regime(ohlcv[bench_ticker], ohlcv.get("^TNX"), ohlcv.get("^IRX"), fred_cache=_fred_data)
+            scored = compute_composite(indicators_df, flow_df, flow_z, phase=regime.phase_hint)
+            scored = apply_state_machine(scored)
+            _COMPUTE_SNAPSHOT_CREATED_AT = datetime.now().timestamp()
+            st.session_state.dashboard_compute_snapshot = {
+                "ohlcv_result": ohlcv_result,
+                "ohlcv": ohlcv,
+                "fred_data": _fred_data,
+                "regime": regime,
+                "scored": scored,
+                "created_at": _COMPUTE_SNAPSHOT_CREATED_AT,
+            }
+    finally:
+        loading_placeholder.empty()
 
 AVAILABLE_TICKERS = sorted(scored.index.tolist())
 initialize_drill_ticker(st.session_state, st.query_params, AVAILABLE_TICKERS)
@@ -616,7 +636,8 @@ def _build_bluf(scored_df: pd.DataFrame):
 
 bluf = _build_bluf(scored)
 transitions = recent_transitions(n=14)
-_record_dashboard_run(scored, bluf, regime, transitions, ohlcv, fred_macro_snapshot(_fred_data))
+if not _REUSED_COMPUTE_SNAPSHOT:
+    _record_dashboard_run(scored, bluf, regime, transitions, ohlcv, fred_macro_snapshot(_fred_data))
 
 # Phase index for the phase bar
 PHASE_IDX = {"EARLY": 0, "MID": 1, "LATE": 2, "RECESSION": 3, "UNKNOWN": -1}
@@ -802,14 +823,24 @@ def render_header_controls():
     _md('<div class="header-controls-slot"></div>')
     ctrl_col1, ctrl_col2 = st.columns(2)
     with ctrl_col1:
-        if st.button("↻", key="refresh_btn", help="Refresh data", use_container_width=True):
-            refresh_market_data(_load_data)
-            st.rerun()
+        st.button(
+            "↻",
+            key="refresh_btn",
+            help="Refresh data",
+            use_container_width=True,
+            on_click=refresh_market_data,
+            args=(_load_data,),
+        )
     with ctrl_col2:
         icon = "☀" if st.session_state.theme == "dark" else "☾"
-        if st.button(icon, key="theme_btn", help="Toggle theme", use_container_width=True):
-            toggle_theme(st.session_state)
-            st.rerun()
+        st.button(
+            icon,
+            key="theme_btn",
+            help="Toggle theme",
+            use_container_width=True,
+            on_click=toggle_theme,
+            args=(st.session_state,),
+        )
 
 
 def render_bluf():
@@ -2155,5 +2186,6 @@ log_event(APP_LOGGER, "dashboard_performance_audit",
     sections_ms=PERF_AUDIT.durations_ms,
     provider=ohlcv_result.provider,
     scored_count=len(scored),
+    reused_compute_snapshot=_REUSED_COMPUTE_SNAPSHOT,
 )
 st.session_state.performance_last_snapshot = _PERF_FINAL_SNAPSHOT

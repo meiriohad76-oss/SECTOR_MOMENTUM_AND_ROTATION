@@ -16,8 +16,10 @@ def test_header_controls_render_after_header_and_bottom_controls_removed():
     )
     assert "ctrl_col1, ctrl_col2, _ = st.columns([1, 1, 18])" not in app_source
     assert "_load_data.clear()" not in app_source
-    assert "refresh_market_data(_load_data)" in app_source
-    assert "toggle_theme(st.session_state)" in app_source
+    assert "on_click=refresh_market_data" in app_source
+    assert "args=(_load_data,)" in app_source
+    assert "on_click=toggle_theme" in app_source
+    assert "args=(st.session_state,)" in app_source
 
 
 def test_header_controls_css_targets_streamlit_wrapper():

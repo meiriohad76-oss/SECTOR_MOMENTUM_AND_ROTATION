@@ -295,7 +295,8 @@ def test_fetch_ohlcv_result_can_bypass_fresh_cache_for_validation(tmp_path, monk
 
     cache_path = tmp_path / "ohlcv.duckdb"
     today = pd.Timestamp.today().normalize()
-    cached_dates = pd.bdate_range(end=today, periods=50)
+    fixture_end = pd.offsets.BDay().rollback(today)
+    cached_dates = pd.bdate_range(end=fixture_end, periods=50)
     cached_frame = pd.DataFrame(
         {
             "open": range(50),

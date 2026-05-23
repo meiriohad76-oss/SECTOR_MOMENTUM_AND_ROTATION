@@ -40,6 +40,34 @@ def test_classify_visual_only_rerun_reports_changed_keys():
     assert result.changed_keys == ("theme",)
 
 
+def test_preference_profile_controls_are_visual_only_state():
+    previous = performance_audit.session_snapshot(
+        {
+            "theme": "dark",
+            "preference_profile_choice": "Desk",
+            "preference_profile_name": "",
+            "preference_profile_message": "",
+        }
+    )
+    current = performance_audit.session_snapshot(
+        {
+            "theme": "dark",
+            "preference_profile_choice": "Review",
+            "preference_profile_name": "Review",
+            "preference_profile_message": "loaded profile Review",
+        }
+    )
+
+    result = performance_audit.classify_rerun(previous, current)
+
+    assert result.kind == "visual_only"
+    assert result.changed_keys == (
+        "preference_profile_choice",
+        "preference_profile_name",
+        "preference_profile_message",
+    )
+
+
 def test_classify_interactive_rerun_when_non_visual_state_changes():
     previous = performance_audit.session_snapshot({"theme": "dark", "klass": "US Sectors"})
     current = performance_audit.session_snapshot({"theme": "dark", "klass": "ALL"})
@@ -48,6 +76,53 @@ def test_classify_interactive_rerun_when_non_visual_state_changes():
 
     assert result.kind == "interactive"
     assert result.changed_keys == ("klass",)
+
+
+def test_should_reuse_dashboard_compute_only_for_visual_only_complete_snapshot():
+    classification = performance_audit.RerunClassification("visual_only", ("theme",))
+    snapshot = {
+        "ohlcv_result": object(),
+        "ohlcv": object(),
+        "fred_data": object(),
+        "regime": object(),
+        "scored": object(),
+        "created_at": 1_000.0,
+    }
+
+    assert performance_audit.should_reuse_dashboard_compute(classification, snapshot, now=1_100.0) is True
+    assert performance_audit.should_reuse_dashboard_compute(
+        performance_audit.RerunClassification("interactive", ("klass",)),
+        snapshot,
+        now=1_100.0,
+    ) is False
+    assert performance_audit.should_reuse_dashboard_compute(classification, None, now=1_100.0) is False
+    assert performance_audit.should_reuse_dashboard_compute(
+        classification,
+        {"ohlcv_result": object(), "ohlcv": object()},
+        now=1_100.0,
+    ) is False
+    without_created_at = dict(snapshot)
+    without_created_at.pop("created_at")
+    assert performance_audit.should_reuse_dashboard_compute(classification, without_created_at, now=1_100.0) is False
+
+
+def test_should_reuse_dashboard_compute_rejects_stale_or_missing_snapshot_age():
+    classification = performance_audit.RerunClassification("visual_only", ("theme",))
+    snapshot = {
+        "ohlcv_result": object(),
+        "ohlcv": object(),
+        "fred_data": object(),
+        "regime": object(),
+        "scored": object(),
+        "created_at": 1_000.0,
+    }
+
+    assert performance_audit.should_reuse_dashboard_compute(classification, snapshot, now=4_599.0) is True
+    assert performance_audit.should_reuse_dashboard_compute(classification, snapshot, now=4_601.0) is False
+
+    missing_age = dict(snapshot)
+    missing_age.pop("created_at")
+    assert performance_audit.should_reuse_dashboard_compute(classification, missing_age, now=1_100.0) is False
 
 
 def test_session_snapshot_tracks_interactive_widget_keys_and_ignores_audit_state():

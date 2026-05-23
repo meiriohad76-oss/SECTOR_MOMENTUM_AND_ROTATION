@@ -11,6 +11,7 @@ from src import data, ohlcv_store
 
 def _frame(days: int = 80, end: date | None = None, start_price: float = 100.0) -> pd.DataFrame:
     end_ts = pd.Timestamp(end or date.today()).normalize()
+    end_ts = pd.offsets.BDay().rollback(end_ts)
     dates = pd.bdate_range(end=end_ts, periods=days)
     values = pd.Series(range(days), index=dates, dtype=float)
     close = start_price + values
