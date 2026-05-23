@@ -1,0 +1,218 @@
+{
+  "generated_at": "2026-05-23T09:21:12Z",
+  "qa_mode": "browser-qa-secret-free",
+  "results": [
+    {
+      "target_id": "desktop-overview",
+      "viewport": "desktop",
+      "tickets": [
+        "B-110",
+        "B-147"
+      ],
+      "url": "http://127.0.0.1:18601/?ticker=XLK",
+      "screenshot": "docs/browser-qa/latest/desktop-overview.png",
+      "checks": [
+        "text:SENTIMENT BOARD",
+        "text:BLUF",
+        "text:VIEW OPTIONS"
+      ],
+      "setup_actions": [],
+      "actions": [],
+      "ok": true,
+      "notes": [
+        "focused text: SENTIMENT BOARD visible=true top=162 height=22 scrollTop=0",
+        "nonblank screenshot"
+      ]
+    },
+    {
+      "target_id": "desktop-palette-view-options",
+      "viewport": "desktop",
+      "tickets": [
+        "B-117"
+      ],
+      "url": "http://127.0.0.1:18601/?ticker=XLK&browser_qa_palette=Solarized",
+      "screenshot": "docs/browser-qa/latest/desktop-palette-view-options.png",
+      "checks": [
+        "text:VIEW OPTIONS",
+        "text:Palette",
+        "text:Solarized"
+      ],
+      "setup_actions": [
+        "expand:VIEW OPTIONS",
+        "expand:VIEW OPTIONS",
+        "expect-radio-checked:Solarized"
+      ],
+      "actions": [],
+      "ok": true,
+      "notes": [
+        "expanded: VIEW OPTIONS",
+        "view options already expanded",
+        "checked radio: Solarized",
+        "focused text: Palette visible=true top=418 height=20 scrollTop=0",
+        "nonblank screenshot"
+      ]
+    },
+    {
+      "target_id": "desktop-rrg-spaghetti-drill",
+      "viewport": "desktop",
+      "tickets": [
+        "B-111",
+        "B-112",
+        "B-116"
+      ],
+      "url": "http://127.0.0.1:18601/?ticker=XLK",
+      "screenshot": "docs/browser-qa/latest/desktop-rrg-spaghetti-drill.png",
+      "checks": [
+        "text:SECTOR SPAGHETTI",
+        "text:DRILL",
+        "text:CMF"
+      ],
+      "setup_actions": [],
+      "actions": [],
+      "ok": true,
+      "notes": [
+        "focused text: US SECTOR RELATIVE STRENGTH visible=true top=429 height=17 scrollTop=4350",
+        "nonblank screenshot"
+      ]
+    },
+    {
+      "target_id": "desktop-comparison-view",
+      "viewport": "desktop",
+      "tickets": [
+        "B-115"
+      ],
+      "url": "http://127.0.0.1:18601/?ticker=XLK",
+      "screenshot": "docs/browser-qa/latest/desktop-comparison-view.png",
+      "checks": [
+        "text:COMPARE TICKERS"
+      ],
+      "setup_actions": [],
+      "actions": [],
+      "ok": true,
+      "notes": [
+        "focused text: COMPARE TICKERS visible=true top=418 height=20 scrollTop=6316",
+        "nonblank screenshot"
+      ]
+    },
+    {
+      "target_id": "desktop-transition-pulse",
+      "viewport": "desktop",
+      "tickets": [
+        "B-114"
+      ],
+      "url": "http://127.0.0.1:18601/?ticker=XLK&browser_qa_transition=1",
+      "screenshot": "docs/browser-qa/latest/desktop-transition-pulse.png",
+      "checks": [
+        "text:Recent transitions",
+        "text:BROWSER QA",
+        "text:STAGE 2 BULLISH"
+      ],
+      "setup_actions": [],
+      "actions": [
+        "expect-visible:.alert-row.pulse-transition"
+      ],
+      "ok": true,
+      "notes": [
+        "focused text: Recent transitions visible=true top=865 height=13 scrollTop=1437",
+        "visible selector: .alert-row.pulse-transition",
+        "nonblank screenshot"
+      ]
+    },
+    {
+      "target_id": "desktop-provider-status-banner",
+      "viewport": "desktop",
+      "tickets": [
+        "B-146"
+      ],
+      "url": "http://127.0.0.1:18601/?ticker=XLK&browser_qa_provider_banner=1",
+      "screenshot": "docs/browser-qa/latest/desktop-provider-status-banner.png",
+      "checks": [
+        "text:Provider gap",
+        "text:Browser QA provider fallback fixture"
+      ],
+      "setup_actions": [],
+      "actions": [
+        "expect-visible:.provider-status-banner"
+      ],
+      "ok": true,
+      "notes": [
+        "focused text: Provider gap visible=true top=109 height=14 scrollTop=0",
+        "visible selector: .provider-status-banner",
+        "nonblank screenshot"
+      ]
+    },
+    {
+      "target_id": "desktop-full-matrix-table",
+      "viewport": "desktop",
+      "tickets": [
+        "B-113"
+      ],
+      "url": "http://127.0.0.1:18601/?ticker=XLK",
+      "screenshot": "docs/browser-qa/latest/desktop-full-matrix-table.png",
+      "checks": [
+        "text:FULL 7",
+        "text:HIDE FULL"
+      ],
+      "setup_actions": [],
+      "actions": [
+        "hover:first-full-table-row",
+        "expect-visible:.full-table tbody tr:first-child .row-preview"
+      ],
+      "ok": true,
+      "notes": [
+        "focused text: FULL 7 visible=true top=418 height=13 scrollTop=8595",
+        "hovered first full-table row",
+        "visible selector: .full-table tbody tr:first-child .row-preview",
+        "nonblank screenshot"
+      ]
+    },
+    {
+      "target_id": "tablet-dashboard",
+      "viewport": "tablet",
+      "tickets": [
+        "B-110",
+        "B-112",
+        "B-115"
+      ],
+      "url": "http://127.0.0.1:18601/?ticker=XLK",
+      "screenshot": "docs/browser-qa/latest/tablet-dashboard.png",
+      "checks": [
+        "text:SENTIMENT BOARD",
+        "text:Risk regime",
+        "text:DRILL"
+      ],
+      "setup_actions": [],
+      "actions": [],
+      "ok": true,
+      "notes": [
+        "focused text: Risk regime visible=true top=638 height=39 scrollTop=0",
+        "nonblank screenshot"
+      ]
+    },
+    {
+      "target_id": "mobile-dashboard",
+      "viewport": "mobile",
+      "tickets": [
+        "B-110",
+        "B-112",
+        "B-114",
+        "B-116",
+        "B-117"
+      ],
+      "url": "http://127.0.0.1:18601/?ticker=XLK",
+      "screenshot": "docs/browser-qa/latest/mobile-dashboard.png",
+      "checks": [
+        "text:SENTIMENT BOARD",
+        "text:BLUF",
+        "text:INSTRUMENTS"
+      ],
+      "setup_actions": [],
+      "actions": [],
+      "ok": true,
+      "notes": [
+        "focused text: BLUF visible=true top=380 height=20 scrollTop=102",
+        "nonblank screenshot"
+      ]
+    }
+  ]
+}

@@ -6,9 +6,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import streamlit as st
@@ -121,6 +123,18 @@ def _md(html: str):
     misparsed otherwise."""
     cleaned = "\n".join(line.lstrip() for line in html.split("\n"))
     st.markdown(cleaned, unsafe_allow_html=True)
+
+
+def _browser_qa_mode_enabled() -> bool:
+    return str(os.environ.get("BROWSER_QA_MODE", "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _browser_qa_query_value(name: str) -> str:
+    return str(st.query_params.get(name, "")).strip()
+
+
+def _browser_qa_query_enabled(name: str) -> bool:
+    return _browser_qa_query_value(name).lower() in {"1", "true", "yes", "on"}
 
 
 def render_loading_state(placeholder, label: str, card_count: int = 4) -> None:
@@ -377,6 +391,10 @@ if "table_open" not in st.session_state:
 if "table_sort" not in st.session_state:
     st.session_state.table_sort = "S_score:desc"
 initialize_preferences(st.session_state)
+if _browser_qa_mode_enabled():
+    qa_palette = _browser_qa_query_value("browser_qa_palette")
+    if qa_palette in PALETTE_OPTIONS:
+        st.session_state.color_palette = qa_palette
 _density_class = density_class(st.session_state.view_density)
 _palette_key = palette_key(st.session_state.color_palette)
 _palette_css = palette_css_variables(st.session_state.color_palette, st.session_state.theme)
@@ -401,6 +419,8 @@ _md(
 @st.cache_data(ttl=3600, show_spinner=False)
 def _load_data(period: str = "3y"):
     tickers = DATA_SYMBOLS
+    if _browser_qa_mode_enabled():
+        return fetch_ohlcv_result(tickers, period=period, provider="yfinance")
     return fetch_ohlcv_result(tickers, period=period)
 
 
@@ -425,9 +445,23 @@ def render_provider_status_banner(ohlcv_result) -> None:
         _md(html)
 
 
+def _render_browser_qa_provider_banner() -> None:
+    if not (_browser_qa_mode_enabled() and _browser_qa_query_enabled("browser_qa_provider_banner")):
+        return
+    render_provider_status_banner(
+        SimpleNamespace(
+            used_stale_cache=False,
+            missing=("BROWSER_QA",),
+            warnings=("Browser QA provider fallback fixture - no API keys required.",),
+        )
+    )
+
+
 @st.cache_data(ttl=21600, show_spinner=False)  # FRED updates monthly/weekly, cache 6h
 def _load_fred() -> dict:
     """Fetch FRED macro series. Empty dict if no API key configured."""
+    if _browser_qa_mode_enabled():
+        return {}
     try:
         from src.fred_data import fetch_fred, fred_available
         if not fred_available():
@@ -519,6 +553,7 @@ if _REUSED_COMPUTE_SNAPSHOT:
         regime = compute_snapshot["regime"]
         scored = compute_snapshot["scored"]
     render_provider_status_banner(ohlcv_result)
+    _render_browser_qa_provider_banner()
 else:
     loading_placeholder = st.empty()
     render_loading_state(loading_placeholder, "Loading market data", card_count=4)
@@ -526,6 +561,7 @@ else:
         with PERF_AUDIT.section("load_data"):
             ohlcv_result = _load_data("3y")
             render_provider_status_banner(ohlcv_result)
+            _render_browser_qa_provider_banner()
             ohlcv = ohlcv_result.data
 
         bench_ticker = BENCH["US"]
@@ -634,8 +670,23 @@ def _build_bluf(scored_df: pd.DataFrame):
     }
 
 
+def _browser_qa_transitions(scored_df: pd.DataFrame) -> list[dict]:
+    if not (_browser_qa_mode_enabled() and _browser_qa_query_enabled("browser_qa_transition")):
+        return []
+    ticker = "XLK" if "XLK" in scored_df.index else str(scored_df.index[0])
+    return [
+        {
+            "ticker": ticker,
+            "from": "BROWSER_QA",
+            "to": "STAGE_2_BULLISH",
+            "date": datetime.now(timezone.utc).date().isoformat(),
+        }
+    ]
+
+
 bluf = _build_bluf(scored)
 transitions = recent_transitions(n=14)
+transitions = _browser_qa_transitions(scored) + transitions
 if not _REUSED_COMPUTE_SNAPSHOT:
     _record_dashboard_run(scored, bluf, regime, transitions, ohlcv, fred_macro_snapshot(_fred_data))
 

@@ -92,64 +92,64 @@ Status legend:
 **Files:** `app.py`, `static/style.css`, `tests/test_mobile_responsive_static.py`, `README.md`, `docs/PRODUCT_DESIGN.md`.
 **Behavior:** header metadata wraps, section heads stack, BLUF/action/status/pick grids collapse, alert rows simplify, full tables scroll horizontally, RRG class controls and drill buttons wrap into usable rows, custom-universe summaries stack, and narrow drill metrics collapse to one column.
 **Safety:** CSS/markup-only; no scoring, data-fetch, provider, persistence, or state-machine behavior changes.
-**Evidence:** `docs/superpowers/plans/2026-05-21-b110-mobile-responsive-view.md`.
-**Residual risk:** local verification includes static coverage and HTTP smoke; screenshot-level mobile browser QA should be added when Playwright or browser tooling is available in the environment.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b110-mobile-responsive-view.md`; browser QA report and screenshots at `docs/browser-qa/latest/browser_qa_report.md`.
+**Residual risk:** responsive screenshot-level QA is now covered for desktop, tablet, and mobile dashboard targets; hover/animation timing remains best-effort because the capture is static screenshots rather than video.
 
 ### B-111 - Sector spaghetti chart - IMPLEMENTED
 **Status:** a US sector relative-strength spaghetti chart is implemented in `backlog-stepwise-qa`.
 **Files:** `src/visuals.py`, `tests/test_visuals.py`, `tests/test_sector_spaghetti_app_static.py`, `app.py`, `README.md`, `docs/PRODUCT_DESIGN.md`.
 **Behavior:** the chart overlays all available US sector ETFs versus SPY over the latest 252 trading days, normalizes every line to 100 at the start of the window, sorts traces by latest relative strength, and renders after the RRG section.
 **Safety:** uses already-loaded dashboard OHLCV only; no new fetch path, no scoring changes, no state writes, and no persistence.
-**Evidence:** `docs/superpowers/plans/2026-05-21-b111-sector-spaghetti-chart.md`.
-**Residual risk:** static and pure helper tests verify behavior; browser screenshot QA should be added when browser tooling is available.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b111-sector-spaghetti-chart.md`; browser QA report and screenshots at `docs/browser-qa/latest/browser_qa_report.md`.
+**Residual risk:** browser screenshot QA now verifies the rendered spaghetti/drill section text and a nonblank full-page capture; chart semantics remain covered by pure helper tests.
 
 ### B-112 - Custom time-range selector in per-ticker drill-down - IMPLEMENTED
 **Status:** a per-ticker drill-down chart range selector is implemented in `backlog-stepwise-qa`.
 **Files:** `src/visuals.py`, `tests/test_visuals.py`, `tests/test_drill_range_app_static.py`, `app.py`, `README.md`, `docs/PRODUCT_DESIGN.md`.
 **Behavior:** the drill-down exposes `3M`, `6M`, `1Y`, `3Y`, and `MAX` ranges. The selected range clips the visible price/30wMA, CMF, and OBV chart windows by the latest available data date while rolling indicators keep the full loaded OHLCV warmup.
 **Safety:** uses existing in-memory OHLCV only; no provider fetch, scoring, alerting, state-machine, or persistence behavior changes.
-**Evidence:** `docs/superpowers/plans/2026-05-21-b112-drill-time-range-selector.md`.
-**Residual risk:** `MAX` means all data already loaded by the dashboard run, currently bounded by the app's configured OHLCV payload; screenshot-level browser QA should be added when browser tooling is available.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b112-drill-time-range-selector.md`; browser QA report and screenshots at `docs/browser-qa/latest/browser_qa_report.md`.
+**Residual risk:** `MAX` means all data already loaded by the dashboard run, currently bounded by the app's configured OHLCV payload; browser QA now covers the drill section across desktop/tablet/mobile targets.
 
 ### B-113 - Hover preview on table rows - IMPLEMENTED
 **Status:** desktop hover previews are implemented for full matrix ticker rows in `backlog-stepwise-qa`.
 **Files:** `src/table_preview.py`, `tests/test_table_preview.py`, `tests/test_table_hover_preview_static.py`, `app.py`, `static/style.css`, `README.md`, `docs/PRODUCT_DESIGN.md`.
 **Behavior:** hovering a ticker row in the full 7-pillar matrix reveals a compact RRG preview card with ticker, quadrant, mini RRG dot, RS-ratio, RS-momentum, S-score, and F-score.
 **Safety:** uses already-computed scored-row fields only; no JavaScript, provider fetch, scoring, alerting, state-machine, or persistence behavior changes.
-**Evidence:** `docs/superpowers/plans/2026-05-21-b113-table-hover-preview.md`.
-**Residual risk:** CSS-only hover behavior is covered by static tests and HTTP smoke; screenshot-level browser QA should be added when browser tooling is available.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b113-table-hover-preview.md`; browser QA report and screenshots at `docs/browser-qa/latest/browser_qa_report.md`.
+**Residual risk:** table availability and the desktop hover preview are now browser-tested by hovering the first full-matrix row and asserting the preview card is visible; mobile/coarse-pointer hiding remains statically covered.
 
 ### B-114 - State transition pulse animation - IMPLEMENTED
 **Status:** transition pulse animation is implemented for recent alert rows and active pick cards in `backlog-stepwise-qa`.
 **Files:** `src/transition_pulse.py`, `tests/test_transition_pulse.py`, `tests/test_transition_pulse_app_static.py`, `app.py`, `static/style.css`, `README.md`, `docs/PRODUCT_DESIGN.md`.
 **Behavior:** tickers with transitions dated today in the existing state-machine transition log receive a `pulse-transition` class. Alert rows and matching active pick cards briefly pulse using the new state color.
 **Safety:** visual-only CSS/markup change; no provider fetch, scoring, alert delivery, state-machine, or persistence behavior changes.
-**Evidence:** `docs/superpowers/plans/2026-05-21-b114-state-transition-pulse.md`.
-**Residual risk:** static and pure helper tests verify class wiring; screenshot-level browser animation QA should be added when browser tooling is available.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b114-state-transition-pulse.md`; browser QA report and screenshots at `docs/browser-qa/latest/browser_qa_report.md`.
+**Residual risk:** a deterministic browser-QA transition fixture now verifies a visible `.pulse-transition` alert row; animation timing remains validated by static class/reduced-motion tests rather than video capture.
 
 ### B-115 - Comparison view - IMPLEMENTED
 **Status:** a 2-4 ticker side-by-side comparison view is implemented in `backlog-stepwise-qa`.
 **Files:** `src/comparison_view.py`, `tests/test_comparison_view.py`, `tests/test_comparison_view_app_static.py`, `app.py`, `static/style.css`, `README.md`, `docs/PRODUCT_DESIGN.md`.
 **Behavior:** a capped `COMPARE TICKERS` multiselect renders compact cards for state, class, S/F, momentum, Weinstein stage, RRG quadrant, class rank, selection flag, and veto status.
 **Safety:** read-only UI from the current scored dataframe; no provider fetch, scoring, alerting, state-machine, or persistence behavior changes.
-**Evidence:** `docs/superpowers/plans/2026-05-21-b115-comparison-view.md`.
-**Residual risk:** static and pure helper tests verify rendering logic; screenshot-level responsive browser QA should be added when browser tooling is available.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b115-comparison-view.md`; browser QA report and screenshots at `docs/browser-qa/latest/browser_qa_report.md`.
+**Residual risk:** responsive browser QA now covers the comparison section on desktop and tablet targets; rendering logic remains covered by pure helper tests.
 
 ### B-116 - 30wMA reference line in sparklines - IMPLEMENTED
 **Status:** pick-card sparklines now include a 30-week moving-average reference line when enough weekly history is loaded in `backlog-stepwise-qa`.
 **Files:** `src/visuals.py`, `tests/test_visuals.py`, `app.py`, `README.md`, `docs/PRODUCT_DESIGN.md`.
 **Behavior:** `svg_sparkline()` computes the latest weekly 30wMA from loaded daily closes, folds it into the SVG y-scale, and renders a subtle dashed horizontal line before the price path.
 **Safety:** visual-only helper change using already-loaded OHLCV; no provider fetch, scoring, alerting, state-machine, or persistence behavior changes.
-**Evidence:** `docs/superpowers/plans/2026-05-21-b116-sparkline-30wma-reference.md`.
-**Residual risk:** SVG helper tests verify markup and warmup behavior; screenshot-level card QA should be added when browser tooling is available.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b116-sparkline-30wma-reference.md`; browser QA report and screenshots at `docs/browser-qa/latest/browser_qa_report.md`.
+**Residual risk:** card/dashboard screenshot QA is now covered for desktop and mobile targets; SVG semantics remain covered by helper tests.
 
 ### B-117 - Custom dashboard palettes - IMPLEMENTED
 **Status:** Solarized, Nord, and Mono palette options are implemented in `backlog-stepwise-qa`.
 **Files:** `src/preferences.py`, `src/run_journal.py`, `tests/test_preferences.py`, `tests/test_view_preferences_static.py`, `tests/test_run_journal.py`, `tests/test_run_journal_app_static.py`, `app.py`, `static/style.css`, `README.md`, `docs/PRODUCT_DESIGN.md`.
 **Behavior:** `VIEW OPTIONS` now includes a `Palette` radio with `Default`, `Solarized`, `Nord`, and `Mono`. The app renders selected palette variables into the page CSS and also writes `data-palette` on the document root for traceability while preserving the dark/light theme toggle.
 **Safety:** visual-only preference/CSS change; no provider fetch, scoring, alerting, or state-machine behavior changes. A stable run-journal fingerprint prevents palette/theme/density reruns from appending duplicate methodology runs.
-**Evidence:** `docs/superpowers/plans/2026-05-21-b117-custom-palettes.md`.
-**Residual risk:** static tests verify palette wiring and token presence; screenshot-level palette QA should be added when browser tooling is available.
+**Evidence:** `docs/superpowers/plans/2026-05-21-b117-custom-palettes.md`; browser QA report and screenshots at `docs/browser-qa/latest/browser_qa_report.md`.
+**Residual risk:** browser QA now expands View Options with a Solarized QA fixture and asserts the Solarized radio is checked; Nord/Mono screenshots can be added later if visual approval requires every palette.
 
 ### B-011 · Build backtest harness (academic-rigorous, 2–3 days)
 **Status:** deterministic pandas/numpy accounting core, historical methodology target-builder, methodology-backed manual report output, historical simulation evidence, full narrative methodology report, notebook inspection guide, in-sample/out-of-sample metrics, acceptance-gate evidence, dashboard artifact surfacing with normalized equity and drawdown charts, optional Massive OHLCV ingestion, methodology-state artifact export, and fast live-data smoke mode implemented in `backlog-stepwise-qa`; manual runner available via `python scripts/run_backtest.py`, with quick provider validation via `python scripts/run_backtest.py --live-smoke`.
@@ -377,12 +377,12 @@ Status legend:
 **Status:** `fetch_ohlcv_result()` now exposes provider/cache metadata while `fetch_ohlcv()` keeps the original dict-returning contract.
 **Files:** `src/data.py`, `src/ohlcv_store.py`, `app.py`, `static/style.css`, `tests/test_data.py`, `tests/test_ohlcv_store.py`, `tests/test_provider_fallback_app_static.py`, `docs/superpowers/plans/2026-05-21-b146-yfinance-fallback.md`.
 **Behavior:** fresh DuckDB cache still serves first, provider misses still fetch normally, and yfinance gaps can fall back to explicit stale cached OHLCV with a compact dashboard provider-status banner. Symbols still missing after provider/cache fallback are surfaced in result warnings for operator visibility.
-**Residual risk:** the banner has static coverage and unit coverage for stale yfinance fallback; it has not yet been screenshot-tested across all responsive breakpoints.
+**Residual risk:** the banner has unit/static coverage and browser QA now includes a deterministic provider-status fixture in secret-free mode; real-provider outage permutations still depend on provider/cache integration tests.
 #### B-147 · Streamlit performance audit — IMPLEMENTED
 **Status:** dashboard reruns now emit a `dashboard_performance_audit` structured log event with rerun classification, changed session-state keys, provider, scored row count, per-section timings, and whether a prior compute snapshot was reused.
 **Files:** `src/performance_audit.py`, `app.py`, `tests/test_performance_audit.py`, `tests/test_performance_audit_app_static.py`, `docs/superpowers/plans/2026-05-21-b147-streamlit-performance-audit.md`.
 **Behavior:** theme, density, BLUF mode, sparkline style, palette, and local preference-profile UI changes classify as `visual_only`; non-visual controls classify as `interactive`. After a complete fresh dashboard compute has populated the session snapshot, visual-only reruns reuse the existing OHLCV result, FRED snapshot, regime object, and scored dataframe for up to one hour instead of calling market-data providers, FRED, indicator/flow scoring, `apply_state_machine()`, or run-journal recording again. Header refresh/theme controls use Streamlit callbacks so refresh/theme mutations happen before the compute gate. Transition rows are still refreshed from the local state file as a small read-only operation so another session's state changes are not hidden. Fresh initial runs, stale/incomplete snapshots, and data-affecting controls continue through the normal compute path.
-**Residual risk:** browser-level timing validation should still be added for a live theme/profile toggle path; current coverage is pure-helper and static app wiring.
+**Residual risk:** browser QA now captures the dashboard after a live render path; browser-level timing validation for an actual theme/profile toggle remains a future performance-specific enhancement.
 - **B-148** Migration from 32-bit Pi 2 (retired) to Pi 5 — DONE ✅
 
 - **B-153** Run journal + debrief engine — IMPLEMENTED through B-153.5; the app now has an append-only local SQLite run journal, dashboard scoring/BLUF auto-recording, a pure forward-outcome debrief engine, dashboard debrief surfacing, macro-conditioned summaries, flat outcome CSV export, and a Markdown debrief report export. Exports are analysis-only and do not change scoring, alerts, provider behavior, or recommendations.

@@ -209,6 +209,21 @@ streamlit run app.py
 
 Or just double-click `run.bat` (creates venv + installs deps automatically on first run). If it fails, run `run-diagnostic.bat` for step-by-step output.
 
+### Browser QA Screenshots
+
+The visual/responsive QA evidence for implemented dashboard tickets lives in `docs/browser-qa/latest/`. Regenerate it from a QA-mode dashboard with:
+
+```powershell
+python -m pip install -r requirements-qa.txt
+$env:BROWSER_QA_MODE="1"; $env:MASSIVE_API_KEY=""; $env:FRED_API_KEY=""
+python -m streamlit run app.py --server.address=127.0.0.1 --server.port=18601 --server.headless=true
+
+# In a second shell:
+python scripts/capture_browser_qa.py --base-url http://127.0.0.1:18601 --browser-channel chrome --qa-mode browser-qa-secret-free
+```
+
+Use `--browser-channel msedge` if Edge is installed and Chrome is not. The `BROWSER_QA_MODE` flag must be set before starting Streamlit; it enables deterministic visual fixtures for palette, transition-pulse, and provider-status screenshots, forces secret-free yfinance/FRED-off behavior, and clearing `MASSIVE_API_KEY` plus `FRED_API_KEY` keeps the run explicit. The script writes `browser_qa_report.md`, `browser_qa_manifest.json`, and nonblank screenshots without requiring API keys or webhook secrets.
+
 ### Linux / macOS / Raspberry Pi
 
 ```bash
