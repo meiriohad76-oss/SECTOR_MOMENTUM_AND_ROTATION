@@ -374,6 +374,236 @@ def walk_forward_split_summary(
     }
 
 
+def _scalar_bool(value, default: bool = False) -> bool:
+    if value is None:
+        return default
+    try:
+        if pd.isna(value):
+            return default
+    except (TypeError, ValueError):
+        pass
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "y"}:
+            return True
+        if normalized in {"false", "0", "no", "n"}:
+            return False
+    return bool(value)
+
+
+def _float_or_nan(value) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return float("nan")
+    return number if np.isfinite(number) else float("nan")
+
+
+def _state_at(states: pd.DataFrame, as_of: pd.Timestamp, ticker: str, fallback: str = "") -> str:
+    if states.empty or as_of not in states.index or ticker not in states.columns:
+        return fallback
+    value = states.loc[as_of, ticker]
+    if value is None or pd.isna(value):
+        return fallback
+    return str(value)
+
+
+def _target_weight_at(target_weights: pd.DataFrame, as_of: pd.Timestamp, ticker: str) -> float:
+    if target_weights.empty or as_of not in target_weights.index or ticker not in target_weights.columns:
+        return 0.0
+    return _float_or_nan(target_weights.loc[as_of, ticker])
+
+
+def _class_benchmark_for(
+    ticker: str,
+    ticker_class: str,
+    prices: pd.DataFrame,
+    benchmark_by_class: dict[str, str] | None,
+) -> str | None:
+    mapping = {str(key): str(value).upper() for key, value in (benchmark_by_class or {}).items()}
+    benchmark = mapping.get(str(ticker_class))
+    if benchmark and benchmark in prices.columns:
+        return benchmark
+    if ticker in prices.columns and ticker_class == "Benchmark":
+        return ticker
+    return "SPY" if "SPY" in prices.columns else None
+
+
+def _forward_label_values(
+    prices: pd.DataFrame,
+    *,
+    ticker: str,
+    benchmark: str | None,
+    as_of: pd.Timestamp,
+    horizon_weeks: int,
+) -> dict:
+    horizon_weeks = _positive_int("horizon_weeks", horizon_weeks)
+    empty = {
+        "available": False,
+        "forward_return": float("nan"),
+        "benchmark_return": float("nan"),
+        "excess_return": float("nan"),
+        "drawdown": float("nan"),
+    }
+    if ticker not in prices.columns or benchmark is None or benchmark not in prices.columns:
+        return empty
+    if as_of not in prices.index:
+        raise ValueError("rebalance dates must exist in prices index")
+    end_target = pd.Timestamp(as_of) + pd.DateOffset(weeks=horizon_weeks)
+    end_date = _first_on_or_after(prices.index, end_target)
+    if end_date is None:
+        return empty
+    start_price = _float_or_nan(prices.loc[as_of, ticker])
+    end_price = _float_or_nan(prices.loc[end_date, ticker])
+    benchmark_start = _float_or_nan(prices.loc[as_of, benchmark])
+    benchmark_end = _float_or_nan(prices.loc[end_date, benchmark])
+    if (
+        not all(np.isfinite(value) for value in [start_price, end_price, benchmark_start, benchmark_end])
+        or min(start_price, end_price, benchmark_start, benchmark_end) <= 0
+    ):
+        return empty
+    window = prices.loc[(prices.index >= as_of) & (prices.index <= end_date), ticker].astype(float)
+    if window.empty or window.isna().any():
+        return empty
+    forward_return = end_price / start_price - 1.0
+    benchmark_return = benchmark_end / benchmark_start - 1.0
+    drawdown = float(window.min() / start_price - 1.0)
+    return {
+        "available": True,
+        "forward_return": float(forward_return),
+        "benchmark_return": float(benchmark_return),
+        "excess_return": float(forward_return - benchmark_return),
+        "drawdown": drawdown,
+    }
+
+
+def build_calibration_feature_labels(
+    targets: HistoricalSignalTargets,
+    prices: pd.DataFrame,
+    *,
+    horizons_weeks: Sequence[int] = (4, 13, 26, 52),
+    benchmark_by_class: dict[str, str] | None = None,
+    drawdown_avoidance_threshold: float = -0.05,
+) -> pd.DataFrame:
+    """Build point-in-time feature rows plus forward labels for calibration research."""
+    raw_prices = prices.copy()
+    raw_prices.index = pd.to_datetime(raw_prices.index)
+    if not raw_prices.index.is_unique:
+        raise ValueError("prices index must be unique")
+    if not raw_prices.columns.is_unique:
+        raise ValueError("prices columns must be unique")
+    raw_prices = raw_prices.sort_index().apply(pd.to_numeric, errors="coerce").dropna(how="all")
+    available_values = raw_prices.to_numpy(dtype=float)
+    available_values = available_values[~np.isnan(available_values)]
+    if len(available_values) and ((~np.isfinite(available_values)).any() or (available_values <= 0).any()):
+        raise ValueError("prices must be finite and strictly positive where available")
+    horizons = sorted({_positive_int("horizons_weeks", value) for value in horizons_weeks})
+    if not horizons:
+        raise ValueError("horizons_weeks must contain at least one value")
+    drawdown_threshold = _finite_scalar("drawdown_avoidance_threshold", drawdown_avoidance_threshold)
+    target_weights = targets.target_weights.copy()
+    target_weights.index = pd.to_datetime(target_weights.index)
+    states = targets.states.copy()
+    states.index = pd.to_datetime(states.index)
+    negative_states = {"WARNING", "EXIT", "BEARISH_STAGE_4"}
+    rows: list[dict] = []
+    bool_columns = {"selected", "veto", "positive_signal", "negative_signal"}
+
+    for raw_as_of in sorted(targets.snapshots):
+        as_of = pd.Timestamp(raw_as_of)
+        if as_of not in raw_prices.index:
+            raise ValueError("rebalance dates must exist in prices index")
+        snapshot = targets.snapshots[raw_as_of].copy()
+        for ticker, snapshot_row in snapshot.iterrows():
+            ticker = str(ticker).upper()
+            ticker_class = str(snapshot_row.get("class", ""))
+            state = _state_at(states, as_of, ticker, fallback=str(snapshot_row.get("state", "")))
+            target_weight = _target_weight_at(target_weights, as_of, ticker)
+            selected = _scalar_bool(snapshot_row.get("selected"), default=target_weight > 0.0)
+            positive_signal = bool(selected or state == "STAGE_2_BULLISH")
+            negative_signal = state in negative_states
+            benchmark = _class_benchmark_for(ticker, ticker_class, raw_prices, benchmark_by_class)
+            row = {
+                "rebalance_date": as_of,
+                "feature_asof_date": as_of,
+                "ticker": ticker,
+                "class": ticker_class,
+                "benchmark_ticker": benchmark,
+                "state": state,
+                "target_weight": target_weight,
+                "selected": selected,
+                "positive_signal": positive_signal,
+                "negative_signal": negative_signal,
+                "S_score": _float_or_nan(snapshot_row.get("S_score")),
+                "S_score_after_veto": _float_or_nan(snapshot_row.get("S_score_after_veto")),
+                "rank_in_class": _float_or_nan(snapshot_row.get("rank_in_class")),
+                "top_n_target": _float_or_nan(snapshot_row.get("top_n_target")),
+                "veto": _scalar_bool(snapshot_row.get("veto"), default=False),
+            }
+            for horizon in horizons:
+                suffix = f"{horizon}w"
+                values = _forward_label_values(
+                    raw_prices,
+                    ticker=ticker,
+                    benchmark=benchmark,
+                    as_of=as_of,
+                    horizon_weeks=horizon,
+                )
+                available = bool(values["available"])
+                positive_success = bool(
+                    positive_signal
+                    and available
+                    and values["forward_return"] > 0.0
+                    and values["excess_return"] > 0.0
+                )
+                avoided_underperformance = bool(
+                    negative_signal and available and values["excess_return"] < 0.0
+                )
+                failed_followthrough = bool(
+                    negative_signal and available and values["forward_return"] <= 0.0
+                )
+                avoided_drawdown = bool(
+                    negative_signal and available and values["drawdown"] <= drawdown_threshold
+                )
+                negative_success = bool(
+                    negative_signal
+                    and available
+                    and (avoided_underperformance or failed_followthrough or avoided_drawdown)
+                )
+                row.update(
+                    {
+                        f"label_available_{suffix}": available,
+                        f"forward_return_{suffix}": values["forward_return"],
+                        f"forward_benchmark_return_{suffix}": values["benchmark_return"],
+                        f"forward_excess_return_{suffix}": values["excess_return"],
+                        f"post_entry_drawdown_{suffix}": values["drawdown"],
+                        f"positive_success_{suffix}": positive_success,
+                        f"negative_avoided_underperformance_{suffix}": avoided_underperformance,
+                        f"negative_failed_followthrough_{suffix}": failed_followthrough,
+                        f"negative_avoided_drawdown_{suffix}": avoided_drawdown,
+                        f"negative_success_{suffix}": negative_success,
+                    }
+                )
+                bool_columns.update(
+                    {
+                        f"label_available_{suffix}",
+                        f"positive_success_{suffix}",
+                        f"negative_avoided_underperformance_{suffix}",
+                        f"negative_failed_followthrough_{suffix}",
+                        f"negative_avoided_drawdown_{suffix}",
+                        f"negative_success_{suffix}",
+                    }
+                )
+            rows.append(row)
+
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        return frame
+    for column in sorted(bool_columns.intersection(frame.columns)):
+        frame[column] = frame[column].map(bool).astype(object)
+    return frame
+
+
 def _clean_prices(prices: pd.DataFrame) -> pd.DataFrame:
     out = prices.copy()
     out.index = pd.to_datetime(out.index)

@@ -209,6 +209,144 @@ def test_walk_forward_calibration_splits_reject_invalid_or_too_short_history():
         )
 
 
+def test_calibration_feature_labels_use_point_in_time_snapshots_and_forward_outcomes():
+    dates = pd.to_datetime(["2024-01-05", "2024-01-12", "2024-02-02", "2024-02-09"])
+    prices = pd.DataFrame(
+        {
+            "XLK": [100.0, 90.0, 110.0, 112.0],
+            "XLF": [100.0, 85.0, 90.0, 88.0],
+            "SPY": [100.0, 98.0, 105.0, 106.0],
+        },
+        index=dates,
+    )
+    first_snapshot = pd.DataFrame(
+        {
+            "class": ["US Sectors", "US Sectors"],
+            "selected": [True, False],
+            "S_score": [1.2, -0.5],
+            "S_score_after_veto": [1.2, -9.99],
+            "rank_in_class": [1, 5],
+            "top_n_target": [4, 4],
+            "veto": [False, True],
+        },
+        index=["XLK", "XLF"],
+    )
+    future_snapshot = first_snapshot.copy()
+    future_snapshot.loc["XLK", "S_score"] = 99.0
+    targets = backtest.HistoricalSignalTargets(
+        target_weights=pd.DataFrame({"XLK": [1.0, 0.0], "XLF": [0.0, 0.0]}, index=[dates[0], dates[2]]),
+        states=pd.DataFrame({"XLK": ["STAGE_2_BULLISH", "HOLD"], "XLF": ["EXIT", "WARNING"]}, index=[dates[0], dates[2]]),
+        snapshots={dates[0]: first_snapshot, dates[2]: future_snapshot},
+    )
+
+    labels = backtest.build_calibration_feature_labels(
+        targets,
+        prices,
+        horizons_weeks=(4,),
+        benchmark_by_class={"US Sectors": "SPY"},
+        drawdown_avoidance_threshold=-0.10,
+    )
+
+    first_rows = labels[labels["rebalance_date"] == dates[0]].set_index("ticker")
+    assert list(first_rows.index) == ["XLK", "XLF"]
+    assert first_rows.loc["XLK", "feature_asof_date"] == dates[0]
+    assert first_rows.loc["XLK", "S_score"] == pytest.approx(1.2)
+    assert first_rows.loc["XLK", "positive_signal"] is True
+    assert first_rows.loc["XLK", "negative_signal"] is False
+    assert first_rows.loc["XLK", "label_available_4w"] is True
+    assert first_rows.loc["XLK", "forward_return_4w"] == pytest.approx(0.10)
+    assert first_rows.loc["XLK", "forward_benchmark_return_4w"] == pytest.approx(0.05)
+    assert first_rows.loc["XLK", "forward_excess_return_4w"] == pytest.approx(0.05)
+    assert first_rows.loc["XLK", "post_entry_drawdown_4w"] == pytest.approx(-0.10)
+    assert first_rows.loc["XLK", "positive_success_4w"] is True
+
+    assert first_rows.loc["XLF", "positive_signal"] is False
+    assert first_rows.loc["XLF", "negative_signal"] is True
+    assert first_rows.loc["XLF", "forward_return_4w"] == pytest.approx(-0.10)
+    assert first_rows.loc["XLF", "forward_excess_return_4w"] == pytest.approx(-0.15)
+    assert first_rows.loc["XLF", "post_entry_drawdown_4w"] == pytest.approx(-0.15)
+    assert first_rows.loc["XLF", "negative_avoided_underperformance_4w"] is True
+    assert first_rows.loc["XLF", "negative_failed_followthrough_4w"] is True
+    assert first_rows.loc["XLF", "negative_avoided_drawdown_4w"] is True
+    assert first_rows.loc["XLF", "negative_success_4w"] is True
+
+
+def test_calibration_feature_labels_mark_unavailable_future_horizons_without_filling():
+    dates = pd.to_datetime(["2024-01-05", "2024-01-12", "2024-02-02"])
+    prices = pd.DataFrame(
+        {
+            "XLK": [100.0, 101.0, 102.0],
+            "SPY": [100.0, 101.0, 102.0],
+        },
+        index=dates,
+    )
+    snapshot = pd.DataFrame(
+        {
+            "class": ["US Sectors"],
+            "selected": [True],
+            "S_score": [1.0],
+        },
+        index=["XLK"],
+    )
+    targets = backtest.HistoricalSignalTargets(
+        target_weights=pd.DataFrame({"XLK": [1.0]}, index=[dates[-1]]),
+        states=pd.DataFrame({"XLK": ["HOLD"]}, index=[dates[-1]]),
+        snapshots={dates[-1]: snapshot},
+    )
+
+    labels = backtest.build_calibration_feature_labels(
+        targets,
+        prices,
+        horizons_weeks=(4,),
+        benchmark_by_class={"US Sectors": "SPY"},
+    )
+
+    row = labels.iloc[0]
+    assert row["label_available_4w"] is False
+    assert pd.isna(row["forward_return_4w"])
+    assert pd.isna(row["forward_excess_return_4w"])
+    assert pd.isna(row["post_entry_drawdown_4w"])
+    assert row["positive_success_4w"] is False
+    assert row["negative_success_4w"] is False
+
+
+def test_calibration_feature_labels_do_not_forward_fill_missing_future_prices():
+    dates = pd.to_datetime(["2024-01-05", "2024-02-02"])
+    prices = pd.DataFrame(
+        {
+            "XLK": [100.0, None],
+            "SPY": [100.0, 105.0],
+        },
+        index=dates,
+    )
+    snapshot = pd.DataFrame(
+        {
+            "class": ["US Sectors"],
+            "selected": [True],
+            "S_score": [1.0],
+        },
+        index=["XLK"],
+    )
+    targets = backtest.HistoricalSignalTargets(
+        target_weights=pd.DataFrame({"XLK": [1.0]}, index=[dates[0]]),
+        states=pd.DataFrame({"XLK": ["STAGE_2_BULLISH"]}, index=[dates[0]]),
+        snapshots={dates[0]: snapshot},
+    )
+
+    labels = backtest.build_calibration_feature_labels(
+        targets,
+        prices,
+        horizons_weeks=(4,),
+        benchmark_by_class={"US Sectors": "SPY"},
+    )
+
+    row = labels.iloc[0]
+    assert row["label_available_4w"] is False
+    assert pd.isna(row["forward_return_4w"])
+    assert pd.isna(row["forward_excess_return_4w"])
+    assert row["positive_success_4w"] is False
+
+
 def test_multi_asset_weights_drift_between_rebalance_dates():
     dates = pd.bdate_range("2024-01-01", periods=3)
     prices = pd.DataFrame(
