@@ -1,0 +1,185 @@
+{
+  "accounting": {
+    "periods_per_year": 252,
+    "transaction_cost_bps": 5.0
+  },
+  "algorithm_components": {
+    "accounting_engine": "src.backtest.run_weight_backtest",
+    "flow_builder": "src.flow.compute_flow_signals",
+    "indicator_builder": "src.indicators.compute_all_indicators",
+    "score_builder": "src.scoring.compute_composite",
+    "state_function": "src.scoring.decide_state",
+    "target_builder": "src.backtest.build_historical_methodology_targets",
+    "weight_builder": "src.backtest.target_weights_from_scores"
+  },
+  "benchmarks": [
+    "AGG",
+    "SPY",
+    "XLB",
+    "XLC",
+    "XLE",
+    "XLF",
+    "XLI",
+    "XLK",
+    "XLP",
+    "XLRE",
+    "XLU",
+    "XLV",
+    "XLY"
+  ],
+  "methodology": {
+    "bench_ticker": "SPY",
+    "bil_ticker": "BIL",
+    "phase": "MID",
+    "selection_policy": "equal_weight_selected_tickers",
+    "target_normalization": "absolute_weight_sum_capped_at_1"
+  },
+  "provider_flags": {
+    "fred_macro": "analysis_only_point_in_time_when_enabled",
+    "historical_provider_flow": "neutral_stub",
+    "massive_provider_flow": "analysis_only_snapshot_replay_when_available",
+    "ohlcv_provider": "auto"
+  },
+  "purpose": "research_only_10_year_walk_forward_calibration",
+  "rebalance": {
+    "cadence": "W-FRI",
+    "date_builder": "src.backtest.weekly_rebalance_dates"
+  },
+  "safety": {
+    "live_promotion_requires_separate_ticket": true,
+    "no_live_scoring_changes": true,
+    "research_only": true
+  },
+  "scoring_parameters": {
+    "binary_filter_count": 3.0,
+    "composite_weights": {
+      "binary_filters": 0.12,
+      "cycle_tilt": 0.08,
+      "mansfield_rs_z": 0.12,
+      "mom_12_1_z": 0.22,
+      "provider_flow_z": 0.23,
+      "rs_momentum_z": 0.08,
+      "rs_ratio_z": 0.15
+    },
+    "flow_veto": {
+      "replacement_score": -9.99,
+      "threshold_z": -0.5
+    },
+    "rank_ascending": false,
+    "rank_method": "min",
+    "selection_top_n_by_class": {
+      "Countries": 3,
+      "Crypto": 1,
+      "Factors": 2,
+      "Mega-Cap Stocks": 3,
+      "Themes": 3,
+      "US Industries": 3,
+      "US Sectors": 4
+    },
+    "state_machine": {
+      "bearish_stage_4": {
+        "cmf21_lt": -0.1,
+        "mansfield_rs_lt": 0.0
+      },
+      "exit": {
+        "antonacci_eq": 0,
+        "block_up_ratio_lt": 0.7,
+        "cmf21_lt": -0.1,
+        "etf_flow_5d_pct_lt": -1.5,
+        "mansfield_rs_lt": 0.0,
+        "rrg_quadrant_eq": "Lagging"
+      },
+      "hold": {
+        "stage_eq": 2
+      },
+      "stage_1_basing": {
+        "stage_eq": 1
+      },
+      "stage_2_bullish": {
+        "breadth_50d_gte": 0.6,
+        "cmf21_gt": 0.05,
+        "etf_flow_5d_pct_gte": 0.0,
+        "rrg_quadrant_eq": "Leading",
+        "stage_eq": 2
+      },
+      "warning": {
+        "breadth_50d_lt": 0.5,
+        "cmf21_lt": 0.0,
+        "dist_days_25_gte": 4,
+        "obv_divergence_eq": true,
+        "rrg_quadrant_eq": "Weakening"
+      }
+    },
+    "state_order": [
+      "STAGE_2_BULLISH",
+      "HOLD",
+      "WARNING",
+      "EXIT",
+      "BEARISH_STAGE_4",
+      "STAGE_1_BASING"
+    ]
+  },
+  "signal_labels": {
+    "forward_horizons_weeks": [
+      4,
+      13,
+      26,
+      52
+    ],
+    "negative_success": [
+      "avoided_underperformance",
+      "avoided_drawdown",
+      "failed_positive_follow_through",
+      "risk_off_or_reduce_exposure_success"
+    ],
+    "positive_success": [
+      "forward_absolute_return",
+      "forward_excess_return_vs_class_benchmark",
+      "post_entry_drawdown"
+    ]
+  },
+  "slice": "B-163.1",
+  "state_machine": {
+    "historical_policy": "recompute_state_per_rebalance_snapshot",
+    "state_file_writes": "disabled"
+  },
+  "ticket": "B-163",
+  "universe": [
+    "AGG",
+    "BIL",
+    "SPY",
+    "XLB",
+    "XLC",
+    "XLE",
+    "XLF",
+    "XLI",
+    "XLK",
+    "XLP",
+    "XLRE",
+    "XLU",
+    "XLV",
+    "XLY"
+  ],
+  "universe_classes": {
+    "AGG": "Other",
+    "BIL": "Benchmark",
+    "SPY": "Benchmark",
+    "XLB": "US Sectors",
+    "XLC": "US Sectors",
+    "XLE": "US Sectors",
+    "XLF": "US Sectors",
+    "XLI": "US Sectors",
+    "XLK": "US Sectors",
+    "XLP": "US Sectors",
+    "XLRE": "US Sectors",
+    "XLU": "US Sectors",
+    "XLV": "US Sectors",
+    "XLY": "US Sectors"
+  },
+  "walk_forward": {
+    "calibration_years": 5,
+    "final_holdout_years": 1,
+    "requested_years": 10,
+    "validation_years": 1
+  }
+}

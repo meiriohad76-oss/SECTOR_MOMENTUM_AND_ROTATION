@@ -96,6 +96,119 @@ def test_split_backtest_metrics_returns_finite_zeroes_for_empty_windows():
     assert windows["In-sample"]["max_drawdown"] == 0.0
 
 
+def test_frozen_baseline_config_is_deterministic_and_hash_is_order_independent():
+    config = backtest.frozen_baseline_config(
+        universe=["XLK", "SPY", "BIL", "XLK"],
+        ohlcv_provider="massive",
+        transaction_cost_bps=5.0,
+        phase="MID",
+    )
+    same_config = backtest.frozen_baseline_config(
+        universe=("BIL", "SPY", "XLK"),
+        ohlcv_provider="massive",
+        transaction_cost_bps=5.0,
+        phase="MID",
+    )
+
+    assert config == same_config
+    assert config["ticket"] == "B-163"
+    assert config["universe"] == ["BIL", "SPY", "XLK"]
+    assert config["rebalance"]["cadence"] == "W-FRI"
+    assert config["accounting"]["transaction_cost_bps"] == 5.0
+    assert config["accounting"]["periods_per_year"] == backtest.TRADING_DAYS_PER_YEAR
+    assert config["provider_flags"]["ohlcv_provider"] == "massive"
+    assert config["provider_flags"]["historical_provider_flow"] == "neutral_stub"
+    assert config["universe_classes"] == {
+        "BIL": "Benchmark",
+        "SPY": "Benchmark",
+        "XLK": "US Sectors",
+    }
+    assert config["scoring_parameters"]["composite_weights"] == {
+        "mom_12_1_z": 0.22,
+        "mansfield_rs_z": 0.12,
+        "rs_ratio_z": 0.15,
+        "rs_momentum_z": 0.08,
+        "binary_filters": 0.12,
+        "cycle_tilt": 0.08,
+        "provider_flow_z": 0.23,
+    }
+    assert config["scoring_parameters"]["flow_veto"]["threshold_z"] == -0.5
+    assert config["scoring_parameters"]["flow_veto"]["replacement_score"] == -9.99
+    assert config["scoring_parameters"]["selection_top_n_by_class"]["US Sectors"] == 4
+    assert config["scoring_parameters"]["state_machine"]["exit"]["etf_flow_5d_pct_lt"] == -1.5
+    assert config["scoring_parameters"]["state_machine"]["warning"]["dist_days_25_gte"] == 4
+    assert config["scoring_parameters"]["state_machine"]["stage_2_bullish"]["breadth_50d_gte"] == 0.60
+    assert config["algorithm_components"]["target_builder"] == (
+        "src.backtest.build_historical_methodology_targets"
+    )
+    assert config["safety"]["research_only"] is True
+    assert config["safety"]["live_promotion_requires_separate_ticket"] is True
+
+    reordered = {key: config[key] for key in reversed(config)}
+    reordered["provider_flags"] = {
+        key: config["provider_flags"][key] for key in reversed(config["provider_flags"])
+    }
+    digest = backtest.baseline_config_hash(config)
+    assert digest == backtest.baseline_config_hash(reordered)
+    assert len(digest) == 64
+    int(digest, 16)
+
+
+def test_walk_forward_calibration_splits_cover_ten_years_without_holdout_leakage():
+    dates = pd.bdate_range("2016-01-01", "2025-12-31")
+
+    splits = backtest.walk_forward_calibration_splits(
+        dates,
+        years=10,
+        calibration_years=5,
+        validation_years=1,
+        final_holdout_years=1,
+    )
+
+    assert len(splits) == 4
+    assert [split.name for split in splits] == ["fold_01", "fold_02", "fold_03", "fold_04"]
+    assert splits[0].calibration_start == pd.Timestamp("2016-01-01")
+    assert splits[0].validation_start == pd.Timestamp("2021-01-01")
+    assert splits[-1].validation_end < splits[-1].final_holdout_start
+    assert {split.final_holdout_start for split in splits} == {pd.Timestamp("2024-12-31")}
+    assert {split.final_holdout_end for split in splits} == {pd.Timestamp("2025-12-31")}
+    for split in splits:
+        assert split.calibration_start <= split.calibration_end < split.validation_start
+        assert split.validation_start <= split.validation_end < split.final_holdout_start
+        assert split.final_holdout_start <= split.final_holdout_end
+
+    summary = backtest.walk_forward_split_summary(splits)
+    assert summary["status"] == "ready"
+    assert summary["requested_years"] == 10
+    assert summary["window"]["start"] == "2016-01-01"
+    assert summary["window"]["end"] == "2025-12-31"
+    assert summary["final_holdout"]["start"] == "2024-12-31"
+    assert summary["fold_count"] == 4
+    assert summary["folds"][0]["calibration_start"] == "2016-01-01"
+
+
+def test_walk_forward_calibration_splits_reject_invalid_or_too_short_history():
+    dates = pd.bdate_range("2024-01-01", periods=40)
+
+    with pytest.raises(ValueError, match="at least 10 years"):
+        backtest.walk_forward_calibration_splits(dates, years=10)
+
+    gap_after_window_start = pd.DatetimeIndex(
+        [pd.Timestamp("2016-01-01")]
+    ).append(pd.bdate_range("2016-03-01", "2025-12-31"))
+    with pytest.raises(ValueError, match="continuous 10-year window"):
+        backtest.walk_forward_calibration_splits(gap_after_window_start, years=10)
+
+    with pytest.raises(ValueError, match="calibration, validation, and holdout"):
+        backtest.walk_forward_calibration_splits(
+            pd.bdate_range("2016-01-01", "2025-12-31"),
+            years=10,
+            calibration_years=8,
+            validation_years=1,
+            final_holdout_years=1,
+        )
+
+
 def test_multi_asset_weights_drift_between_rebalance_dates():
     dates = pd.bdate_range("2024-01-01", periods=3)
     prices = pd.DataFrame(

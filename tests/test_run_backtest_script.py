@@ -17,6 +17,9 @@ def test_run_backtest_artifact_paths_are_repo_root_anchored():
     assert run_backtest.EQUITY_PATH == run_backtest.ROOT / "docs" / "backtest_equity.csv"
     assert run_backtest.STATES_PATH == run_backtest.ROOT / "docs" / "backtest_states.csv"
     assert run_backtest.METADATA_PATH == run_backtest.ROOT / "docs" / "backtest_metadata.json"
+    assert run_backtest._calibration_baseline_config_path() == (
+        run_backtest.ROOT / "docs" / "calibration_10y_baseline_config.json"
+    )
     assert run_backtest.FRED_VALIDATION_REPORT_PATH == (
         run_backtest.ROOT / "docs" / "fred_macro_validation_report.md"
     )
@@ -29,6 +32,20 @@ def test_run_backtest_artifact_paths_are_repo_root_anchored():
     assert run_backtest.MASSIVE_VALIDATION_SUMMARY_PATH == (
         run_backtest.ROOT / "docs" / "massive_provider_validation_summary.csv"
     )
+
+
+def test_static_calibration_baseline_config_matches_current_runner_baseline():
+    expected = backtest.frozen_baseline_config(
+        universe=run_backtest.REQUIRED_TICKERS,
+        benchmark_tickers=["AGG", "SPY", *run_backtest.SECTOR_BENCHMARK_TICKERS],
+        ohlcv_provider="auto",
+        transaction_cost_bps=5.0,
+        phase="MID",
+    )
+
+    artifact = json.loads(run_backtest._calibration_baseline_config_path().read_text(encoding="utf-8"))
+
+    assert artifact == expected
 
 
 def test_run_backtest_parser_exposes_macro_variants_flag():
@@ -1011,6 +1028,19 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     assert metadata["macro_variant_summary"] == []
     assert "Methodology" in metadata["equity_columns"]
     assert metadata["states_columns"] == ["XLK", "XLF"]
+    assert metadata["baseline_config"]["ticket"] == "B-163"
+    assert metadata["baseline_config"]["universe"] == expected_tickers
+    assert metadata["baseline_config"]["provider_flags"]["ohlcv_provider"] == "auto"
+    assert metadata["baseline_config_sha256"] == backtest.baseline_config_hash(
+        metadata["baseline_config"]
+    )
+    baseline_config_path = run_backtest._calibration_baseline_config_path()
+    assert baseline_config_path.exists()
+    assert json.loads(baseline_config_path.read_text(encoding="utf-8")) == metadata[
+        "baseline_config"
+    ]
+    assert metadata["calibration_split_summary"]["status"] == "insufficient_history"
+    assert metadata["calibration_split_summary"]["requested_years"] == 10
 
 
 def test_run_backtest_live_smoke_fetches_short_period_without_artifacts(

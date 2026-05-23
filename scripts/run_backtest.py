@@ -29,6 +29,7 @@ FRED_VALIDATION_REPORT_PATH = ROOT / "docs" / "fred_macro_validation_report.md"
 FRED_VALIDATION_SUMMARY_PATH = ROOT / "docs" / "fred_macro_validation_summary.csv"
 MASSIVE_VALIDATION_REPORT_PATH = ROOT / "docs" / "massive_provider_validation_report.md"
 MASSIVE_VALIDATION_SUMMARY_PATH = ROOT / "docs" / "massive_provider_validation_summary.csv"
+CALIBRATION_BASELINE_CONFIG_FILENAME = "calibration_10y_baseline_config.json"
 MASSIVE_AGGS_ENDPOINT = "https://api.massive.com/v2/aggs/ticker/{ticker}/range/1/day/{from}/{to}"
 MASSIVE_TRADES_ENDPOINT = "https://api.massive.com/v3/trades/{ticker}"
 MASSIVE_BLOCK_TRADE_THRESHOLDS = (1.0, 1.25, 1.5)
@@ -80,6 +81,17 @@ def _sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _calibration_baseline_config_path() -> Path:
+    return METADATA_PATH.with_name(CALIBRATION_BASELINE_CONFIG_FILENAME)
+
+
+def _artifact_label(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        return path.name
+
+
 def _replace_bytes(path: Path, payload: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_name(path.name + ".tmp")
@@ -123,6 +135,8 @@ def _write_artifacts(
     massive_validation_report: str | None = None,
     massive_validation_summary=None,
     ohlcv_source: dict | None = None,
+    baseline_config: dict | None = None,
+    calibration_split_summary: dict | None = None,
 ) -> None:
     report_bytes = report.encode("utf-8")
     methodology_report_bytes = methodology_report.encode("utf-8")
@@ -145,6 +159,7 @@ def _write_artifacts(
         "macro_variant_summary": _frame_records(macro_variant_summary),
         "massive_validation_summary": _frame_records(massive_validation_summary),
         "ohlcv_source": ohlcv_source or {},
+        "calibration_split_summary": calibration_split_summary or {},
     }
     payloads = {
         REPORT_PATH: report_bytes,
@@ -168,6 +183,16 @@ def _write_artifacts(
         massive_validation_summary_bytes = massive_validation_summary.to_csv(index=False).encode("utf-8")
         payloads[MASSIVE_VALIDATION_SUMMARY_PATH] = massive_validation_summary_bytes
         metadata["massive_validation_summary_sha256"] = _sha256_bytes(massive_validation_summary_bytes)
+    if baseline_config is not None:
+        baseline_config_bytes = (
+            json.dumps(baseline_config, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8")
+        baseline_config_path = _calibration_baseline_config_path()
+        payloads[baseline_config_path] = baseline_config_bytes
+        metadata["baseline_config"] = baseline_config
+        metadata["baseline_config_sha256"] = backtest.baseline_config_hash(baseline_config)
+        metadata["baseline_config_artifact"] = _artifact_label(baseline_config_path)
+        metadata["baseline_config_artifact_sha256"] = _sha256_bytes(baseline_config_bytes)
     metadata_bytes = (json.dumps(metadata, indent=2, sort_keys=True) + "\n").encode("utf-8")
     payloads[METADATA_PATH] = metadata_bytes
     staged = _stage_artifacts(payloads)
@@ -249,6 +274,45 @@ def _resolve_validation_split(
             f"({in_sample_count} in-sample, {oos_count} OOS rebalances)"
         ),
     )
+
+
+def _date_or_none(index: pd.DatetimeIndex, position: int) -> str | None:
+    if len(index) == 0:
+        return None
+    return pd.Timestamp(index[position]).date().isoformat()
+
+
+def _build_calibration_split_summary(
+    rebalance_dates,
+    *,
+    years: int = 10,
+    calibration_years: int = 5,
+    validation_years: int = 1,
+    final_holdout_years: int = 1,
+) -> dict:
+    dates = pd.DatetimeIndex(pd.to_datetime(rebalance_dates)).dropna().sort_values().unique()
+    try:
+        splits = backtest.walk_forward_calibration_splits(
+            dates,
+            years=years,
+            calibration_years=calibration_years,
+            validation_years=validation_years,
+            final_holdout_years=final_holdout_years,
+        )
+    except ValueError as exc:
+        return {
+            "status": "insufficient_history",
+            "requested_years": years,
+            "calibration_years": calibration_years,
+            "validation_years": validation_years,
+            "final_holdout_years": final_holdout_years,
+            "available_start": _date_or_none(dates, 0),
+            "available_end": _date_or_none(dates, -1),
+            "fold_count": 0,
+            "folds": [],
+            "reason": str(exc),
+        }
+    return backtest.walk_forward_split_summary(splits, requested_years=years)
 
 
 def _fetch_macro_data(enabled: bool) -> dict[str, pd.Series]:
@@ -1275,6 +1339,14 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         rebalance_dates = backtest.weekly_rebalance_dates(prices)
+        baseline_config = backtest.frozen_baseline_config(
+            universe=REQUIRED_TICKERS,
+            benchmark_tickers=["AGG", "SPY", *SECTOR_BENCHMARK_TICKERS],
+            ohlcv_provider=requested_provider,
+            transaction_cost_bps=5.0,
+            phase="MID",
+        )
+        calibration_split_summary = _build_calibration_split_summary(rebalance_dates)
         methodology_targets = backtest.build_historical_methodology_targets(
             ohlcv,
             rebalance_dates=rebalance_dates,
@@ -1456,6 +1528,8 @@ def main(argv: list[str] | None = None) -> int:
             massive_validation_report=massive_validation_report,
             massive_validation_summary=massive_validation_summary,
             ohlcv_source=ohlcv_source,
+            baseline_config=baseline_config,
+            calibration_split_summary=calibration_split_summary,
         )
     except Exception as exc:
         print(f"Manual backtest data validation failed: {exc}")

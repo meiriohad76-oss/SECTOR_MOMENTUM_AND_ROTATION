@@ -5,8 +5,10 @@ writes. It accepts already-loaded prices and target weights.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
-from typing import Callable, Optional, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -46,6 +48,17 @@ class MacroVariantRule:
     availability_lag_days: int = 0
 
 
+@dataclass(frozen=True)
+class WalkForwardSplit:
+    name: str
+    calibration_start: pd.Timestamp
+    calibration_end: pd.Timestamp
+    validation_start: pd.Timestamp
+    validation_end: pd.Timestamp
+    final_holdout_start: pd.Timestamp
+    final_holdout_end: pd.Timestamp
+
+
 ScoreSnapshotFn = Callable[[dict[str, pd.DataFrame], str, str, str], pd.DataFrame]
 
 
@@ -57,6 +70,308 @@ def _finite_scalar(name: str, value) -> float:
     if not np.isfinite(number):
         raise ValueError(f"{name} must be finite")
     return number
+
+
+def _sorted_unique_strings(name: str, values: Sequence[str]) -> list[str]:
+    out = sorted({str(value).strip().upper() for value in values if str(value).strip()})
+    if not out:
+        raise ValueError(f"{name} must contain at least one value")
+    return out
+
+
+def _positive_int(name: str, value) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be a positive integer") from exc
+    if number <= 0 or float(number) != float(value):
+        raise ValueError(f"{name} must be a positive integer")
+    return number
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, pd.Timestamp):
+        return value.date().isoformat()
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, np.floating):
+        number = float(value)
+        if not np.isfinite(number):
+            raise ValueError("configuration contains non-finite numeric value")
+        return number
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, set):
+        return [_json_safe(item) for item in sorted(value)]
+    return value
+
+
+def baseline_config_hash(config: dict) -> str:
+    payload = json.dumps(
+        _json_safe(config),
+        allow_nan=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def frozen_baseline_config(
+    universe: Sequence[str],
+    *,
+    benchmark_tickers: Sequence[str] = ("AGG", "SPY"),
+    rebalance_cadence: str = "W-FRI",
+    phase: str = "MID",
+    bench_ticker: str = "SPY",
+    bil_ticker: str = "BIL",
+    ohlcv_provider: str = "auto",
+    transaction_cost_bps: float = 5.0,
+    periods_per_year: int = TRADING_DAYS_PER_YEAR,
+    requested_years: int = 10,
+    calibration_years: int = 5,
+    validation_years: int = 1,
+    final_holdout_years: int = 1,
+    signal_horizons_weeks: Sequence[int] = (4, 13, 26, 52),
+) -> dict:
+    cost_bps = _finite_scalar("transaction_cost_bps", transaction_cost_bps)
+    if cost_bps < 0:
+        raise ValueError("transaction_cost_bps must be non-negative")
+    periods = _positive_int("periods_per_year", periods_per_year)
+    horizons = sorted({_positive_int("signal_horizons_weeks", value) for value in signal_horizons_weeks})
+    if not horizons:
+        raise ValueError("signal_horizons_weeks must contain at least one value")
+    universe_tickers = _sorted_unique_strings("universe", universe)
+    from . import scoring, universe as universe_module
+
+    return {
+        "ticket": "B-163",
+        "slice": "B-163.1",
+        "purpose": "research_only_10_year_walk_forward_calibration",
+        "universe": universe_tickers,
+        "universe_classes": {
+            ticker: universe_module.class_of(ticker)
+            for ticker in universe_tickers
+        },
+        "benchmarks": _sorted_unique_strings("benchmark_tickers", benchmark_tickers),
+        "rebalance": {
+            "cadence": str(rebalance_cadence),
+            "date_builder": "src.backtest.weekly_rebalance_dates",
+        },
+        "methodology": {
+            "phase": str(phase),
+            "bench_ticker": str(bench_ticker).strip().upper(),
+            "bil_ticker": str(bil_ticker).strip().upper(),
+            "selection_policy": "equal_weight_selected_tickers",
+            "target_normalization": "absolute_weight_sum_capped_at_1",
+        },
+        "accounting": {
+            "transaction_cost_bps": cost_bps,
+            "periods_per_year": periods,
+        },
+        "walk_forward": {
+            "requested_years": _positive_int("requested_years", requested_years),
+            "calibration_years": _positive_int("calibration_years", calibration_years),
+            "validation_years": _positive_int("validation_years", validation_years),
+            "final_holdout_years": _positive_int("final_holdout_years", final_holdout_years),
+        },
+        "signal_labels": {
+            "forward_horizons_weeks": horizons,
+            "positive_success": [
+                "forward_absolute_return",
+                "forward_excess_return_vs_class_benchmark",
+                "post_entry_drawdown",
+            ],
+            "negative_success": [
+                "avoided_underperformance",
+                "avoided_drawdown",
+                "failed_positive_follow_through",
+                "risk_off_or_reduce_exposure_success",
+            ],
+        },
+        "provider_flags": {
+            "ohlcv_provider": str(ohlcv_provider),
+            "historical_provider_flow": "neutral_stub",
+            "fred_macro": "analysis_only_point_in_time_when_enabled",
+            "massive_provider_flow": "analysis_only_snapshot_replay_when_available",
+        },
+        "scoring_parameters": scoring.methodology_scoring_parameters(),
+        "algorithm_components": {
+            "indicator_builder": "src.indicators.compute_all_indicators",
+            "flow_builder": "src.flow.compute_flow_signals",
+            "score_builder": "src.scoring.compute_composite",
+            "state_function": "src.scoring.decide_state",
+            "target_builder": "src.backtest.build_historical_methodology_targets",
+            "weight_builder": "src.backtest.target_weights_from_scores",
+            "accounting_engine": "src.backtest.run_weight_backtest",
+        },
+        "state_machine": {
+            "historical_policy": "recompute_state_per_rebalance_snapshot",
+            "state_file_writes": "disabled",
+        },
+        "safety": {
+            "research_only": True,
+            "live_promotion_requires_separate_ticket": True,
+            "no_live_scoring_changes": True,
+        },
+    }
+
+
+def _clean_datetime_index(name: str, dates: Sequence[pd.Timestamp] | pd.DatetimeIndex) -> pd.DatetimeIndex:
+    try:
+        index = pd.DatetimeIndex(pd.to_datetime(dates))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be datetime-like") from exc
+    index = index[~index.isna()]
+    if index.empty:
+        raise ValueError(f"{name} must contain at least one date")
+    return pd.DatetimeIndex(sorted(index.unique()))
+
+
+def _first_on_or_after(index: pd.DatetimeIndex, target: pd.Timestamp) -> pd.Timestamp | None:
+    matches = index[index >= target]
+    if matches.empty:
+        return None
+    return pd.Timestamp(matches[0])
+
+
+def _last_before(index: pd.DatetimeIndex, target: pd.Timestamp) -> pd.Timestamp | None:
+    matches = index[index < target]
+    if matches.empty:
+        return None
+    return pd.Timestamp(matches[-1])
+
+
+def walk_forward_calibration_splits(
+    dates: Sequence[pd.Timestamp] | pd.DatetimeIndex,
+    *,
+    years: int = 10,
+    calibration_years: int = 5,
+    validation_years: int = 1,
+    final_holdout_years: int = 1,
+) -> list[WalkForwardSplit]:
+    years = _positive_int("years", years)
+    calibration_years = _positive_int("calibration_years", calibration_years)
+    validation_years = _positive_int("validation_years", validation_years)
+    final_holdout_years = _positive_int("final_holdout_years", final_holdout_years)
+    if calibration_years + validation_years + final_holdout_years >= years:
+        raise ValueError(
+            "calibration, validation, and holdout years must leave rolling history before "
+            "the final holdout"
+        )
+
+    index = _clean_datetime_index("dates", dates)
+    window_end = pd.Timestamp(index[-1])
+    window_start_target = window_end - pd.DateOffset(years=years) + pd.Timedelta(days=1)
+    if pd.Timestamp(index[0]) > window_start_target:
+        raise ValueError(f"dates must span at least {years} years")
+    window_dates = index[index >= window_start_target]
+    if window_dates.empty:
+        raise ValueError(f"dates must span at least {years} years")
+    if pd.Timestamp(window_dates[0]) - window_start_target > pd.Timedelta(days=7):
+        raise ValueError("dates must provide a continuous 10-year window without large gaps")
+    if len(window_dates) > 1:
+        max_gap = pd.Series(window_dates).diff().dropna().max()
+        if pd.notna(max_gap) and max_gap > pd.Timedelta(days=45):
+            raise ValueError("dates must provide a continuous 10-year window without large gaps")
+    window_start = pd.Timestamp(window_dates[0])
+    holdout_start_target = window_end - pd.DateOffset(years=final_holdout_years)
+    holdout_start = _first_on_or_after(window_dates, holdout_start_target)
+    if holdout_start is None:
+        raise ValueError("final holdout window cannot be built from available dates")
+
+    splits: list[WalkForwardSplit] = []
+    calibration_start = window_start
+    while True:
+        validation_start_target = calibration_start + pd.DateOffset(years=calibration_years)
+        validation_start = _first_on_or_after(window_dates, validation_start_target)
+        if validation_start is None or validation_start >= holdout_start:
+            break
+        calibration_end = _last_before(window_dates, validation_start)
+        validation_end_target = validation_start + pd.DateOffset(years=validation_years)
+        validation_end_limit = min(validation_end_target, holdout_start)
+        validation_end = _last_before(window_dates, validation_end_limit)
+        if calibration_end is None or validation_end is None:
+            break
+        if not (calibration_start <= calibration_end < validation_start <= validation_end < holdout_start):
+            break
+        splits.append(
+            WalkForwardSplit(
+                name=f"fold_{len(splits) + 1:02d}",
+                calibration_start=pd.Timestamp(calibration_start),
+                calibration_end=pd.Timestamp(calibration_end),
+                validation_start=pd.Timestamp(validation_start),
+                validation_end=pd.Timestamp(validation_end),
+                final_holdout_start=pd.Timestamp(holdout_start),
+                final_holdout_end=pd.Timestamp(window_end),
+            )
+        )
+        next_start_target = calibration_start + pd.DateOffset(years=validation_years)
+        next_start = _first_on_or_after(window_dates, next_start_target)
+        if next_start is None or next_start <= calibration_start:
+            break
+        calibration_start = pd.Timestamp(next_start)
+
+    if not splits:
+        raise ValueError("walk-forward split parameters produced no calibration folds")
+    return splits
+
+
+def _date_string(value: pd.Timestamp) -> str:
+    return pd.Timestamp(value).date().isoformat()
+
+
+def _split_to_record(split: WalkForwardSplit) -> dict[str, str]:
+    return {
+        "name": split.name,
+        "calibration_start": _date_string(split.calibration_start),
+        "calibration_end": _date_string(split.calibration_end),
+        "validation_start": _date_string(split.validation_start),
+        "validation_end": _date_string(split.validation_end),
+        "final_holdout_start": _date_string(split.final_holdout_start),
+        "final_holdout_end": _date_string(split.final_holdout_end),
+    }
+
+
+def walk_forward_split_summary(
+    splits: Sequence[WalkForwardSplit],
+    *,
+    requested_years: int = 10,
+) -> dict:
+    requested_years = _positive_int("requested_years", requested_years)
+    if not splits:
+        return {
+            "status": "no_splits",
+            "requested_years": requested_years,
+            "fold_count": 0,
+            "folds": [],
+        }
+    no_lookahead_verified = all(
+        split.calibration_start <= split.calibration_end < split.validation_start
+        and split.validation_start <= split.validation_end < split.final_holdout_start
+        and split.final_holdout_start <= split.final_holdout_end
+        for split in splits
+    )
+    window_start = min(split.calibration_start for split in splits)
+    window_end = max(split.final_holdout_end for split in splits)
+    holdout_start = min(split.final_holdout_start for split in splits)
+    holdout_end = max(split.final_holdout_end for split in splits)
+    return {
+        "status": "ready",
+        "requested_years": requested_years,
+        "fold_count": len(splits),
+        "window": {
+            "start": _date_string(window_start),
+            "end": _date_string(window_end),
+        },
+        "final_holdout": {
+            "start": _date_string(holdout_start),
+            "end": _date_string(holdout_end),
+        },
+        "no_lookahead_verified": no_lookahead_verified,
+        "folds": [_split_to_record(split) for split in splits],
+    }
 
 
 def _clean_prices(prices: pd.DataFrame) -> pd.DataFrame:
