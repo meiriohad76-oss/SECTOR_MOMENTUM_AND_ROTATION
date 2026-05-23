@@ -16,6 +16,7 @@ import pandas as pd
 import streamlit as st
 
 from src.backtest import drawdown_frame, normalized_equity_frame
+from src.calibration_dashboard import calibration_artifact_status_rows
 from src.component_docs import DASHBOARD_COMPONENT_DOCS, component_docs_html
 from src.comparison_view import (
     comparison_card_rows,
@@ -1906,12 +1907,6 @@ def _read_csv_artifact(path: Path) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def _artifact_status_label(path: Path, expected_hash: str | None = None) -> str:
-    if expected_hash is not None:
-        return "READY" if _artifact_hash_matches(path, expected_hash) else "PENDING"
-    return "READY" if path.exists() else "PENDING"
-
-
 def render_calibration_lab():
     _md(
         """
@@ -1936,43 +1931,20 @@ def render_calibration_lab():
         "baseline_config_artifact_sha256"
     )
     baseline_config_exists = CALIBRATION_BASELINE_CONFIG_PATH.exists()
-    baseline_verified = bool(baseline_hash) and _artifact_hash_matches(
-        CALIBRATION_BASELINE_CONFIG_PATH, baseline_hash
+    status_rows = calibration_artifact_status_rows(
+        baseline_config_path=CALIBRATION_BASELINE_CONFIG_PATH,
+        report_path=CALIBRATION_REPORT_PATH,
+        summary_path=CALIBRATION_SUMMARY_PATH,
+        candidates_path=CALIBRATION_CANDIDATES_PATH,
+        metadata_path=CALIBRATION_METADATA_PATH,
+        baseline_hash=baseline_hash,
     )
-    baseline_status = (
-        "VERIFIED" if baseline_verified else "UNVERIFIED" if baseline_config_exists else "PENDING"
-    )
+    baseline_status = status_rows[0]["Status"]
+    baseline_verified = baseline_status == "VERIFIED"
     split_summary = metadata.get("calibration_split_summary") or calibration_metadata.get(
         "calibration_split_summary"
     )
 
-    status_rows = [
-        {
-            "Artifact": "Frozen baseline config",
-            "Path": "docs/calibration_10y_baseline_config.json",
-            "Status": baseline_status,
-        },
-        {
-            "Artifact": "Calibration report",
-            "Path": "docs/calibration_10y_report.md",
-            "Status": _artifact_status_label(CALIBRATION_REPORT_PATH),
-        },
-        {
-            "Artifact": "Calibration summary",
-            "Path": "docs/calibration_10y_summary.csv",
-            "Status": _artifact_status_label(CALIBRATION_SUMMARY_PATH),
-        },
-        {
-            "Artifact": "Calibration candidates",
-            "Path": "docs/calibration_10y_candidates.csv",
-            "Status": _artifact_status_label(CALIBRATION_CANDIDATES_PATH),
-        },
-        {
-            "Artifact": "Calibration metadata",
-            "Path": "docs/calibration_10y_metadata.json",
-            "Status": _artifact_status_label(CALIBRATION_METADATA_PATH),
-        },
-    ]
     st.dataframe(pd.DataFrame(status_rows), hide_index=True, use_container_width=True)
 
     if split_summary:

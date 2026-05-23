@@ -45,6 +45,14 @@ def test_component_docs_rows_are_operator_scannable():
     assert all(row["Render Function"].startswith("render_") for row in rows)
 
 
+def test_component_docs_cover_calibration_hash_states():
+    calibration_doc = next(doc for doc in DASHBOARD_COMPONENT_DOCS if doc.name == "Calibration lab")
+
+    assert "baseline pending" in calibration_doc.states
+    assert "hash unverified" in calibration_doc.states
+    assert "hash verified" in calibration_doc.states
+
+
 def test_component_docs_html_is_generated_from_catalog():
     html = component_docs_html(DASHBOARD_COMPONENT_DOCS)
 

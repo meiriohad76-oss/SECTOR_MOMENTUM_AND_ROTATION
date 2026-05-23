@@ -150,8 +150,8 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         section="Research",
         render_function="render_calibration_lab",
         data_inputs=("frozen baseline config", "calibration report", "summary artifacts"),
-        states=("baseline ready", "report pending", "candidate table"),
-        qa=("calibration dashboard static tests", "backtest unit tests"),
+        states=("baseline pending", "hash unverified", "hash verified", "report pending", "candidate table"),
+        qa=("calibration dashboard model tests", "calibration dashboard static tests", "backtest unit tests"),
     ),
     ComponentDoc(
         name="Evidence gates",

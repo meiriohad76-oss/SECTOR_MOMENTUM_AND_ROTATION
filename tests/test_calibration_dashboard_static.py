@@ -27,7 +27,9 @@ def test_app_surfaces_calibration_artifacts_without_running_calibration():
     assert "Calibration lab" in app_source
     assert "B-163" in app_source
     assert "baseline_config_exists = CALIBRATION_BASELINE_CONFIG_PATH.exists()" in app_source
-    assert "baseline_verified = bool(baseline_hash) and _artifact_hash_matches(" in app_source
+    assert "calibration_artifact_status_rows(" in app_source
+    assert 'baseline_status = status_rows[0]["Status"]' in app_source
+    assert 'baseline_verified = baseline_status == "VERIFIED"' in app_source
     assert "Hash status" in app_source
     assert "UNVERIFIED" in app_source
     assert "_read_csv_artifact(CALIBRATION_SUMMARY_PATH)" in app_source
