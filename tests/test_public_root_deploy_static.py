@@ -13,7 +13,9 @@ def test_cloudflare_docs_separate_public_root_from_dashboard():
     assert "Public methodology landing page" in docs
     assert "ahaddashboards.uk" in docs
     assert "www.ahaddashboards.uk" in docs
-    assert "dashboard.ahaddashboards.uk" in docs
+    assert "sentimentdashboard.ahaddashboards.uk" in docs
+    assert "https://dashboard.ahaddashboards.uk" not in docs
+    assert "cloudflared tunnel route dns sector-dashboard dashboard.ahaddashboards.uk" not in docs
     assert "http://localhost:8500" in docs
     assert "http://localhost:8501" in docs
     assert "public/" in docs
@@ -23,7 +25,8 @@ def test_cloudflare_docs_separate_public_root_from_dashboard():
     assert "hostname: ahaddashboards.uk" in config
     assert "hostname: www.ahaddashboards.uk" in config
     assert "service: http://localhost:8500" in config
-    assert "hostname: dashboard.ahaddashboards.uk" in config
+    assert "hostname: sentimentdashboard.ahaddashboards.uk" in config
+    assert "hostname: dashboard.ahaddashboards.uk" not in config
     assert "service: http://localhost:8501" in config
 
 

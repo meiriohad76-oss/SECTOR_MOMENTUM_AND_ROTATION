@@ -5,7 +5,7 @@
 B-152 keeps the public root separate from the dashboard:
 
 - Public root: `https://ahaddashboards.uk` and `https://www.ahaddashboards.uk` -> `http://localhost:8500`
-- Protected dashboard: `https://dashboard.ahaddashboards.uk` -> `http://localhost:8501`
+- Protected dashboard: `https://sentimentdashboard.ahaddashboards.uk` -> `http://localhost:8501`
 
 Serve the static `public/` directory with `systemd/methodology-landing.service` or the non-sudo `systemd/user/methodology-landing.service`, then route the root hostnames to that static service. Keep Cloudflare Access on the dashboard hostname so the live Streamlit app stays private while the methodology overview is public.
 
@@ -57,7 +57,7 @@ Pick the root and dashboard hostnames:
 ```bash
 cloudflared tunnel route dns sector-dashboard ahaddashboards.uk
 cloudflared tunnel route dns sector-dashboard www.ahaddashboards.uk
-cloudflared tunnel route dns sector-dashboard dashboard.ahaddashboards.uk
+cloudflared tunnel route dns sector-dashboard sentimentdashboard.ahaddashboards.uk
 ```
 
 This adds a `CNAME` to your Cloudflare DNS pointing at the tunnel. Repeat for additional subdomains if needed.
@@ -80,7 +80,7 @@ ingress:
     service: http://localhost:8500
   - hostname: www.ahaddashboards.uk
     service: http://localhost:8500
-  - hostname: dashboard.ahaddashboards.uk
+  - hostname: sentimentdashboard.ahaddashboards.uk
     service: http://localhost:8501
     originRequest:
       # Streamlit uses WebSocket for live updates
@@ -97,7 +97,7 @@ A copy of this template is in [`../config/cloudflared-config.yml.example`](../co
 cloudflared tunnel run sector-dashboard
 ```
 
-Open `https://ahaddashboards.uk` in your browser to see the public methodology page. Open `https://dashboard.ahaddashboards.uk` to verify the dashboard route. `Ctrl+C` to stop.
+Open `https://ahaddashboards.uk` in your browser to see the public methodology page. Open `https://sentimentdashboard.ahaddashboards.uk` to verify the dashboard route. `Ctrl+C` to stop.
 
 ## 7. Install as a service (auto-start on boot)
 

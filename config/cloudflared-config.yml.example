@@ -4,7 +4,7 @@
 #   1. <YOUR-TUNNEL-UUID>  — printed by `cloudflared tunnel create sector-dashboard`
 #   2. <USERNAME>          — your Pi username (e.g. meiri)
 #   3. ahaddashboards.uk / www.ahaddashboards.uk — public methodology root hostnames
-#   4. dashboard.ahaddashboards.uk — the protected dashboard hostname
+#   4. sentimentdashboard.ahaddashboards.uk — the protected dashboard hostname
 #
 # Then:
 #   sudo cloudflared service install
@@ -26,7 +26,7 @@ ingress:
     service: http://localhost:8500
 
   # Protected dashboard route
-  - hostname: dashboard.ahaddashboards.uk
+  - hostname: sentimentdashboard.ahaddashboards.uk
     service: http://localhost:8501
     originRequest:
       # Streamlit uses WebSocket for live updates

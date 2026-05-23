@@ -17,7 +17,7 @@ B-152 adds a static public landing page under `public/`. It is separate from the
 Use separate hostnames or Cloudflare applications:
 
 - Public root: `https://ahaddashboards.uk` and `https://www.ahaddashboards.uk` -> `http://localhost:8500`
-- Protected dashboard: `https://dashboard.ahaddashboards.uk` -> `http://localhost:8501`
+- Protected dashboard: `https://sentimentdashboard.ahaddashboards.uk` -> `http://localhost:8501`
 
 Keep Cloudflare Access enabled on the dashboard host. Do not put Cloudflare Access on the public methodology root unless you want the methodology page private too.
 
@@ -56,7 +56,7 @@ After updating DNS/Cloudflare Tunnel or Cloudflare Pages, verify both surfaces:
 ```bash
 curl -I https://ahaddashboards.uk/
 curl -I https://www.ahaddashboards.uk/
-curl -I https://dashboard.ahaddashboards.uk/?ticker=XLK
+curl -I https://sentimentdashboard.ahaddashboards.uk/?ticker=XLK
 ```
 
 Expected:

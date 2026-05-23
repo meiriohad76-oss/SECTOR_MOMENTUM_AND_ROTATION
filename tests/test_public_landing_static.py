@@ -36,9 +36,13 @@ def test_public_landing_explains_methodology_without_live_data():
 
 def test_public_landing_keeps_dashboard_separate_and_protected():
     html = INDEX.read_text(encoding="utf-8")
+    methodology_html = (PUBLIC / "methodology.html").read_text(encoding="utf-8")
     lower_html = html.lower()
 
-    assert "https://dashboard.ahaddashboards.uk/?ticker=XLK" in html
+    assert "https://sentimentdashboard.ahaddashboards.uk/?ticker=XLK" in html
+    assert "https://sentimentdashboard.ahaddashboards.uk/?ticker=XLK" in methodology_html
+    assert "https://dashboard.ahaddashboards.uk" not in html
+    assert "https://dashboard.ahaddashboards.uk" not in methodology_html
     assert "Cloudflare Access" in html
     assert "live picks" not in html.lower()
     assert "current holdings" not in html.lower()
