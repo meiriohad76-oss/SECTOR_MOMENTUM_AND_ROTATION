@@ -50,6 +50,14 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         qa=("static app wiring",),
     ),
     ComponentDoc(
+        name="Component docs",
+        section="Documentation",
+        render_function="render_component_docs",
+        data_inputs=("component catalog",),
+        states=("collapsed expander", "generated inventory"),
+        qa=("component docs tests",),
+    ),
+    ComponentDoc(
         name="BLUF",
         section="Decision surface",
         render_function="render_bluf",
@@ -136,6 +144,22 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         data_inputs=("manual backtest report", "equity artifact", "metadata hash"),
         states=("artifact ready", "artifact missing", "hash mismatch"),
         qa=("backtest static tests", "backtest unit tests"),
+    ),
+    ComponentDoc(
+        name="Calibration lab",
+        section="Research",
+        render_function="render_calibration_lab",
+        data_inputs=("frozen baseline config", "calibration report", "summary artifacts"),
+        states=("baseline ready", "report pending", "candidate table"),
+        qa=("calibration dashboard static tests", "backtest unit tests"),
+    ),
+    ComponentDoc(
+        name="Evidence gates",
+        section="Research",
+        render_function="render_evidence_gate_lab",
+        data_inputs=("FRED validation summary", "Massive validation summary", "evidence gate report"),
+        states=("blocked no candidates", "ready for review", "fail closed"),
+        qa=("evidence gate tests", "dashboard static tests"),
     ),
     ComponentDoc(
         name="Personal trade backtest",

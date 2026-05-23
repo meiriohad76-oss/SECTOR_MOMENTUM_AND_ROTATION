@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.evidence_gates import evaluate_promotion_gate, format_evidence_gate_report
+from src.evidence_gates import (
+    evaluate_promotion_gate,
+    format_evidence_gate_report,
+    promotion_gate_decisions_frame,
+)
 
 
 def test_evidence_gate_blocks_when_no_candidates():
@@ -99,3 +103,43 @@ def test_format_evidence_gate_report_documents_thresholds_and_rollback():
     assert "OOS Sharpe delta >= 0.10" in report
     assert "No live scoring, veto, alert, recommendation, broker, or Pillar 7 behavior changes are made by this report." in report
     assert "Rollback" in report
+
+
+def test_promotion_gate_decisions_frame_is_dashboard_safe_and_fail_closed():
+    fred = evaluate_promotion_gate(
+        ticket="B-158",
+        source="FRED macro",
+        summary=pd.DataFrame([{"variant": "Curve falling defensive", "promotion_label": "needs more testing"}]),
+        validation_report_path="docs/fred_macro_validation_report.md",
+    )
+    massive = evaluate_promotion_gate(
+        ticket="B-160",
+        source="Massive provider data",
+        summary=pd.DataFrame([{"variant": "Massive aggregate OHLCV", "promotion_label": "candidate"}]),
+        validation_report_path="docs/massive_provider_validation_report.md",
+    )
+
+    frame = promotion_gate_decisions_frame([fred, massive])
+
+    assert frame.to_dict("records") == [
+        {
+            "Ticket": "B-158",
+            "Source": "FRED macro",
+            "Status": "blocked_no_candidates",
+            "Validation Report": "docs/fred_macro_validation_report.md",
+            "Candidates": 0,
+            "Candidate Variants": "-",
+            "Blockers": "No candidate rows were present in the validation summary.",
+            "Live Promotion Allowed": False,
+        },
+        {
+            "Ticket": "B-160",
+            "Source": "Massive provider data",
+            "Status": "ready_for_review",
+            "Validation Report": "docs/massive_provider_validation_report.md",
+            "Candidates": 1,
+            "Candidate Variants": "Massive aggregate OHLCV",
+            "Blockers": "-",
+            "Live Promotion Allowed": False,
+        },
+    ]

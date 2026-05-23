@@ -98,6 +98,36 @@ def _csv_list(values: Iterable[str]) -> str:
     return ", ".join(items) if items else "-"
 
 
+def promotion_gate_decisions_frame(decisions: Iterable[PromotionGateDecision]) -> pd.DataFrame:
+    """Return dashboard-safe promotion gate rows without enabling live promotion."""
+    rows = [
+        {
+            "Ticket": decision.ticket,
+            "Source": decision.source,
+            "Status": decision.status,
+            "Validation Report": decision.validation_report_path,
+            "Candidates": decision.candidate_count,
+            "Candidate Variants": _csv_list(decision.candidate_variants),
+            "Blockers": _csv_list(decision.blockers),
+            "Live Promotion Allowed": bool(decision.live_promotion_allowed),
+        }
+        for decision in decisions
+    ]
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "Ticket",
+            "Source",
+            "Status",
+            "Validation Report",
+            "Candidates",
+            "Candidate Variants",
+            "Blockers",
+            "Live Promotion Allowed",
+        ],
+    )
+
+
 def format_evidence_gate_report(
     decisions: Iterable[PromotionGateDecision],
     *,

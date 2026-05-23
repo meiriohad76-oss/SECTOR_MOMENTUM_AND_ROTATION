@@ -30,6 +30,7 @@ from src.custom_universe import (
     summary_counts_frame,
 )
 from src.data import fetch_ohlcv_result, _select_ohlcv_provider
+from src.evidence_gates import evaluate_promotion_gate, promotion_gate_decisions_frame
 from src.flow import compute_flow_signals, flow_composite_z, STUB_MODE
 from src.indicators import compute_all_indicators
 from src.macro import assess_regime
@@ -349,6 +350,16 @@ BACKTEST_REPORT_PATH = APP_ROOT / "docs" / "backtest_report.md"
 BACKTEST_EQUITY_PATH = APP_ROOT / "docs" / "backtest_equity.csv"
 BACKTEST_STATES_PATH = APP_ROOT / "docs" / "backtest_states.csv"
 BACKTEST_METADATA_PATH = APP_ROOT / "docs" / "backtest_metadata.json"
+CALIBRATION_BASELINE_CONFIG_PATH = APP_ROOT / "docs" / "calibration_10y_baseline_config.json"
+CALIBRATION_REPORT_PATH = APP_ROOT / "docs" / "calibration_10y_report.md"
+CALIBRATION_SUMMARY_PATH = APP_ROOT / "docs" / "calibration_10y_summary.csv"
+CALIBRATION_CANDIDATES_PATH = APP_ROOT / "docs" / "calibration_10y_candidates.csv"
+CALIBRATION_METADATA_PATH = APP_ROOT / "docs" / "calibration_10y_metadata.json"
+FRED_VALIDATION_SUMMARY_PATH = APP_ROOT / "docs" / "fred_macro_validation_summary.csv"
+MASSIVE_VALIDATION_SUMMARY_PATH = APP_ROOT / "docs" / "massive_provider_validation_summary.csv"
+FRED_VALIDATION_REPORT_PATH = APP_ROOT / "docs" / "fred_macro_validation_report.md"
+MASSIVE_VALIDATION_REPORT_PATH = APP_ROOT / "docs" / "massive_provider_validation_report.md"
+EVIDENCE_GATE_REPORT_PATH = APP_ROOT / "docs" / "evidence_gate_report.md"
 SAVED_INPUTS_PATH = APP_ROOT / "data" / "saved_inputs.json"
 PREFERENCE_PROFILES_PATH = APP_ROOT / "data" / "preference_profiles.json"
 LOAD_WATCHLIST_LABEL = "LOAD WATCHLIST"
@@ -1886,6 +1897,217 @@ def _load_backtest_states(metadata):
         return None
 
 
+def _read_csv_artifact(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    try:
+        return pd.read_csv(path)
+    except Exception:
+        return pd.DataFrame()
+
+
+def _artifact_status_label(path: Path, expected_hash: str | None = None) -> str:
+    if expected_hash is not None:
+        return "READY" if _artifact_hash_matches(path, expected_hash) else "PENDING"
+    return "READY" if path.exists() else "PENDING"
+
+
+def render_calibration_lab():
+    _md(
+        """
+        <section class="section" id="calibration-lab">
+          <div class="section-head">
+            <h2>Calibration lab <span class="count">B-163 · research artifacts</span></h2>
+            <div class="right">READ-ONLY EVIDENCE</div>
+          </div>
+        </section>
+        """
+    )
+
+    metadata = _load_backtest_metadata() or {}
+    calibration_metadata = {}
+    if CALIBRATION_METADATA_PATH.exists():
+        try:
+            calibration_metadata = json.loads(CALIBRATION_METADATA_PATH.read_text(encoding="utf-8"))
+        except Exception as exc:
+            st.warning(f"Could not read calibration metadata artifact: {exc}")
+
+    baseline_hash = metadata.get("baseline_config_artifact_sha256") or calibration_metadata.get(
+        "baseline_config_artifact_sha256"
+    )
+    baseline_config_exists = CALIBRATION_BASELINE_CONFIG_PATH.exists()
+    baseline_verified = bool(baseline_hash) and _artifact_hash_matches(
+        CALIBRATION_BASELINE_CONFIG_PATH, baseline_hash
+    )
+    baseline_status = (
+        "VERIFIED" if baseline_verified else "UNVERIFIED" if baseline_config_exists else "PENDING"
+    )
+    split_summary = metadata.get("calibration_split_summary") or calibration_metadata.get(
+        "calibration_split_summary"
+    )
+
+    status_rows = [
+        {
+            "Artifact": "Frozen baseline config",
+            "Path": "docs/calibration_10y_baseline_config.json",
+            "Status": baseline_status,
+        },
+        {
+            "Artifact": "Calibration report",
+            "Path": "docs/calibration_10y_report.md",
+            "Status": _artifact_status_label(CALIBRATION_REPORT_PATH),
+        },
+        {
+            "Artifact": "Calibration summary",
+            "Path": "docs/calibration_10y_summary.csv",
+            "Status": _artifact_status_label(CALIBRATION_SUMMARY_PATH),
+        },
+        {
+            "Artifact": "Calibration candidates",
+            "Path": "docs/calibration_10y_candidates.csv",
+            "Status": _artifact_status_label(CALIBRATION_CANDIDATES_PATH),
+        },
+        {
+            "Artifact": "Calibration metadata",
+            "Path": "docs/calibration_10y_metadata.json",
+            "Status": _artifact_status_label(CALIBRATION_METADATA_PATH),
+        },
+    ]
+    st.dataframe(pd.DataFrame(status_rows), hide_index=True, use_container_width=True)
+
+    if split_summary:
+        _md(
+            f"""
+            <div class="chart-help">
+              <b>Walk-forward split status:</b>
+              <code>{_esc(str(split_summary.get("status", "unknown")))}</code>.
+              Requested window: <code>{_esc(str(split_summary.get("requested_years", 10)))}</code> years.
+            </div>
+            """
+        )
+    else:
+        _md(
+            """
+            <div class="chart-help">
+              Walk-forward split metadata will appear here after the manual runner writes
+              calibration metadata. The dashboard does not run calibration on page load.
+            </div>
+            """
+        )
+
+    if baseline_config_exists:
+        if not baseline_verified:
+            _md(
+                """
+                <div class="chart-help">
+                  <b>Hash status:</b> <code>UNVERIFIED</code>.
+                  The frozen baseline config file exists and is shown below, but the current
+                  metadata does not contain a matching hash for this artifact.
+                </div>
+                """
+            )
+        with st.expander("Frozen baseline config", expanded=False):
+            try:
+                st.json(json.loads(CALIBRATION_BASELINE_CONFIG_PATH.read_text(encoding="utf-8")))
+            except Exception as exc:
+                st.warning(f"Could not read frozen baseline config artifact: {exc}")
+    else:
+        _md(
+            """
+            <div class="chart-help">
+              Frozen baseline config pending. Run <code>python scripts/run_backtest.py</code>
+              to refresh the baseline artifact before calibration.
+            </div>
+            """
+        )
+
+    if CALIBRATION_REPORT_PATH.exists():
+        with st.expander("Calibration report", expanded=False):
+            st.markdown(CALIBRATION_REPORT_PATH.read_text(encoding="utf-8"))
+    else:
+        _md(
+            """
+            <div class="chart-help">
+              Full 10-year calibration report pending. Future B-163 slices will generate
+              <code>docs/calibration_10y_report.md</code> after baseline and calibrated
+              out-of-sample runs are complete.
+            </div>
+            """
+        )
+
+    summary = _read_csv_artifact(CALIBRATION_SUMMARY_PATH)
+    if not summary.empty:
+        st.dataframe(summary, hide_index=True, use_container_width=True)
+
+    candidates = _read_csv_artifact(CALIBRATION_CANDIDATES_PATH)
+    if not candidates.empty:
+        with st.expander("Calibration candidates", expanded=False):
+            st.dataframe(candidates, hide_index=True, use_container_width=True)
+
+
+def _read_validation_summary(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    try:
+        return pd.read_csv(path)
+    except Exception:
+        return pd.DataFrame()
+
+
+def render_evidence_gate_lab():
+    _md(
+        """
+        <section class="section" id="evidence-gate-lab">
+          <div class="section-head">
+            <h2>Evidence gates <span class="count">B-158 / B-160</span></h2>
+            <div class="right">FAIL-CLOSED RESEARCH</div>
+          </div>
+        </section>
+        """
+    )
+
+    fred_decision = evaluate_promotion_gate(
+        ticket="B-158",
+        source="FRED macro",
+        summary=_read_validation_summary(FRED_VALIDATION_SUMMARY_PATH),
+        validation_report_path="docs/fred_macro_validation_report.md",
+    )
+    massive_decision = evaluate_promotion_gate(
+        ticket="B-160",
+        source="Massive provider data",
+        summary=_read_validation_summary(MASSIVE_VALIDATION_SUMMARY_PATH),
+        validation_report_path="docs/massive_provider_validation_report.md",
+    )
+    decisions = [fred_decision, massive_decision]
+    gate_rows = promotion_gate_decisions_frame(decisions)
+    live_promotion_allowed = any(decision.live_promotion_allowed for decision in decisions)
+
+    _md(
+        f"""
+        <div class="chart-help">
+          <b>Live promotion allowed:</b> <code>{_esc(str(live_promotion_allowed))}</code>.
+          These gates surface validation status only; any promoted rule still requires
+          a separate reviewed patch and rollback plan.
+        </div>
+        """
+    )
+    st.dataframe(gate_rows, hide_index=True, use_container_width=True)
+
+    if EVIDENCE_GATE_REPORT_PATH.exists():
+        with st.expander("Evidence gate report", expanded=False):
+            st.markdown(EVIDENCE_GATE_REPORT_PATH.read_text(encoding="utf-8"))
+    else:
+        _md(
+            """
+            <div class="chart-help">
+              Evidence gate report pending. Run
+              <code>python scripts/evaluate_evidence_gates.py</code> from the repo root
+              after validation summaries are refreshed.
+            </div>
+            """
+        )
+
+
 def render_backtest_lab():
     _md(
         """
@@ -2226,6 +2448,8 @@ _render_timed("render_comparison_view", render_comparison_view)
 _render_timed("render_portfolio_analyzer", render_portfolio_analyzer)
 _render_timed("render_custom_universe_builder", render_custom_universe_builder)
 _render_timed("render_backtest_lab", render_backtest_lab)
+_render_timed("render_calibration_lab", render_calibration_lab)
+_render_timed("render_evidence_gate_lab", render_evidence_gate_lab)
 _render_timed("render_personal_trade_backtest", render_personal_trade_backtest)
 _render_timed("render_debrief_lab", render_debrief_lab)
 _render_timed("render_full_table", render_full_table)

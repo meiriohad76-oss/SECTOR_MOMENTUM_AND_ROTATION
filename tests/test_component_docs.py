@@ -23,7 +23,6 @@ def test_component_docs_cover_dashboard_render_sections():
     render_functions = {
         line.split(",", 1)[1].split(")", 1)[0].strip()
         for line in render_lines
-        if "render_component_docs" not in line
     }
 
     assert render_functions
