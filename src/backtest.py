@@ -604,6 +604,248 @@ def build_calibration_feature_labels(
     return frame
 
 
+def _bool_series(series: pd.Series) -> pd.Series:
+    return series.map(lambda value: _scalar_bool(value, default=False)).astype(bool)
+
+
+def _rate(numerator: int, denominator: int) -> float:
+    return float(numerator / denominator) if denominator else 0.0
+
+
+def _mean_or_zero(series: pd.Series) -> float:
+    values = pd.to_numeric(series, errors="coerce").dropna()
+    return float(values.mean()) if len(values) else 0.0
+
+
+def _calibration_metric_columns(group_cols: Sequence[str] = ()) -> list[str]:
+    return [
+        *group_cols,
+        "direction",
+        "horizon_weeks",
+        "total_count",
+        "available_count",
+        "unavailable_count",
+        "missing_label_rate",
+        "signal_count",
+        "signal_available_count",
+        "signal_unavailable_count",
+        "signal_missing_rate",
+        "success_count",
+        "failure_count",
+        "hit_rate",
+        "actual_outcome_count",
+        "true_positive",
+        "false_positive",
+        "false_negative",
+        "true_negative",
+        "precision",
+        "recall",
+        "f1",
+        "average_forward_return",
+        "average_forward_excess_return",
+        "average_post_entry_drawdown",
+        "average_drawdown_avoided",
+    ]
+
+
+def _normalized_group_columns(group_by: str | Sequence[str] | None) -> list[str]:
+    if group_by is None:
+        return []
+    if isinstance(group_by, str):
+        group_cols = [group_by]
+    else:
+        group_cols = [str(column) for column in group_by]
+    if not group_cols:
+        raise ValueError("group_by must contain at least one column")
+    return group_cols
+
+
+def _required_calibration_columns(horizon: int) -> dict[str, str]:
+    suffix = f"{horizon}w"
+    return {
+        "available": f"label_available_{suffix}",
+        "positive_success": f"positive_success_{suffix}",
+        "negative_success": f"negative_success_{suffix}",
+        "forward_return": f"forward_return_{suffix}",
+        "forward_excess_return": f"forward_excess_return_{suffix}",
+        "post_entry_drawdown": f"post_entry_drawdown_{suffix}",
+    }
+
+
+def _calibration_actual_outcome(
+    *,
+    direction: str,
+    available: pd.Series,
+    forward_return: pd.Series,
+    forward_excess_return: pd.Series,
+    post_entry_drawdown: pd.Series,
+    drawdown_avoidance_threshold: float,
+) -> pd.Series:
+    if direction == "positive":
+        actual = (
+            available
+            & forward_return.notna()
+            & forward_excess_return.notna()
+            & (forward_return > 0.0)
+            & (forward_excess_return > 0.0)
+        )
+    else:
+        actual = (
+            available
+            & (
+                (forward_return.notna() & (forward_return <= 0.0))
+                | (forward_excess_return.notna() & (forward_excess_return < 0.0))
+                | (
+                    post_entry_drawdown.notna()
+                    & (post_entry_drawdown <= drawdown_avoidance_threshold)
+                )
+            )
+        )
+    actual = actual.astype(bool)
+    return actual.reindex(available.index, fill_value=False).astype(bool)
+
+
+def calibration_label_metrics(
+    labels: pd.DataFrame,
+    *,
+    horizons_weeks: Sequence[int] = (4, 13, 26, 52),
+    group_by: str | Sequence[str] | None = None,
+    drawdown_avoidance_threshold: float = -0.05,
+) -> pd.DataFrame:
+    """Aggregate calibration label hit rates and directional confusion metrics."""
+    horizons = sorted({_positive_int("horizons_weeks", value) for value in horizons_weeks})
+    if not horizons:
+        raise ValueError("horizons_weeks must contain at least one value")
+    threshold = _finite_scalar("drawdown_avoidance_threshold", drawdown_avoidance_threshold)
+    group_cols = _normalized_group_columns(group_by)
+    metric_columns = _calibration_metric_columns(group_cols)
+    if labels.empty:
+        return pd.DataFrame(columns=metric_columns)
+    required_base = {"positive_signal", "negative_signal", *group_cols}
+    missing_base = sorted(required_base.difference(labels.columns))
+    if missing_base:
+        raise ValueError(f"labels missing required columns: {', '.join(missing_base)}")
+
+    rows: list[dict] = []
+    frame = labels.copy()
+    if group_cols:
+        groups = frame.groupby(group_cols, dropna=False, sort=True)
+    else:
+        groups = [((), frame)]
+
+    for horizon in horizons:
+        horizon_columns = _required_calibration_columns(horizon)
+        required = set(horizon_columns.values())
+        missing = sorted(required.difference(frame.columns))
+        if missing:
+            raise ValueError(
+                f"labels missing required columns for {horizon}w: {', '.join(missing)}"
+            )
+
+        for raw_group_key, group in groups:
+            if group_cols:
+                group_values = (
+                    raw_group_key if isinstance(raw_group_key, tuple) else (raw_group_key,)
+                )
+                group_record = dict(zip(group_cols, group_values))
+            else:
+                group_record = {}
+
+            available = _bool_series(group[horizon_columns["available"]])
+            forward_return = pd.to_numeric(
+                group[horizon_columns["forward_return"]], errors="coerce"
+            )
+            forward_excess_return = pd.to_numeric(
+                group[horizon_columns["forward_excess_return"]], errors="coerce"
+            )
+            post_entry_drawdown = pd.to_numeric(
+                group[horizon_columns["post_entry_drawdown"]], errors="coerce"
+            )
+
+            for direction, signal_col in (
+                ("positive", "positive_signal"),
+                ("negative", "negative_signal"),
+            ):
+                signal = _bool_series(group[signal_col])
+                signal_available = signal & available
+                signal_unavailable = signal & ~available
+                actual = _calibration_actual_outcome(
+                    direction=direction,
+                    available=available,
+                    forward_return=forward_return,
+                    forward_excess_return=forward_excess_return,
+                    post_entry_drawdown=post_entry_drawdown,
+                    drawdown_avoidance_threshold=threshold,
+                )
+                success = signal_available & actual
+                predicted = signal_available
+                failure = signal_available & ~success
+                true_positive = int((predicted & actual).sum())
+                false_positive = int((predicted & ~actual).sum())
+                false_negative = int((~predicted & available & actual).sum())
+                true_negative = int((~predicted & available & ~actual).sum())
+                precision = _rate(true_positive, true_positive + false_positive)
+                recall = _rate(true_positive, true_positive + false_negative)
+                f1 = _rate(
+                    2 * true_positive,
+                    2 * true_positive + false_positive + false_negative,
+                )
+                success_count = int(success.sum())
+                failure_count = int(failure.sum())
+                signal_count = int(signal.sum())
+                total_count = int(len(group))
+                available_count = int(available.sum())
+                signal_available_count = int(signal_available.sum())
+                drawdown_avoided = 0.0
+                if direction == "negative":
+                    drawdown_avoided = _mean_or_zero(
+                        -post_entry_drawdown.loc[signal_available].clip(upper=0.0)
+                    )
+
+                rows.append(
+                    {
+                        **group_record,
+                        "direction": direction,
+                        "horizon_weeks": horizon,
+                        "total_count": total_count,
+                        "available_count": available_count,
+                        "unavailable_count": total_count - available_count,
+                        "missing_label_rate": _rate(
+                            total_count - available_count, total_count
+                        ),
+                        "signal_count": signal_count,
+                        "signal_available_count": signal_available_count,
+                        "signal_unavailable_count": int(signal_unavailable.sum()),
+                        "signal_missing_rate": _rate(
+                            int(signal_unavailable.sum()), signal_count
+                        ),
+                        "success_count": success_count,
+                        "failure_count": failure_count,
+                        "hit_rate": _rate(success_count, signal_available_count),
+                        "actual_outcome_count": int(actual.sum()),
+                        "true_positive": true_positive,
+                        "false_positive": false_positive,
+                        "false_negative": false_negative,
+                        "true_negative": true_negative,
+                        "precision": precision,
+                        "recall": recall,
+                        "f1": f1,
+                        "average_forward_return": _mean_or_zero(
+                            forward_return.loc[signal_available]
+                        ),
+                        "average_forward_excess_return": _mean_or_zero(
+                            forward_excess_return.loc[signal_available]
+                        ),
+                        "average_post_entry_drawdown": _mean_or_zero(
+                            post_entry_drawdown.loc[signal_available]
+                        ),
+                        "average_drawdown_avoided": drawdown_avoided,
+                    }
+                )
+
+    return pd.DataFrame(rows, columns=metric_columns)
+
+
 def _clean_prices(prices: pd.DataFrame) -> pd.DataFrame:
     out = prices.copy()
     out.index = pd.to_datetime(out.index)

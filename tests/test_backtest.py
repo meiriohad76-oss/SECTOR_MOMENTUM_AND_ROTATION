@@ -347,6 +347,166 @@ def test_calibration_feature_labels_do_not_forward_fill_missing_future_prices():
     assert row["positive_success_4w"] is False
 
 
+def test_calibration_label_metrics_reports_directional_success_and_confusion_counts():
+    labels = pd.DataFrame(
+        {
+            "class": ["US Sectors", "US Sectors", "US Sectors", "Bonds"],
+            "positive_signal": [True, True, False, False],
+            "negative_signal": [False, False, True, False],
+            "label_available_4w": [True, True, True, True],
+            "positive_success_4w": [True, False, False, False],
+            "negative_success_4w": [False, False, True, False],
+            "forward_return_4w": [0.10, -0.05, -0.08, 0.04],
+            "forward_excess_return_4w": [0.04, -0.03, -0.06, 0.02],
+            "post_entry_drawdown_4w": [-0.02, -0.12, -0.15, 0.00],
+        }
+    )
+
+    metrics = backtest.calibration_label_metrics(labels, horizons_weeks=(4,))
+
+    positive = metrics.set_index(["direction", "horizon_weeks"]).loc[("positive", 4)]
+    assert positive["total_count"] == 4
+    assert positive["available_count"] == 4
+    assert positive["signal_count"] == 2
+    assert positive["signal_available_count"] == 2
+    assert positive["success_count"] == 1
+    assert positive["failure_count"] == 1
+    assert positive["hit_rate"] == pytest.approx(0.5)
+    assert positive["true_positive"] == 1
+    assert positive["false_positive"] == 1
+    assert positive["false_negative"] == 1
+    assert positive["true_negative"] == 1
+    assert positive["precision"] == pytest.approx(0.5)
+    assert positive["recall"] == pytest.approx(0.5)
+    assert positive["f1"] == pytest.approx(0.5)
+    assert positive["average_forward_return"] == pytest.approx(0.025)
+    assert positive["average_forward_excess_return"] == pytest.approx(0.005)
+    assert positive["average_post_entry_drawdown"] == pytest.approx(-0.07)
+    assert positive["average_drawdown_avoided"] == pytest.approx(0.0)
+
+    negative = metrics.set_index(["direction", "horizon_weeks"]).loc[("negative", 4)]
+    assert negative["signal_count"] == 1
+    assert negative["signal_available_count"] == 1
+    assert negative["success_count"] == 1
+    assert negative["failure_count"] == 0
+    assert negative["hit_rate"] == pytest.approx(1.0)
+    assert negative["true_positive"] == 1
+    assert negative["false_positive"] == 0
+    assert negative["false_negative"] == 1
+    assert negative["true_negative"] == 2
+    assert negative["precision"] == pytest.approx(1.0)
+    assert negative["recall"] == pytest.approx(0.5)
+    assert negative["f1"] == pytest.approx(2 / 3)
+    assert negative["average_forward_return"] == pytest.approx(-0.08)
+    assert negative["average_forward_excess_return"] == pytest.approx(-0.06)
+    assert negative["average_post_entry_drawdown"] == pytest.approx(-0.15)
+    assert negative["average_drawdown_avoided"] == pytest.approx(0.15)
+
+
+def test_calibration_label_metrics_excludes_unavailable_labels_and_groups_rows():
+    labels = pd.DataFrame(
+        {
+            "class": ["US Sectors", "US Sectors", "Bonds"],
+            "state": ["STAGE_2_BULLISH", "EXIT", "EXIT"],
+            "positive_signal": [True, False, False],
+            "negative_signal": [False, True, True],
+            "label_available_4w": [False, True, False],
+            "positive_success_4w": [False, False, False],
+            "negative_success_4w": [False, False, False],
+            "forward_return_4w": [float("nan"), 0.03, float("nan")],
+            "forward_excess_return_4w": [float("nan"), 0.01, float("nan")],
+            "post_entry_drawdown_4w": [float("nan"), -0.01, float("nan")],
+        }
+    )
+
+    metrics = backtest.calibration_label_metrics(labels, horizons_weeks=(4,), group_by="class")
+
+    grouped = metrics.set_index(["class", "direction", "horizon_weeks"])
+    us_negative = grouped.loc[("US Sectors", "negative", 4)]
+    assert us_negative["total_count"] == 2
+    assert us_negative["available_count"] == 1
+    assert us_negative["unavailable_count"] == 1
+    assert us_negative["signal_count"] == 1
+    assert us_negative["signal_available_count"] == 1
+    assert us_negative["signal_unavailable_count"] == 0
+    assert us_negative["success_count"] == 0
+    assert us_negative["failure_count"] == 1
+    assert us_negative["hit_rate"] == pytest.approx(0.0)
+
+    bonds_negative = grouped.loc[("Bonds", "negative", 4)]
+    assert bonds_negative["total_count"] == 1
+    assert bonds_negative["available_count"] == 0
+    assert bonds_negative["unavailable_count"] == 1
+    assert bonds_negative["signal_count"] == 1
+    assert bonds_negative["signal_available_count"] == 0
+    assert bonds_negative["signal_unavailable_count"] == 1
+    assert bonds_negative["success_count"] == 0
+    assert bonds_negative["failure_count"] == 0
+    assert bonds_negative["hit_rate"] == pytest.approx(0.0)
+
+
+def test_calibration_label_metrics_accepts_columnless_empty_label_table():
+    metrics = backtest.calibration_label_metrics(pd.DataFrame(), horizons_weeks=(4,))
+
+    assert metrics.empty
+    assert list(metrics.columns) == [
+        "direction",
+        "horizon_weeks",
+        "total_count",
+        "available_count",
+        "unavailable_count",
+        "missing_label_rate",
+        "signal_count",
+        "signal_available_count",
+        "signal_unavailable_count",
+        "signal_missing_rate",
+        "success_count",
+        "failure_count",
+        "hit_rate",
+        "actual_outcome_count",
+        "true_positive",
+        "false_positive",
+        "false_negative",
+        "true_negative",
+        "precision",
+        "recall",
+        "f1",
+        "average_forward_return",
+        "average_forward_excess_return",
+        "average_post_entry_drawdown",
+        "average_drawdown_avoided",
+    ]
+
+
+def test_calibration_label_metrics_recomputes_negative_outcomes_with_metrics_threshold():
+    labels = pd.DataFrame(
+        {
+            "positive_signal": [False],
+            "negative_signal": [True],
+            "label_available_4w": [True],
+            "positive_success_4w": [False],
+            "negative_success_4w": [True],
+            "forward_return_4w": [0.04],
+            "forward_excess_return_4w": [0.02],
+            "post_entry_drawdown_4w": [-0.06],
+        }
+    )
+
+    metrics = backtest.calibration_label_metrics(
+        labels,
+        horizons_weeks=(4,),
+        drawdown_avoidance_threshold=-0.10,
+    )
+
+    negative = metrics.set_index(["direction", "horizon_weeks"]).loc[("negative", 4)]
+    assert negative["success_count"] == 0
+    assert negative["failure_count"] == 1
+    assert negative["hit_rate"] == pytest.approx(0.0)
+    assert negative["actual_outcome_count"] == 0
+    assert negative["false_positive"] == 1
+    assert negative["true_positive"] == 0
+
+
 def test_multi_asset_weights_drift_between_rebalance_dates():
     dates = pd.bdate_range("2024-01-01", periods=3)
     prices = pd.DataFrame(
