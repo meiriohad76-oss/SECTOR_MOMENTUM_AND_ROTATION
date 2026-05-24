@@ -693,7 +693,7 @@ def _format_expanded_calibration_report(
         "",
         f"- Label rows: {_format_count(metadata.get('label_rows'))}",
         f"- Candidate rows: {_format_count(metadata.get('candidate_rows'))}",
-        f"- Sector/class override rows: {_format_count(metadata.get('sector_override_rows'))}",
+        f"- True sector override rows: {_format_count(metadata.get('sector_override_rows'))}",
         f"- Live promotion allowed: `{str(metadata.get('live_promotion_allowed', False)).lower()}`",
         "",
         "## Strongest Candidate Rows",
@@ -710,11 +710,16 @@ def _format_expanded_calibration_report(
                 kind="mergesort",
             )
         for _, row in ordered.head(10).iterrows():
+            sector = str(row.get("sector") or "").strip()
+            scope = str(row.get("scope") or "unknown").strip()
+            sector_suffix = ""
+            if sector and sector.lower() not in {"global", scope.lower()}:
+                sector_suffix = f", sector `{sector}`"
             lines.append(
                 "- "
                 f"`{row.get('candidate_id', 'unknown')}` "
                 f"({row.get('direction', 'unknown')}, {row.get('horizon_weeks', 'n/a')}w, "
-                f"scope `{row.get('scope', 'unknown')}`): holdout hit-rate delta "
+                f"scope `{scope}`{sector_suffix}): holdout hit-rate delta "
                 f"{_format_percent(row.get('holdout_hit_rate_delta_vs_baseline'))}; "
                 f"bootstrap CI [{row.get('bootstrap_ci_low', 'n/a')}, "
                 f"{row.get('bootstrap_ci_high', 'n/a')}]; "
@@ -723,9 +728,9 @@ def _format_expanded_calibration_report(
             reasons = str(row.get("rejection_reasons") or "").strip()
             if reasons:
                 lines.append(f"  - Rejection/status reasons: `{reasons}`")
-    lines.extend(["", "## Sector/Class Overrides", ""])
+    lines.extend(["", "## Sector Overrides", ""])
     if sector_overrides is None or sector_overrides.empty:
-        lines.append("- No sector/class-specific override passed the research gate.")
+        lines.append("- No ticker-level sector override passed the research gate.")
     else:
         for _, row in sector_overrides.iterrows():
             lines.append(
@@ -741,7 +746,7 @@ def _format_expanded_calibration_report(
             "## Safety",
             "",
             "- Expanded calibration is artifact-only and read-only in the dashboard.",
-            "- Sector/class weights are research candidates, not active live methodology parameters.",
+            "- Sector weights are research candidates, not active live methodology parameters.",
             "- Live promotion requires a separate reviewed ticket with activation flag, frozen config, rollback plan, and evidence-gate approval.",
             "",
         ]

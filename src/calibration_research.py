@@ -4,6 +4,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from src import universe
+
 
 def _candidate_token(value: float) -> str:
     return str(value).replace("-", "minus_").replace(".", "_")
@@ -18,42 +20,47 @@ def expanded_candidate_grid() -> list[dict]:
     negative_thresholds = [0.0, -0.5, -1.0]
     scopes = ["global", "US Sectors", "US Industries", "Factors", "Mega-Cap Stocks"]
     rules: list[dict] = []
-    for scope in scopes:
-        safe_scope = _scope_token(scope)
+
+    def add_rules(prefix: str, *, scope: str, sector: str | None = None) -> None:
+        base = {"scope": scope, "research_only": True}
+        if sector is not None:
+            base["sector"] = sector
         for threshold in score_thresholds:
             rules.append(
                 {
-                    "candidate_id": f"{safe_scope}_positive_score_ge_{_candidate_token(threshold)}",
-                    "scope": scope,
+                    **base,
+                    "candidate_id": f"{prefix}_positive_score_ge_{_candidate_token(threshold)}",
                     "direction": "positive",
                     "positive_min_s_score_after_veto": threshold,
                     "relative_strength_min": None,
-                    "research_only": True,
                 }
             )
             rules.append(
                 {
+                    **base,
                     "candidate_id": (
-                        f"{safe_scope}_positive_score_ge_{_candidate_token(threshold)}"
+                        f"{prefix}_positive_score_ge_{_candidate_token(threshold)}"
                         "_rel_strength_ge_0_0"
                     ),
-                    "scope": scope,
                     "direction": "positive",
                     "positive_min_s_score_after_veto": threshold,
                     "relative_strength_min": 0.0,
-                    "research_only": True,
                 }
             )
         for threshold in negative_thresholds:
             rules.append(
                 {
-                    "candidate_id": f"{safe_scope}_negative_score_le_{_candidate_token(threshold)}",
-                    "scope": scope,
+                    **base,
+                    "candidate_id": f"{prefix}_negative_score_le_{_candidate_token(threshold)}",
                     "direction": "negative",
                     "negative_max_s_score_after_veto": threshold,
-                    "research_only": True,
                 }
             )
+
+    for scope in scopes:
+        add_rules(_scope_token(scope), scope=scope)
+    for sector_ticker in universe.US_SECTORS:
+        add_rules(sector_ticker.lower(), scope="US Sectors", sector=sector_ticker)
     return rules
 
 
@@ -78,8 +85,15 @@ def sector_override_candidates(
     missing = sorted(required.difference(frame.columns))
     if missing:
         raise ValueError(f"sector override rows missing required columns: {', '.join(missing)}")
+    sector_values = frame.get("sector", pd.Series("", index=frame.index)).astype(str).str.upper()
+    scope_values = frame.get("scope", pd.Series("", index=frame.index)).astype(str).str.strip()
+    true_us_sector = (
+        scope_values.eq("US Sectors")
+        & sector_values.isin(set(universe.US_SECTORS))
+    )
     mask = (
-        (pd.to_numeric(frame["train_signal_count"], errors="coerce") >= int(min_train_signals))
+        true_us_sector
+        & (pd.to_numeric(frame["train_signal_count"], errors="coerce") >= int(min_train_signals))
         & (pd.to_numeric(frame["holdout_signal_count"], errors="coerce") >= int(min_holdout_signals))
         & (
             pd.to_numeric(
@@ -102,7 +116,7 @@ def sector_override_candidates(
             )
             >= 0
         )
-        & (frame["fold_stability_passed"].map(bool))
+        & _bool_series(frame["fold_stability_passed"])
         & (pd.to_numeric(frame["bootstrap_ci_low"], errors="coerce") >= 0)
         & (frame["promotion_label"].astype(str) == "research_candidate")
     )
@@ -119,6 +133,122 @@ def sector_override_candidates(
     out["promotion_requires"] = "separate_reviewed_live_promotion_ticket"
     out["live_promotion_allowed"] = out["live_promotion_allowed"].astype(object)
     return out.reset_index(drop=True)
+
+
+def _zero_bootstrap_result(
+    *,
+    method: str,
+    candidate_count: int = 0,
+    baseline_count: int = 0,
+    block_count: int = 0,
+) -> dict:
+    return {
+        "method": method,
+        "mean_delta": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "sample_count": int(baseline_count),
+        "candidate_sample_count": int(candidate_count),
+        "baseline_sample_count": int(baseline_count),
+        "block_count": int(block_count),
+        "valid_resample_count": 0,
+        "invalid_resample_count": 0,
+    }
+
+
+def block_bootstrap_hit_rate_delta(
+    baseline_success,
+    candidate_flags,
+    block_keys,
+    *,
+    samples: int = 1000,
+    random_seed: int = 42,
+) -> dict:
+    """Bootstrap candidate-vs-baseline deltas over paired rebalance-date blocks."""
+    sample_count = int(samples)
+    if sample_count <= 0:
+        raise ValueError("samples must be a positive integer")
+
+    success = pd.to_numeric(pd.Series(baseline_success), errors="coerce")
+    candidate = pd.Series(candidate_flags).map(_scalar_bool)
+    blocks = pd.Series(block_keys)
+    if not (len(success) == len(candidate) == len(blocks)):
+        raise ValueError("baseline_success, candidate_flags, and block_keys must have equal length")
+
+    frame = pd.DataFrame(
+        {
+            "success": success,
+            "candidate": candidate.astype(bool),
+            "block": blocks,
+        }
+    )
+    frame = frame[frame["success"].notna()].copy()
+    if frame.empty:
+        return _zero_bootstrap_result(method="paired_block_by_rebalance_date")
+
+    frame["block"] = frame["block"].where(frame["block"].notna(), frame.index)
+    frame["block"] = frame["block"].astype(str)
+    frame["candidate_success"] = frame["success"] * frame["candidate"].astype(int)
+
+    baseline_count = int(len(frame))
+    candidate_count = int(frame["candidate"].sum())
+    block_count = int(frame["block"].nunique())
+    if candidate_count == 0 or baseline_count == 0 or block_count == 0:
+        return _zero_bootstrap_result(
+            method="paired_block_by_rebalance_date",
+            candidate_count=candidate_count,
+            baseline_count=baseline_count,
+            block_count=block_count,
+        )
+
+    observed = float(frame.loc[frame["candidate"], "success"].mean() - frame["success"].mean())
+    stats = frame.groupby("block", sort=True).agg(
+        baseline_success_sum=("success", "sum"),
+        baseline_count=("success", "size"),
+        candidate_success_sum=("candidate_success", "sum"),
+        candidate_count=("candidate", "sum"),
+    )
+    baseline_success_sum = stats["baseline_success_sum"].to_numpy(dtype=float)
+    baseline_counts = stats["baseline_count"].to_numpy(dtype=float)
+    candidate_success_sum = stats["candidate_success_sum"].to_numpy(dtype=float)
+    candidate_counts = stats["candidate_count"].to_numpy(dtype=float)
+
+    rng = np.random.default_rng(int(random_seed))
+    deltas: list[float] = []
+    invalid_resample_count = 0
+    for _ in range(sample_count):
+        idx = rng.integers(0, len(stats), len(stats))
+        sampled_baseline_count = baseline_counts[idx].sum()
+        sampled_candidate_count = candidate_counts[idx].sum()
+        if sampled_baseline_count == 0 or sampled_candidate_count == 0:
+            invalid_resample_count += 1
+            continue
+        sampled_baseline_rate = baseline_success_sum[idx].sum() / sampled_baseline_count
+        sampled_candidate_rate = candidate_success_sum[idx].sum() / sampled_candidate_count
+        deltas.append(float(sampled_candidate_rate - sampled_baseline_rate))
+    if not deltas:
+        return {
+            **_zero_bootstrap_result(
+                method="paired_block_by_rebalance_date",
+                candidate_count=candidate_count,
+                baseline_count=baseline_count,
+                block_count=block_count,
+            ),
+            "invalid_resample_count": sample_count,
+        }
+
+    return {
+        "method": "paired_block_by_rebalance_date",
+        "mean_delta": round(observed, 6),
+        "ci_low": round(float(np.percentile(deltas, 2.5)), 6),
+        "ci_high": round(float(np.percentile(deltas, 97.5)), 6),
+        "sample_count": baseline_count,
+        "candidate_sample_count": candidate_count,
+        "baseline_sample_count": baseline_count,
+        "block_count": block_count,
+        "valid_resample_count": int(len(deltas)),
+        "invalid_resample_count": int(invalid_resample_count),
+    }
 
 
 def bootstrap_hit_rate_delta(
@@ -229,8 +359,13 @@ def _scope_frame(frame: pd.DataFrame, rule: dict) -> pd.DataFrame:
         else:
             return scoped.iloc[0:0].copy()
     sector = rule.get("sector")
-    if sector is not None and "sector" in scoped.columns:
-        scoped = scoped[scoped["sector"].astype(str) == str(sector)]
+    if sector is not None:
+        if "sector" in scoped.columns and (scoped["sector"].astype(str) == str(sector)).any():
+            scoped = scoped[scoped["sector"].astype(str) == str(sector)]
+        elif "ticker" in scoped.columns:
+            scoped = scoped[scoped["ticker"].astype(str).str.upper() == str(sector).upper()]
+        else:
+            return scoped.iloc[0:0].copy()
     return scoped
 
 
@@ -325,21 +460,37 @@ def _metrics_for_signals(
     }
 
 
-def _bootstrap_for_metrics(candidate: dict, baseline: dict) -> dict:
-    candidate_values = list(candidate.get("success_values") or [])
-    baseline_values = list(baseline.get("success_values") or [])
-    if not candidate_values or not baseline_values:
-        return {
-            "mean_delta": 0.0,
-            "ci_low": 0.0,
-            "ci_high": 0.0,
-            "sample_count": 0,
-            "candidate_sample_count": 0,
-            "baseline_sample_count": 0,
-        }
-    return bootstrap_hit_rate_delta(
-        candidate_values,
-        baseline_values,
+def _bootstrap_for_rule(
+    frame: pd.DataFrame,
+    *,
+    rule: dict,
+    direction: str,
+    horizon_weeks: int,
+) -> dict:
+    if frame.empty:
+        return _zero_bootstrap_result(method="paired_block_by_rebalance_date")
+    available_col = f"label_available_{horizon_weeks}w"
+    success_col = _success_column(direction, horizon_weeks)
+    required = {"positive_signal", "negative_signal", available_col, success_col}
+    missing = sorted(required.difference(frame.columns))
+    if missing:
+        raise ValueError(f"labels missing required columns: {', '.join(missing)}")
+    available = _bool_series(frame[available_col])
+    baseline_mask = _signal_mask(frame, rule, direction, candidate=False) & available
+    baseline = frame.loc[baseline_mask].copy()
+    if baseline.empty:
+        return _zero_bootstrap_result(method="paired_block_by_rebalance_date")
+
+    candidate_mask = _signal_mask(baseline, rule, direction, candidate=True)
+    block_keys = (
+        baseline["rebalance_date"]
+        if "rebalance_date" in baseline.columns
+        else pd.Series(baseline.index, index=baseline.index)
+    )
+    return block_bootstrap_hit_rate_delta(
+        _bool_series(baseline[success_col]).astype(int),
+        candidate_mask,
+        block_keys,
         samples=500,
         random_seed=164,
     )
@@ -351,6 +502,7 @@ def _promotion_label(
     holdout_signal_count: int,
     holdout_evaluated: bool,
     holdout_delta: float,
+    fold_stability_passed: bool,
     bootstrap: dict,
     min_train_signals: int,
     min_holdout_signals: int,
@@ -361,6 +513,10 @@ def _promotion_label(
         return "do not promote", "no_mature_holdout_labels"
     if holdout_delta <= 0:
         return "needs more testing", "holdout_no_improvement"
+    if not fold_stability_passed:
+        return "needs more testing", "fold_unstable"
+    if int(bootstrap.get("valid_resample_count", 1) or 0) <= 0:
+        return "needs more testing", "bootstrap_insufficient_candidate_blocks"
     if float(bootstrap.get("ci_low", 0.0)) < 0:
         return "needs more testing", "bootstrap_interval_crosses_zero"
     return "research_candidate", "separate_live_promotion_ticket_required"
@@ -450,13 +606,20 @@ def evaluate_expanded_candidates(
                 candidate_holdout["average_post_entry_drawdown"]
                 - baseline_holdout["average_post_entry_drawdown"]
             )
-            bootstrap = _bootstrap_for_metrics(candidate_holdout, baseline_holdout)
+            bootstrap = _bootstrap_for_rule(
+                scoped_holdout,
+                rule=rule,
+                direction=direction,
+                horizon_weeks=horizon,
+            )
             holdout_evaluated = bool(candidate_holdout["signal_count"] > 0)
+            fold_stability_passed = bool(train_delta >= 0 and holdout_delta >= 0)
             promotion_label, rejection_reasons = _promotion_label(
                 train_signal_count=candidate_train["signal_count"],
                 holdout_signal_count=candidate_holdout["signal_count"],
                 holdout_evaluated=holdout_evaluated,
                 holdout_delta=holdout_delta,
+                fold_stability_passed=fold_stability_passed,
                 bootstrap=bootstrap,
                 min_train_signals=min_train,
                 min_holdout_signals=min_holdout,
@@ -496,6 +659,7 @@ def evaluate_expanded_candidates(
                     "bootstrap_mean_delta": bootstrap["mean_delta"],
                     "bootstrap_ci_low": bootstrap["ci_low"],
                     "bootstrap_ci_high": bootstrap["ci_high"],
+                    "bootstrap_method": bootstrap["method"],
                     "bootstrap_sample_count": bootstrap["sample_count"],
                     "bootstrap_candidate_sample_count": bootstrap[
                         "candidate_sample_count"
@@ -503,7 +667,15 @@ def evaluate_expanded_candidates(
                     "bootstrap_baseline_sample_count": bootstrap[
                         "baseline_sample_count"
                     ],
-                    "fold_stability_passed": bool(train_delta >= 0 and holdout_delta >= 0),
+                    "bootstrap_valid_resample_count": bootstrap.get(
+                        "valid_resample_count",
+                        0,
+                    ),
+                    "bootstrap_invalid_resample_count": bootstrap.get(
+                        "invalid_resample_count",
+                        0,
+                    ),
+                    "fold_stability_passed": fold_stability_passed,
                     "holdout_evaluated": holdout_evaluated,
                     "promotion_label": promotion_label,
                     "rejection_reasons": rejection_reasons,
@@ -519,7 +691,7 @@ def evaluate_expanded_candidates(
         "live_promotion_allowed",
     ):
         if column in out.columns:
-            out[column] = out[column].map(bool).astype(object)
+            out[column] = _bool_series(out[column]).astype(object)
     return out.sort_values(["horizon_weeks", "candidate_id"], kind="mergesort").reset_index(
         drop=True
     )

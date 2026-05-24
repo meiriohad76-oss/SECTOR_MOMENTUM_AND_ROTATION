@@ -15,42 +15,39 @@ This is research-only statistical calibration evidence. It does not change live 
 ## Candidate Counts
 
 - Label rows: 4968
-- Candidate rows: 135
-- Sector/class override rows: 4
+- Candidate rows: 432
+- True sector override rows: 0
 - Live promotion allowed: `false`
 
 ## Strongest Candidate Rows
 
-- `global_positive_score_ge_1_2` (positive, 26w, scope `global`): holdout hit-rate delta 27.80%; bootstrap CI [0.132018, 0.402906]; research_candidate.
+- `xlf_positive_score_ge_1_2` (positive, 13w, scope `US Sectors`, sector `XLF`): holdout hit-rate delta 59.49%; bootstrap CI [0.481013, 0.696203]; do not promote.
+  - Rejection/status reasons: `thin_sample`
+- `xlf_positive_score_ge_1_2` (positive, 26w, scope `US Sectors`, sector `XLF`): holdout hit-rate delta 51.95%; bootstrap CI [0.414286, 0.623377]; do not promote.
+  - Rejection/status reasons: `thin_sample`
+- `global_positive_score_ge_1_2` (positive, 26w, scope `global`): holdout hit-rate delta 27.80%; bootstrap CI [0.145341, 0.405721]; research_candidate.
   - Rejection/status reasons: `separate_live_promotion_ticket_required`
-- `us_sectors_positive_score_ge_1_2` (positive, 26w, scope `US Sectors`): holdout hit-rate delta 27.80%; bootstrap CI [0.132018, 0.402906]; research_candidate.
+- `us_sectors_positive_score_ge_1_2` (positive, 26w, scope `US Sectors`): holdout hit-rate delta 27.80%; bootstrap CI [0.145341, 0.405721]; research_candidate.
   - Rejection/status reasons: `separate_live_promotion_ticket_required`
-- `global_positive_score_ge_1_0` (positive, 26w, scope `global`): holdout hit-rate delta 23.80%; bootstrap CI [0.141285, 0.335421]; research_candidate.
+- `global_positive_score_ge_1_0` (positive, 26w, scope `global`): holdout hit-rate delta 23.80%; bootstrap CI [0.150082, 0.323021]; research_candidate.
   - Rejection/status reasons: `separate_live_promotion_ticket_required`
-- `us_sectors_positive_score_ge_1_0` (positive, 26w, scope `US Sectors`): holdout hit-rate delta 23.80%; bootstrap CI [0.141285, 0.335421]; research_candidate.
+- `us_sectors_positive_score_ge_1_0` (positive, 26w, scope `US Sectors`): holdout hit-rate delta 23.80%; bootstrap CI [0.150082, 0.323021]; research_candidate.
   - Rejection/status reasons: `separate_live_promotion_ticket_required`
-- `global_positive_score_ge_1_2` (positive, 52w, scope `global`): holdout hit-rate delta 16.02%; bootstrap CI [-0.002927, 0.307105]; needs more testing.
-  - Rejection/status reasons: `bootstrap_interval_crosses_zero`
-- `us_sectors_positive_score_ge_1_2` (positive, 52w, scope `US Sectors`): holdout hit-rate delta 16.02%; bootstrap CI [-0.002927, 0.307105]; needs more testing.
-  - Rejection/status reasons: `bootstrap_interval_crosses_zero`
-- `global_positive_score_ge_1_0` (positive, 52w, scope `global`): holdout hit-rate delta 15.79%; bootstrap CI [0.04129, 0.272376]; research_candidate.
+- `xlu_positive_score_ge_1_0` (positive, 52w, scope `US Sectors`, sector `XLU`): holdout hit-rate delta 16.67%; bootstrap CI [-0.4, 0.733333]; do not promote.
+  - Rejection/status reasons: `thin_sample`
+- `global_positive_score_ge_1_2` (positive, 52w, scope `global`): holdout hit-rate delta 16.02%; bootstrap CI [0.015707, 0.290113]; research_candidate.
   - Rejection/status reasons: `separate_live_promotion_ticket_required`
-- `us_sectors_positive_score_ge_1_0` (positive, 52w, scope `US Sectors`): holdout hit-rate delta 15.79%; bootstrap CI [0.04129, 0.272376]; research_candidate.
+- `us_sectors_positive_score_ge_1_2` (positive, 52w, scope `US Sectors`): holdout hit-rate delta 16.02%; bootstrap CI [0.015707, 0.290113]; research_candidate.
   - Rejection/status reasons: `separate_live_promotion_ticket_required`
-- `global_positive_score_ge_0_8` (positive, 26w, scope `global`): holdout hit-rate delta 15.03%; bootstrap CI [0.070086, 0.235772]; research_candidate.
-  - Rejection/status reasons: `separate_live_promotion_ticket_required`
-- `us_sectors_positive_score_ge_0_8` (positive, 26w, scope `US Sectors`): holdout hit-rate delta 15.03%; bootstrap CI [0.070086, 0.235772]; research_candidate.
+- `global_positive_score_ge_1_0` (positive, 52w, scope `global`): holdout hit-rate delta 15.79%; bootstrap CI [0.081455, 0.237077]; research_candidate.
   - Rejection/status reasons: `separate_live_promotion_ticket_required`
 
-## Sector/Class Overrides
+## Sector Overrides
 
-- `us_sectors_positive_score_ge_1_0` for `US Sectors`: weight multiplier `1.238`; promotion requires `separate_reviewed_live_promotion_ticket`.
-- `us_sectors_positive_score_ge_1_2` for `US Sectors`: weight multiplier `1.25`; promotion requires `separate_reviewed_live_promotion_ticket`.
-- `us_sectors_positive_score_ge_0_8` for `US Sectors`: weight multiplier `1.1284`; promotion requires `separate_reviewed_live_promotion_ticket`.
-- `us_sectors_positive_score_ge_1_0` for `US Sectors`: weight multiplier `1.1579`; promotion requires `separate_reviewed_live_promotion_ticket`.
+- No ticker-level sector override passed the research gate.
 
 ## Safety
 
 - Expanded calibration is artifact-only and read-only in the dashboard.
-- Sector/class weights are research candidates, not active live methodology parameters.
+- Sector weights are research candidates, not active live methodology parameters.
 - Live promotion requires a separate reviewed ticket with activation flag, frozen config, rollback plan, and evidence-gate approval.
