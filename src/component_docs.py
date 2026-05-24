@@ -149,8 +149,20 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         name="Calibration lab",
         section="Research",
         render_function="render_calibration_lab",
-        data_inputs=("frozen baseline config", "calibration report", "summary artifacts"),
-        states=("baseline pending", "hash unverified", "hash verified", "report pending", "candidate table"),
+        data_inputs=(
+            "frozen baseline config",
+            "calibration report",
+            "summary artifacts",
+            "candidate config artifact",
+        ),
+        states=(
+            "baseline pending",
+            "hash unverified",
+            "hash verified",
+            "report pending",
+            "candidate table",
+            "candidate config",
+        ),
         qa=("calibration dashboard model tests", "calibration dashboard static tests", "backtest unit tests"),
     ),
     ComponentDoc(

@@ -20,24 +20,33 @@ def test_app_surfaces_calibration_artifacts_without_running_calibration():
         '"calibration_10y_candidates.csv"'
     ) in app_source
     assert (
+        'CALIBRATION_CANDIDATE_CONFIG_PATH = APP_ROOT / "docs" / '
+        '"calibration_10y_candidate_config.json"'
+    ) in app_source
+    assert (
         'CALIBRATION_METADATA_PATH = APP_ROOT / "docs" / '
         '"calibration_10y_metadata.json"'
     ) in app_source
     assert "def render_calibration_lab():" in app_source
     assert "Calibration lab" in app_source
     assert "B-163" in app_source
+    assert "from src.calibration_dashboard import calibration_artifact_status_rows, shared_artifact_hash" in app_source
     assert "baseline_config_exists = CALIBRATION_BASELINE_CONFIG_PATH.exists()" in app_source
     assert "calibration_artifact_status_rows(" in app_source
+    assert "candidate_config_hash = shared_artifact_hash(" in app_source
     assert 'baseline_status = status_rows[0]["Status"]' in app_source
     assert 'baseline_verified = baseline_status == "VERIFIED"' in app_source
     assert 'candidate_status = status_rows[3]["Status"]' in app_source
-    assert 'metadata_status = status_rows[4]["Status"]' in app_source
+    assert 'candidate_config_status = status_rows[4]["Status"]' in app_source
+    assert 'metadata_status = status_rows[5]["Status"]' in app_source
     assert 'metadata_status == "VERIFIED"' in app_source
     assert 'candidate_status == "VERIFIED"' in app_source
+    assert 'candidate_config_status == "VERIFIED"' in app_source
     assert "Hash status" in app_source
     assert "UNVERIFIED" in app_source
     assert "_read_csv_artifact(CALIBRATION_SUMMARY_PATH)" in app_source
     assert "_read_csv_artifact(CALIBRATION_CANDIDATES_PATH)" in app_source
+    assert "CALIBRATION_CANDIDATE_CONFIG_PATH.read_text" in app_source
     assert "CALIBRATION_REPORT_PATH.read_text" in app_source
     assert "CALIBRATION_BASELINE_CONFIG_PATH" in app_source
     assert "calibration_label_metrics(" not in app_source

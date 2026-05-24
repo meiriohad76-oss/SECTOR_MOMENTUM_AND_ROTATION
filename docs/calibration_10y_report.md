@@ -1,6 +1,6 @@
 # 10-Year Calibration Baseline Report
 
-Ticket: B-163.6
+Ticket: B-163.7
 
 This is research-only baseline and calibration-candidate evidence. It does not change live scoring, alter recommendations, or allow live promotion.
 
@@ -10,6 +10,7 @@ This is research-only baseline and calibration-candidate evidence. It does not c
 - Label rows: 4968
 - Summary rows: 24
 - Split status: `insufficient_history`
+- Calibrated rerun gate: `skipped_insufficient_history`
 
 ## Overall Baseline Hit Rates
 

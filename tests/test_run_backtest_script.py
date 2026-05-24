@@ -29,6 +29,9 @@ def test_run_backtest_artifact_paths_are_repo_root_anchored():
     assert run_backtest.CALIBRATION_CANDIDATES_PATH == (
         run_backtest.ROOT / "docs" / "calibration_10y_candidates.csv"
     )
+    assert run_backtest.CALIBRATION_CANDIDATE_CONFIG_PATH == (
+        run_backtest.ROOT / "docs" / "calibration_10y_candidate_config.json"
+    )
     assert run_backtest.CALIBRATION_METADATA_PATH == (
         run_backtest.ROOT / "docs" / "calibration_10y_metadata.json"
     )
@@ -151,7 +154,7 @@ def test_build_calibration_baseline_artifacts_summarizes_directional_metrics(mon
         ),
     )
 
-    summary, report, metadata, candidates = run_backtest._build_calibration_baseline_artifacts(
+    summary, report, metadata, candidates, candidate_config = run_backtest._build_calibration_baseline_artifacts(
         targets="targets",
         prices=pd.DataFrame({"XLK": [100.0]}),
         baseline_config={"ticket": "B-163"},
@@ -185,7 +188,7 @@ def test_build_calibration_baseline_artifacts_summarizes_directional_metrics(mon
     assert report.index("Positive momentum hit rate") < report.index("Negative momentum hit rate")
     assert "research-only" in report
     assert metadata["ticket"] == "B-163"
-    assert metadata["slice"] == "B-163.6"
+    assert metadata["slice"] == "B-163.7"
     assert metadata["research_only"] is True
     assert metadata["live_promotion_allowed"] is False
     assert metadata["label_rows"] == 3
@@ -197,6 +200,100 @@ def test_build_calibration_baseline_artifacts_summarizes_directional_metrics(mon
     assert not candidates.empty
     assert "selected_by_calibration" in candidates.columns
     assert set(candidates["live_promotion_allowed"]) == {False}
+    assert candidate_config["ticket"] == "B-163"
+    assert candidate_config["slice"] == "B-163.7"
+    assert candidate_config["config_status"] == "blocked_final_holdout_not_evaluated"
+    assert candidate_config["selected_candidate_id"] == "positive_score_ge_0_8"
+    assert candidate_config["final_holdout_evaluated"] is False
+    assert candidate_config["live_promotion_allowed"] is False
+
+
+def test_build_calibration_candidate_config_skips_when_history_is_insufficient():
+    candidates = pd.DataFrame(
+        [
+            {
+                "candidate_id": "no_ready_walk_forward_splits",
+                "horizon_weeks": 4,
+                "gate_status": "skipped_insufficient_history",
+                "promotion_label": "do not promote",
+                "selected_by_calibration": False,
+                "final_holdout_evaluated": False,
+                "final_holdout_rows_used": 0,
+                "live_promotion_allowed": False,
+            }
+        ]
+    )
+
+    config = run_backtest._build_calibration_candidate_config(
+        candidates=candidates,
+        baseline_config={"ticket": "B-163"},
+        calibration_split_summary={
+            "status": "insufficient_history",
+            "requested_years": 10,
+            "reason": "dates must span at least 10 years",
+        },
+    )
+
+    assert config["ticket"] == "B-163"
+    assert config["slice"] == "B-163.7"
+    assert config["config_status"] == "skipped_insufficient_history"
+    assert config["candidate_config_available"] is False
+    assert config["selected_candidate_id"] is None
+    assert config["selected_candidate"] == {}
+    assert config["calibration_split_status"] == "insufficient_history"
+    assert config["final_holdout_evaluated"] is False
+    assert config["final_holdout_rows_used"] == 0
+    assert config["live_promotion_allowed"] is False
+    assert config["safety"]["live_scoring_change"] == "none"
+
+
+def test_build_calibration_candidate_config_records_selected_candidate_without_promotion():
+    candidates = pd.DataFrame(
+        [
+            {
+                "candidate_id": "baseline",
+                "horizon_weeks": 4,
+                "gate_status": "baseline_reference",
+                "promotion_label": "do not promote",
+                "selected_by_calibration": False,
+                "selection_source": "calibration_window_only",
+                "final_holdout_evaluated": False,
+                "final_holdout_rows_used": 0,
+                "live_promotion_allowed": False,
+            },
+            {
+                "candidate_id": "positive_score_ge_0_8",
+                "horizon_weeks": 4,
+                "gate_status": "blocked_final_holdout_not_evaluated",
+                "promotion_label": "needs more testing",
+                "rejection_reasons": "final_holdout_not_evaluated",
+                "selected_by_calibration": True,
+                "selection_source": "calibration_window_only",
+                "positive_min_s_score_after_veto": 0.8,
+                "negative_max_s_score_after_veto": float("nan"),
+                "final_holdout_evaluated": False,
+                "final_holdout_rows_used": 0,
+                "live_promotion_allowed": False,
+            },
+        ]
+    )
+
+    config = run_backtest._build_calibration_candidate_config(
+        candidates=candidates,
+        baseline_config={"ticket": "B-163"},
+        calibration_split_summary={"status": "ready", "requested_years": 10, "fold_count": 4},
+    )
+
+    assert config["config_status"] == "blocked_final_holdout_not_evaluated"
+    assert config["candidate_config_available"] is True
+    assert config["selected_candidate_id"] == "positive_score_ge_0_8"
+    assert config["selected_candidate"]["gate_status"] == "blocked_final_holdout_not_evaluated"
+    assert config["candidate_rule"]["positive_min_s_score_after_veto"] == pytest.approx(0.8)
+    assert config["candidate_rule"]["negative_max_s_score_after_veto"] is None
+    assert config["final_holdout_evaluated"] is False
+    assert config["final_holdout_rows_used"] == 0
+    assert config["live_promotion_allowed"] is False
+    assert config["safety"]["candidate_promotion"] == "not_allowed"
 
 
 def test_build_massive_provider_validation_summary_compares_default_and_massive_without_cache(
@@ -645,6 +742,11 @@ def test_run_backtest_writes_macro_variant_summary_to_metadata(monkeypatch, tmp_
     monkeypatch.setattr(run_backtest, "CALIBRATION_REPORT_PATH", tmp_path / "calibration_10y_report.md")
     monkeypatch.setattr(run_backtest, "CALIBRATION_SUMMARY_PATH", tmp_path / "calibration_10y_summary.csv")
     monkeypatch.setattr(run_backtest, "CALIBRATION_CANDIDATES_PATH", tmp_path / "calibration_10y_candidates.csv")
+    monkeypatch.setattr(
+        run_backtest,
+        "CALIBRATION_CANDIDATE_CONFIG_PATH",
+        tmp_path / "calibration_10y_candidate_config.json",
+    )
     monkeypatch.setattr(run_backtest, "CALIBRATION_METADATA_PATH", tmp_path / "calibration_10y_metadata.json")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(
@@ -755,6 +857,11 @@ def test_run_backtest_writes_fred_validation_report_when_macro_variants_enabled(
     monkeypatch.setattr(run_backtest, "CALIBRATION_REPORT_PATH", tmp_path / "calibration_10y_report.md")
     monkeypatch.setattr(run_backtest, "CALIBRATION_SUMMARY_PATH", tmp_path / "calibration_10y_summary.csv")
     monkeypatch.setattr(run_backtest, "CALIBRATION_CANDIDATES_PATH", tmp_path / "calibration_10y_candidates.csv")
+    monkeypatch.setattr(
+        run_backtest,
+        "CALIBRATION_CANDIDATE_CONFIG_PATH",
+        tmp_path / "calibration_10y_candidate_config.json",
+    )
     monkeypatch.setattr(run_backtest, "CALIBRATION_METADATA_PATH", tmp_path / "calibration_10y_metadata.json")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(
@@ -907,6 +1014,11 @@ def test_run_backtest_writes_massive_validation_report_when_massive_variants_ena
     monkeypatch.setattr(run_backtest, "CALIBRATION_REPORT_PATH", tmp_path / "calibration_10y_report.md")
     monkeypatch.setattr(run_backtest, "CALIBRATION_SUMMARY_PATH", tmp_path / "calibration_10y_summary.csv")
     monkeypatch.setattr(run_backtest, "CALIBRATION_CANDIDATES_PATH", tmp_path / "calibration_10y_candidates.csv")
+    monkeypatch.setattr(
+        run_backtest,
+        "CALIBRATION_CANDIDATE_CONFIG_PATH",
+        tmp_path / "calibration_10y_candidate_config.json",
+    )
     monkeypatch.setattr(run_backtest, "CALIBRATION_METADATA_PATH", tmp_path / "calibration_10y_metadata.json")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(run_backtest, "fetch_ohlcv_result", fake_fetch_result)
@@ -1114,6 +1226,12 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     monkeypatch.setattr(run_backtest, "CALIBRATION_REPORT_PATH", tmp_path / "calibration_10y_report.md", raising=False)
     monkeypatch.setattr(run_backtest, "CALIBRATION_SUMMARY_PATH", tmp_path / "calibration_10y_summary.csv", raising=False)
     monkeypatch.setattr(run_backtest, "CALIBRATION_CANDIDATES_PATH", tmp_path / "calibration_10y_candidates.csv", raising=False)
+    monkeypatch.setattr(
+        run_backtest,
+        "CALIBRATION_CANDIDATE_CONFIG_PATH",
+        tmp_path / "calibration_10y_candidate_config.json",
+        raising=False,
+    )
     monkeypatch.setattr(run_backtest, "CALIBRATION_METADATA_PATH", tmp_path / "calibration_10y_metadata.json", raising=False)
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
@@ -1136,7 +1254,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
             "# Calibration Baseline Report\n",
             {
                 "ticket": "B-163",
-                "slice": "B-163.6",
+                "slice": "B-163.7",
                 "research_only": True,
                 "live_promotion_allowed": False,
             },
@@ -1150,6 +1268,12 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
                     }
                 ]
             ),
+            {
+                "ticket": "B-163",
+                "slice": "B-163.7",
+                "config_status": "skipped_insufficient_history",
+                "live_promotion_allowed": False,
+            },
         )
 
     monkeypatch.setattr(
@@ -1244,7 +1368,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     calibration_summary = pd.read_csv(run_backtest.CALIBRATION_SUMMARY_PATH)
     assert calibration_summary.loc[0, "scope"] == "overall"
     calibration_metadata = json.loads(run_backtest.CALIBRATION_METADATA_PATH.read_text(encoding="utf-8"))
-    assert calibration_metadata["slice"] == "B-163.6"
+    assert calibration_metadata["slice"] == "B-163.7"
     assert calibration_metadata["summary_sha256"] == run_backtest._sha256_bytes(
         run_backtest.CALIBRATION_SUMMARY_PATH.read_bytes()
     )
@@ -1254,6 +1378,12 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     assert metadata["calibration_10y_candidates_sha256"] == calibration_metadata[
         "candidates_sha256"
     ]
+    assert metadata["calibration_10y_candidate_config_sha256"] == calibration_metadata[
+        "candidate_config_sha256"
+    ]
+    candidate_config = json.loads(run_backtest.CALIBRATION_CANDIDATE_CONFIG_PATH.read_text(encoding="utf-8"))
+    assert candidate_config["slice"] == "B-163.7"
+    assert candidate_config["config_status"] == "skipped_insufficient_history"
 
 
 def test_run_backtest_live_smoke_fetches_short_period_without_artifacts(
@@ -1418,6 +1548,7 @@ def test_write_artifacts_persists_calibration_artifacts_and_metadata(monkeypatch
     calibration_report_path = tmp_path / "calibration_10y_report.md"
     calibration_summary_path = tmp_path / "calibration_10y_summary.csv"
     calibration_candidates_path = tmp_path / "calibration_10y_candidates.csv"
+    calibration_candidate_config_path = tmp_path / "calibration_10y_candidate_config.json"
     calibration_metadata_path = tmp_path / "calibration_10y_metadata.json"
 
     monkeypatch.setattr(run_backtest, "REPORT_PATH", report_path)
@@ -1428,6 +1559,12 @@ def test_write_artifacts_persists_calibration_artifacts_and_metadata(monkeypatch
     monkeypatch.setattr(run_backtest, "CALIBRATION_REPORT_PATH", calibration_report_path, raising=False)
     monkeypatch.setattr(run_backtest, "CALIBRATION_SUMMARY_PATH", calibration_summary_path, raising=False)
     monkeypatch.setattr(run_backtest, "CALIBRATION_CANDIDATES_PATH", calibration_candidates_path, raising=False)
+    monkeypatch.setattr(
+        run_backtest,
+        "CALIBRATION_CANDIDATE_CONFIG_PATH",
+        calibration_candidate_config_path,
+        raising=False,
+    )
     monkeypatch.setattr(run_backtest, "CALIBRATION_METADATA_PATH", calibration_metadata_path, raising=False)
 
     calibration_summary = pd.DataFrame(
@@ -1460,9 +1597,15 @@ def test_write_artifacts_persists_calibration_artifacts_and_metadata(monkeypatch
         calibration_report="# Calibration Baseline Report\n",
         calibration_summary=calibration_summary,
         calibration_candidates=calibration_candidates,
+        calibration_candidate_config={
+            "ticket": "B-163",
+            "slice": "B-163.7",
+            "config_status": "blocked_final_holdout_not_evaluated",
+            "live_promotion_allowed": False,
+        },
         calibration_metadata={
             "ticket": "B-163",
-            "slice": "B-163.6",
+            "slice": "B-163.7",
             "research_only": True,
             "live_promotion_allowed": False,
         },
@@ -1471,6 +1614,8 @@ def test_write_artifacts_persists_calibration_artifacts_and_metadata(monkeypatch
     assert calibration_report_path.read_text(encoding="utf-8").startswith("# Calibration")
     assert pd.read_csv(calibration_summary_path).loc[0, "hit_rate"] == pytest.approx(0.75)
     assert pd.read_csv(calibration_candidates_path).loc[0, "candidate_id"] == "positive_score_ge_0_8"
+    candidate_config = json.loads(calibration_candidate_config_path.read_text(encoding="utf-8"))
+    assert candidate_config["slice"] == "B-163.7"
     calibration_metadata = json.loads(calibration_metadata_path.read_text(encoding="utf-8"))
     backtest_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     assert calibration_metadata["summary_sha256"] == run_backtest._sha256_bytes(
@@ -1482,6 +1627,9 @@ def test_write_artifacts_persists_calibration_artifacts_and_metadata(monkeypatch
     assert calibration_metadata["candidates_sha256"] == run_backtest._sha256_bytes(
         calibration_candidates_path.read_bytes()
     )
+    assert calibration_metadata["candidate_config_sha256"] == run_backtest._sha256_bytes(
+        calibration_candidate_config_path.read_bytes()
+    )
     assert backtest_metadata["calibration_10y_summary_sha256"] == calibration_metadata[
         "summary_sha256"
     ]
@@ -1490,4 +1638,7 @@ def test_write_artifacts_persists_calibration_artifacts_and_metadata(monkeypatch
     ]
     assert backtest_metadata["calibration_10y_candidates_sha256"] == calibration_metadata[
         "candidates_sha256"
+    ]
+    assert backtest_metadata["calibration_10y_candidate_config_sha256"] == calibration_metadata[
+        "candidate_config_sha256"
     ]

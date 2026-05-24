@@ -32,6 +32,7 @@ MASSIVE_VALIDATION_SUMMARY_PATH = ROOT / "docs" / "massive_provider_validation_s
 CALIBRATION_REPORT_PATH = ROOT / "docs" / "calibration_10y_report.md"
 CALIBRATION_SUMMARY_PATH = ROOT / "docs" / "calibration_10y_summary.csv"
 CALIBRATION_CANDIDATES_PATH = ROOT / "docs" / "calibration_10y_candidates.csv"
+CALIBRATION_CANDIDATE_CONFIG_PATH = ROOT / "docs" / "calibration_10y_candidate_config.json"
 CALIBRATION_METADATA_PATH = ROOT / "docs" / "calibration_10y_metadata.json"
 CALIBRATION_BASELINE_CONFIG_FILENAME = "calibration_10y_baseline_config.json"
 CALIBRATION_HORIZONS_WEEKS = (4, 13, 26, 52)
@@ -145,6 +146,7 @@ def _write_artifacts(
     calibration_report: str | None = None,
     calibration_summary=None,
     calibration_candidates=None,
+    calibration_candidate_config: dict | None = None,
     calibration_metadata: dict | None = None,
 ) -> None:
     report_bytes = report.encode("utf-8")
@@ -212,6 +214,15 @@ def _write_artifacts(
         calibration_metadata_payload["candidates_sha256"] = metadata[
             "calibration_10y_candidates_sha256"
         ]
+    if calibration_candidate_config is not None:
+        calibration_candidate_config_bytes = _json_artifact_bytes(calibration_candidate_config)
+        payloads[CALIBRATION_CANDIDATE_CONFIG_PATH] = calibration_candidate_config_bytes
+        metadata["calibration_10y_candidate_config_sha256"] = _sha256_bytes(
+            calibration_candidate_config_bytes
+        )
+        calibration_metadata_payload["candidate_config_sha256"] = metadata[
+            "calibration_10y_candidate_config_sha256"
+        ]
     if baseline_config is not None:
         baseline_config_bytes = (
             json.dumps(baseline_config, indent=2, sort_keys=True) + "\n"
@@ -227,6 +238,7 @@ def _write_artifacts(
         or calibration_report is not None
         or calibration_summary is not None
         or calibration_candidates is not None
+        or calibration_candidate_config is not None
     ):
         calibration_metadata_payload.setdefault("generated_at_utc", metadata["generated_at_utc"])
         calibration_metadata_bytes = (
@@ -281,6 +293,32 @@ def _frame_records(frame) -> list[dict]:
     if frame is None or getattr(frame, "empty", True):
         return []
     return json.loads(frame.to_json(orient="records"))
+
+
+def _json_ready(value):
+    if isinstance(value, dict):
+        return {str(key): _json_ready(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_ready(item) for item in value]
+    if isinstance(value, pd.Timestamp):
+        return value.date().isoformat()
+    if hasattr(value, "item") and not isinstance(value, (str, bytes)):
+        try:
+            return _json_ready(value.item())
+        except (TypeError, ValueError):
+            pass
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return value
+
+
+def _json_artifact_bytes(payload: dict) -> bytes:
+    return (
+        json.dumps(_json_ready(payload), allow_nan=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
 
 
 def _resolve_validation_split(
@@ -416,7 +454,7 @@ def _format_calibration_baseline_report(
     lines = [
         "# 10-Year Calibration Baseline Report",
         "",
-        "Ticket: B-163.6",
+        "Ticket: B-163.7",
         "",
         (
             "This is research-only baseline and calibration-candidate evidence. It does "
@@ -429,6 +467,7 @@ def _format_calibration_baseline_report(
         f"- Label rows: {_format_count(metadata.get('label_rows'))}",
         f"- Summary rows: {_format_count(metadata.get('summary_rows'))}",
         f"- Split status: `{metadata.get('calibration_split_summary', {}).get('status', 'unknown')}`",
+        f"- Calibrated rerun gate: `{metadata.get('candidate_config_status', 'unknown')}`",
         "",
         "## Overall Baseline Hit Rates",
         "",
@@ -541,6 +580,111 @@ def _calibration_candidate_rules() -> tuple[backtest.CalibrationCandidateRule, .
     )
 
 
+def _scalar_bool(value, default: bool = False) -> bool:
+    if value is None:
+        return default
+    try:
+        if pd.isna(value):
+            return default
+    except (TypeError, ValueError):
+        pass
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "y"}:
+            return True
+        if normalized in {"false", "0", "no", "n"}:
+            return False
+    return bool(value)
+
+
+def _selected_candidate_rows(candidates: pd.DataFrame) -> pd.DataFrame:
+    if candidates is None or candidates.empty or "selected_by_calibration" not in candidates.columns:
+        return pd.DataFrame()
+    return candidates[candidates["selected_by_calibration"].map(_scalar_bool)].copy()
+
+
+def _build_calibration_candidate_config(
+    *,
+    candidates: pd.DataFrame,
+    baseline_config: dict,
+    calibration_split_summary: dict,
+) -> dict:
+    split_status = str((calibration_split_summary or {}).get("status", "unknown"))
+    base = {
+        "ticket": "B-163",
+        "slice": "B-163.7",
+        "purpose": "research_only_calibrated_rerun_gate",
+        "research_only": True,
+        "baseline_config_sha256": backtest.baseline_config_hash(baseline_config),
+        "calibration_split_status": split_status,
+        "calibration_split_summary": calibration_split_summary or {},
+        "candidate_rows": int(len(candidates)) if candidates is not None else 0,
+        "candidate_config_available": False,
+        "selected_candidate_id": None,
+        "selected_candidate": {},
+        "candidate_rule": {},
+        "final_holdout_evaluated": False,
+        "final_holdout_rows_used": 0,
+        "live_promotion_allowed": False,
+        "safety": {
+            "parameter_tuning": "research_only_calibrated_rerun_gate",
+            "candidate_promotion": "not_allowed",
+            "live_scoring_change": "none",
+            "final_holdout": "not_evaluated",
+        },
+    }
+    if split_status != "ready":
+        return {
+            **base,
+            "config_status": "skipped_insufficient_history",
+            "gate_reasons": [
+                str((calibration_split_summary or {}).get("reason") or "walk_forward_splits_not_ready")
+            ],
+        }
+
+    selected = _selected_candidate_rows(candidates)
+    if selected.empty:
+        return {
+            **base,
+            "config_status": "blocked_no_selected_candidate",
+            "gate_reasons": ["no_candidate_selected_by_calibration"],
+        }
+
+    row = selected.iloc[0].to_dict()
+    candidate_id = str(row.get("candidate_id", "unknown"))
+    gate_status = str(row.get("gate_status") or "blocked_final_holdout_not_evaluated")
+    final_holdout_rows_used = _json_ready(row.get("final_holdout_rows_used")) or 0
+    selected_candidate = _json_ready(row)
+    candidate_rule = {
+        "candidate_id": candidate_id,
+        "horizon_weeks": _json_ready(row.get("horizon_weeks")),
+        "selection_source": _json_ready(row.get("selection_source")),
+        "positive_min_s_score_after_veto": _json_ready(
+            row.get("positive_min_s_score_after_veto")
+        ),
+        "negative_max_s_score_after_veto": _json_ready(
+            row.get("negative_max_s_score_after_veto")
+        ),
+    }
+    config_available = gate_status == "blocked_final_holdout_not_evaluated"
+    return {
+        **base,
+        "config_status": gate_status,
+        "candidate_config_available": bool(config_available),
+        "selected_candidate_id": candidate_id,
+        "selected_candidate": selected_candidate,
+        "candidate_rule": candidate_rule,
+        "final_holdout_evaluated": _scalar_bool(row.get("final_holdout_evaluated")),
+        "final_holdout_rows_used": int(final_holdout_rows_used),
+        "live_promotion_allowed": False,
+        "gate_reasons": [
+            reason
+            for reason in str(row.get("rejection_reasons") or gate_status).split(";")
+            if reason
+        ],
+    }
+
+
 def _build_calibration_baseline_artifacts(
     *,
     targets,
@@ -548,7 +692,7 @@ def _build_calibration_baseline_artifacts(
     baseline_config: dict,
     calibration_split_summary: dict,
     ohlcv_source: dict,
-) -> tuple[pd.DataFrame, str, dict, pd.DataFrame]:
+) -> tuple[pd.DataFrame, str, dict, pd.DataFrame, dict]:
     labels = backtest.build_calibration_feature_labels(
         targets,
         prices,
@@ -597,6 +741,11 @@ def _build_calibration_baseline_artifacts(
         candidate_rules=_calibration_candidate_rules(),
         min_direction_signal_count=20,
     )
+    candidate_config = _build_calibration_candidate_config(
+        candidates=candidates,
+        baseline_config=baseline_config,
+        calibration_split_summary=calibration_split_summary,
+    )
 
     date_values = (
         pd.to_datetime(labels["rebalance_date"]).dropna().sort_values()
@@ -605,8 +754,8 @@ def _build_calibration_baseline_artifacts(
     )
     metadata = {
         "ticket": "B-163",
-        "slice": "B-163.6",
-        "purpose": "research_only_walk_forward_calibration_candidate_search",
+        "slice": "B-163.7",
+        "purpose": "research_only_walk_forward_calibration_candidate_search_and_rerun_gate",
         "research_only": True,
         "live_promotion_allowed": False,
         "horizons_weeks": list(CALIBRATION_HORIZONS_WEEKS),
@@ -621,6 +770,8 @@ def _build_calibration_baseline_artifacts(
         "candidate_search_status": (
             "completed" if calibration_splits else "skipped_insufficient_history"
         ),
+        "candidate_config_status": candidate_config["config_status"],
+        "candidate_config_available": candidate_config["candidate_config_available"],
         "label_start": _date_or_none(pd.DatetimeIndex(date_values), 0),
         "label_end": _date_or_none(pd.DatetimeIndex(date_values), -1),
         "ticker_count": int(labels["ticker"].nunique()) if "ticker" in labels.columns else 0,
@@ -632,6 +783,7 @@ def _build_calibration_baseline_artifacts(
             "parameter_tuning": "research_only_candidate_search",
             "candidate_promotion": "not_allowed",
             "live_scoring_change": "none",
+            "calibrated_rerun": candidate_config["config_status"],
             "final_holdout": "not_evaluated",
         },
     }
@@ -640,7 +792,7 @@ def _build_calibration_baseline_artifacts(
         candidates=candidates,
         metadata=metadata,
     )
-    return summary, report, metadata, candidates
+    return summary, report, metadata, candidates, candidate_config
 
 
 def _fetch_macro_data(enabled: bool) -> dict[str, pd.Series]:
@@ -1841,6 +1993,7 @@ def main(argv: list[str] | None = None) -> int:
             calibration_report,
             calibration_metadata,
             calibration_candidates,
+            calibration_candidate_config,
         ) = _build_calibration_baseline_artifacts(
             targets=methodology_targets,
             prices=prices,
@@ -1873,6 +2026,7 @@ def main(argv: list[str] | None = None) -> int:
             calibration_report=calibration_report,
             calibration_summary=calibration_summary,
             calibration_candidates=calibration_candidates,
+            calibration_candidate_config=calibration_candidate_config,
             calibration_metadata=calibration_metadata,
         )
     except Exception as exc:

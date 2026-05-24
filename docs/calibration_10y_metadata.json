@@ -12,11 +12,14 @@
     "status": "insufficient_history",
     "validation_years": 1
   },
+  "candidate_config_available": false,
+  "candidate_config_sha256": "bebd155ca2226dd32b27c212fea5f91b76fdbf20550aa3aca492dd7583b3fef2",
+  "candidate_config_status": "skipped_insufficient_history",
   "candidate_rows": 1,
   "candidate_search_status": "skipped_insufficient_history",
   "candidates_sha256": "c509a91d2c16c2a12fe092c5c838ed9e3ad3457ce03adf3af491f586484adbec",
   "class_count": 2,
-  "generated_at_utc": "2026-05-24T06:23:21.712043Z",
+  "generated_at_utc": "2026-05-24T14:48:03.020942Z",
   "horizons_weeks": [
     4,
     13,
@@ -36,17 +39,18 @@
     "stale_cache_hit_count": 0,
     "warnings": []
   },
-  "purpose": "research_only_walk_forward_calibration_candidate_search",
-  "report_sha256": "400ef55665463d04553b6a57177d0f7eca167d997f83883a37cdb72eefc4a916",
+  "purpose": "research_only_walk_forward_calibration_candidate_search_and_rerun_gate",
+  "report_sha256": "b04d361305e37f6040d9975d957c56ba2e442bfefb23d2cd9362cb884f6001fb",
   "research_only": true,
   "safety": {
+    "calibrated_rerun": "skipped_insufficient_history",
     "candidate_promotion": "not_allowed",
     "final_holdout": "not_evaluated",
     "live_scoring_change": "none",
     "parameter_tuning": "research_only_candidate_search"
   },
   "selected_candidate_count": 0,
-  "slice": "B-163.6",
+  "slice": "B-163.7",
   "summary_rows": 24,
   "summary_sha256": "3bec57028ab59142e5f4ac24099a2ea341c5f81fc7c0ee6393223d99c786582d",
   "ticker_count": 12,

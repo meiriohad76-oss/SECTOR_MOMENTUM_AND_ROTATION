@@ -11,6 +11,14 @@ def artifact_hash_matches(path: Path, expected_hash: str | None) -> bool:
     return hashlib.sha256(path.read_bytes()).hexdigest() == expected_hash
 
 
+def shared_artifact_hash(primary_hash: str | None, secondary_hash: str | None) -> str | None:
+    if not primary_hash or not secondary_hash:
+        return None
+    if primary_hash != secondary_hash:
+        return "__HASH_MISMATCH__"
+    return primary_hash
+
+
 def baseline_config_status(path: Path, expected_hash: str | None) -> str:
     if not path.exists():
         return "PENDING"
@@ -37,11 +45,13 @@ def calibration_artifact_status_rows(
     report_path: Path,
     summary_path: Path,
     candidates_path: Path,
+    candidate_config_path: Path,
     metadata_path: Path,
     baseline_hash: str | None,
     report_hash: str | None = None,
     summary_hash: str | None = None,
     candidates_hash: str | None = None,
+    candidate_config_hash: str | None = None,
     metadata_hash: str | None = None,
 ) -> list[dict[str, str]]:
     return [
@@ -64,6 +74,11 @@ def calibration_artifact_status_rows(
             "Artifact": "Calibration candidates",
             "Path": "docs/calibration_10y_candidates.csv",
             "Status": artifact_status(candidates_path, candidates_hash),
+        },
+        {
+            "Artifact": "Calibrated candidate config",
+            "Path": "docs/calibration_10y_candidate_config.json",
+            "Status": artifact_status(candidate_config_path, candidate_config_hash),
         },
         {
             "Artifact": "Calibration metadata",

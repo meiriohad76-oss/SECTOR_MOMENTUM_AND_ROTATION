@@ -16,7 +16,7 @@ import pandas as pd
 import streamlit as st
 
 from src.backtest import drawdown_frame, normalized_equity_frame
-from src.calibration_dashboard import calibration_artifact_status_rows
+from src.calibration_dashboard import calibration_artifact_status_rows, shared_artifact_hash
 from src.component_docs import DASHBOARD_COMPONENT_DOCS, component_docs_html
 from src.comparison_view import (
     comparison_card_rows,
@@ -355,6 +355,7 @@ CALIBRATION_BASELINE_CONFIG_PATH = APP_ROOT / "docs" / "calibration_10y_baseline
 CALIBRATION_REPORT_PATH = APP_ROOT / "docs" / "calibration_10y_report.md"
 CALIBRATION_SUMMARY_PATH = APP_ROOT / "docs" / "calibration_10y_summary.csv"
 CALIBRATION_CANDIDATES_PATH = APP_ROOT / "docs" / "calibration_10y_candidates.csv"
+CALIBRATION_CANDIDATE_CONFIG_PATH = APP_ROOT / "docs" / "calibration_10y_candidate_config.json"
 CALIBRATION_METADATA_PATH = APP_ROOT / "docs" / "calibration_10y_metadata.json"
 FRED_VALIDATION_SUMMARY_PATH = APP_ROOT / "docs" / "fred_macro_validation_summary.csv"
 MASSIVE_VALIDATION_SUMMARY_PATH = APP_ROOT / "docs" / "massive_provider_validation_summary.csv"
@@ -1939,6 +1940,10 @@ def render_calibration_lab():
     candidates_hash = metadata.get(
         "calibration_10y_candidates_sha256"
     ) or calibration_metadata.get("candidates_sha256")
+    candidate_config_hash = shared_artifact_hash(
+        metadata.get("calibration_10y_candidate_config_sha256"),
+        calibration_metadata.get("candidate_config_sha256"),
+    )
     metadata_hash = metadata.get("calibration_10y_metadata_sha256")
     baseline_config_exists = CALIBRATION_BASELINE_CONFIG_PATH.exists()
     status_rows = calibration_artifact_status_rows(
@@ -1946,18 +1951,24 @@ def render_calibration_lab():
         report_path=CALIBRATION_REPORT_PATH,
         summary_path=CALIBRATION_SUMMARY_PATH,
         candidates_path=CALIBRATION_CANDIDATES_PATH,
+        candidate_config_path=CALIBRATION_CANDIDATE_CONFIG_PATH,
         metadata_path=CALIBRATION_METADATA_PATH,
         baseline_hash=baseline_hash,
         report_hash=report_hash,
         summary_hash=summary_hash,
         candidates_hash=candidates_hash,
+        candidate_config_hash=candidate_config_hash,
         metadata_hash=metadata_hash,
     )
     baseline_status = status_rows[0]["Status"]
     baseline_verified = baseline_status == "VERIFIED"
     candidate_status = status_rows[3]["Status"]
-    metadata_status = status_rows[4]["Status"]
+    candidate_config_status = status_rows[4]["Status"]
+    metadata_status = status_rows[5]["Status"]
     candidate_artifact_verified = candidate_status == "VERIFIED" and metadata_status == "VERIFIED"
+    candidate_config_verified = (
+        candidate_config_status == "VERIFIED" and metadata_status == "VERIFIED"
+    )
     split_summary = metadata.get("calibration_split_summary") or calibration_metadata.get(
         "calibration_split_summary"
     )
@@ -2042,6 +2053,22 @@ def render_calibration_lab():
             <div class="chart-help">
               Calibration candidate artifact hash is <code>UNVERIFIED</code>.
               Run <code>python scripts/run_backtest.py</code> to refresh candidate evidence.
+            </div>
+            """
+        )
+
+    if candidate_config_verified:
+        with st.expander("Calibrated candidate config", expanded=False):
+            try:
+                st.json(json.loads(CALIBRATION_CANDIDATE_CONFIG_PATH.read_text(encoding="utf-8")))
+            except Exception as exc:
+                st.warning(f"Could not read calibrated candidate config artifact: {exc}")
+    elif CALIBRATION_CANDIDATE_CONFIG_PATH.exists() and candidate_config_status == "UNVERIFIED":
+        _md(
+            """
+            <div class="chart-help">
+              Calibrated candidate config artifact hash is <code>UNVERIFIED</code>.
+              Run <code>python scripts/run_backtest.py</code> to refresh calibrated rerun gate evidence.
             </div>
             """
         )
