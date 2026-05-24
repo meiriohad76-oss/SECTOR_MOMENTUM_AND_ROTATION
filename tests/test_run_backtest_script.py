@@ -188,7 +188,7 @@ def test_build_calibration_baseline_artifacts_summarizes_directional_metrics(mon
     assert report.index("Positive momentum hit rate") < report.index("Negative momentum hit rate")
     assert "research-only" in report
     assert metadata["ticket"] == "B-163"
-    assert metadata["slice"] == "B-163.7"
+    assert metadata["slice"] == "B-163.8"
     assert metadata["research_only"] is True
     assert metadata["live_promotion_allowed"] is False
     assert metadata["label_rows"] == 3
@@ -201,7 +201,7 @@ def test_build_calibration_baseline_artifacts_summarizes_directional_metrics(mon
     assert "selected_by_calibration" in candidates.columns
     assert set(candidates["live_promotion_allowed"]) == {False}
     assert candidate_config["ticket"] == "B-163"
-    assert candidate_config["slice"] == "B-163.7"
+    assert candidate_config["slice"] == "B-163.8"
     assert candidate_config["config_status"] == "blocked_final_holdout_not_evaluated"
     assert candidate_config["selected_candidate_id"] == "positive_score_ge_0_8"
     assert candidate_config["final_holdout_evaluated"] is False
@@ -235,7 +235,7 @@ def test_build_calibration_candidate_config_skips_when_history_is_insufficient()
     )
 
     assert config["ticket"] == "B-163"
-    assert config["slice"] == "B-163.7"
+    assert config["slice"] == "B-163.8"
     assert config["config_status"] == "skipped_insufficient_history"
     assert config["candidate_config_available"] is False
     assert config["selected_candidate_id"] is None
@@ -293,7 +293,66 @@ def test_build_calibration_candidate_config_records_selected_candidate_without_p
     assert config["final_holdout_evaluated"] is False
     assert config["final_holdout_rows_used"] == 0
     assert config["live_promotion_allowed"] is False
-    assert config["safety"]["candidate_promotion"] == "not_allowed"
+    assert config["safety"]["candidate_promotion"] == "separate_ticket_required"
+
+
+def test_build_calibration_candidate_config_records_final_holdout_candidate_without_live_promotion():
+    candidates = pd.DataFrame(
+        [
+            {
+                "candidate_id": "positive_score_ge_0_8",
+                "horizon_weeks": 4,
+                "gate_status": "passed_final_holdout_research_candidate",
+                "promotion_label": "candidate",
+                "rejection_reasons": "separate_live_promotion_ticket_required",
+                "selected_by_calibration": True,
+                "selection_source": "calibration_window_only",
+                "positive_min_s_score_after_veto": 0.8,
+                "negative_max_s_score_after_veto": float("nan"),
+                "final_holdout_evaluated": True,
+                "final_holdout_rows_used": 42,
+                "final_holdout_positive_hit_rate_delta_vs_baseline": 0.12,
+                "final_holdout_negative_hit_rate_delta_vs_baseline": 0.0,
+                "live_promotion_allowed": False,
+            }
+        ]
+    )
+
+    config = run_backtest._build_calibration_candidate_config(
+        candidates=candidates,
+        baseline_config={"ticket": "B-163"},
+        calibration_split_summary={
+            "status": "ready",
+            "requested_years": 10,
+            "minimum_accepted_years": 5,
+            "history_window_status": "accepted_short_history",
+            "fold_count": 2,
+        },
+    )
+
+    assert config["config_status"] == "passed_final_holdout_research_candidate"
+    assert config["candidate_config_available"] is True
+    assert config["selected_candidate_id"] == "positive_score_ge_0_8"
+    assert config["final_holdout_evaluated"] is True
+    assert config["final_holdout_rows_used"] == 42
+    assert config["selected_candidate"]["promotion_label"] == "candidate"
+    assert config["candidate_rule"]["positive_min_s_score_after_veto"] == pytest.approx(0.8)
+    assert config["live_promotion_allowed"] is False
+    assert config["safety"]["candidate_promotion"] == "separate_ticket_required"
+
+
+def test_build_calibration_split_summary_accepts_current_shortened_history_window():
+    rebalance_dates = pd.bdate_range("2018-06-22", "2026-05-22")
+
+    summary = run_backtest._build_calibration_split_summary(rebalance_dates)
+
+    assert summary["status"] == "ready"
+    assert summary["requested_years"] == 10
+    assert summary["minimum_accepted_years"] == 5
+    assert summary["history_window_status"] == "accepted_short_history"
+    assert summary["fold_count"] >= 1
+    assert summary["window"]["start"] == "2018-06-22"
+    assert summary["coverage_years"] >= 7.8
 
 
 def test_build_massive_provider_validation_summary_compares_default_and_massive_without_cache(
@@ -1254,7 +1313,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
             "# Calibration Baseline Report\n",
             {
                 "ticket": "B-163",
-                "slice": "B-163.7",
+                "slice": "B-163.8",
                 "research_only": True,
                 "live_promotion_allowed": False,
             },
@@ -1270,7 +1329,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
             ),
             {
                 "ticket": "B-163",
-                "slice": "B-163.7",
+                "slice": "B-163.8",
                 "config_status": "skipped_insufficient_history",
                 "live_promotion_allowed": False,
             },
@@ -1368,7 +1427,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     calibration_summary = pd.read_csv(run_backtest.CALIBRATION_SUMMARY_PATH)
     assert calibration_summary.loc[0, "scope"] == "overall"
     calibration_metadata = json.loads(run_backtest.CALIBRATION_METADATA_PATH.read_text(encoding="utf-8"))
-    assert calibration_metadata["slice"] == "B-163.7"
+    assert calibration_metadata["slice"] == "B-163.8"
     assert calibration_metadata["summary_sha256"] == run_backtest._sha256_bytes(
         run_backtest.CALIBRATION_SUMMARY_PATH.read_bytes()
     )
@@ -1382,7 +1441,7 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
         "candidate_config_sha256"
     ]
     candidate_config = json.loads(run_backtest.CALIBRATION_CANDIDATE_CONFIG_PATH.read_text(encoding="utf-8"))
-    assert candidate_config["slice"] == "B-163.7"
+    assert candidate_config["slice"] == "B-163.8"
     assert candidate_config["config_status"] == "skipped_insufficient_history"
 
 
@@ -1599,13 +1658,13 @@ def test_write_artifacts_persists_calibration_artifacts_and_metadata(monkeypatch
         calibration_candidates=calibration_candidates,
         calibration_candidate_config={
             "ticket": "B-163",
-            "slice": "B-163.7",
+            "slice": "B-163.8",
             "config_status": "blocked_final_holdout_not_evaluated",
             "live_promotion_allowed": False,
         },
         calibration_metadata={
             "ticket": "B-163",
-            "slice": "B-163.7",
+            "slice": "B-163.8",
             "research_only": True,
             "live_promotion_allowed": False,
         },
@@ -1615,7 +1674,7 @@ def test_write_artifacts_persists_calibration_artifacts_and_metadata(monkeypatch
     assert pd.read_csv(calibration_summary_path).loc[0, "hit_rate"] == pytest.approx(0.75)
     assert pd.read_csv(calibration_candidates_path).loc[0, "candidate_id"] == "positive_score_ge_0_8"
     candidate_config = json.loads(calibration_candidate_config_path.read_text(encoding="utf-8"))
-    assert candidate_config["slice"] == "B-163.7"
+    assert candidate_config["slice"] == "B-163.8"
     calibration_metadata = json.loads(calibration_metadata_path.read_text(encoding="utf-8"))
     backtest_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     assert calibration_metadata["summary_sha256"] == run_backtest._sha256_bytes(

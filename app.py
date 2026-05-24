@@ -1976,12 +1976,31 @@ def render_calibration_lab():
     st.dataframe(pd.DataFrame(status_rows), hide_index=True, use_container_width=True)
 
     if split_summary:
+        split_status = str(split_summary.get("status", "unknown"))
+        requested_years = str(split_summary.get("requested_years", 10))
+        minimum_accepted_years = str(split_summary.get("minimum_accepted_years", "n/a"))
+        effective_calibration_years = str(
+            split_summary.get("effective_calibration_years", "n/a")
+        )
+        coverage_years = str(split_summary.get("coverage_years", "n/a"))
+        history_window_status = str(split_summary.get("history_window_status", "unknown"))
+        history_window_reason = str(split_summary.get("history_window_reason") or "")
+        reason_line = (
+            f"<br />Reason: {_esc(history_window_reason)}."
+            if history_window_reason
+            else ""
+        )
         _md(
             f"""
             <div class="chart-help">
               <b>Walk-forward split status:</b>
-              <code>{_esc(str(split_summary.get("status", "unknown")))}</code>.
-              Requested window: <code>{_esc(str(split_summary.get("requested_years", 10)))}</code> years.
+              <code>{_esc(split_status)}</code>.
+              Requested window: <code>{_esc(requested_years)}</code> years.
+              Minimum accepted: <code>{_esc(minimum_accepted_years)}</code> years.
+              Effective calibration: <code>{_esc(effective_calibration_years)}</code> years.
+              Coverage used: <code>{_esc(coverage_years)}</code> years.
+              History window: <code>{_esc(history_window_status)}</code>.
+              {reason_line}
             </div>
             """
         )

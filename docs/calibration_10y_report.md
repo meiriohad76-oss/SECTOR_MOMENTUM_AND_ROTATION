@@ -1,6 +1,6 @@
-# 10-Year Calibration Baseline Report
+# Calibration Baseline Report
 
-Ticket: B-163.7
+Ticket: B-163.8
 
 This is research-only baseline and calibration-candidate evidence. It does not change live scoring, alter recommendations, or allow live promotion.
 
@@ -9,8 +9,9 @@ This is research-only baseline and calibration-candidate evidence. It does not c
 - Baseline config hash: `70d9b9ba8879ed98142d330c3611312aeab956850115484a2a16533c6cffb69f`
 - Label rows: 4968
 - Summary rows: 24
-- Split status: `insufficient_history`
-- Calibrated rerun gate: `skipped_insufficient_history`
+- Split status: `ready`
+- History window: `accepted_short_history` (7.92 years used; minimum accepted 5 years; effective calibration 5 years).
+- Calibrated rerun gate: `rejected_final_holdout_no_data`
 
 ## Overall Baseline Hit Rates
 
@@ -25,11 +26,12 @@ This is research-only baseline and calibration-candidate evidence. It does not c
 
 ## Calibration Candidate Search
 
-- No calibration candidate was selected. Status: `skipped_insufficient_history`.
-- Final holdout remains untouched in this slice; no candidate is promoted.
+- Selected by calibration window only: `positive_score_ge_1_0` (rejected_final_holdout_no_data; do not promote).
+- Final holdout evidence was not evaluated for the selected candidate.
+- Final holdout is evaluated only after calibration-window selection; no candidate is live-promoted.
 
 ## Safety
 
 - Candidate search is research-only and does not update live methodology parameters.
-- Final holdout evaluation and live promotion remain pending future reviewed B-163 slices.
+- Live promotion remains pending a future reviewed ticket with an activation flag and rollback plan.
 - Dashboard surfacing remains artifact-only and read-only.

@@ -42,6 +42,9 @@ def test_app_surfaces_calibration_artifacts_without_running_calibration():
     assert 'metadata_status == "VERIFIED"' in app_source
     assert 'candidate_status == "VERIFIED"' in app_source
     assert 'candidate_config_status == "VERIFIED"' in app_source
+    assert "history_window_status" in app_source
+    assert "Minimum accepted" in app_source
+    assert "Effective calibration" in app_source
     assert "Hash status" in app_source
     assert "UNVERIFIED" in app_source
     assert "_read_csv_artifact(CALIBRATION_SUMMARY_PATH)" in app_source

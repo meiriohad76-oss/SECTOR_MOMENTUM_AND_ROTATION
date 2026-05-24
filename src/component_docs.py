@@ -162,6 +162,8 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
             "report pending",
             "candidate table",
             "candidate config",
+            "accepted shortened history",
+            "final-holdout evidence",
         ),
         qa=("calibration dashboard model tests", "calibration dashboard static tests", "backtest unit tests"),
     ),

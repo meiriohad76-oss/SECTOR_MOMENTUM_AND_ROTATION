@@ -25,4 +25,11 @@ def test_committed_calibration_candidate_config_matches_both_metadata_hashes():
     ]
     assert candidate_config["config_status"] == calibration_metadata["candidate_config_status"]
     assert candidate_config["live_promotion_allowed"] is False
-    assert candidate_config["final_holdout_evaluated"] is False
+    final_holdout_status = str(candidate_config["config_status"])
+    if final_holdout_status.startswith(
+        ("passed_final_holdout", "rejected_final_holdout")
+    ) and final_holdout_status != "rejected_final_holdout_no_data":
+        assert candidate_config["final_holdout_evaluated"] is True
+        assert candidate_config["final_holdout_rows_used"] > 0
+    else:
+        assert candidate_config["final_holdout_evaluated"] is False

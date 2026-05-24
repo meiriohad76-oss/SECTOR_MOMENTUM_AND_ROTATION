@@ -36,6 +36,8 @@ CALIBRATION_CANDIDATE_CONFIG_PATH = ROOT / "docs" / "calibration_10y_candidate_c
 CALIBRATION_METADATA_PATH = ROOT / "docs" / "calibration_10y_metadata.json"
 CALIBRATION_BASELINE_CONFIG_FILENAME = "calibration_10y_baseline_config.json"
 CALIBRATION_HORIZONS_WEEKS = (4, 13, 26, 52)
+CALIBRATION_REQUESTED_YEARS = 10
+CALIBRATION_MINIMUM_ACCEPTED_YEARS = 5
 MASSIVE_AGGS_ENDPOINT = "https://api.massive.com/v2/aggs/ticker/{ticker}/range/1/day/{from}/{to}"
 MASSIVE_TRADES_ENDPOINT = "https://api.massive.com/v3/trades/{ticker}"
 MASSIVE_BLOCK_TRADE_THRESHOLDS = (1.0, 1.25, 1.5)
@@ -364,7 +366,8 @@ def _date_or_none(index: pd.DatetimeIndex, position: int) -> str | None:
 def _build_calibration_split_summary(
     rebalance_dates,
     *,
-    years: int = 10,
+    years: int = CALIBRATION_REQUESTED_YEARS,
+    minimum_years: int = CALIBRATION_MINIMUM_ACCEPTED_YEARS,
     calibration_years: int = 5,
     validation_years: int = 1,
     final_holdout_years: int = 1,
@@ -374,6 +377,7 @@ def _build_calibration_split_summary(
         splits = backtest.walk_forward_calibration_splits(
             dates,
             years=years,
+            minimum_years=minimum_years,
             calibration_years=calibration_years,
             validation_years=validation_years,
             final_holdout_years=final_holdout_years,
@@ -382,6 +386,7 @@ def _build_calibration_split_summary(
         return {
             "status": "insufficient_history",
             "requested_years": years,
+            "minimum_accepted_years": minimum_years,
             "calibration_years": calibration_years,
             "validation_years": validation_years,
             "final_holdout_years": final_holdout_years,
@@ -391,7 +396,11 @@ def _build_calibration_split_summary(
             "folds": [],
             "reason": str(exc),
         }
-    return backtest.walk_forward_split_summary(splits, requested_years=years)
+    return backtest.walk_forward_split_summary(
+        splits,
+        requested_years=years,
+        minimum_accepted_years=minimum_years,
+    )
 
 
 def _normalize_calibration_summary(metrics: pd.DataFrame, *, scope: str) -> pd.DataFrame:
@@ -452,9 +461,9 @@ def _format_calibration_baseline_report(
     metadata: dict,
 ) -> str:
     lines = [
-        "# 10-Year Calibration Baseline Report",
+        "# Calibration Baseline Report",
         "",
-        "Ticket: B-163.7",
+        "Ticket: B-163.8",
         "",
         (
             "This is research-only baseline and calibration-candidate evidence. It does "
@@ -467,6 +476,13 @@ def _format_calibration_baseline_report(
         f"- Label rows: {_format_count(metadata.get('label_rows'))}",
         f"- Summary rows: {_format_count(metadata.get('summary_rows'))}",
         f"- Split status: `{metadata.get('calibration_split_summary', {}).get('status', 'unknown')}`",
+        (
+            "- History window: "
+            f"`{metadata.get('calibration_split_summary', {}).get('history_window_status', 'unknown')}` "
+            f"({metadata.get('calibration_split_summary', {}).get('coverage_years', 'n/a')} years used; "
+            f"minimum accepted {metadata.get('calibration_split_summary', {}).get('minimum_accepted_years', 'n/a')} years; "
+            f"effective calibration {metadata.get('calibration_split_summary', {}).get('effective_calibration_years', 'n/a')} years)."
+        ),
         f"- Calibrated rerun gate: `{metadata.get('candidate_config_status', 'unknown')}`",
         "",
         "## Overall Baseline Hit Rates",
@@ -519,8 +535,26 @@ def _format_calibration_baseline_report(
                     f"({row.get('gate_status', 'unknown')}; "
                     f"{row.get('promotion_label', 'do not promote')})."
                 )
+                if _scalar_bool(row.get("final_holdout_evaluated")):
+                    horizon = _format_count(row.get("horizon_weeks"))
+                    lines.append(
+                        "- Final holdout evidence "
+                        f"({horizon}w, {_format_count(row.get('final_holdout_rows_used'))} rows): "
+                        "positive hit rate "
+                        f"{_format_percent(row.get('final_holdout_positive_hit_rate'))} "
+                        "vs baseline "
+                        f"{_format_percent(row.get('baseline_final_holdout_positive_hit_rate'))}; "
+                        "negative hit rate "
+                        f"{_format_percent(row.get('final_holdout_negative_hit_rate'))} "
+                        "vs baseline "
+                        f"{_format_percent(row.get('baseline_final_holdout_negative_hit_rate'))}."
+                    )
+                else:
+                    lines.append(
+                        "- Final holdout evidence was not evaluated for the selected candidate."
+                    )
         lines.append(
-            "- Final holdout remains untouched in this slice; no candidate is promoted."
+            "- Final holdout is evaluated only after calibration-window selection; no candidate is live-promoted."
         )
     lines.extend(
         [
@@ -528,7 +562,7 @@ def _format_calibration_baseline_report(
             "## Safety",
             "",
             "- Candidate search is research-only and does not update live methodology parameters.",
-            "- Final holdout evaluation and live promotion remain pending future reviewed B-163 slices.",
+            "- Live promotion remains pending a future reviewed ticket with an activation flag and rollback plan.",
             "- Dashboard surfacing remains artifact-only and read-only.",
             "",
         ]
@@ -612,7 +646,7 @@ def _build_calibration_candidate_config(
     split_status = str((calibration_split_summary or {}).get("status", "unknown"))
     base = {
         "ticket": "B-163",
-        "slice": "B-163.7",
+        "slice": "B-163.8",
         "purpose": "research_only_calibrated_rerun_gate",
         "research_only": True,
         "baseline_config_sha256": backtest.baseline_config_hash(baseline_config),
@@ -628,7 +662,7 @@ def _build_calibration_candidate_config(
         "live_promotion_allowed": False,
         "safety": {
             "parameter_tuning": "research_only_calibrated_rerun_gate",
-            "candidate_promotion": "not_allowed",
+            "candidate_promotion": "separate_ticket_required",
             "live_scoring_change": "none",
             "final_holdout": "not_evaluated",
         },
@@ -666,7 +700,7 @@ def _build_calibration_candidate_config(
             row.get("negative_max_s_score_after_veto")
         ),
     }
-    config_available = gate_status == "blocked_final_holdout_not_evaluated"
+    config_available = candidate_id != "unknown"
     return {
         **base,
         "config_status": gate_status,
@@ -682,6 +716,14 @@ def _build_calibration_candidate_config(
             for reason in str(row.get("rejection_reasons") or gate_status).split(";")
             if reason
         ],
+        "safety": {
+            **base["safety"],
+            "final_holdout": (
+                "evaluated_research_only"
+                if _scalar_bool(row.get("final_holdout_evaluated"))
+                else "not_evaluated"
+            ),
+        },
     }
 
 
@@ -740,6 +782,7 @@ def _build_calibration_baseline_artifacts(
         horizons_weeks=CALIBRATION_HORIZONS_WEEKS,
         candidate_rules=_calibration_candidate_rules(),
         min_direction_signal_count=20,
+        evaluate_final_holdout=True,
     )
     candidate_config = _build_calibration_candidate_config(
         candidates=candidates,
@@ -754,7 +797,7 @@ def _build_calibration_baseline_artifacts(
     )
     metadata = {
         "ticket": "B-163",
-        "slice": "B-163.7",
+        "slice": "B-163.8",
         "purpose": "research_only_walk_forward_calibration_candidate_search_and_rerun_gate",
         "research_only": True,
         "live_promotion_allowed": False,
@@ -781,10 +824,14 @@ def _build_calibration_baseline_artifacts(
         "ohlcv_source": ohlcv_source,
         "safety": {
             "parameter_tuning": "research_only_candidate_search",
-            "candidate_promotion": "not_allowed",
+            "candidate_promotion": "separate_ticket_required",
             "live_scoring_change": "none",
             "calibrated_rerun": candidate_config["config_status"],
-            "final_holdout": "not_evaluated",
+            "final_holdout": (
+                "evaluated_research_only"
+                if candidate_config["final_holdout_evaluated"]
+                else "not_evaluated"
+            ),
         },
     }
     report = _format_calibration_baseline_report(

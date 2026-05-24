@@ -187,22 +187,51 @@
   "baseline_config_artifact": "docs/calibration_10y_baseline_config.json",
   "baseline_config_artifact_sha256": "07a335f234be88cf37438ab9bfe0d1f9ff5d2dc117b485c8e7f667d75ed9c384",
   "baseline_config_sha256": "70d9b9ba8879ed98142d330c3611312aeab956850115484a2a16533c6cffb69f",
-  "calibration_10y_candidate_config_sha256": "bebd155ca2226dd32b27c212fea5f91b76fdbf20550aa3aca492dd7583b3fef2",
-  "calibration_10y_candidates_sha256": "c509a91d2c16c2a12fe092c5c838ed9e3ad3457ce03adf3af491f586484adbec",
-  "calibration_10y_metadata_sha256": "595ed9ea09dde959f153fe1651f3c310eee8bb6fd1a970da237777de677f9fae",
-  "calibration_10y_report_sha256": "b04d361305e37f6040d9975d957c56ba2e442bfefb23d2cd9362cb884f6001fb",
+  "calibration_10y_candidate_config_sha256": "d0657434f1ab2a2659901d7f6e48a5ca8e24763a232a5df68c3badf9269d1696",
+  "calibration_10y_candidates_sha256": "509156e4f09c4a7b4e532e721b003e27dcac9e229b44451ec4b3a15237fb93e5",
+  "calibration_10y_metadata_sha256": "92eac99a63c6bb4a4288db756e0cdb38910d9a563f7b70d4f556c123fb3213d3",
+  "calibration_10y_report_sha256": "c72c8c55a1cca9a572c2771fbd7af070e5772073f6e61cf9f7004e2862955fa2",
   "calibration_10y_summary_sha256": "3bec57028ab59142e5f4ac24099a2ea341c5f81fc7c0ee6393223d99c786582d",
   "calibration_split_summary": {
-    "available_end": "2026-05-22",
-    "available_start": "2018-06-22",
-    "calibration_years": 5,
-    "final_holdout_years": 1,
-    "fold_count": 0,
-    "folds": [],
-    "reason": "dates must span at least 10 years",
+    "coverage_years": 7.92,
+    "effective_calibration_years": 5,
+    "final_holdout": {
+      "end": "2026-05-22",
+      "start": "2025-05-23"
+    },
+    "fold_count": 2,
+    "folds": [
+      {
+        "calibration_end": "2023-06-16",
+        "calibration_start": "2018-06-22",
+        "calibration_years": 5,
+        "final_holdout_end": "2026-05-22",
+        "final_holdout_start": "2025-05-23",
+        "name": "fold_01",
+        "validation_end": "2024-06-21",
+        "validation_start": "2023-06-23"
+      },
+      {
+        "calibration_end": "2024-06-21",
+        "calibration_start": "2019-06-28",
+        "calibration_years": 5,
+        "final_holdout_end": "2026-05-22",
+        "final_holdout_start": "2025-05-23",
+        "name": "fold_02",
+        "validation_end": "2025-05-16",
+        "validation_start": "2024-06-28"
+      }
+    ],
+    "history_window_reason": "available history is shorter than 10 years but meets the configured minimum",
+    "history_window_status": "accepted_short_history",
+    "minimum_accepted_years": 5,
+    "no_lookahead_verified": true,
     "requested_years": 10,
-    "status": "insufficient_history",
-    "validation_years": 1
+    "status": "ready",
+    "window": {
+      "end": "2026-05-22",
+      "start": "2018-06-22"
+    }
   },
   "equity_columns": [
     "Methodology",
@@ -211,7 +240,7 @@
   ],
   "equity_rows": 1993,
   "equity_sha256": "03767338f1b13790411058c914f49655b8a56b01deb61033887e3b67246bacc9",
-  "generated_at_utc": "2026-05-24T14:48:03.020942Z",
+  "generated_at_utc": "2026-05-24T16:15:07.162980Z",
   "macro_variant_summary": [],
   "massive_validation_summary": [],
   "methodology_report_sha256": "b74a106f3054d8e1c6da646a5aad033713090ab8f6c284b634d7530dac2e93db",

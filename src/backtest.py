@@ -64,6 +64,7 @@ class WalkForwardSplit:
     validation_end: pd.Timestamp
     final_holdout_start: pd.Timestamp
     final_holdout_end: pd.Timestamp
+    calibration_years: int | None = None
 
 
 ScoreSnapshotFn = Callable[[dict[str, pd.DataFrame], str, str, str], pd.DataFrame]
@@ -254,15 +255,28 @@ def walk_forward_calibration_splits(
     dates: Sequence[pd.Timestamp] | pd.DatetimeIndex,
     *,
     years: int = 10,
+    minimum_years: int | None = None,
+    minimum_calibration_years: int = 3,
     calibration_years: int = 5,
     validation_years: int = 1,
     final_holdout_years: int = 1,
 ) -> list[WalkForwardSplit]:
     years = _positive_int("years", years)
+    minimum_years_value = None
+    if minimum_years is not None:
+        minimum_years_value = _positive_int("minimum_years", minimum_years)
+        if minimum_years_value > years:
+            raise ValueError("minimum_years cannot exceed years")
+    minimum_calibration_years = _positive_int(
+        "minimum_calibration_years",
+        minimum_calibration_years,
+    )
     calibration_years = _positive_int("calibration_years", calibration_years)
     validation_years = _positive_int("validation_years", validation_years)
     final_holdout_years = _positive_int("final_holdout_years", final_holdout_years)
-    if calibration_years + validation_years + final_holdout_years >= years:
+    if minimum_calibration_years > calibration_years:
+        raise ValueError("minimum_calibration_years cannot exceed calibration_years")
+    if minimum_years_value is None and calibration_years + validation_years + final_holdout_years >= years:
         raise ValueError(
             "calibration, validation, and holdout years must leave rolling history before "
             "the final holdout"
@@ -270,9 +284,24 @@ def walk_forward_calibration_splits(
 
     index = _clean_datetime_index("dates", dates)
     window_end = pd.Timestamp(index[-1])
-    window_start_target = window_end - pd.DateOffset(years=years) + pd.Timedelta(days=1)
+    requested_window_start_target = (
+        window_end - pd.DateOffset(years=years) + pd.Timedelta(days=1)
+    )
+    window_start_target = requested_window_start_target
+    accepted_short_history = False
     if pd.Timestamp(index[0]) > window_start_target:
-        raise ValueError(f"dates must span at least {years} years")
+        if minimum_years_value is None:
+            raise ValueError(f"dates must span at least {years} years")
+        minimum_start_target = (
+            window_end - pd.DateOffset(years=minimum_years_value) + pd.Timedelta(days=1)
+        )
+        if pd.Timestamp(index[0]) > minimum_start_target:
+            raise ValueError(
+                f"dates must span at least {years} years "
+                f"(minimum accepted {minimum_years_value} years)"
+            )
+        window_start_target = pd.Timestamp(index[0])
+        accepted_short_history = True
     window_dates = index[index >= window_start_target]
     if window_dates.empty:
         raise ValueError(f"dates must span at least {years} years")
@@ -283,6 +312,20 @@ def walk_forward_calibration_splits(
         if pd.notna(max_gap) and max_gap > pd.Timedelta(days=45):
             raise ValueError("dates must provide a continuous 10-year window without large gaps")
     window_start = pd.Timestamp(window_dates[0])
+    effective_calibration_years = calibration_years
+    if accepted_short_history:
+        coverage_years = ((window_end - window_start).days + 1) / 365.25
+        max_calibration_years = int(np.floor(coverage_years)) - (
+            validation_years + final_holdout_years
+        )
+        if max_calibration_years < minimum_calibration_years:
+            raise ValueError(
+                "accepted shortened history must leave enough room for "
+                f"{minimum_calibration_years} calibration years, "
+                f"{validation_years} validation years, and "
+                f"{final_holdout_years} holdout years"
+            )
+        effective_calibration_years = min(calibration_years, max_calibration_years)
     holdout_start_target = window_end - pd.DateOffset(years=final_holdout_years)
     holdout_start = _first_on_or_after(window_dates, holdout_start_target)
     if holdout_start is None:
@@ -291,7 +334,9 @@ def walk_forward_calibration_splits(
     splits: list[WalkForwardSplit] = []
     calibration_start = window_start
     while True:
-        validation_start_target = calibration_start + pd.DateOffset(years=calibration_years)
+        validation_start_target = calibration_start + pd.DateOffset(
+            years=effective_calibration_years
+        )
         validation_start = _first_on_or_after(window_dates, validation_start_target)
         if validation_start is None or validation_start >= holdout_start:
             break
@@ -312,6 +357,7 @@ def walk_forward_calibration_splits(
                 validation_end=pd.Timestamp(validation_end),
                 final_holdout_start=pd.Timestamp(holdout_start),
                 final_holdout_end=pd.Timestamp(window_end),
+                calibration_years=effective_calibration_years,
             )
         )
         next_start_target = calibration_start + pd.DateOffset(years=validation_years)
@@ -329,8 +375,8 @@ def _date_string(value: pd.Timestamp) -> str:
     return pd.Timestamp(value).date().isoformat()
 
 
-def _split_to_record(split: WalkForwardSplit) -> dict[str, str]:
-    return {
+def _split_to_record(split: WalkForwardSplit) -> dict[str, object]:
+    record = {
         "name": split.name,
         "calibration_start": _date_string(split.calibration_start),
         "calibration_end": _date_string(split.calibration_end),
@@ -339,21 +385,34 @@ def _split_to_record(split: WalkForwardSplit) -> dict[str, str]:
         "final_holdout_start": _date_string(split.final_holdout_start),
         "final_holdout_end": _date_string(split.final_holdout_end),
     }
+    if split.calibration_years is not None:
+        record["calibration_years"] = int(split.calibration_years)
+    return record
 
 
 def walk_forward_split_summary(
     splits: Sequence[WalkForwardSplit],
     *,
     requested_years: int = 10,
+    minimum_accepted_years: int | None = None,
 ) -> dict:
     requested_years = _positive_int("requested_years", requested_years)
+    minimum_accepted_years_value = None
+    if minimum_accepted_years is not None:
+        minimum_accepted_years_value = _positive_int(
+            "minimum_accepted_years",
+            minimum_accepted_years,
+        )
     if not splits:
-        return {
+        summary = {
             "status": "no_splits",
             "requested_years": requested_years,
             "fold_count": 0,
             "folds": [],
         }
+        if minimum_accepted_years_value is not None:
+            summary["minimum_accepted_years"] = minimum_accepted_years_value
+        return summary
     no_lookahead_verified = all(
         split.calibration_start <= split.calibration_end < split.validation_start
         and split.validation_start <= split.validation_end < split.final_holdout_start
@@ -364,9 +423,23 @@ def walk_forward_split_summary(
     window_end = max(split.final_holdout_end for split in splits)
     holdout_start = min(split.final_holdout_start for split in splits)
     holdout_end = max(split.final_holdout_end for split in splits)
-    return {
+    split_calibration_years = {
+        split.calibration_years for split in splits if split.calibration_years is not None
+    }
+    requested_start_target = (
+        pd.Timestamp(window_end) - pd.DateOffset(years=requested_years) + pd.Timedelta(days=1)
+    )
+    coverage_years = round(((pd.Timestamp(window_end) - pd.Timestamp(window_start)).days + 1) / 365.25, 2)
+    history_window_status = (
+        "full_requested_history"
+        if pd.Timestamp(window_start) <= requested_start_target
+        else "accepted_short_history"
+    )
+    summary = {
         "status": "ready",
         "requested_years": requested_years,
+        "coverage_years": coverage_years,
+        "history_window_status": history_window_status,
         "fold_count": len(splits),
         "window": {
             "start": _date_string(window_start),
@@ -379,6 +452,16 @@ def walk_forward_split_summary(
         "no_lookahead_verified": no_lookahead_verified,
         "folds": [_split_to_record(split) for split in splits],
     }
+    if len(split_calibration_years) == 1:
+        summary["effective_calibration_years"] = int(next(iter(split_calibration_years)))
+    if minimum_accepted_years_value is not None:
+        summary["minimum_accepted_years"] = minimum_accepted_years_value
+    if history_window_status == "accepted_short_history":
+        summary["history_window_reason"] = (
+            f"available history is shorter than {requested_years} years "
+            f"but meets the configured minimum"
+        )
+    return summary
 
 
 def _scalar_bool(value, default: bool = False) -> bool:
@@ -878,8 +961,13 @@ def _windowed_labels_for_split(
         if horizon_weeks is not None:
             maturity_dates = _label_maturity_dates(labels, horizon_weeks)
             mask &= maturity_dates.notna() & (maturity_dates < split.final_holdout_start)
+    elif window == "final_holdout":
+        mask = (dates >= split.final_holdout_start) & (dates <= split.final_holdout_end)
+        if horizon_weeks is not None:
+            maturity_dates = _label_maturity_dates(labels, horizon_weeks)
+            mask &= maturity_dates.notna() & (maturity_dates <= split.final_holdout_end)
     else:
-        raise ValueError("window must be calibration or validation")
+        raise ValueError("window must be calibration, validation, or final_holdout")
     return labels.loc[mask].copy()
 
 
@@ -975,6 +1063,155 @@ def _candidate_gate_status(
     return "blocked_final_holdout_not_evaluated", "needs more testing", ";".join(reasons)
 
 
+def _optional_candidate_threshold(value) -> float | None:
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    if value is None:
+        return None
+    return _finite_scalar("candidate_threshold", value)
+
+
+def _candidate_rule_from_row(row: dict) -> CalibrationCandidateRule:
+    return CalibrationCandidateRule(
+        candidate_id=str(row.get("candidate_id", "unknown")),
+        positive_min_s_score_after_veto=_optional_candidate_threshold(
+            row.get("positive_min_s_score_after_veto")
+        ),
+        negative_max_s_score_after_veto=_optional_candidate_threshold(
+            row.get("negative_max_s_score_after_veto")
+        ),
+    )
+
+
+def _final_holdout_labels_for_splits(
+    labels: pd.DataFrame,
+    splits: Sequence[WalkForwardSplit],
+    horizon: int,
+) -> pd.DataFrame:
+    frames = []
+    seen_windows = set()
+    for split in splits:
+        key = (
+            pd.Timestamp(split.final_holdout_start),
+            pd.Timestamp(split.final_holdout_end),
+        )
+        if key in seen_windows:
+            continue
+        seen_windows.add(key)
+        frames.append(_windowed_labels_for_split(labels, split, "final_holdout", horizon))
+    if not frames:
+        return labels.iloc[0:0].copy()
+    return pd.concat(frames, ignore_index=True)
+
+
+def _final_holdout_gate_status(
+    *,
+    row: dict,
+    directions: Sequence[str],
+    min_direction_signal_count: int,
+    max_negative_hit_rate_degradation: float,
+) -> tuple[str, str, str]:
+    reasons = ["separate_live_promotion_ticket_required"]
+    for direction in directions:
+        count = int(row.get(f"final_holdout_{direction}_signal_available_count", 0))
+        if count < min_direction_signal_count:
+            reasons.insert(0, "final_holdout_thin_sample")
+            return "rejected_final_holdout_thin_sample", "do not promote", ";".join(reasons)
+    negative_delta = row.get("final_holdout_negative_hit_rate_delta_vs_baseline", 0.0)
+    if negative_delta < -max_negative_hit_rate_degradation:
+        reasons.insert(0, "final_holdout_negative_signal_degraded")
+        return "rejected_final_holdout_degraded", "do not promote", ";".join(reasons)
+    positive_delta = row.get("final_holdout_positive_hit_rate_delta_vs_baseline", 0.0)
+    if positive_delta < 0:
+        reasons.insert(0, "final_holdout_positive_signal_degraded")
+        return "rejected_final_holdout_degraded", "do not promote", ";".join(reasons)
+    direction_deltas = [
+        row.get(f"final_holdout_{direction}_hit_rate_delta_vs_baseline", 0.0)
+        for direction in directions
+    ]
+    if not any(delta > 0 for delta in direction_deltas):
+        reasons.insert(0, "final_holdout_no_improvement")
+        return "rejected_final_holdout_no_improvement", "do not promote", ";".join(reasons)
+    return "passed_final_holdout_research_candidate", "candidate", ";".join(reasons)
+
+
+def _apply_final_holdout_evidence(
+    frame: pd.DataFrame,
+    labels: pd.DataFrame,
+    splits: Sequence[WalkForwardSplit],
+    *,
+    min_direction_signal_count: int,
+    max_negative_hit_rate_degradation: float,
+    drawdown_avoidance_threshold: float,
+) -> pd.DataFrame:
+    if frame.empty or labels.empty or not splits or "selected_by_calibration" not in frame.columns:
+        return frame
+    result = frame.copy()
+    selected_indexes = result.index[result["selected_by_calibration"].map(bool)].tolist()
+    for selected_index in selected_indexes:
+        row = result.loc[selected_index].to_dict()
+        if str(row.get("gate_status")) != "blocked_final_holdout_not_evaluated":
+            continue
+        horizon = _positive_int("horizon_weeks", row.get("horizon_weeks"))
+        holdout_labels = _final_holdout_labels_for_splits(labels, splits, horizon)
+        if holdout_labels.empty:
+            result.loc[selected_index, "gate_status"] = "rejected_final_holdout_no_data"
+            result.loc[selected_index, "promotion_label"] = "do not promote"
+            result.loc[
+                selected_index,
+                "rejection_reasons",
+            ] = "final_holdout_no_mature_labels;separate_live_promotion_ticket_required"
+            continue
+        rule = _candidate_rule_from_row(row)
+        candidate_holdout_labels = _candidate_signals(holdout_labels, rule)
+        baseline_metrics = calibration_label_metrics(
+            holdout_labels,
+            horizons_weeks=(horizon,),
+            drawdown_avoidance_threshold=drawdown_avoidance_threshold,
+        )
+        candidate_metrics = calibration_label_metrics(
+            candidate_holdout_labels,
+            horizons_weeks=(horizon,),
+            drawdown_avoidance_threshold=drawdown_avoidance_threshold,
+        )
+        updated = dict(row)
+        updated["final_holdout_evaluated"] = True
+        updated["final_holdout_rows_used"] = int(len(holdout_labels))
+        for direction in ("positive", "negative"):
+            baseline = _direction_metric(baseline_metrics, direction, horizon)
+            candidate = _direction_metric(candidate_metrics, direction, horizon)
+            candidate_hit_rate = _calibration_metric_value(candidate, "hit_rate")
+            baseline_hit_rate = _calibration_metric_value(baseline, "hit_rate")
+            updated[f"final_holdout_{direction}_hit_rate"] = candidate_hit_rate
+            updated[f"baseline_final_holdout_{direction}_hit_rate"] = baseline_hit_rate
+            updated[f"final_holdout_{direction}_hit_rate_delta_vs_baseline"] = (
+                candidate_hit_rate - baseline_hit_rate
+            )
+            updated[f"final_holdout_{direction}_signal_available_count"] = int(
+                _calibration_metric_value(candidate, "signal_available_count")
+            )
+            updated[f"baseline_final_holdout_{direction}_signal_available_count"] = int(
+                _calibration_metric_value(baseline, "signal_available_count")
+            )
+        directions = _candidate_direction_scope(rule)
+        gate_status, promotion_label, rejection_reasons = _final_holdout_gate_status(
+            row=updated,
+            directions=directions,
+            min_direction_signal_count=min_direction_signal_count,
+            max_negative_hit_rate_degradation=max_negative_hit_rate_degradation,
+        )
+        updated["gate_status"] = gate_status
+        updated["promotion_label"] = promotion_label
+        updated["rejection_reasons"] = rejection_reasons
+        updated["live_promotion_allowed"] = False
+        for key, value in updated.items():
+            result.loc[selected_index, key] = value
+    return result
+
+
 def calibration_candidate_search(
     labels: pd.DataFrame,
     splits: Sequence[WalkForwardSplit],
@@ -985,6 +1222,7 @@ def calibration_candidate_search(
     max_negative_hit_rate_degradation: float = 0.0,
     min_fold_validation_hit_rate_delta: float = 0.0,
     drawdown_avoidance_threshold: float = -0.05,
+    evaluate_final_holdout: bool = False,
 ) -> pd.DataFrame:
     """Evaluate deterministic calibration candidates without final-holdout leakage."""
     horizons = sorted({_positive_int("horizons_weeks", value) for value in horizons_weeks})
@@ -1188,13 +1426,29 @@ def calibration_candidate_search(
         return frame
     selectable = frame[frame["candidate_id"] != "baseline"].copy()
     if not selectable.empty:
-        selectable = selectable.sort_values(
+        selection_pool = selectable
+        if evaluate_final_holdout:
+            eligible = selectable[
+                selectable["gate_status"] == "blocked_final_holdout_not_evaluated"
+            ]
+            if not eligible.empty:
+                selection_pool = eligible
+        selection_pool = selection_pool.sort_values(
             ["calibration_objective_delta", "horizon_weeks", "candidate_id"],
             ascending=[False, True, True],
             kind="mergesort",
         )
-        selected_index = selectable.index[0]
+        selected_index = selection_pool.index[0]
         frame.loc[selected_index, "selected_by_calibration"] = True
+    if evaluate_final_holdout:
+        frame = _apply_final_holdout_evidence(
+            frame,
+            labels,
+            splits,
+            min_direction_signal_count=min_count,
+            max_negative_hit_rate_degradation=negative_tolerance,
+            drawdown_avoidance_threshold=drawdown_avoidance_threshold,
+        )
     bool_columns = ["selected_by_calibration", "final_holdout_evaluated", "live_promotion_allowed"]
     for column in bool_columns:
         frame[column] = frame[column].map(bool).astype(object)
@@ -1209,6 +1463,16 @@ def calibration_candidate_search(
         "final_holdout_evaluated",
         "final_holdout_rows_used",
         "live_promotion_allowed",
+        "final_holdout_positive_hit_rate",
+        "baseline_final_holdout_positive_hit_rate",
+        "final_holdout_positive_hit_rate_delta_vs_baseline",
+        "final_holdout_positive_signal_available_count",
+        "baseline_final_holdout_positive_signal_available_count",
+        "final_holdout_negative_hit_rate",
+        "baseline_final_holdout_negative_hit_rate",
+        "final_holdout_negative_hit_rate_delta_vs_baseline",
+        "final_holdout_negative_signal_available_count",
+        "baseline_final_holdout_negative_signal_available_count",
         "directions_changed",
         "positive_min_s_score_after_veto",
         "negative_max_s_score_after_veto",
