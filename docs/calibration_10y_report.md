@@ -1,8 +1,8 @@
 # 10-Year Calibration Baseline Report
 
-Ticket: B-163.5
+Ticket: B-163.6
 
-This is research-only baseline evidence. It does not tune methodology parameters, change live scoring, alter recommendations, or allow live promotion.
+This is research-only baseline and calibration-candidate evidence. It does not change live scoring, alter recommendations, or allow live promotion.
 
 ## Provenance
 
@@ -22,7 +22,13 @@ This is research-only baseline evidence. It does not tune methodology parameters
 - Positive momentum hit rate (52w): 36.19% (532 successes / 1470 available signals).
 - Negative momentum hit rate (52w): 84.31% (3310 successes / 3926 available signals).
 
+## Calibration Candidate Search
+
+- No calibration candidate was selected. Status: `skipped_insufficient_history`.
+- Final holdout remains untouched in this slice; no candidate is promoted.
+
 ## Safety
 
-- Candidate search, parameter calibration, and live promotion remain pending future B-163 slices.
+- Candidate search is research-only and does not update live methodology parameters.
+- Final holdout evaluation and live promotion remain pending future reviewed B-163 slices.
 - Dashboard surfacing remains artifact-only and read-only.

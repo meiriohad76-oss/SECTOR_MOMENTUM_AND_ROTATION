@@ -1930,6 +1930,16 @@ def render_calibration_lab():
     baseline_hash = metadata.get("baseline_config_artifact_sha256") or calibration_metadata.get(
         "baseline_config_artifact_sha256"
     )
+    report_hash = metadata.get("calibration_10y_report_sha256") or calibration_metadata.get(
+        "report_sha256"
+    )
+    summary_hash = metadata.get("calibration_10y_summary_sha256") or calibration_metadata.get(
+        "summary_sha256"
+    )
+    candidates_hash = metadata.get(
+        "calibration_10y_candidates_sha256"
+    ) or calibration_metadata.get("candidates_sha256")
+    metadata_hash = metadata.get("calibration_10y_metadata_sha256")
     baseline_config_exists = CALIBRATION_BASELINE_CONFIG_PATH.exists()
     status_rows = calibration_artifact_status_rows(
         baseline_config_path=CALIBRATION_BASELINE_CONFIG_PATH,
@@ -1938,9 +1948,16 @@ def render_calibration_lab():
         candidates_path=CALIBRATION_CANDIDATES_PATH,
         metadata_path=CALIBRATION_METADATA_PATH,
         baseline_hash=baseline_hash,
+        report_hash=report_hash,
+        summary_hash=summary_hash,
+        candidates_hash=candidates_hash,
+        metadata_hash=metadata_hash,
     )
     baseline_status = status_rows[0]["Status"]
     baseline_verified = baseline_status == "VERIFIED"
+    candidate_status = status_rows[3]["Status"]
+    metadata_status = status_rows[4]["Status"]
+    candidate_artifact_verified = candidate_status == "VERIFIED" and metadata_status == "VERIFIED"
     split_summary = metadata.get("calibration_split_summary") or calibration_metadata.get(
         "calibration_split_summary"
     )
@@ -2011,10 +2028,23 @@ def render_calibration_lab():
     if not summary.empty:
         st.dataframe(summary, hide_index=True, use_container_width=True)
 
-    candidates = _read_csv_artifact(CALIBRATION_CANDIDATES_PATH)
-    if not candidates.empty:
+    candidates = (
+        _read_csv_artifact(CALIBRATION_CANDIDATES_PATH)
+        if candidate_artifact_verified
+        else pd.DataFrame()
+    )
+    if not candidates.empty and candidate_artifact_verified:
         with st.expander("Calibration candidates", expanded=False):
             st.dataframe(candidates, hide_index=True, use_container_width=True)
+    elif CALIBRATION_CANDIDATES_PATH.exists() and candidate_status == "UNVERIFIED":
+        _md(
+            """
+            <div class="chart-help">
+              Calibration candidate artifact hash is <code>UNVERIFIED</code>.
+              Run <code>python scripts/run_backtest.py</code> to refresh candidate evidence.
+            </div>
+            """
+        )
 
 
 def _read_validation_summary(path: Path) -> pd.DataFrame:

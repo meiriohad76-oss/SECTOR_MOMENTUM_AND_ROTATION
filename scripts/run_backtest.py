@@ -31,6 +31,7 @@ MASSIVE_VALIDATION_REPORT_PATH = ROOT / "docs" / "massive_provider_validation_re
 MASSIVE_VALIDATION_SUMMARY_PATH = ROOT / "docs" / "massive_provider_validation_summary.csv"
 CALIBRATION_REPORT_PATH = ROOT / "docs" / "calibration_10y_report.md"
 CALIBRATION_SUMMARY_PATH = ROOT / "docs" / "calibration_10y_summary.csv"
+CALIBRATION_CANDIDATES_PATH = ROOT / "docs" / "calibration_10y_candidates.csv"
 CALIBRATION_METADATA_PATH = ROOT / "docs" / "calibration_10y_metadata.json"
 CALIBRATION_BASELINE_CONFIG_FILENAME = "calibration_10y_baseline_config.json"
 CALIBRATION_HORIZONS_WEEKS = (4, 13, 26, 52)
@@ -143,6 +144,7 @@ def _write_artifacts(
     calibration_split_summary: dict | None = None,
     calibration_report: str | None = None,
     calibration_summary=None,
+    calibration_candidates=None,
     calibration_metadata: dict | None = None,
 ) -> None:
     report_bytes = report.encode("utf-8")
@@ -201,6 +203,15 @@ def _write_artifacts(
         payloads[CALIBRATION_SUMMARY_PATH] = calibration_summary_bytes
         metadata["calibration_10y_summary_sha256"] = _sha256_bytes(calibration_summary_bytes)
         calibration_metadata_payload["summary_sha256"] = metadata["calibration_10y_summary_sha256"]
+    if calibration_candidates is not None:
+        calibration_candidates_bytes = calibration_candidates.to_csv(index=False).encode("utf-8")
+        payloads[CALIBRATION_CANDIDATES_PATH] = calibration_candidates_bytes
+        metadata["calibration_10y_candidates_sha256"] = _sha256_bytes(
+            calibration_candidates_bytes
+        )
+        calibration_metadata_payload["candidates_sha256"] = metadata[
+            "calibration_10y_candidates_sha256"
+        ]
     if baseline_config is not None:
         baseline_config_bytes = (
             json.dumps(baseline_config, indent=2, sort_keys=True) + "\n"
@@ -211,7 +222,12 @@ def _write_artifacts(
         metadata["baseline_config_sha256"] = backtest.baseline_config_hash(baseline_config)
         metadata["baseline_config_artifact"] = _artifact_label(baseline_config_path)
         metadata["baseline_config_artifact_sha256"] = _sha256_bytes(baseline_config_bytes)
-    if calibration_metadata is not None or calibration_report is not None or calibration_summary is not None:
+    if (
+        calibration_metadata is not None
+        or calibration_report is not None
+        or calibration_summary is not None
+        or calibration_candidates is not None
+    ):
         calibration_metadata_payload.setdefault("generated_at_utc", metadata["generated_at_utc"])
         calibration_metadata_bytes = (
             json.dumps(calibration_metadata_payload, indent=2, sort_keys=True) + "\n"
@@ -394,16 +410,17 @@ def _format_count(value) -> str:
 def _format_calibration_baseline_report(
     summary: pd.DataFrame,
     *,
+    candidates: pd.DataFrame,
     metadata: dict,
 ) -> str:
     lines = [
         "# 10-Year Calibration Baseline Report",
         "",
-        "Ticket: B-163.5",
+        "Ticket: B-163.6",
         "",
         (
-            "This is research-only baseline evidence. It does not tune methodology "
-            "parameters, change live scoring, alter recommendations, or allow live promotion."
+            "This is research-only baseline and calibration-candidate evidence. It does "
+            "not change live scoring, alter recommendations, or allow live promotion."
         ),
         "",
         "## Provenance",
@@ -437,14 +454,91 @@ def _format_calibration_baseline_report(
     lines.extend(
         [
             "",
+            "## Calibration Candidate Search",
+            "",
+        ]
+    )
+    if candidates.empty:
+        lines.append("- No calibration candidate rows were produced.")
+    else:
+        selected = (
+            candidates[candidates["selected_by_calibration"].map(bool)]
+            if "selected_by_calibration" in candidates.columns
+            else pd.DataFrame()
+        )
+        if selected.empty:
+            first = candidates.iloc[0]
+            lines.append(
+                "- No calibration candidate was selected. "
+                f"Status: `{first.get('gate_status', 'unknown')}`."
+            )
+        else:
+            for _, row in selected.iterrows():
+                lines.append(
+                    "- Selected by calibration window only: "
+                    f"`{row.get('candidate_id', 'unknown')}` "
+                    f"({row.get('gate_status', 'unknown')}; "
+                    f"{row.get('promotion_label', 'do not promote')})."
+                )
+        lines.append(
+            "- Final holdout remains untouched in this slice; no candidate is promoted."
+        )
+    lines.extend(
+        [
+            "",
             "## Safety",
             "",
-            "- Candidate search, parameter calibration, and live promotion remain pending future B-163 slices.",
+            "- Candidate search is research-only and does not update live methodology parameters.",
+            "- Final holdout evaluation and live promotion remain pending future reviewed B-163 slices.",
             "- Dashboard surfacing remains artifact-only and read-only.",
             "",
         ]
     )
     return "\n".join(lines)
+
+
+def _calibration_splits_from_summary(summary: dict) -> list[backtest.WalkForwardSplit]:
+    if not summary or summary.get("status") != "ready":
+        return []
+    splits = []
+    for row in summary.get("folds", []):
+        try:
+            splits.append(
+                backtest.WalkForwardSplit(
+                    name=str(row["name"]),
+                    calibration_start=pd.Timestamp(row["calibration_start"]),
+                    calibration_end=pd.Timestamp(row["calibration_end"]),
+                    validation_start=pd.Timestamp(row["validation_start"]),
+                    validation_end=pd.Timestamp(row["validation_end"]),
+                    final_holdout_start=pd.Timestamp(row["final_holdout_start"]),
+                    final_holdout_end=pd.Timestamp(row["final_holdout_end"]),
+                )
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("calibration split summary contains an invalid fold") from exc
+    return splits
+
+
+def _calibration_candidate_rules() -> tuple[backtest.CalibrationCandidateRule, ...]:
+    return (
+        backtest.CalibrationCandidateRule(candidate_id="baseline"),
+        backtest.CalibrationCandidateRule(
+            candidate_id="positive_score_ge_0_8",
+            positive_min_s_score_after_veto=0.8,
+        ),
+        backtest.CalibrationCandidateRule(
+            candidate_id="positive_score_ge_1_0",
+            positive_min_s_score_after_veto=1.0,
+        ),
+        backtest.CalibrationCandidateRule(
+            candidate_id="negative_score_le_0_0",
+            negative_max_s_score_after_veto=0.0,
+        ),
+        backtest.CalibrationCandidateRule(
+            candidate_id="negative_score_le_minus_0_5",
+            negative_max_s_score_after_veto=-0.5,
+        ),
+    )
 
 
 def _build_calibration_baseline_artifacts(
@@ -454,7 +548,7 @@ def _build_calibration_baseline_artifacts(
     baseline_config: dict,
     calibration_split_summary: dict,
     ohlcv_source: dict,
-) -> tuple[pd.DataFrame, str, dict]:
+) -> tuple[pd.DataFrame, str, dict, pd.DataFrame]:
     labels = backtest.build_calibration_feature_labels(
         targets,
         prices,
@@ -495,6 +589,15 @@ def _build_calibration_baseline_artifacts(
         summary["scope"] = summary["scope"].astype(str)
         summary["direction"] = summary["direction"].astype(str)
 
+    calibration_splits = _calibration_splits_from_summary(calibration_split_summary)
+    candidates = backtest.calibration_candidate_search(
+        labels,
+        calibration_splits,
+        horizons_weeks=CALIBRATION_HORIZONS_WEEKS,
+        candidate_rules=_calibration_candidate_rules(),
+        min_direction_signal_count=20,
+    )
+
     date_values = (
         pd.to_datetime(labels["rebalance_date"]).dropna().sort_values()
         if "rebalance_date" in labels.columns
@@ -502,13 +605,22 @@ def _build_calibration_baseline_artifacts(
     )
     metadata = {
         "ticket": "B-163",
-        "slice": "B-163.5",
-        "purpose": "research_only_baseline_calibration_summary",
+        "slice": "B-163.6",
+        "purpose": "research_only_walk_forward_calibration_candidate_search",
         "research_only": True,
         "live_promotion_allowed": False,
         "horizons_weeks": list(CALIBRATION_HORIZONS_WEEKS),
         "label_rows": int(len(labels)),
         "summary_rows": int(len(summary)),
+        "candidate_rows": int(len(candidates)),
+        "selected_candidate_count": (
+            int(candidates["selected_by_calibration"].map(bool).sum())
+            if "selected_by_calibration" in candidates.columns
+            else 0
+        ),
+        "candidate_search_status": (
+            "completed" if calibration_splits else "skipped_insufficient_history"
+        ),
         "label_start": _date_or_none(pd.DatetimeIndex(date_values), 0),
         "label_end": _date_or_none(pd.DatetimeIndex(date_values), -1),
         "ticker_count": int(labels["ticker"].nunique()) if "ticker" in labels.columns else 0,
@@ -517,13 +629,18 @@ def _build_calibration_baseline_artifacts(
         "calibration_split_summary": calibration_split_summary,
         "ohlcv_source": ohlcv_source,
         "safety": {
-            "parameter_tuning": "not_run",
+            "parameter_tuning": "research_only_candidate_search",
             "candidate_promotion": "not_allowed",
             "live_scoring_change": "none",
+            "final_holdout": "not_evaluated",
         },
     }
-    report = _format_calibration_baseline_report(summary, metadata=metadata)
-    return summary, report, metadata
+    report = _format_calibration_baseline_report(
+        summary,
+        candidates=candidates,
+        metadata=metadata,
+    )
+    return summary, report, metadata, candidates
 
 
 def _fetch_macro_data(enabled: bool) -> dict[str, pd.Series]:
@@ -1719,7 +1836,12 @@ def main(argv: list[str] | None = None) -> int:
             ohlcv_fetch_result,
             cache_policy="bypassed" if validation_mode else "normal",
         )
-        calibration_summary, calibration_report, calibration_metadata = _build_calibration_baseline_artifacts(
+        (
+            calibration_summary,
+            calibration_report,
+            calibration_metadata,
+            calibration_candidates,
+        ) = _build_calibration_baseline_artifacts(
             targets=methodology_targets,
             prices=prices,
             baseline_config=baseline_config,
@@ -1750,6 +1872,7 @@ def main(argv: list[str] | None = None) -> int:
             calibration_split_summary=calibration_split_summary,
             calibration_report=calibration_report,
             calibration_summary=calibration_summary,
+            calibration_candidates=calibration_candidates,
             calibration_metadata=calibration_metadata,
         )
     except Exception as exc:

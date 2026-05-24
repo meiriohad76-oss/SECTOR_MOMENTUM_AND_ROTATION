@@ -1,0 +1,2 @@
+candidate_id,horizon_weeks,gate_status,promotion_label,rejection_reasons,selected_by_calibration,selection_source,final_holdout_evaluated,final_holdout_rows_used,live_promotion_allowed
+no_ready_walk_forward_splits,4,skipped_insufficient_history,do not promote,no_ready_walk_forward_splits,False,calibration_window_only,False,0,False

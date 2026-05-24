@@ -43,3 +43,41 @@ def test_calibration_artifact_status_rows_distinguish_baseline_hash_states(tmp_p
         "Status": "READY",
     }
     assert verified[2]["Status"] == "PENDING"
+
+
+def test_calibration_artifact_status_rows_verify_candidate_hash(tmp_path):
+    baseline = tmp_path / "calibration_10y_baseline_config.json"
+    report = tmp_path / "calibration_10y_report.md"
+    summary = tmp_path / "calibration_10y_summary.csv"
+    candidates = tmp_path / "calibration_10y_candidates.csv"
+    metadata = tmp_path / "calibration_10y_metadata.json"
+    candidates.write_text("candidate_id\nbaseline\n", encoding="utf-8")
+
+    rows = calibration_artifact_status_rows(
+        baseline_config_path=baseline,
+        report_path=report,
+        summary_path=summary,
+        candidates_path=candidates,
+        metadata_path=metadata,
+        baseline_hash=None,
+        candidates_hash="not-the-current-hash",
+    )
+
+    assert rows[3] == {
+        "Artifact": "Calibration candidates",
+        "Path": "docs/calibration_10y_candidates.csv",
+        "Status": "UNVERIFIED",
+    }
+
+    expected_hash = hashlib.sha256(candidates.read_bytes()).hexdigest()
+    verified = calibration_artifact_status_rows(
+        baseline_config_path=baseline,
+        report_path=report,
+        summary_path=summary,
+        candidates_path=candidates,
+        metadata_path=metadata,
+        baseline_hash=None,
+        candidates_hash=expected_hash,
+    )
+
+    assert verified[3]["Status"] == "VERIFIED"

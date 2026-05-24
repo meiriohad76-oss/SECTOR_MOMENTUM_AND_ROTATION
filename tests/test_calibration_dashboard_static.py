@@ -30,6 +30,10 @@ def test_app_surfaces_calibration_artifacts_without_running_calibration():
     assert "calibration_artifact_status_rows(" in app_source
     assert 'baseline_status = status_rows[0]["Status"]' in app_source
     assert 'baseline_verified = baseline_status == "VERIFIED"' in app_source
+    assert 'candidate_status = status_rows[3]["Status"]' in app_source
+    assert 'metadata_status = status_rows[4]["Status"]' in app_source
+    assert 'metadata_status == "VERIFIED"' in app_source
+    assert 'candidate_status == "VERIFIED"' in app_source
     assert "Hash status" in app_source
     assert "UNVERIFIED" in app_source
     assert "_read_csv_artifact(CALIBRATION_SUMMARY_PATH)" in app_source
@@ -37,6 +41,7 @@ def test_app_surfaces_calibration_artifacts_without_running_calibration():
     assert "CALIBRATION_REPORT_PATH.read_text" in app_source
     assert "CALIBRATION_BASELINE_CONFIG_PATH" in app_source
     assert "calibration_label_metrics(" not in app_source
+    assert "calibration_candidate_search(" not in app_source
     assert "run_backtest.main(" not in app_source
 
 

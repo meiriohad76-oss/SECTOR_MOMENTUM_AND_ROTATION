@@ -23,6 +23,14 @@ def artifact_presence_status(path: Path) -> str:
     return "READY" if path.exists() else "PENDING"
 
 
+def artifact_status(path: Path, expected_hash: str | None = None) -> str:
+    if not path.exists():
+        return "PENDING"
+    if expected_hash is None:
+        return "READY"
+    return "VERIFIED" if artifact_hash_matches(path, expected_hash) else "UNVERIFIED"
+
+
 def calibration_artifact_status_rows(
     *,
     baseline_config_path: Path,
@@ -31,6 +39,10 @@ def calibration_artifact_status_rows(
     candidates_path: Path,
     metadata_path: Path,
     baseline_hash: str | None,
+    report_hash: str | None = None,
+    summary_hash: str | None = None,
+    candidates_hash: str | None = None,
+    metadata_hash: str | None = None,
 ) -> list[dict[str, str]]:
     return [
         {
@@ -41,21 +53,21 @@ def calibration_artifact_status_rows(
         {
             "Artifact": "Calibration report",
             "Path": "docs/calibration_10y_report.md",
-            "Status": artifact_presence_status(report_path),
+            "Status": artifact_status(report_path, report_hash),
         },
         {
             "Artifact": "Calibration summary",
             "Path": "docs/calibration_10y_summary.csv",
-            "Status": artifact_presence_status(summary_path),
+            "Status": artifact_status(summary_path, summary_hash),
         },
         {
             "Artifact": "Calibration candidates",
             "Path": "docs/calibration_10y_candidates.csv",
-            "Status": artifact_presence_status(candidates_path),
+            "Status": artifact_status(candidates_path, candidates_hash),
         },
         {
             "Artifact": "Calibration metadata",
             "Path": "docs/calibration_10y_metadata.json",
-            "Status": artifact_presence_status(metadata_path),
+            "Status": artifact_status(metadata_path, metadata_hash),
         },
     ]

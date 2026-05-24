@@ -49,6 +49,13 @@ class MacroVariantRule:
 
 
 @dataclass(frozen=True)
+class CalibrationCandidateRule:
+    candidate_id: str
+    positive_min_s_score_after_veto: float | None = None
+    negative_max_s_score_after_veto: float | None = None
+
+
+@dataclass(frozen=True)
 class WalkForwardSplit:
     name: str
     calibration_start: pd.Timestamp
@@ -440,6 +447,7 @@ def _forward_label_values(
     horizon_weeks = _positive_int("horizon_weeks", horizon_weeks)
     empty = {
         "available": False,
+        "end_date": None,
         "forward_return": float("nan"),
         "benchmark_return": float("nan"),
         "excess_return": float("nan"),
@@ -453,6 +461,7 @@ def _forward_label_values(
     end_date = _first_on_or_after(prices.index, end_target)
     if end_date is None:
         return empty
+    empty["end_date"] = pd.Timestamp(end_date)
     start_price = _float_or_nan(prices.loc[as_of, ticker])
     end_price = _float_or_nan(prices.loc[end_date, ticker])
     benchmark_start = _float_or_nan(prices.loc[as_of, benchmark])
@@ -470,6 +479,7 @@ def _forward_label_values(
     drawdown = float(window.min() / start_price - 1.0)
     return {
         "available": True,
+        "end_date": pd.Timestamp(end_date),
         "forward_return": float(forward_return),
         "benchmark_return": float(benchmark_return),
         "excess_return": float(forward_return - benchmark_return),
@@ -573,6 +583,7 @@ def build_calibration_feature_labels(
                 row.update(
                     {
                         f"label_available_{suffix}": available,
+                        f"label_end_date_{suffix}": values["end_date"],
                         f"forward_return_{suffix}": values["forward_return"],
                         f"forward_benchmark_return_{suffix}": values["benchmark_return"],
                         f"forward_excess_return_{suffix}": values["excess_return"],
@@ -844,6 +855,382 @@ def calibration_label_metrics(
                 )
 
     return pd.DataFrame(rows, columns=metric_columns)
+
+
+def _windowed_labels_for_split(
+    labels: pd.DataFrame,
+    split: WalkForwardSplit,
+    window: str,
+    horizon_weeks: int | None = None,
+) -> pd.DataFrame:
+    if labels.empty:
+        return labels.copy()
+    if "rebalance_date" not in labels.columns:
+        raise ValueError("labels missing required columns: rebalance_date")
+    dates = pd.to_datetime(labels["rebalance_date"])
+    if window == "calibration":
+        mask = (dates >= split.calibration_start) & (dates <= split.calibration_end)
+        if horizon_weeks is not None:
+            maturity_dates = _label_maturity_dates(labels, horizon_weeks)
+            mask &= maturity_dates.notna() & (maturity_dates <= split.calibration_end)
+    elif window == "validation":
+        mask = (dates >= split.validation_start) & (dates <= split.validation_end)
+        if horizon_weeks is not None:
+            maturity_dates = _label_maturity_dates(labels, horizon_weeks)
+            mask &= maturity_dates.notna() & (maturity_dates < split.final_holdout_start)
+    else:
+        raise ValueError("window must be calibration or validation")
+    return labels.loc[mask].copy()
+
+
+def _label_maturity_dates(labels: pd.DataFrame, horizon_weeks: int) -> pd.Series:
+    horizon = _positive_int("horizon_weeks", horizon_weeks)
+    column = f"label_end_date_{horizon}w"
+    if column in labels.columns:
+        return pd.to_datetime(labels[column], errors="coerce")
+    return pd.to_datetime(labels["rebalance_date"], errors="coerce") + pd.DateOffset(weeks=horizon)
+
+
+def _candidate_signals(labels: pd.DataFrame, rule: CalibrationCandidateRule) -> pd.DataFrame:
+    frame = labels.copy()
+    if frame.empty:
+        return frame
+    required = {"positive_signal", "negative_signal"}
+    missing = sorted(required.difference(frame.columns))
+    if missing:
+        raise ValueError(f"labels missing required columns: {', '.join(missing)}")
+    score = pd.to_numeric(frame.get("S_score_after_veto"), errors="coerce")
+    if rule.positive_min_s_score_after_veto is not None:
+        threshold = _finite_scalar(
+            "positive_min_s_score_after_veto",
+            rule.positive_min_s_score_after_veto,
+        )
+        frame["positive_signal"] = _bool_series(frame["positive_signal"]) & score.ge(threshold)
+    if rule.negative_max_s_score_after_veto is not None:
+        threshold = _finite_scalar(
+            "negative_max_s_score_after_veto",
+            rule.negative_max_s_score_after_veto,
+        )
+        frame["negative_signal"] = _bool_series(frame["negative_signal"]) & score.le(threshold)
+    return frame
+
+
+def _direction_metric(metrics: pd.DataFrame, direction: str, horizon: int) -> dict[str, float]:
+    if metrics.empty:
+        return {}
+    rows = metrics[
+        (metrics["direction"].astype(str) == direction)
+        & (pd.to_numeric(metrics["horizon_weeks"], errors="coerce") == horizon)
+    ]
+    if rows.empty:
+        return {}
+    return rows.iloc[0].to_dict()
+
+
+def _calibration_metric_value(metrics: dict[str, float], column: str) -> float:
+    value = metrics.get(column, 0.0)
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return number if np.isfinite(number) else 0.0
+
+
+def _candidate_direction_scope(rule: CalibrationCandidateRule) -> tuple[str, ...]:
+    directions: list[str] = []
+    if rule.positive_min_s_score_after_veto is not None:
+        directions.append("positive")
+    if rule.negative_max_s_score_after_veto is not None:
+        directions.append("negative")
+    return tuple(directions or ["positive", "negative"])
+
+
+def _candidate_gate_status(
+    *,
+    row: dict,
+    directions: Sequence[str],
+    min_direction_signal_count: int,
+    max_negative_hit_rate_degradation: float,
+    min_fold_validation_hit_rate_delta: float,
+) -> tuple[str, str, str]:
+    reasons = ["final_holdout_not_evaluated"]
+    for direction in directions:
+        calibration_count = int(row[f"calibration_{direction}_signal_available_count"])
+        validation_count = int(row[f"validation_{direction}_signal_available_count"])
+        if (
+            calibration_count < min_direction_signal_count
+            or validation_count < min_direction_signal_count
+        ):
+            reasons.insert(0, "thin_sample")
+            return "rejected_thin_sample", "do not promote", ";".join(reasons)
+    if row["validation_negative_hit_rate_delta_vs_baseline"] < -max_negative_hit_rate_degradation:
+        reasons.insert(0, "negative_signal_degraded")
+        return "rejected_negative_signal_degraded", "do not promote", ";".join(reasons)
+    if row["validation_positive_hit_rate_delta_vs_baseline"] < 0:
+        reasons.insert(0, "positive_signal_degraded")
+        return "rejected_positive_signal_degraded", "do not promote", ";".join(reasons)
+    if row["minimum_validation_fold_hit_rate_delta"] < min_fold_validation_hit_rate_delta:
+        reasons.insert(0, "unstable_folds")
+        return "rejected_unstable_folds", "do not promote", ";".join(reasons)
+    return "blocked_final_holdout_not_evaluated", "needs more testing", ";".join(reasons)
+
+
+def calibration_candidate_search(
+    labels: pd.DataFrame,
+    splits: Sequence[WalkForwardSplit],
+    *,
+    horizons_weeks: Sequence[int] = (4, 13, 26, 52),
+    candidate_rules: Sequence[CalibrationCandidateRule] | None = None,
+    min_direction_signal_count: int = 20,
+    max_negative_hit_rate_degradation: float = 0.0,
+    min_fold_validation_hit_rate_delta: float = 0.0,
+    drawdown_avoidance_threshold: float = -0.05,
+) -> pd.DataFrame:
+    """Evaluate deterministic calibration candidates without final-holdout leakage."""
+    horizons = sorted({_positive_int("horizons_weeks", value) for value in horizons_weeks})
+    min_count = _positive_int("min_direction_signal_count", min_direction_signal_count)
+    negative_tolerance = _finite_scalar(
+        "max_negative_hit_rate_degradation",
+        max_negative_hit_rate_degradation,
+    )
+    if negative_tolerance < 0:
+        raise ValueError("max_negative_hit_rate_degradation must be non-negative")
+    fold_floor = _finite_scalar(
+        "min_fold_validation_hit_rate_delta",
+        min_fold_validation_hit_rate_delta,
+    )
+    rules = tuple(candidate_rules or (CalibrationCandidateRule(candidate_id="baseline"),))
+    if not rules:
+        raise ValueError("candidate_rules must contain at least one rule")
+    if not splits:
+        return pd.DataFrame(
+            [
+                {
+                    "candidate_id": "no_ready_walk_forward_splits",
+                    "horizon_weeks": horizons[0],
+                    "gate_status": "skipped_insufficient_history",
+                    "promotion_label": "do not promote",
+                    "rejection_reasons": "no_ready_walk_forward_splits",
+                    "selected_by_calibration": False,
+                    "selection_source": "calibration_window_only",
+                    "final_holdout_evaluated": False,
+                    "final_holdout_rows_used": 0,
+                    "live_promotion_allowed": False,
+                }
+            ]
+        )
+
+    rows: list[dict] = []
+    for horizon in horizons:
+        baseline_calibration_frames = []
+        baseline_validation_frames = []
+        for split in splits:
+            baseline_calibration_frames.append(
+                _windowed_labels_for_split(labels, split, "calibration", horizon)
+            )
+            baseline_validation_frames.append(
+                _windowed_labels_for_split(labels, split, "validation", horizon)
+            )
+        baseline_calibration = pd.concat(baseline_calibration_frames, ignore_index=True)
+        baseline_validation = pd.concat(baseline_validation_frames, ignore_index=True)
+        baseline_calibration_metrics = calibration_label_metrics(
+            baseline_calibration,
+            horizons_weeks=(horizon,),
+            drawdown_avoidance_threshold=drawdown_avoidance_threshold,
+        )
+        baseline_validation_metrics = calibration_label_metrics(
+            baseline_validation,
+            horizons_weeks=(horizon,),
+            drawdown_avoidance_threshold=drawdown_avoidance_threshold,
+        )
+        baseline_cal_pos = _direction_metric(baseline_calibration_metrics, "positive", horizon)
+        baseline_cal_neg = _direction_metric(baseline_calibration_metrics, "negative", horizon)
+        baseline_val_pos = _direction_metric(baseline_validation_metrics, "positive", horizon)
+        baseline_val_neg = _direction_metric(baseline_validation_metrics, "negative", horizon)
+
+        for index, rule in enumerate(rules):
+            candidate_calibration_frames = []
+            candidate_validation_frames = []
+            fold_validation_deltas = []
+            for split in splits:
+                calibration_frame = _candidate_signals(
+                    _windowed_labels_for_split(labels, split, "calibration", horizon),
+                    rule,
+                )
+                validation_frame = _candidate_signals(
+                    _windowed_labels_for_split(labels, split, "validation", horizon),
+                    rule,
+                )
+                candidate_calibration_frames.append(calibration_frame)
+                candidate_validation_frames.append(validation_frame)
+                fold_baseline = calibration_label_metrics(
+                    _windowed_labels_for_split(labels, split, "validation", horizon),
+                    horizons_weeks=(horizon,),
+                    drawdown_avoidance_threshold=drawdown_avoidance_threshold,
+                )
+                fold_candidate = calibration_label_metrics(
+                    validation_frame,
+                    horizons_weeks=(horizon,),
+                    drawdown_avoidance_threshold=drawdown_avoidance_threshold,
+                )
+                fold_validation_deltas.append(
+                    min(
+                        _calibration_metric_value(
+                            _direction_metric(fold_candidate, "positive", horizon),
+                            "hit_rate",
+                        )
+                        - _calibration_metric_value(
+                            _direction_metric(fold_baseline, "positive", horizon),
+                            "hit_rate",
+                        ),
+                        _calibration_metric_value(
+                            _direction_metric(fold_candidate, "negative", horizon),
+                            "hit_rate",
+                        )
+                        - _calibration_metric_value(
+                            _direction_metric(fold_baseline, "negative", horizon),
+                            "hit_rate",
+                        ),
+                    )
+                )
+            candidate_calibration = pd.concat(candidate_calibration_frames, ignore_index=True)
+            candidate_validation = pd.concat(candidate_validation_frames, ignore_index=True)
+            candidate_calibration_metrics = calibration_label_metrics(
+                candidate_calibration,
+                horizons_weeks=(horizon,),
+                drawdown_avoidance_threshold=drawdown_avoidance_threshold,
+            )
+            candidate_validation_metrics = calibration_label_metrics(
+                candidate_validation,
+                horizons_weeks=(horizon,),
+                drawdown_avoidance_threshold=drawdown_avoidance_threshold,
+            )
+            cand_cal_pos = _direction_metric(candidate_calibration_metrics, "positive", horizon)
+            cand_cal_neg = _direction_metric(candidate_calibration_metrics, "negative", horizon)
+            cand_val_pos = _direction_metric(candidate_validation_metrics, "positive", horizon)
+            cand_val_neg = _direction_metric(candidate_validation_metrics, "negative", horizon)
+            row = {
+                "candidate_id": str(rule.candidate_id),
+                "horizon_weeks": horizon,
+                "rule_order": index,
+                "positive_min_s_score_after_veto": rule.positive_min_s_score_after_veto,
+                "negative_max_s_score_after_veto": rule.negative_max_s_score_after_veto,
+                "selection_source": "calibration_window_only",
+                "selected_by_calibration": False,
+                "final_holdout_evaluated": False,
+                "final_holdout_rows_used": 0,
+                "live_promotion_allowed": False,
+                "calibration_positive_hit_rate": _calibration_metric_value(cand_cal_pos, "hit_rate"),
+                "calibration_negative_hit_rate": _calibration_metric_value(cand_cal_neg, "hit_rate"),
+                "validation_positive_hit_rate": _calibration_metric_value(cand_val_pos, "hit_rate"),
+                "validation_negative_hit_rate": _calibration_metric_value(cand_val_neg, "hit_rate"),
+                "baseline_calibration_positive_hit_rate": _calibration_metric_value(baseline_cal_pos, "hit_rate"),
+                "baseline_calibration_negative_hit_rate": _calibration_metric_value(baseline_cal_neg, "hit_rate"),
+                "baseline_validation_positive_hit_rate": _calibration_metric_value(baseline_val_pos, "hit_rate"),
+                "baseline_validation_negative_hit_rate": _calibration_metric_value(baseline_val_neg, "hit_rate"),
+                "calibration_positive_signal_available_count": int(
+                    _calibration_metric_value(cand_cal_pos, "signal_available_count")
+                ),
+                "calibration_negative_signal_available_count": int(
+                    _calibration_metric_value(cand_cal_neg, "signal_available_count")
+                ),
+                "validation_positive_signal_available_count": int(
+                    _calibration_metric_value(cand_val_pos, "signal_available_count")
+                ),
+                "validation_negative_signal_available_count": int(
+                    _calibration_metric_value(cand_val_neg, "signal_available_count")
+                ),
+                "fold_count": len(splits),
+                "minimum_validation_fold_hit_rate_delta": (
+                    min(fold_validation_deltas) if fold_validation_deltas else 0.0
+                ),
+            }
+            row["calibration_positive_hit_rate_delta_vs_baseline"] = (
+                row["calibration_positive_hit_rate"]
+                - row["baseline_calibration_positive_hit_rate"]
+            )
+            row["calibration_negative_hit_rate_delta_vs_baseline"] = (
+                row["calibration_negative_hit_rate"]
+                - row["baseline_calibration_negative_hit_rate"]
+            )
+            row["validation_positive_hit_rate_delta_vs_baseline"] = (
+                row["validation_positive_hit_rate"]
+                - row["baseline_validation_positive_hit_rate"]
+            )
+            row["validation_negative_hit_rate_delta_vs_baseline"] = (
+                row["validation_negative_hit_rate"]
+                - row["baseline_validation_negative_hit_rate"]
+            )
+            row["calibration_objective_delta"] = (
+                row["calibration_positive_hit_rate_delta_vs_baseline"]
+                + row["calibration_negative_hit_rate_delta_vs_baseline"]
+            )
+            directions = _candidate_direction_scope(rule)
+            row["directions_changed"] = ",".join(directions)
+            gate_status, promotion_label, rejection_reasons = _candidate_gate_status(
+                row=row,
+                directions=directions,
+                min_direction_signal_count=min_count,
+                max_negative_hit_rate_degradation=negative_tolerance,
+                min_fold_validation_hit_rate_delta=fold_floor,
+            )
+            if str(rule.candidate_id) == "baseline":
+                gate_status = "baseline_reference"
+                promotion_label = "do not promote"
+                rejection_reasons = "baseline_reference;final_holdout_not_evaluated"
+            row["gate_status"] = gate_status
+            row["promotion_label"] = promotion_label
+            row["rejection_reasons"] = rejection_reasons
+            rows.append(row)
+
+    frame = pd.DataFrame(rows)
+    if frame.empty:
+        return frame
+    selectable = frame[frame["candidate_id"] != "baseline"].copy()
+    if not selectable.empty:
+        selectable = selectable.sort_values(
+            ["calibration_objective_delta", "horizon_weeks", "candidate_id"],
+            ascending=[False, True, True],
+            kind="mergesort",
+        )
+        selected_index = selectable.index[0]
+        frame.loc[selected_index, "selected_by_calibration"] = True
+    bool_columns = ["selected_by_calibration", "final_holdout_evaluated", "live_promotion_allowed"]
+    for column in bool_columns:
+        frame[column] = frame[column].map(bool).astype(object)
+    preferred = [
+        "candidate_id",
+        "horizon_weeks",
+        "gate_status",
+        "promotion_label",
+        "rejection_reasons",
+        "selected_by_calibration",
+        "selection_source",
+        "final_holdout_evaluated",
+        "final_holdout_rows_used",
+        "live_promotion_allowed",
+        "directions_changed",
+        "positive_min_s_score_after_veto",
+        "negative_max_s_score_after_veto",
+        "calibration_objective_delta",
+        "calibration_positive_hit_rate_delta_vs_baseline",
+        "calibration_negative_hit_rate_delta_vs_baseline",
+        "validation_positive_hit_rate_delta_vs_baseline",
+        "validation_negative_hit_rate_delta_vs_baseline",
+        "calibration_positive_signal_available_count",
+        "calibration_negative_signal_available_count",
+        "validation_positive_signal_available_count",
+        "validation_negative_signal_available_count",
+        "fold_count",
+        "minimum_validation_fold_hit_rate_delta",
+    ]
+    columns = [column for column in preferred if column in frame.columns]
+    columns.extend(column for column in frame.columns if column not in columns)
+    return frame[columns].sort_values(
+        ["horizon_weeks", "selected_by_calibration", "rule_order"],
+        ascending=[True, False, True],
+        kind="mergesort",
+    ).reset_index(drop=True)
 
 
 def _clean_prices(prices: pd.DataFrame) -> pd.DataFrame:

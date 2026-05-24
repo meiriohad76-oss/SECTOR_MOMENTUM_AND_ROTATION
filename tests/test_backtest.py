@@ -254,6 +254,7 @@ def test_calibration_feature_labels_use_point_in_time_snapshots_and_forward_outc
     assert first_rows.loc["XLK", "positive_signal"] is True
     assert first_rows.loc["XLK", "negative_signal"] is False
     assert first_rows.loc["XLK", "label_available_4w"] is True
+    assert first_rows.loc["XLK", "label_end_date_4w"] == dates[2]
     assert first_rows.loc["XLK", "forward_return_4w"] == pytest.approx(0.10)
     assert first_rows.loc["XLK", "forward_benchmark_return_4w"] == pytest.approx(0.05)
     assert first_rows.loc["XLK", "forward_excess_return_4w"] == pytest.approx(0.05)
@@ -303,6 +304,7 @@ def test_calibration_feature_labels_mark_unavailable_future_horizons_without_fil
 
     row = labels.iloc[0]
     assert row["label_available_4w"] is False
+    assert pd.isna(row["label_end_date_4w"])
     assert pd.isna(row["forward_return_4w"])
     assert pd.isna(row["forward_excess_return_4w"])
     assert pd.isna(row["post_entry_drawdown_4w"])
@@ -505,6 +507,272 @@ def test_calibration_label_metrics_recomputes_negative_outcomes_with_metrics_thr
     assert negative["actual_outcome_count"] == 0
     assert negative["false_positive"] == 1
     assert negative["true_positive"] == 0
+
+
+def test_calibration_candidate_search_selects_using_calibration_folds_only():
+    labels = pd.DataFrame(
+        {
+            "rebalance_date": pd.to_datetime(
+                [
+                    "2020-01-03",
+                    "2020-01-10",
+                    "2020-01-17",
+                    "2021-01-08",
+                    "2021-01-15",
+                    "2022-01-07",
+                ]
+            ),
+            "ticker": ["XLK", "XLF", "XLE", "XLK", "XLF", "XLK"],
+            "positive_signal": [True, True, False, True, False, True],
+            "negative_signal": [False, False, True, False, True, False],
+            "S_score_after_veto": [1.2, 0.1, -0.8, 1.1, -0.7, 9.9],
+            "label_available_4w": [True, True, True, True, True, True],
+            "positive_success_4w": [True, False, False, True, False, True],
+            "negative_success_4w": [False, False, True, False, True, False],
+            "forward_return_4w": [0.08, -0.04, -0.07, 0.05, -0.06, 0.50],
+            "forward_excess_return_4w": [0.05, -0.02, -0.04, 0.03, -0.04, 0.45],
+            "post_entry_drawdown_4w": [-0.01, -0.05, -0.11, -0.01, -0.09, -0.01],
+        }
+    )
+    split = backtest.WalkForwardSplit(
+        name="fold_01",
+        calibration_start=pd.Timestamp("2020-01-01"),
+        calibration_end=pd.Timestamp("2020-12-31"),
+        validation_start=pd.Timestamp("2021-01-01"),
+        validation_end=pd.Timestamp("2021-12-31"),
+        final_holdout_start=pd.Timestamp("2022-01-01"),
+        final_holdout_end=pd.Timestamp("2022-12-31"),
+    )
+
+    candidates = backtest.calibration_candidate_search(
+        labels,
+        [split],
+        horizons_weeks=(4,),
+        candidate_rules=(
+            backtest.CalibrationCandidateRule(candidate_id="baseline"),
+            backtest.CalibrationCandidateRule(
+                candidate_id="positive_score_ge_0_8",
+                positive_min_s_score_after_veto=0.8,
+            ),
+            backtest.CalibrationCandidateRule(
+                candidate_id="future_oracle_score_ge_9",
+                positive_min_s_score_after_veto=9.0,
+            ),
+        ),
+        min_direction_signal_count=1,
+    )
+
+    selected = candidates[candidates["selected_by_calibration"]].iloc[0]
+    future_oracle = candidates[candidates["candidate_id"] == "future_oracle_score_ge_9"].iloc[0]
+
+    assert selected["candidate_id"] == "positive_score_ge_0_8"
+    assert selected["selection_source"] == "calibration_window_only"
+    assert selected["final_holdout_evaluated"] is False
+    assert selected["final_holdout_rows_used"] == 0
+    assert "final_holdout_not_evaluated" in selected["rejection_reasons"]
+    assert selected["promotion_label"] == "needs more testing"
+    assert future_oracle["selected_by_calibration"] is False
+    assert future_oracle["calibration_positive_signal_available_count"] == 0
+    assert future_oracle["validation_positive_signal_available_count"] == 0
+
+
+def test_calibration_candidate_search_rejection_gates_label_thin_and_degraded_rows():
+    labels = pd.DataFrame(
+        {
+            "rebalance_date": pd.to_datetime(
+                [
+                    "2020-01-03",
+                    "2020-01-10",
+                    "2020-01-17",
+                    "2020-01-24",
+                    "2021-01-08",
+                    "2021-01-15",
+                    "2021-01-22",
+                ]
+            ),
+            "ticker": ["XLK", "XLF", "XLE", "XLV", "XLK", "XLF", "XLE"],
+            "positive_signal": [True, False, False, False, True, False, False],
+            "negative_signal": [False, True, True, True, False, True, True],
+            "S_score_after_veto": [1.0, -1.0, 0.5, -0.9, 1.1, 0.5, -1.0],
+            "label_available_4w": [True, True, True, True, True, True, True],
+            "positive_success_4w": [True, False, False, False, True, False, False],
+            "negative_success_4w": [False, True, False, True, False, True, False],
+            "forward_return_4w": [0.08, -0.08, 0.04, -0.07, 0.06, -0.06, 0.03],
+            "forward_excess_return_4w": [0.04, -0.05, 0.02, -0.05, 0.03, -0.04, 0.02],
+            "post_entry_drawdown_4w": [-0.01, -0.12, -0.01, -0.08, -0.01, -0.09, -0.01],
+        }
+    )
+    split = backtest.WalkForwardSplit(
+        name="fold_01",
+        calibration_start=pd.Timestamp("2020-01-01"),
+        calibration_end=pd.Timestamp("2020-12-31"),
+        validation_start=pd.Timestamp("2021-01-01"),
+        validation_end=pd.Timestamp("2021-12-31"),
+        final_holdout_start=pd.Timestamp("2022-01-01"),
+        final_holdout_end=pd.Timestamp("2022-12-31"),
+    )
+
+    thin = backtest.calibration_candidate_search(
+        labels,
+        [split],
+        horizons_weeks=(4,),
+        candidate_rules=(
+            backtest.CalibrationCandidateRule(candidate_id="baseline"),
+            backtest.CalibrationCandidateRule(
+                candidate_id="negative_score_le_0",
+                negative_max_s_score_after_veto=0.0,
+            ),
+        ),
+        min_direction_signal_count=2,
+    )
+    thin_selected = thin[thin["selected_by_calibration"]].iloc[0]
+
+    degraded = backtest.calibration_candidate_search(
+        labels,
+        [split],
+        horizons_weeks=(4,),
+        candidate_rules=(
+            backtest.CalibrationCandidateRule(candidate_id="baseline"),
+            backtest.CalibrationCandidateRule(
+                candidate_id="negative_score_le_0",
+                negative_max_s_score_after_veto=0.0,
+            ),
+        ),
+        min_direction_signal_count=1,
+    )
+    degraded_selected = degraded[degraded["selected_by_calibration"]].iloc[0]
+
+    assert thin_selected["candidate_id"] == "negative_score_le_0"
+    assert thin_selected["gate_status"] == "rejected_thin_sample"
+    assert "thin_sample" in thin_selected["rejection_reasons"]
+    assert thin_selected["promotion_label"] == "do not promote"
+    assert degraded_selected["candidate_id"] == "negative_score_le_0"
+    assert degraded_selected["gate_status"] == "rejected_negative_signal_degraded"
+    assert degraded_selected["validation_negative_hit_rate_delta_vs_baseline"] < 0
+    assert "negative_signal_degraded" in degraded_selected["rejection_reasons"]
+    assert degraded_selected["promotion_label"] == "do not promote"
+
+
+def test_calibration_candidate_search_rejects_unstable_validation_folds():
+    labels = pd.DataFrame(
+        {
+            "rebalance_date": pd.to_datetime(
+                [
+                    "2020-01-03",
+                    "2020-01-10",
+                    "2021-01-08",
+                    "2021-01-15",
+                    "2022-01-07",
+                    "2022-01-14",
+                ]
+            ),
+            "ticker": ["XLK", "XLF", "XLK", "XLF", "XLK", "XLF"],
+            "positive_signal": [True, True, True, True, True, True],
+            "negative_signal": [False, False, False, False, False, False],
+            "S_score_after_veto": [1.0, 0.2, 1.0, 0.2, 1.0, 0.2],
+            "label_available_4w": [True, True, True, True, True, True],
+            "positive_success_4w": [True, False, True, False, False, True],
+            "negative_success_4w": [False, False, False, False, False, False],
+            "forward_return_4w": [0.08, -0.03, 0.06, -0.02, -0.04, 0.05],
+            "forward_excess_return_4w": [0.04, -0.02, 0.03, -0.01, -0.03, 0.02],
+            "post_entry_drawdown_4w": [-0.01, -0.05, -0.01, -0.04, -0.08, -0.01],
+        }
+    )
+    splits = [
+        backtest.WalkForwardSplit(
+            name="fold_01",
+            calibration_start=pd.Timestamp("2020-01-01"),
+            calibration_end=pd.Timestamp("2020-12-31"),
+            validation_start=pd.Timestamp("2021-01-01"),
+            validation_end=pd.Timestamp("2021-12-31"),
+            final_holdout_start=pd.Timestamp("2023-01-01"),
+            final_holdout_end=pd.Timestamp("2023-12-31"),
+        ),
+        backtest.WalkForwardSplit(
+            name="fold_02",
+            calibration_start=pd.Timestamp("2021-01-01"),
+            calibration_end=pd.Timestamp("2021-12-31"),
+            validation_start=pd.Timestamp("2022-01-01"),
+            validation_end=pd.Timestamp("2022-12-31"),
+            final_holdout_start=pd.Timestamp("2023-01-01"),
+            final_holdout_end=pd.Timestamp("2023-12-31"),
+        ),
+    ]
+
+    candidates = backtest.calibration_candidate_search(
+        labels,
+        splits,
+        horizons_weeks=(4,),
+        candidate_rules=(
+            backtest.CalibrationCandidateRule(candidate_id="baseline"),
+            backtest.CalibrationCandidateRule(
+                candidate_id="positive_score_ge_0_8",
+                positive_min_s_score_after_veto=0.8,
+            ),
+        ),
+        min_direction_signal_count=1,
+    )
+
+    selected = candidates[candidates["selected_by_calibration"]].iloc[0]
+
+    assert selected["candidate_id"] == "positive_score_ge_0_8"
+    assert selected["calibration_positive_hit_rate_delta_vs_baseline"] > 0
+    assert selected["validation_positive_hit_rate_delta_vs_baseline"] == pytest.approx(0.0)
+    assert selected["minimum_validation_fold_hit_rate_delta"] < 0
+    assert selected["gate_status"] == "rejected_unstable_folds"
+    assert "unstable_folds" in selected["rejection_reasons"]
+    assert selected["promotion_label"] == "do not promote"
+
+
+def test_calibration_candidate_search_excludes_validation_labels_that_mature_in_holdout():
+    labels = pd.DataFrame(
+        {
+            "rebalance_date": pd.to_datetime(["2020-01-03", "2021-12-31"]),
+            "ticker": ["XLK", "XLK"],
+            "positive_signal": [True, True],
+            "negative_signal": [False, False],
+            "S_score_after_veto": [1.0, 1.0],
+            "label_available_4w": [True, True],
+            "label_end_date_4w": pd.to_datetime(["2020-01-31", "2022-01-28"]),
+            "positive_success_4w": [True, True],
+            "negative_success_4w": [False, False],
+            "forward_return_4w": [0.06, 0.20],
+            "forward_excess_return_4w": [0.03, 0.18],
+            "post_entry_drawdown_4w": [-0.01, -0.01],
+        }
+    )
+    split = backtest.WalkForwardSplit(
+        name="fold_01",
+        calibration_start=pd.Timestamp("2020-01-01"),
+        calibration_end=pd.Timestamp("2020-12-31"),
+        validation_start=pd.Timestamp("2021-01-01"),
+        validation_end=pd.Timestamp("2021-12-31"),
+        final_holdout_start=pd.Timestamp("2022-01-01"),
+        final_holdout_end=pd.Timestamp("2022-12-31"),
+    )
+
+    candidates = backtest.calibration_candidate_search(
+        labels,
+        [split],
+        horizons_weeks=(4,),
+        candidate_rules=(
+            backtest.CalibrationCandidateRule(candidate_id="baseline"),
+            backtest.CalibrationCandidateRule(
+                candidate_id="positive_score_ge_0_8",
+                positive_min_s_score_after_veto=0.8,
+            ),
+        ),
+        min_direction_signal_count=1,
+    )
+
+    selected = candidates[candidates["selected_by_calibration"]].iloc[0]
+
+    assert selected["candidate_id"] == "positive_score_ge_0_8"
+    assert selected["validation_positive_signal_available_count"] == 0
+    assert selected["final_holdout_evaluated"] is False
+    assert selected["final_holdout_rows_used"] == 0
+    assert selected["gate_status"] == "rejected_thin_sample"
+    assert "thin_sample" in selected["rejection_reasons"]
 
 
 def test_multi_asset_weights_drift_between_rebalance_dates():

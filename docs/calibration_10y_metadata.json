@@ -12,8 +12,11 @@
     "status": "insufficient_history",
     "validation_years": 1
   },
+  "candidate_rows": 1,
+  "candidate_search_status": "skipped_insufficient_history",
+  "candidates_sha256": "c509a91d2c16c2a12fe092c5c838ed9e3ad3457ce03adf3af491f586484adbec",
   "class_count": 2,
-  "generated_at_utc": "2026-05-24T05:25:57.196126Z",
+  "generated_at_utc": "2026-05-24T06:23:21.712043Z",
   "horizons_weeks": [
     4,
     13,
@@ -33,15 +36,17 @@
     "stale_cache_hit_count": 0,
     "warnings": []
   },
-  "purpose": "research_only_baseline_calibration_summary",
-  "report_sha256": "f62b8f618b41dc1c4e935d6a7ec8582a6a0119493aedf6f327648c93425ef496",
+  "purpose": "research_only_walk_forward_calibration_candidate_search",
+  "report_sha256": "400ef55665463d04553b6a57177d0f7eca167d997f83883a37cdb72eefc4a916",
   "research_only": true,
   "safety": {
     "candidate_promotion": "not_allowed",
+    "final_holdout": "not_evaluated",
     "live_scoring_change": "none",
-    "parameter_tuning": "not_run"
+    "parameter_tuning": "research_only_candidate_search"
   },
-  "slice": "B-163.5",
+  "selected_candidate_count": 0,
+  "slice": "B-163.6",
   "summary_rows": 24,
   "summary_sha256": "3bec57028ab59142e5f4ac24099a2ea341c5f81fc7c0ee6393223d99c786582d",
   "ticker_count": 12,
