@@ -129,6 +129,7 @@ def test_session_snapshot_tracks_interactive_widget_keys_and_ignores_audit_state
     snapshot = performance_audit.session_snapshot(
         {
             "theme": "dark",
+            "methodology_ticker_input": "NVDA",
             "comparison_tickers": ["XLK", "XLF"],
             "portfolio_analyzer_mode": "Portfolio",
             "portfolio_single_ticker": "XLK",
@@ -148,6 +149,7 @@ def test_session_snapshot_tracks_interactive_widget_keys_and_ignores_audit_state
     values = dict(snapshot)
 
     assert values["comparison_tickers"] == "['XLK', 'XLF']"
+    assert values["methodology_ticker_input"] == "NVDA"
     assert values["portfolio_analyzer_mode"] == "Portfolio"
     assert values["portfolio_single_ticker"] == "XLK"
     assert values["portfolio_single_source"] == "XLF"

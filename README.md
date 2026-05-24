@@ -78,6 +78,8 @@ B-153 records dashboard methodology runs in the local SQLite journal at `data/ru
 
 ## Portfolio analyzer
 
+B-165 adds a first-class **Analyze ticker** section before the drill-down. Enter a symbol from the current scored universe and the dashboard shows the same methodology snapshot used everywhere else: state, S score, F score, class/rank, selected flag, veto status, and a one-row methodology table. The section is read-only and includes a direct jump into the full drill-down for that ticker.
+
 B-130 adds a read-only analyzer section inside the Streamlit app:
 
 - **Ticker mode:** enter one ticker and see its current state, score, flow, class, selection flag, and portfolio-weighted exposure as a one-position analysis.

@@ -329,6 +329,12 @@ Status legend:
 **Latest result:** the manual runner generated a ready fixed split with train window `2018-06-22` to `2023-06-16` and holdout window `2023-06-23` to `2026-05-22` (2.92 years), then evaluated 144 expanded candidate rules across 13-week, 26-week, and 52-week horizons for 432 candidate rows. Current artifacts contain 4,968 point-in-time label rows and use deterministic paired block bootstrap confidence intervals by rebalance date. Twelve rows earn the research-candidate label after the fold-stability gate, but no true ticker-level US sector override candidate passes the sector override gate; all rows remain research-only and `live_promotion_allowed=false`.
 **Safety:** live promotion requires a separate reviewed ticket with activation flag, frozen config, rollback plan, and evidence gate approval.
 
+### B-165 - First-class ticker methodology analyzer - IMPLEMENTED
+**Goal:** let the user type a ticker and immediately see how the dashboard methodology evaluates it without digging into the portfolio analyzer.
+**Scope:** dashboard UX entry point only. It reuses the existing scored snapshot, B-130 single-ticker parser, and read-only holding analysis path; it does not fetch new symbols, recompute scores, save user input, or alter recommendations.
+**Behavior:** the dashboard now renders an `Analyze ticker` section before the per-ticker drill-down. A valid ticker from the current scored universe displays state, S score, F score, class/rank, selected flag, veto status, and the standard methodology row, plus a `VIEW FULL DRILL-DOWN` button that syncs the existing drill-down navigation.
+**QA:** static app wiring tests cover the section, parser/analyzer reuse, render order, and drill-down action. Rerun-audit tests track the new `methodology_ticker_input` widget key.
+
 ---
 
 ## Completed v3+ ideas

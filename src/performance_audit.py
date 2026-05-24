@@ -23,6 +23,7 @@ COMPUTE_SNAPSHOT_KEYS = ("ohlcv_result", "ohlcv", "fred_data", "regime", "scored
 DASHBOARD_COMPUTE_SNAPSHOT_TTL_SECONDS = 3600
 SESSION_STATE_KEYS = VISUAL_STATE_KEYS + (
     "klass",
+    "methodology_ticker_input",
     "drill_ticker",
     "drill_range",
     "comparison_tickers",

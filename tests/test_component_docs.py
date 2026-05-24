@@ -61,6 +61,7 @@ def test_component_docs_html_is_generated_from_catalog():
     assert "Component docs" in html
     assert "Storybook-style inventory" in html
     assert "render_bluf" in html
+    assert "Analyze ticker" in html
     assert "Portfolio analyzer" in html
     assert "Backtest lab" in html
     assert "fetch_ohlcv(" not in html

@@ -1194,6 +1194,13 @@ html.density-compact .pick-spark {
 .full-table .dot.bad { color: var(--red); }
 
 /* ---------- Portfolio analyzer ---------- */
+.ticker-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+
 .portfolio-actions {
   display: grid;
   gap: 8px;
@@ -1520,6 +1527,7 @@ html.density-compact .pick-spark {
     flex: 1 1 104px !important;
   }
   .drill-metrics { grid-template-columns: 1fr 1fr; }
+  .ticker-analysis-grid { grid-template-columns: 1fr 1fr; }
   .custom-universe-summary { grid-template-columns: 1fr; }
   .footer {
     flex-direction: column;
@@ -1536,6 +1544,7 @@ html.density-compact .pick-spark {
   .macro-tile .tile-value { white-space: normal; }
   .drill { padding: 14px 12px 16px; }
   .drill-metrics { grid-template-columns: 1fr; }
+  .ticker-analysis-grid { grid-template-columns: 1fr; }
   .portfolio-actions .pa-row { grid-template-columns: 1fr; }
   .pick-metrics { grid-template-columns: 1fr; }
 }

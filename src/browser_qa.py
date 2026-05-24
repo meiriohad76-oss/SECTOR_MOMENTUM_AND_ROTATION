@@ -96,7 +96,6 @@ def browser_qa_targets() -> tuple[BrowserQaTarget, ...]:
             focus_text="Palette",
             setup_actions=(
                 "expand:VIEW OPTIONS",
-                "expand:VIEW OPTIONS",
                 "expect-radio-checked:Solarized",
             ),
         ),

@@ -106,6 +106,14 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         qa=("sector spaghetti tests",),
     ),
     ComponentDoc(
+        name="Analyze ticker",
+        section="Analysis",
+        render_function="render_ticker_analyzer",
+        data_inputs=("typed ticker", "scored snapshot"),
+        states=("valid ticker", "invalid ticker", "missing scored ticker", "drill-down handoff"),
+        qa=("ticker analyzer static tests", "performance audit tests"),
+    ),
+    ComponentDoc(
         name="Per-ticker drill-down",
         section="Charts",
         render_function="render_drill",

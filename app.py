@@ -397,6 +397,8 @@ if "klass" not in st.session_state:
     st.session_state.klass = "US Sectors"
 if "drill_ticker" not in st.session_state:
     st.session_state.drill_ticker = "XLK"
+if "methodology_ticker_input" not in st.session_state:
+    st.session_state.methodology_ticker_input = st.session_state.drill_ticker
 if "drill_range" not in st.session_state:
     st.session_state.drill_range = "1Y"
 elif st.session_state.drill_range not in DRILL_RANGE_OPTIONS:
@@ -734,6 +736,87 @@ def _render_drill_buttons(prefix: str, tickers: list[str], max_columns: int = 4)
         with cols[idx % len(cols)]:
             if st.button(f"DRILL {ticker}", key=f"{prefix}_{idx}_{ticker}", use_container_width=True):
                 _go_to_drill(ticker)
+
+
+def _score_text(value: object) -> str:
+    if value is None or pd.isna(value):
+        return "n/a"
+    return f"{float(value):+.3f}"
+
+
+def render_ticker_analyzer():
+    _md(
+        f"""
+        <section class="section" id="ticker-analyzer">
+          <div class="section-head">
+            <h2>Analyze ticker <span class="count">methodology snapshot</span></h2>
+            <div class="right">{len(scored)} scored tickers</div>
+          </div>
+        </section>
+        """
+    )
+
+    ticker_text = st.text_input("Ticker to analyze", key="methodology_ticker_input", placeholder="XLK")
+    result = parse_single_ticker(ticker_text)
+    for error in result.errors:
+        st.warning(error.message)
+
+    if not result.holdings:
+        return
+
+    ticker = result.holdings[0].ticker
+    try:
+        analysis = analyze_holdings(result.holdings, scored)
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+
+    if analysis.missing_tickers:
+        st.warning(f"{ticker} is not in the current scored universe.")
+        return
+
+    row = scored.loc[ticker]
+    state = str(row.get("state") or "UNKNOWN")
+    asset_class = str(row.get("class") or "UNKNOWN")
+    s_score = row.get("S_score")
+    f_score = row.get("F_score")
+    rank = row.get("rank_in_class")
+    rank_text = "n/a" if rank is None or pd.isna(rank) else str(int(rank))
+    selected = "YES" if bool(row.get("selected")) else "NO"
+    veto = "VETO" if bool(row.get("veto")) else "OK"
+    stage = row.get("stage") or "n/a"
+    quadrant = str(row.get("rrg_quadrant") or "n/a").upper()
+    state_label = state.replace("_", " ")
+
+    _md(
+        f"""
+        <div class="ticker-analysis-grid">
+          <div class="tile">
+            <div class="tile-label">State</div>
+            <div class="tile-value" style="color:{_state_color_var(state)};font-size:1.1rem;">{_esc(state_label)}</div>
+            <div class="tile-sub">Stage {_esc(str(stage))} / {_esc(quadrant)}</div>
+          </div>
+          <div class="tile">
+            <div class="tile-label">Composite</div>
+            <div class="tile-value {'up' if (s_score or 0) >= 0 else 'down'}">{_score_text(s_score)}<span class="grade {_grade_letter(s_score)}">{_grade_letter(s_score)}</span></div>
+            <div class="tile-sub">rank {rank_text} in {_esc(asset_class)}</div>
+          </div>
+          <div class="tile">
+            <div class="tile-label">Flow</div>
+            <div class="tile-value {'up' if (f_score or 0) >= 0 else 'down'}">{_score_text(f_score)}</div>
+            <div class="tile-sub">{veto}</div>
+          </div>
+          <div class="tile">
+            <div class="tile-label">Selection</div>
+            <div class="tile-value {'up' if selected == 'YES' else 'flat'}">{selected}</div>
+            <div class="tile-sub">{_esc(ticker)} / {_esc(asset_class)}</div>
+          </div>
+        </div>
+        """
+    )
+    st.dataframe(analysis_rows_frame(analysis), hide_index=True, use_container_width=True)
+    if st.button(f"VIEW FULL DRILL-DOWN {ticker}", key=f"ticker_analyzer_drill_{ticker}", use_container_width=True):
+        _go_to_drill(ticker)
 
 
 def render_explainer():
@@ -2592,6 +2675,7 @@ _render_timed("render_alerts", render_alerts)
 _render_timed("render_picks", render_picks)
 _render_timed("render_rrg", render_rrg)
 _render_timed("render_sector_spaghetti", render_sector_spaghetti)
+_render_timed("render_ticker_analyzer", render_ticker_analyzer)
 _render_timed("render_drill", render_drill)
 _render_timed("render_comparison_view", render_comparison_view)
 _render_timed("render_portfolio_analyzer", render_portfolio_analyzer)

@@ -32,6 +32,7 @@ def test_browser_qa_targets_cover_visual_residual_risks():
     assert by_id["desktop-palette-view-options"].tickets == ("B-117",)
     assert by_id["desktop-palette-view-options"].path == "/?ticker=XLK&browser_qa_palette=Solarized"
     assert "expand:VIEW OPTIONS" in by_id["desktop-palette-view-options"].setup_actions
+    assert by_id["desktop-palette-view-options"].setup_actions.count("expand:VIEW OPTIONS") == 1
     assert "expect-radio-checked:Solarized" in by_id["desktop-palette-view-options"].setup_actions
     assert by_id["desktop-transition-pulse"].tickets == ("B-114",)
     assert "expect-visible:.alert-row.pulse-transition" in by_id["desktop-transition-pulse"].actions
