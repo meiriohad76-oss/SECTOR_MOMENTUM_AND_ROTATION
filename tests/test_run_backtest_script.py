@@ -20,6 +20,15 @@ def test_run_backtest_artifact_paths_are_repo_root_anchored():
     assert run_backtest._calibration_baseline_config_path() == (
         run_backtest.ROOT / "docs" / "calibration_10y_baseline_config.json"
     )
+    assert run_backtest.CALIBRATION_REPORT_PATH == (
+        run_backtest.ROOT / "docs" / "calibration_10y_report.md"
+    )
+    assert run_backtest.CALIBRATION_SUMMARY_PATH == (
+        run_backtest.ROOT / "docs" / "calibration_10y_summary.csv"
+    )
+    assert run_backtest.CALIBRATION_METADATA_PATH == (
+        run_backtest.ROOT / "docs" / "calibration_10y_metadata.json"
+    )
     assert run_backtest.FRED_VALIDATION_REPORT_PATH == (
         run_backtest.ROOT / "docs" / "fred_macro_validation_report.md"
     )
@@ -58,6 +67,91 @@ def test_run_backtest_parser_exposes_massive_variants_flag():
     args = run_backtest._parser().parse_args(["--massive-variants"])
 
     assert args.massive_variants is True
+
+
+def test_build_calibration_baseline_artifacts_summarizes_directional_metrics(monkeypatch):
+    labels = pd.DataFrame(
+        {
+            "rebalance_date": pd.to_datetime(["2020-01-03", "2020-01-10"]),
+            "ticker": ["XLK", "XLF"],
+            "class": ["sector", "sector"],
+        }
+    )
+    metric_calls = []
+
+    def fake_build_labels(targets, prices, horizons_weeks):
+        assert targets == "targets"
+        assert prices.equals(pd.DataFrame({"XLK": [100.0]}))
+        assert horizons_weeks == run_backtest.CALIBRATION_HORIZONS_WEEKS
+        return labels
+
+    def fake_metrics(label_frame, horizons_weeks, group_by=None):
+        metric_calls.append({"horizons": horizons_weeks, "group_by": group_by})
+        assert label_frame is labels
+        base = {
+            "horizon_weeks": 4,
+            "total_count": 2,
+            "available_count": 2,
+            "signal_count": 1,
+            "signal_available_count": 1,
+            "success_count": 1,
+            "failure_count": 0,
+            "hit_rate": 1.0,
+            "precision": 1.0,
+            "recall": 0.5,
+            "f1": 2 / 3,
+            "average_forward_return": 0.04,
+            "average_forward_excess_return": 0.02,
+            "average_post_entry_drawdown": -0.01,
+            "average_drawdown_avoided": 0.0,
+        }
+        if group_by == "class":
+            return pd.DataFrame([{**base, "class": "sector", "direction": "positive"}])
+        return pd.DataFrame(
+            [
+                {**base, "direction": "positive"},
+                {
+                    **base,
+                    "direction": "negative",
+                    "hit_rate": 0.0,
+                    "success_count": 0,
+                    "failure_count": 1,
+                    "average_drawdown_avoided": 0.03,
+                },
+            ]
+        )
+
+    monkeypatch.setattr(run_backtest.backtest, "build_calibration_feature_labels", fake_build_labels)
+    monkeypatch.setattr(run_backtest.backtest, "calibration_label_metrics", fake_metrics)
+
+    summary, report, metadata = run_backtest._build_calibration_baseline_artifacts(
+        targets="targets",
+        prices=pd.DataFrame({"XLK": [100.0]}),
+        baseline_config={"ticket": "B-163"},
+        calibration_split_summary={"status": "ready", "fold_count": 3},
+        ohlcv_source={"provider": "yfinance"},
+    )
+
+    assert metric_calls == [
+        {"horizons": run_backtest.CALIBRATION_HORIZONS_WEEKS, "group_by": None},
+        {"horizons": run_backtest.CALIBRATION_HORIZONS_WEEKS, "group_by": "class"},
+    ]
+    assert summary["scope"].tolist() == ["overall", "overall", "class"]
+    assert summary["direction"].tolist() == ["positive", "negative", "positive"]
+    assert summary.loc[0, "hit_rate"] == pytest.approx(1.0)
+    assert "Positive momentum hit rate" in report
+    assert "Negative momentum hit rate" in report
+    assert report.index("Positive momentum hit rate") < report.index("Negative momentum hit rate")
+    assert "research-only" in report
+    assert metadata["ticket"] == "B-163"
+    assert metadata["slice"] == "B-163.5"
+    assert metadata["research_only"] is True
+    assert metadata["live_promotion_allowed"] is False
+    assert metadata["label_rows"] == 2
+    assert metadata["summary_rows"] == 3
+    assert metadata["horizons_weeks"] == list(run_backtest.CALIBRATION_HORIZONS_WEEKS)
+    assert metadata["calibration_split_summary"]["status"] == "ready"
+    assert metadata["ohlcv_source"]["provider"] == "yfinance"
 
 
 def test_build_massive_provider_validation_summary_compares_default_and_massive_without_cache(
@@ -503,6 +597,9 @@ def test_run_backtest_writes_macro_variant_summary_to_metadata(monkeypatch, tmp_
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
     monkeypatch.setattr(run_backtest, "FRED_VALIDATION_REPORT_PATH", tmp_path / "fred_macro_validation_report.md")
     monkeypatch.setattr(run_backtest, "FRED_VALIDATION_SUMMARY_PATH", tmp_path / "fred_macro_validation_summary.csv")
+    monkeypatch.setattr(run_backtest, "CALIBRATION_REPORT_PATH", tmp_path / "calibration_10y_report.md")
+    monkeypatch.setattr(run_backtest, "CALIBRATION_SUMMARY_PATH", tmp_path / "calibration_10y_summary.csv")
+    monkeypatch.setattr(run_backtest, "CALIBRATION_METADATA_PATH", tmp_path / "calibration_10y_metadata.json")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(
         run_backtest,
@@ -609,6 +706,9 @@ def test_run_backtest_writes_fred_validation_report_when_macro_variants_enabled(
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
     monkeypatch.setattr(run_backtest, "FRED_VALIDATION_REPORT_PATH", tmp_path / "fred_macro_validation_report.md")
     monkeypatch.setattr(run_backtest, "FRED_VALIDATION_SUMMARY_PATH", tmp_path / "fred_macro_validation_summary.csv")
+    monkeypatch.setattr(run_backtest, "CALIBRATION_REPORT_PATH", tmp_path / "calibration_10y_report.md")
+    monkeypatch.setattr(run_backtest, "CALIBRATION_SUMMARY_PATH", tmp_path / "calibration_10y_summary.csv")
+    monkeypatch.setattr(run_backtest, "CALIBRATION_METADATA_PATH", tmp_path / "calibration_10y_metadata.json")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(
         run_backtest,
@@ -757,6 +857,9 @@ def test_run_backtest_writes_massive_validation_report_when_massive_variants_ena
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
     monkeypatch.setattr(run_backtest, "MASSIVE_VALIDATION_REPORT_PATH", tmp_path / "massive_report.md")
     monkeypatch.setattr(run_backtest, "MASSIVE_VALIDATION_SUMMARY_PATH", tmp_path / "massive_summary.csv")
+    monkeypatch.setattr(run_backtest, "CALIBRATION_REPORT_PATH", tmp_path / "calibration_10y_report.md")
+    monkeypatch.setattr(run_backtest, "CALIBRATION_SUMMARY_PATH", tmp_path / "calibration_10y_summary.csv")
+    monkeypatch.setattr(run_backtest, "CALIBRATION_METADATA_PATH", tmp_path / "calibration_10y_metadata.json")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(run_backtest, "fetch_ohlcv_result", fake_fetch_result)
     monkeypatch.setattr(run_backtest, "_resolved_provider", lambda provider: "massive")
@@ -960,9 +1063,42 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
     monkeypatch.setattr(run_backtest, "STATES_PATH", tmp_path / "backtest_states.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
+    monkeypatch.setattr(run_backtest, "CALIBRATION_REPORT_PATH", tmp_path / "calibration_10y_report.md", raising=False)
+    monkeypatch.setattr(run_backtest, "CALIBRATION_SUMMARY_PATH", tmp_path / "calibration_10y_summary.csv", raising=False)
+    monkeypatch.setattr(run_backtest, "CALIBRATION_METADATA_PATH", tmp_path / "calibration_10y_metadata.json", raising=False)
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
     monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
     monkeypatch.setattr(run_backtest, "_build_macro_variant_summary", lambda **kwargs: pd.DataFrame())
+    calibration_builder_calls = []
+
+    def fake_build_calibration_baseline_artifacts(**kwargs):
+        calibration_builder_calls.append(kwargs)
+        return (
+            pd.DataFrame(
+                [
+                    {
+                        "scope": "overall",
+                        "direction": "positive",
+                        "horizon_weeks": 4,
+                        "hit_rate": 1.0,
+                    }
+                ]
+            ),
+            "# Calibration Baseline Report\n",
+            {
+                "ticket": "B-163",
+                "slice": "B-163.5",
+                "research_only": True,
+                "live_promotion_allowed": False,
+            },
+        )
+
+    monkeypatch.setattr(
+        run_backtest,
+        "_build_calibration_baseline_artifacts",
+        fake_build_calibration_baseline_artifacts,
+        raising=False,
+    )
     monkeypatch.setattr(
         run_backtest.backtest,
         "build_historical_methodology_targets",
@@ -1041,6 +1177,19 @@ def test_run_backtest_fetches_benchmarks_and_writes_rich_report(monkeypatch, tmp
     ]
     assert metadata["calibration_split_summary"]["status"] == "insufficient_history"
     assert metadata["calibration_split_summary"]["requested_years"] == 10
+    assert calibration_builder_calls
+    assert calibration_builder_calls[0]["baseline_config"]["ticket"] == "B-163"
+    assert run_backtest.CALIBRATION_REPORT_PATH.read_text(encoding="utf-8").startswith(
+        "# Calibration Baseline Report"
+    )
+    calibration_summary = pd.read_csv(run_backtest.CALIBRATION_SUMMARY_PATH)
+    assert calibration_summary.loc[0, "scope"] == "overall"
+    calibration_metadata = json.loads(run_backtest.CALIBRATION_METADATA_PATH.read_text(encoding="utf-8"))
+    assert calibration_metadata["slice"] == "B-163.5"
+    assert calibration_metadata["summary_sha256"] == run_backtest._sha256_bytes(
+        run_backtest.CALIBRATION_SUMMARY_PATH.read_bytes()
+    )
+    assert metadata["calibration_10y_summary_sha256"] == calibration_metadata["summary_sha256"]
 
 
 def test_run_backtest_live_smoke_fetches_short_period_without_artifacts(
@@ -1194,3 +1343,67 @@ def test_write_artifacts_does_not_replace_existing_files_when_stage_fails(monkey
     assert equity_path.read_text(encoding="utf-8") == "old equity"
     assert states_path.read_text(encoding="utf-8") == "old states"
     assert metadata_path.read_text(encoding="utf-8") == "old metadata"
+
+
+def test_write_artifacts_persists_calibration_artifacts_and_metadata(monkeypatch, tmp_path):
+    report_path = tmp_path / "backtest_report.md"
+    methodology_path = tmp_path / "backtest_methodology_report.md"
+    equity_path = tmp_path / "backtest_equity.csv"
+    states_path = tmp_path / "backtest_states.csv"
+    metadata_path = tmp_path / "backtest_metadata.json"
+    calibration_report_path = tmp_path / "calibration_10y_report.md"
+    calibration_summary_path = tmp_path / "calibration_10y_summary.csv"
+    calibration_metadata_path = tmp_path / "calibration_10y_metadata.json"
+
+    monkeypatch.setattr(run_backtest, "REPORT_PATH", report_path)
+    monkeypatch.setattr(run_backtest, "METHODOLOGY_REPORT_PATH", methodology_path)
+    monkeypatch.setattr(run_backtest, "EQUITY_PATH", equity_path)
+    monkeypatch.setattr(run_backtest, "STATES_PATH", states_path)
+    monkeypatch.setattr(run_backtest, "METADATA_PATH", metadata_path)
+    monkeypatch.setattr(run_backtest, "CALIBRATION_REPORT_PATH", calibration_report_path, raising=False)
+    monkeypatch.setattr(run_backtest, "CALIBRATION_SUMMARY_PATH", calibration_summary_path, raising=False)
+    monkeypatch.setattr(run_backtest, "CALIBRATION_METADATA_PATH", calibration_metadata_path, raising=False)
+
+    calibration_summary = pd.DataFrame(
+        [
+            {
+                "scope": "overall",
+                "direction": "positive",
+                "horizon_weeks": 4,
+                "hit_rate": 0.75,
+            }
+        ]
+    )
+
+    run_backtest._write_artifacts(
+        "report",
+        "methodology",
+        pd.DataFrame({"Methodology": [1.0]}, index=pd.to_datetime(["2020-01-03"])),
+        pd.DataFrame({"XLK": ["HOLD"]}, index=pd.to_datetime(["2020-01-03"])),
+        ["XLK"],
+        calibration_report="# Calibration Baseline Report\n",
+        calibration_summary=calibration_summary,
+        calibration_metadata={
+            "ticket": "B-163",
+            "slice": "B-163.5",
+            "research_only": True,
+            "live_promotion_allowed": False,
+        },
+    )
+
+    assert calibration_report_path.read_text(encoding="utf-8").startswith("# Calibration")
+    assert pd.read_csv(calibration_summary_path).loc[0, "hit_rate"] == pytest.approx(0.75)
+    calibration_metadata = json.loads(calibration_metadata_path.read_text(encoding="utf-8"))
+    backtest_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert calibration_metadata["summary_sha256"] == run_backtest._sha256_bytes(
+        calibration_summary_path.read_bytes()
+    )
+    assert calibration_metadata["report_sha256"] == run_backtest._sha256_bytes(
+        calibration_report_path.read_bytes()
+    )
+    assert backtest_metadata["calibration_10y_summary_sha256"] == calibration_metadata[
+        "summary_sha256"
+    ]
+    assert backtest_metadata["calibration_10y_report_sha256"] == calibration_metadata[
+        "report_sha256"
+    ]

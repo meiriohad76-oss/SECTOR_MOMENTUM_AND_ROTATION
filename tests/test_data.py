@@ -245,14 +245,15 @@ def test_fetch_ohlcv_result_uses_stale_cache_when_yfinance_is_unavailable(tmp_pa
     today = pd.Timestamp.today().date()
     cache_path = tmp_path / "ohlcv.duckdb"
     stale_dates = pd.bdate_range(end=pd.Timestamp(today) - pd.Timedelta(days=8), periods=80)
+    row_count = len(stale_dates)
     stale_frame = pd.DataFrame(
         {
-            "open": range(80),
-            "high": range(1, 81),
-            "low": range(80),
-            "close": range(100, 180),
-            "volume": [1_000_000] * 80,
-            "adj_close": range(100, 180),
+            "open": range(row_count),
+            "high": range(1, row_count + 1),
+            "low": range(row_count),
+            "close": range(100, 100 + row_count),
+            "volume": [1_000_000] * row_count,
+            "adj_close": range(100, 100 + row_count),
         },
         index=stale_dates,
     )

@@ -29,7 +29,11 @@ FRED_VALIDATION_REPORT_PATH = ROOT / "docs" / "fred_macro_validation_report.md"
 FRED_VALIDATION_SUMMARY_PATH = ROOT / "docs" / "fred_macro_validation_summary.csv"
 MASSIVE_VALIDATION_REPORT_PATH = ROOT / "docs" / "massive_provider_validation_report.md"
 MASSIVE_VALIDATION_SUMMARY_PATH = ROOT / "docs" / "massive_provider_validation_summary.csv"
+CALIBRATION_REPORT_PATH = ROOT / "docs" / "calibration_10y_report.md"
+CALIBRATION_SUMMARY_PATH = ROOT / "docs" / "calibration_10y_summary.csv"
+CALIBRATION_METADATA_PATH = ROOT / "docs" / "calibration_10y_metadata.json"
 CALIBRATION_BASELINE_CONFIG_FILENAME = "calibration_10y_baseline_config.json"
+CALIBRATION_HORIZONS_WEEKS = (4, 13, 26, 52)
 MASSIVE_AGGS_ENDPOINT = "https://api.massive.com/v2/aggs/ticker/{ticker}/range/1/day/{from}/{to}"
 MASSIVE_TRADES_ENDPOINT = "https://api.massive.com/v3/trades/{ticker}"
 MASSIVE_BLOCK_TRADE_THRESHOLDS = (1.0, 1.25, 1.5)
@@ -137,6 +141,9 @@ def _write_artifacts(
     ohlcv_source: dict | None = None,
     baseline_config: dict | None = None,
     calibration_split_summary: dict | None = None,
+    calibration_report: str | None = None,
+    calibration_summary=None,
+    calibration_metadata: dict | None = None,
 ) -> None:
     report_bytes = report.encode("utf-8")
     methodology_report_bytes = methodology_report.encode("utf-8")
@@ -183,6 +190,17 @@ def _write_artifacts(
         massive_validation_summary_bytes = massive_validation_summary.to_csv(index=False).encode("utf-8")
         payloads[MASSIVE_VALIDATION_SUMMARY_PATH] = massive_validation_summary_bytes
         metadata["massive_validation_summary_sha256"] = _sha256_bytes(massive_validation_summary_bytes)
+    calibration_metadata_payload = dict(calibration_metadata or {})
+    if calibration_report is not None:
+        calibration_report_bytes = calibration_report.encode("utf-8")
+        payloads[CALIBRATION_REPORT_PATH] = calibration_report_bytes
+        metadata["calibration_10y_report_sha256"] = _sha256_bytes(calibration_report_bytes)
+        calibration_metadata_payload["report_sha256"] = metadata["calibration_10y_report_sha256"]
+    if calibration_summary is not None:
+        calibration_summary_bytes = calibration_summary.to_csv(index=False).encode("utf-8")
+        payloads[CALIBRATION_SUMMARY_PATH] = calibration_summary_bytes
+        metadata["calibration_10y_summary_sha256"] = _sha256_bytes(calibration_summary_bytes)
+        calibration_metadata_payload["summary_sha256"] = metadata["calibration_10y_summary_sha256"]
     if baseline_config is not None:
         baseline_config_bytes = (
             json.dumps(baseline_config, indent=2, sort_keys=True) + "\n"
@@ -193,6 +211,13 @@ def _write_artifacts(
         metadata["baseline_config_sha256"] = backtest.baseline_config_hash(baseline_config)
         metadata["baseline_config_artifact"] = _artifact_label(baseline_config_path)
         metadata["baseline_config_artifact_sha256"] = _sha256_bytes(baseline_config_bytes)
+    if calibration_metadata is not None or calibration_report is not None or calibration_summary is not None:
+        calibration_metadata_payload.setdefault("generated_at_utc", metadata["generated_at_utc"])
+        calibration_metadata_bytes = (
+            json.dumps(calibration_metadata_payload, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8")
+        payloads[CALIBRATION_METADATA_PATH] = calibration_metadata_bytes
+        metadata["calibration_10y_metadata_sha256"] = _sha256_bytes(calibration_metadata_bytes)
     metadata_bytes = (json.dumps(metadata, indent=2, sort_keys=True) + "\n").encode("utf-8")
     payloads[METADATA_PATH] = metadata_bytes
     staged = _stage_artifacts(payloads)
@@ -313,6 +338,192 @@ def _build_calibration_split_summary(
             "reason": str(exc),
         }
     return backtest.walk_forward_split_summary(splits, requested_years=years)
+
+
+def _normalize_calibration_summary(metrics: pd.DataFrame, *, scope: str) -> pd.DataFrame:
+    if metrics is None or metrics.empty:
+        return pd.DataFrame()
+    frame = metrics.copy()
+    frame.insert(0, "scope", scope)
+    if "class" not in frame.columns:
+        frame.insert(1, "class", "all")
+    else:
+        frame["class"] = frame["class"].fillna("unknown").astype(str)
+    preferred = [
+        "scope",
+        "class",
+        "direction",
+        "horizon_weeks",
+        "total_count",
+        "available_count",
+        "signal_count",
+        "signal_available_count",
+        "success_count",
+        "failure_count",
+        "hit_rate",
+        "precision",
+        "recall",
+        "f1",
+        "average_forward_return",
+        "average_forward_excess_return",
+        "average_post_entry_drawdown",
+        "average_drawdown_avoided",
+    ]
+    columns = [column for column in preferred if column in frame.columns]
+    columns.extend(column for column in frame.columns if column not in columns)
+    return frame[columns]
+
+
+def _format_percent(value) -> str:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "n/a"
+    if pd.isna(number):
+        return "n/a"
+    return f"{number * 100:.2f}%"
+
+
+def _format_count(value) -> str:
+    try:
+        return str(int(value))
+    except (TypeError, ValueError):
+        return "0"
+
+
+def _format_calibration_baseline_report(
+    summary: pd.DataFrame,
+    *,
+    metadata: dict,
+) -> str:
+    lines = [
+        "# 10-Year Calibration Baseline Report",
+        "",
+        "Ticket: B-163.5",
+        "",
+        (
+            "This is research-only baseline evidence. It does not tune methodology "
+            "parameters, change live scoring, alter recommendations, or allow live promotion."
+        ),
+        "",
+        "## Provenance",
+        "",
+        f"- Baseline config hash: `{metadata.get('baseline_config_sha256', 'unknown')}`",
+        f"- Label rows: {_format_count(metadata.get('label_rows'))}",
+        f"- Summary rows: {_format_count(metadata.get('summary_rows'))}",
+        f"- Split status: `{metadata.get('calibration_split_summary', {}).get('status', 'unknown')}`",
+        "",
+        "## Overall Baseline Hit Rates",
+        "",
+    ]
+    overall = summary[summary["scope"] == "overall"] if not summary.empty else pd.DataFrame()
+    if overall.empty:
+        lines.append("- No baseline label metrics were available for this run.")
+    else:
+        ordered = overall.copy()
+        ordered["_direction_order"] = (
+            ordered["direction"].map({"positive": 0, "negative": 1}).fillna(9)
+        )
+        for _, row in ordered.sort_values(["horizon_weeks", "_direction_order"]).iterrows():
+            direction = str(row.get("direction", "")).lower()
+            label = "Positive momentum" if direction == "positive" else "Negative momentum"
+            lines.append(
+                "- "
+                f"{label} hit rate ({int(row.get('horizon_weeks', 0))}w): "
+                f"{_format_percent(row.get('hit_rate'))} "
+                f"({_format_count(row.get('success_count'))} successes / "
+                f"{_format_count(row.get('signal_available_count'))} available signals)."
+            )
+    lines.extend(
+        [
+            "",
+            "## Safety",
+            "",
+            "- Candidate search, parameter calibration, and live promotion remain pending future B-163 slices.",
+            "- Dashboard surfacing remains artifact-only and read-only.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _build_calibration_baseline_artifacts(
+    *,
+    targets,
+    prices: pd.DataFrame,
+    baseline_config: dict,
+    calibration_split_summary: dict,
+    ohlcv_source: dict,
+) -> tuple[pd.DataFrame, str, dict]:
+    labels = backtest.build_calibration_feature_labels(
+        targets,
+        prices,
+        horizons_weeks=CALIBRATION_HORIZONS_WEEKS,
+    )
+    overall = _normalize_calibration_summary(
+        backtest.calibration_label_metrics(
+            labels,
+            horizons_weeks=CALIBRATION_HORIZONS_WEEKS,
+        ),
+        scope="overall",
+    )
+    by_class = pd.DataFrame()
+    if not labels.empty and "class" in labels.columns:
+        by_class = _normalize_calibration_summary(
+            backtest.calibration_label_metrics(
+                labels,
+                horizons_weeks=CALIBRATION_HORIZONS_WEEKS,
+                group_by="class",
+            ),
+            scope="class",
+        )
+    summary = pd.concat([overall, by_class], ignore_index=True)
+    if not summary.empty:
+        summary["scope"] = pd.Categorical(
+            summary["scope"],
+            categories=["overall", "class"],
+            ordered=True,
+        )
+        summary["direction"] = pd.Categorical(
+            summary["direction"],
+            categories=["positive", "negative"],
+            ordered=True,
+        )
+        summary = summary.sort_values(
+            ["scope", "class", "horizon_weeks", "direction"]
+        ).reset_index(drop=True)
+        summary["scope"] = summary["scope"].astype(str)
+        summary["direction"] = summary["direction"].astype(str)
+
+    date_values = (
+        pd.to_datetime(labels["rebalance_date"]).dropna().sort_values()
+        if "rebalance_date" in labels.columns
+        else pd.DatetimeIndex([])
+    )
+    metadata = {
+        "ticket": "B-163",
+        "slice": "B-163.5",
+        "purpose": "research_only_baseline_calibration_summary",
+        "research_only": True,
+        "live_promotion_allowed": False,
+        "horizons_weeks": list(CALIBRATION_HORIZONS_WEEKS),
+        "label_rows": int(len(labels)),
+        "summary_rows": int(len(summary)),
+        "label_start": _date_or_none(pd.DatetimeIndex(date_values), 0),
+        "label_end": _date_or_none(pd.DatetimeIndex(date_values), -1),
+        "ticker_count": int(labels["ticker"].nunique()) if "ticker" in labels.columns else 0,
+        "class_count": int(labels["class"].nunique()) if "class" in labels.columns else 0,
+        "baseline_config_sha256": backtest.baseline_config_hash(baseline_config),
+        "calibration_split_summary": calibration_split_summary,
+        "ohlcv_source": ohlcv_source,
+        "safety": {
+            "parameter_tuning": "not_run",
+            "candidate_promotion": "not_allowed",
+            "live_scoring_change": "none",
+        },
+    }
+    report = _format_calibration_baseline_report(summary, metadata=metadata)
+    return summary, report, metadata
 
 
 def _fetch_macro_data(enabled: bool) -> dict[str, pd.Series]:
@@ -1508,6 +1719,13 @@ def main(argv: list[str] | None = None) -> int:
             ohlcv_fetch_result,
             cache_policy="bypassed" if validation_mode else "normal",
         )
+        calibration_summary, calibration_report, calibration_metadata = _build_calibration_baseline_artifacts(
+            targets=methodology_targets,
+            prices=prices,
+            baseline_config=baseline_config,
+            calibration_split_summary=calibration_split_summary,
+            ohlcv_source=ohlcv_source,
+        )
         equity = backtest.equity_frame(
             {
                 "Methodology": methodology_result,
@@ -1530,6 +1748,9 @@ def main(argv: list[str] | None = None) -> int:
             ohlcv_source=ohlcv_source,
             baseline_config=baseline_config,
             calibration_split_summary=calibration_split_summary,
+            calibration_report=calibration_report,
+            calibration_summary=calibration_summary,
+            calibration_metadata=calibration_metadata,
         )
     except Exception as exc:
         print(f"Manual backtest data validation failed: {exc}")

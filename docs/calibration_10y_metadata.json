@@ -1,0 +1,49 @@
+{
+  "baseline_config_sha256": "70d9b9ba8879ed98142d330c3611312aeab956850115484a2a16533c6cffb69f",
+  "calibration_split_summary": {
+    "available_end": "2026-05-22",
+    "available_start": "2018-06-22",
+    "calibration_years": 5,
+    "final_holdout_years": 1,
+    "fold_count": 0,
+    "folds": [],
+    "reason": "dates must span at least 10 years",
+    "requested_years": 10,
+    "status": "insufficient_history",
+    "validation_years": 1
+  },
+  "class_count": 2,
+  "generated_at_utc": "2026-05-24T05:25:57.196126Z",
+  "horizons_weeks": [
+    4,
+    13,
+    26,
+    52
+  ],
+  "label_end": "2026-05-22",
+  "label_rows": 4968,
+  "label_start": "2018-06-22",
+  "live_promotion_allowed": false,
+  "ohlcv_source": {
+    "cache_policy": "normal",
+    "fetched_count": 0,
+    "fresh_cache_hit_count": 0,
+    "missing_count": 0,
+    "provider": "",
+    "stale_cache_hit_count": 0,
+    "warnings": []
+  },
+  "purpose": "research_only_baseline_calibration_summary",
+  "report_sha256": "f62b8f618b41dc1c4e935d6a7ec8582a6a0119493aedf6f327648c93425ef496",
+  "research_only": true,
+  "safety": {
+    "candidate_promotion": "not_allowed",
+    "live_scoring_change": "none",
+    "parameter_tuning": "not_run"
+  },
+  "slice": "B-163.5",
+  "summary_rows": 24,
+  "summary_sha256": "3bec57028ab59142e5f4ac24099a2ea341c5f81fc7c0ee6393223d99c786582d",
+  "ticker_count": 12,
+  "ticket": "B-163"
+}

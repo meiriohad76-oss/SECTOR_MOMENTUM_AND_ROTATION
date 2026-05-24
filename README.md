@@ -66,7 +66,7 @@ The report uses the historical methodology target builder as the strategy path, 
 
 ## Calibration and evidence gates
 
-B-163 adds a dashboard Calibration Lab that surfaces the frozen baseline config, walk-forward split metadata, and future 10-year calibration artifacts from `docs/` without running calibration on page load. The current lab is read-only; it does not tune parameters, change live scoring, or promote a candidate.
+B-163 adds a dashboard Calibration Lab that surfaces the frozen baseline config, walk-forward split metadata, and 10-year calibration artifacts from `docs/` without running calibration on page load. The manual backtest runner now writes the baseline calibration report, summary CSV, and metadata JSON from point-in-time labels and directional success metrics. The lab remains read-only; it does not tune parameters, change live scoring, or promote a candidate.
 
 B-158/B-160 add a dashboard Evidence Gates section for the FRED and Massive promotion gates. It reads the committed validation summaries, shows fail-closed gate decisions such as `blocked_no_candidates`, and displays `Live Promotion Allowed = False` until a separate reviewed promotion patch exists.
 
