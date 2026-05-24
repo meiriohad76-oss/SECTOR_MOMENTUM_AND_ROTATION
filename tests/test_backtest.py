@@ -219,6 +219,25 @@ def test_walk_forward_calibration_splits_accept_short_history_with_minimum_floor
     assert summary["no_lookahead_verified"] is True
 
 
+def test_fixed_train_holdout_split_uses_five_year_train_and_remaining_holdout():
+    dates = pd.bdate_range("2018-06-22", "2026-05-22")
+
+    split = backtest.fixed_train_holdout_calibration_split(
+        dates,
+        train_years=5,
+        minimum_holdout_years=2,
+        maximum_holdout_years=3,
+    )
+
+    assert split["status"] == "ready"
+    assert split["profile"] == "fixed_5y_train_2y_to_3y_holdout"
+    assert split["train"]["start"] == "2018-06-22"
+    assert split["train"]["end"] < split["holdout"]["start"]
+    assert split["holdout"]["years"] >= 2.0
+    assert split["holdout"]["years"] <= 3.05
+    assert split["no_lookahead_verified"] is True
+
+
 def test_walk_forward_calibration_splits_adapt_calibration_years_for_five_to_seven_year_history():
     cases = [
         ("2021-05-21", 3),

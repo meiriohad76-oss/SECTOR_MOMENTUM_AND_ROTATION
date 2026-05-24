@@ -27,10 +27,34 @@ def test_app_surfaces_calibration_artifacts_without_running_calibration():
         'CALIBRATION_METADATA_PATH = APP_ROOT / "docs" / '
         '"calibration_10y_metadata.json"'
     ) in app_source
+    assert 'CALIBRATION_EXPANDED_REPORT_PATH = APP_ROOT / "docs" / "calibration_expanded_report.md"' in app_source
+    assert (
+        'CALIBRATION_EXPANDED_CANDIDATES_PATH = APP_ROOT / "docs" / '
+        '"calibration_expanded_candidates.csv"'
+    ) in app_source
+    assert (
+        'CALIBRATION_SECTOR_OVERRIDES_PATH = APP_ROOT / "docs" / '
+        '"calibration_sector_overrides.csv"'
+    ) in app_source
+    assert (
+        'CALIBRATION_EXPANDED_METADATA_PATH = APP_ROOT / "docs" / '
+        '"calibration_expanded_metadata.json"'
+    ) in app_source
     assert "def render_calibration_lab():" in app_source
     assert "Calibration lab" in app_source
+    assert "Expanded calibration" in app_source
+    assert "sector-specific" in app_source
     assert "B-163" in app_source
-    assert "from src.calibration_dashboard import calibration_artifact_status_rows, shared_artifact_hash" in app_source
+    assert (
+        "from src.calibration_dashboard import ("
+        in app_source
+        and "calibration_artifact_status_rows"
+        in app_source
+        and "expanded_calibration_artifact_status_rows"
+        in app_source
+        and "shared_artifact_hash"
+        in app_source
+    )
     assert "baseline_config_exists = CALIBRATION_BASELINE_CONFIG_PATH.exists()" in app_source
     assert "calibration_artifact_status_rows(" in app_source
     assert "candidate_config_hash = shared_artifact_hash(" in app_source
@@ -51,6 +75,11 @@ def test_app_surfaces_calibration_artifacts_without_running_calibration():
     assert "_read_csv_artifact(CALIBRATION_CANDIDATES_PATH)" in app_source
     assert "CALIBRATION_CANDIDATE_CONFIG_PATH.read_text" in app_source
     assert "CALIBRATION_REPORT_PATH.read_text" in app_source
+    assert "CALIBRATION_EXPANDED_REPORT_PATH.read_text" in app_source
+    assert 'expanded_metadata_hash = metadata.get("calibration_expanded_metadata_sha256")' in app_source
+    assert "expanded_report_status == \"VERIFIED\"" in app_source
+    assert "_read_csv_artifact(CALIBRATION_EXPANDED_CANDIDATES_PATH)" in app_source
+    assert "_read_csv_artifact(CALIBRATION_SECTOR_OVERRIDES_PATH)" in app_source
     assert "CALIBRATION_BASELINE_CONFIG_PATH" in app_source
     assert "calibration_label_metrics(" not in app_source
     assert "calibration_candidate_search(" not in app_source

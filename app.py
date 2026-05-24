@@ -16,7 +16,11 @@ import pandas as pd
 import streamlit as st
 
 from src.backtest import drawdown_frame, normalized_equity_frame
-from src.calibration_dashboard import calibration_artifact_status_rows, shared_artifact_hash
+from src.calibration_dashboard import (
+    calibration_artifact_status_rows,
+    expanded_calibration_artifact_status_rows,
+    shared_artifact_hash,
+)
 from src.component_docs import DASHBOARD_COMPONENT_DOCS, component_docs_html
 from src.comparison_view import (
     comparison_card_rows,
@@ -357,6 +361,10 @@ CALIBRATION_SUMMARY_PATH = APP_ROOT / "docs" / "calibration_10y_summary.csv"
 CALIBRATION_CANDIDATES_PATH = APP_ROOT / "docs" / "calibration_10y_candidates.csv"
 CALIBRATION_CANDIDATE_CONFIG_PATH = APP_ROOT / "docs" / "calibration_10y_candidate_config.json"
 CALIBRATION_METADATA_PATH = APP_ROOT / "docs" / "calibration_10y_metadata.json"
+CALIBRATION_EXPANDED_REPORT_PATH = APP_ROOT / "docs" / "calibration_expanded_report.md"
+CALIBRATION_EXPANDED_CANDIDATES_PATH = APP_ROOT / "docs" / "calibration_expanded_candidates.csv"
+CALIBRATION_SECTOR_OVERRIDES_PATH = APP_ROOT / "docs" / "calibration_sector_overrides.csv"
+CALIBRATION_EXPANDED_METADATA_PATH = APP_ROOT / "docs" / "calibration_expanded_metadata.json"
 FRED_VALIDATION_SUMMARY_PATH = APP_ROOT / "docs" / "fred_macro_validation_summary.csv"
 MASSIVE_VALIDATION_SUMMARY_PATH = APP_ROOT / "docs" / "massive_provider_validation_summary.csv"
 FRED_VALIDATION_REPORT_PATH = APP_ROOT / "docs" / "fred_macro_validation_report.md"
@@ -2088,6 +2096,99 @@ def render_calibration_lab():
             <div class="chart-help">
               Calibrated candidate config artifact hash is <code>UNVERIFIED</code>.
               Run <code>python scripts/run_backtest.py</code> to refresh calibrated rerun gate evidence.
+            </div>
+            """
+        )
+
+    expanded_metadata = {}
+    if CALIBRATION_EXPANDED_METADATA_PATH.exists():
+        try:
+            expanded_metadata = json.loads(
+                CALIBRATION_EXPANDED_METADATA_PATH.read_text(encoding="utf-8")
+            )
+        except Exception as exc:
+            st.warning(f"Could not read expanded calibration metadata artifact: {exc}")
+    expanded_artifact_hashes = expanded_metadata.get("artifacts", {})
+    expanded_metadata_hash = metadata.get("calibration_expanded_metadata_sha256")
+    expanded_status_rows = expanded_calibration_artifact_status_rows(
+        report_path=CALIBRATION_EXPANDED_REPORT_PATH,
+        candidates_path=CALIBRATION_EXPANDED_CANDIDATES_PATH,
+        sector_overrides_path=CALIBRATION_SECTOR_OVERRIDES_PATH,
+        metadata_path=CALIBRATION_EXPANDED_METADATA_PATH,
+        report_hash=expanded_artifact_hashes.get("report_sha256"),
+        candidates_hash=expanded_artifact_hashes.get("candidates_sha256"),
+        sector_overrides_hash=expanded_artifact_hashes.get("sector_overrides_sha256"),
+        metadata_hash=expanded_metadata_hash,
+    )
+    _md(
+        """
+        <div class="chart-help">
+          <b>Expanded calibration:</b> B-164 research-only threshold, filter, and
+          sector-specific rule evidence. These artifacts do not change live scoring.
+        </div>
+        """
+    )
+    st.dataframe(pd.DataFrame(expanded_status_rows), hide_index=True, use_container_width=True)
+    expanded_report_status = expanded_status_rows[0]["Status"]
+    expanded_candidates_status = expanded_status_rows[1]["Status"]
+    sector_overrides_status = expanded_status_rows[2]["Status"]
+    expanded_metadata_status = expanded_status_rows[3]["Status"]
+    expanded_report_verified = (
+        expanded_report_status == "VERIFIED" and expanded_metadata_status == "VERIFIED"
+    )
+    expanded_candidates_verified = (
+        expanded_candidates_status == "VERIFIED" and expanded_metadata_status == "VERIFIED"
+    )
+    sector_overrides_verified = (
+        sector_overrides_status == "VERIFIED" and expanded_metadata_status == "VERIFIED"
+    )
+
+    if CALIBRATION_EXPANDED_REPORT_PATH.exists():
+        if not expanded_report_verified:
+            _md(
+                """
+                <div class="chart-help">
+                  Expanded calibration report or metadata hash is <code>UNVERIFIED</code>.
+                  Run <code>python scripts/run_backtest.py</code> to refresh B-164 evidence.
+                </div>
+                """
+            )
+        if expanded_report_status == "VERIFIED" and expanded_metadata_status == "VERIFIED":
+            with st.expander("Expanded calibration report", expanded=False):
+                st.markdown(CALIBRATION_EXPANDED_REPORT_PATH.read_text(encoding="utf-8"))
+
+    expanded_candidates = (
+        _read_csv_artifact(CALIBRATION_EXPANDED_CANDIDATES_PATH)
+        if expanded_candidates_verified
+        else pd.DataFrame()
+    )
+    if not expanded_candidates.empty:
+        with st.expander("Expanded calibration candidates", expanded=False):
+            st.dataframe(expanded_candidates, hide_index=True, use_container_width=True)
+    elif CALIBRATION_EXPANDED_CANDIDATES_PATH.exists() and expanded_candidates_status == "UNVERIFIED":
+        _md(
+            """
+            <div class="chart-help">
+              Expanded calibration candidate artifact hash is <code>UNVERIFIED</code>.
+              Run <code>python scripts/run_backtest.py</code> to refresh B-164 evidence.
+            </div>
+            """
+        )
+
+    sector_overrides = (
+        _read_csv_artifact(CALIBRATION_SECTOR_OVERRIDES_PATH)
+        if sector_overrides_verified
+        else pd.DataFrame()
+    )
+    if not sector_overrides.empty:
+        with st.expander("Sector-specific research overrides", expanded=False):
+            st.dataframe(sector_overrides, hide_index=True, use_container_width=True)
+    elif CALIBRATION_SECTOR_OVERRIDES_PATH.exists() and sector_overrides_status == "UNVERIFIED":
+        _md(
+            """
+            <div class="chart-help">
+              Sector-specific override artifact hash is <code>UNVERIFIED</code>.
+              Run <code>python scripts/run_backtest.py</code> to refresh B-164 evidence.
             </div>
             """
         )

@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src import backtest
+from src import calibration_research
 from src.data import _select_ohlcv_provider, fetch_ohlcv, fetch_ohlcv_result
 from src.fred_data import fetch_fred
 from src import provider_snapshots
@@ -34,8 +35,13 @@ CALIBRATION_SUMMARY_PATH = ROOT / "docs" / "calibration_10y_summary.csv"
 CALIBRATION_CANDIDATES_PATH = ROOT / "docs" / "calibration_10y_candidates.csv"
 CALIBRATION_CANDIDATE_CONFIG_PATH = ROOT / "docs" / "calibration_10y_candidate_config.json"
 CALIBRATION_METADATA_PATH = ROOT / "docs" / "calibration_10y_metadata.json"
+CALIBRATION_EXPANDED_REPORT_PATH = ROOT / "docs" / "calibration_expanded_report.md"
+CALIBRATION_EXPANDED_CANDIDATES_PATH = ROOT / "docs" / "calibration_expanded_candidates.csv"
+CALIBRATION_SECTOR_OVERRIDES_PATH = ROOT / "docs" / "calibration_sector_overrides.csv"
+CALIBRATION_EXPANDED_METADATA_PATH = ROOT / "docs" / "calibration_expanded_metadata.json"
 CALIBRATION_BASELINE_CONFIG_FILENAME = "calibration_10y_baseline_config.json"
 CALIBRATION_HORIZONS_WEEKS = (4, 13, 26, 52)
+CALIBRATION_EXPANDED_HORIZONS_WEEKS = (13, 26, 52)
 CALIBRATION_REQUESTED_YEARS = 10
 CALIBRATION_MINIMUM_ACCEPTED_YEARS = 5
 MASSIVE_AGGS_ENDPOINT = "https://api.massive.com/v2/aggs/ticker/{ticker}/range/1/day/{from}/{to}"
@@ -150,6 +156,10 @@ def _write_artifacts(
     calibration_candidates=None,
     calibration_candidate_config: dict | None = None,
     calibration_metadata: dict | None = None,
+    expanded_calibration_report: str | None = None,
+    expanded_calibration_candidates=None,
+    expanded_calibration_sector_overrides=None,
+    expanded_calibration_metadata: dict | None = None,
 ) -> None:
     report_bytes = report.encode("utf-8")
     methodology_report_bytes = methodology_report.encode("utf-8")
@@ -248,8 +258,83 @@ def _write_artifacts(
         ).encode("utf-8")
         payloads[CALIBRATION_METADATA_PATH] = calibration_metadata_bytes
         metadata["calibration_10y_metadata_sha256"] = _sha256_bytes(calibration_metadata_bytes)
+    if (
+        expanded_calibration_report is not None
+        and expanded_calibration_candidates is not None
+        and expanded_calibration_sector_overrides is not None
+    ):
+        expanded_payloads, expanded_metadata_payload = _expanded_calibration_payloads(
+            report=expanded_calibration_report,
+            candidates=expanded_calibration_candidates,
+            sector_overrides=expanded_calibration_sector_overrides,
+            metadata=expanded_calibration_metadata or {},
+        )
+        payloads.update(expanded_payloads)
+        metadata["calibration_expanded_report_sha256"] = expanded_metadata_payload[
+            "artifacts"
+        ]["report_sha256"]
+        metadata["calibration_expanded_candidates_sha256"] = expanded_metadata_payload[
+            "artifacts"
+        ]["candidates_sha256"]
+        metadata["calibration_sector_overrides_sha256"] = expanded_metadata_payload[
+            "artifacts"
+        ]["sector_overrides_sha256"]
+        metadata["calibration_expanded_metadata_sha256"] = _sha256_bytes(
+            expanded_payloads[CALIBRATION_EXPANDED_METADATA_PATH]
+        )
     metadata_bytes = (json.dumps(metadata, indent=2, sort_keys=True) + "\n").encode("utf-8")
     payloads[METADATA_PATH] = metadata_bytes
+    staged = _stage_artifacts(payloads)
+    _replace_staged_artifacts(staged)
+
+
+def _expanded_calibration_payloads(
+    *,
+    report: str,
+    candidates: pd.DataFrame,
+    sector_overrides: pd.DataFrame,
+    metadata: dict,
+) -> tuple[dict[Path, bytes], dict]:
+    report_bytes = report.encode("utf-8")
+    candidates_bytes = candidates.to_csv(index=False).encode("utf-8")
+    sector_overrides_bytes = sector_overrides.to_csv(index=False).encode("utf-8")
+    metadata_payload = {
+        **dict(metadata or {}),
+        "ticket": "B-164",
+        "research_only": True,
+        "live_promotion_allowed": False,
+        "split_profile": "fixed_5y_train_2y_to_3y_holdout",
+        "artifacts": {
+            "report_sha256": _sha256_bytes(report_bytes),
+            "candidates_sha256": _sha256_bytes(candidates_bytes),
+            "sector_overrides_sha256": _sha256_bytes(sector_overrides_bytes),
+        },
+    }
+    metadata_bytes = _json_artifact_bytes(metadata_payload)
+    return (
+        {
+            CALIBRATION_EXPANDED_REPORT_PATH: report_bytes,
+            CALIBRATION_EXPANDED_CANDIDATES_PATH: candidates_bytes,
+            CALIBRATION_SECTOR_OVERRIDES_PATH: sector_overrides_bytes,
+            CALIBRATION_EXPANDED_METADATA_PATH: metadata_bytes,
+        },
+        metadata_payload,
+    )
+
+
+def _write_expanded_calibration_artifacts(
+    *,
+    report: str,
+    candidates: pd.DataFrame,
+    sector_overrides: pd.DataFrame,
+    metadata: dict,
+) -> None:
+    payloads, _ = _expanded_calibration_payloads(
+        report=report,
+        candidates=candidates,
+        sector_overrides=sector_overrides,
+        metadata=metadata,
+    )
     staged = _stage_artifacts(payloads)
     _replace_staged_artifacts(staged)
 
@@ -568,6 +653,186 @@ def _format_calibration_baseline_report(
         ]
     )
     return "\n".join(lines)
+
+
+def _format_expanded_calibration_report(
+    candidates: pd.DataFrame,
+    *,
+    sector_overrides: pd.DataFrame,
+    metadata: dict,
+) -> str:
+    split = metadata.get("split") or {}
+    lines = [
+        "# Expanded Calibration Report",
+        "",
+        "Ticket: B-164",
+        "",
+        (
+            "This is research-only statistical calibration evidence. It does not change "
+            "live scoring, alerts, recommendations, broker behavior, or dashboard decision text."
+        ),
+        "",
+        "## Split",
+        "",
+        f"- Profile: `{split.get('profile', 'unknown')}`",
+        f"- Status: `{split.get('status', 'unknown')}`",
+        (
+            "- Train window: "
+            f"`{split.get('train', {}).get('start', 'n/a')}` to "
+            f"`{split.get('train', {}).get('end', 'n/a')}`"
+        ),
+        (
+            "- Holdout window: "
+            f"`{split.get('holdout', {}).get('start', 'n/a')}` to "
+            f"`{split.get('holdout', {}).get('end', 'n/a')}` "
+            f"({split.get('holdout', {}).get('years', 'n/a')} years)"
+        ),
+        f"- No-lookahead verified: `{split.get('no_lookahead_verified', False)}`",
+        "",
+        "## Candidate Counts",
+        "",
+        f"- Label rows: {_format_count(metadata.get('label_rows'))}",
+        f"- Candidate rows: {_format_count(metadata.get('candidate_rows'))}",
+        f"- Sector/class override rows: {_format_count(metadata.get('sector_override_rows'))}",
+        f"- Live promotion allowed: `{str(metadata.get('live_promotion_allowed', False)).lower()}`",
+        "",
+        "## Strongest Candidate Rows",
+        "",
+    ]
+    if candidates is None or candidates.empty:
+        lines.append("- No expanded calibration candidate rows were produced.")
+    else:
+        ordered = candidates.copy()
+        if "holdout_hit_rate_delta_vs_baseline" in ordered.columns:
+            ordered = ordered.sort_values(
+                ["holdout_hit_rate_delta_vs_baseline", "candidate_id"],
+                ascending=[False, True],
+                kind="mergesort",
+            )
+        for _, row in ordered.head(10).iterrows():
+            lines.append(
+                "- "
+                f"`{row.get('candidate_id', 'unknown')}` "
+                f"({row.get('direction', 'unknown')}, {row.get('horizon_weeks', 'n/a')}w, "
+                f"scope `{row.get('scope', 'unknown')}`): holdout hit-rate delta "
+                f"{_format_percent(row.get('holdout_hit_rate_delta_vs_baseline'))}; "
+                f"bootstrap CI [{row.get('bootstrap_ci_low', 'n/a')}, "
+                f"{row.get('bootstrap_ci_high', 'n/a')}]; "
+                f"{row.get('promotion_label', 'do not promote')}."
+            )
+            reasons = str(row.get("rejection_reasons") or "").strip()
+            if reasons:
+                lines.append(f"  - Rejection/status reasons: `{reasons}`")
+    lines.extend(["", "## Sector/Class Overrides", ""])
+    if sector_overrides is None or sector_overrides.empty:
+        lines.append("- No sector/class-specific override passed the research gate.")
+    else:
+        for _, row in sector_overrides.iterrows():
+            lines.append(
+                "- "
+                f"`{row.get('candidate_id', 'unknown')}` for "
+                f"`{row.get('sector', row.get('scope', 'unknown'))}`: weight multiplier "
+                f"`{row.get('sector_weight_multiplier', 'n/a')}`; "
+                f"promotion requires `{row.get('promotion_requires', 'separate_reviewed_live_promotion_ticket')}`."
+            )
+    lines.extend(
+        [
+            "",
+            "## Safety",
+            "",
+            "- Expanded calibration is artifact-only and read-only in the dashboard.",
+            "- Sector/class weights are research candidates, not active live methodology parameters.",
+            "- Live promotion requires a separate reviewed ticket with activation flag, frozen config, rollback plan, and evidence-gate approval.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _build_expanded_calibration_artifacts(
+    *,
+    targets,
+    prices: pd.DataFrame,
+    rebalance_dates,
+) -> tuple[pd.DataFrame, pd.DataFrame, str, dict]:
+    dates = pd.DatetimeIndex(pd.to_datetime(rebalance_dates)).dropna().sort_values().unique()
+    try:
+        split = backtest.fixed_train_holdout_calibration_split(
+            dates,
+            train_years=5,
+            minimum_holdout_years=2,
+            maximum_holdout_years=3,
+        )
+    except ValueError as exc:
+        split = {
+            "status": "insufficient_history",
+            "profile": "fixed_5y_train_2y_to_3y_holdout",
+            "reason": str(exc),
+        }
+
+    labels = backtest.build_calibration_feature_labels(
+        targets,
+        prices,
+        horizons_weeks=CALIBRATION_HORIZONS_WEEKS,
+    )
+    candidate_rules = calibration_research.expanded_candidate_grid()
+    if split.get("status") == "ready":
+        candidates = calibration_research.evaluate_expanded_candidates(
+            labels,
+            split,
+            candidate_rules=candidate_rules,
+            horizons_weeks=CALIBRATION_EXPANDED_HORIZONS_WEEKS,
+            min_train_signals=40,
+            min_holdout_signals=20,
+        )
+    else:
+        candidates = pd.DataFrame(
+            [
+                {
+                    "candidate_id": "split_not_ready",
+                    "scope": "global",
+                    "sector": "global",
+                    "direction": "positive",
+                    "horizon_weeks": CALIBRATION_EXPANDED_HORIZONS_WEEKS[0],
+                    "promotion_label": "do not promote",
+                    "rejection_reasons": str(split.get("reason", "split_not_ready")),
+                    "research_only": True,
+                    "live_promotion_allowed": False,
+                }
+            ]
+        )
+    sector_source = (
+        candidates[candidates["scope"].astype(str).str.lower() != "global"]
+        if not candidates.empty and "scope" in candidates.columns
+        else pd.DataFrame()
+    )
+    if sector_source.empty:
+        sector_overrides = pd.DataFrame()
+    else:
+        sector_overrides = calibration_research.sector_override_candidates(sector_source)
+    metadata = {
+        "ticket": "B-164",
+        "purpose": "research_only_expanded_statistical_calibration",
+        "research_only": True,
+        "live_promotion_allowed": False,
+        "horizons_weeks": list(CALIBRATION_EXPANDED_HORIZONS_WEEKS),
+        "split": split,
+        "candidate_rule_count": int(len(candidate_rules)),
+        "label_rows": int(len(labels)),
+        "candidate_rows": int(len(candidates)),
+        "sector_override_rows": int(len(sector_overrides)),
+        "safety": {
+            "live_scoring_change": "none",
+            "candidate_promotion": "separate_ticket_required",
+            "dashboard_behavior": "read_only_artifacts",
+        },
+    }
+    report = _format_expanded_calibration_report(
+        candidates,
+        sector_overrides=sector_overrides,
+        metadata=metadata,
+    )
+    return candidates, sector_overrides, report, metadata
 
 
 def _calibration_splits_from_summary(summary: dict) -> list[backtest.WalkForwardSplit]:
@@ -2048,6 +2313,16 @@ def main(argv: list[str] | None = None) -> int:
             calibration_split_summary=calibration_split_summary,
             ohlcv_source=ohlcv_source,
         )
+        (
+            expanded_candidates,
+            expanded_sector_overrides,
+            expanded_report,
+            expanded_metadata,
+        ) = _build_expanded_calibration_artifacts(
+            targets=methodology_targets,
+            prices=prices,
+            rebalance_dates=rebalance_dates,
+        )
         equity = backtest.equity_frame(
             {
                 "Methodology": methodology_result,
@@ -2075,6 +2350,10 @@ def main(argv: list[str] | None = None) -> int:
             calibration_candidates=calibration_candidates,
             calibration_candidate_config=calibration_candidate_config,
             calibration_metadata=calibration_metadata,
+            expanded_calibration_report=expanded_report,
+            expanded_calibration_candidates=expanded_candidates,
+            expanded_calibration_sector_overrides=expanded_sector_overrides,
+            expanded_calibration_metadata=expanded_metadata,
         )
     except Exception as exc:
         print(f"Manual backtest data validation failed: {exc}")

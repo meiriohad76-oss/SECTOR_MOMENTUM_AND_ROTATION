@@ -154,6 +154,7 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
             "calibration report",
             "summary artifacts",
             "candidate config artifact",
+            "expanded calibration artifacts",
         ),
         states=(
             "baseline pending",
@@ -164,6 +165,7 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
             "candidate config",
             "accepted shortened history",
             "final-holdout evidence",
+            "sector-specific overrides",
         ),
         qa=("calibration dashboard model tests", "calibration dashboard static tests", "backtest unit tests"),
     ),

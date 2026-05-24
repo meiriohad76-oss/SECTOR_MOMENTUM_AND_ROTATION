@@ -1,0 +1,40 @@
+{
+  "artifacts": {
+    "candidates_sha256": "eee261628758ed2d270e561acde1f9104a015c91e14d779539f24c3f958210c8",
+    "report_sha256": "fa72a648184f07fd2b338a66d55695f53085e3dcb91c76036ff48f1c1bee493e",
+    "sector_overrides_sha256": "38bd7a1fb0b90116bd32ffcf7d8dd10517419e9982e6a8afefb7df2da4c7e114"
+  },
+  "candidate_rows": 135,
+  "candidate_rule_count": 45,
+  "horizons_weeks": [
+    13,
+    26,
+    52
+  ],
+  "label_rows": 4968,
+  "live_promotion_allowed": false,
+  "purpose": "research_only_expanded_statistical_calibration",
+  "research_only": true,
+  "safety": {
+    "candidate_promotion": "separate_ticket_required",
+    "dashboard_behavior": "read_only_artifacts",
+    "live_scoring_change": "none"
+  },
+  "sector_override_rows": 4,
+  "split": {
+    "holdout": {
+      "end": "2026-05-22",
+      "start": "2023-06-23",
+      "years": 2.92
+    },
+    "no_lookahead_verified": true,
+    "profile": "fixed_5y_train_2y_to_3y_holdout",
+    "status": "ready",
+    "train": {
+      "end": "2023-06-16",
+      "start": "2018-06-22"
+    }
+  },
+  "split_profile": "fixed_5y_train_2y_to_3y_holdout",
+  "ticket": "B-164"
+}

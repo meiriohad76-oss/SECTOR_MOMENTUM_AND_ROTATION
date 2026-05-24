@@ -371,6 +371,60 @@ def walk_forward_calibration_splits(
     return splits
 
 
+def fixed_train_holdout_calibration_split(
+    dates: Sequence[pd.Timestamp] | pd.DatetimeIndex,
+    *,
+    train_years: int = 5,
+    minimum_holdout_years: int = 2,
+    maximum_holdout_years: int = 3,
+) -> dict:
+    index = _clean_datetime_index("dates", dates)
+    train_years = _positive_int("train_years", train_years)
+    minimum_holdout_years = _positive_int("minimum_holdout_years", minimum_holdout_years)
+    maximum_holdout_years = _positive_int("maximum_holdout_years", maximum_holdout_years)
+    if minimum_holdout_years > maximum_holdout_years:
+        raise ValueError("minimum_holdout_years cannot exceed maximum_holdout_years")
+
+    train_start = pd.Timestamp(index[0])
+    train_end_target = train_start + pd.DateOffset(years=train_years)
+    holdout_start = _first_on_or_after(index, train_end_target)
+    if holdout_start is None:
+        raise ValueError("not enough history to build holdout window")
+
+    holdout_end_target = holdout_start + pd.DateOffset(years=maximum_holdout_years)
+    holdout_dates = index[(index >= holdout_start) & (index < holdout_end_target)]
+    if holdout_dates.empty:
+        raise ValueError("holdout window cannot be built from available dates")
+
+    holdout_end = pd.Timestamp(holdout_dates[-1])
+    holdout_years = ((holdout_end - pd.Timestamp(holdout_start)).days + 1) / 365.25
+    if holdout_years < minimum_holdout_years:
+        return {
+            "status": "insufficient_holdout",
+            "profile": "fixed_5y_train_2y_to_3y_holdout",
+            "reason": "holdout window is shorter than the configured minimum",
+            "holdout_years": round(holdout_years, 2),
+        }
+
+    train_end = _last_before(index, holdout_start)
+    if train_end is None:
+        raise ValueError("train window cannot be built from available dates")
+    return {
+        "status": "ready",
+        "profile": "fixed_5y_train_2y_to_3y_holdout",
+        "train": {
+            "start": _date_string(train_start),
+            "end": _date_string(train_end),
+        },
+        "holdout": {
+            "start": _date_string(holdout_start),
+            "end": _date_string(holdout_end),
+            "years": round(holdout_years, 2),
+        },
+        "no_lookahead_verified": True,
+    }
+
+
 def _date_string(value: pd.Timestamp) -> str:
     return pd.Timestamp(value).date().isoformat()
 

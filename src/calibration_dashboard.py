@@ -39,6 +39,14 @@ def artifact_status(path: Path, expected_hash: str | None = None) -> str:
     return "VERIFIED" if artifact_hash_matches(path, expected_hash) else "UNVERIFIED"
 
 
+def strict_artifact_status(path: Path, expected_hash: str | None = None) -> str:
+    if not path.exists():
+        return "PENDING"
+    if not expected_hash:
+        return "UNVERIFIED"
+    return "VERIFIED" if artifact_hash_matches(path, expected_hash) else "UNVERIFIED"
+
+
 def calibration_artifact_status_rows(
     *,
     baseline_config_path: Path,
@@ -84,5 +92,40 @@ def calibration_artifact_status_rows(
             "Artifact": "Calibration metadata",
             "Path": "docs/calibration_10y_metadata.json",
             "Status": artifact_status(metadata_path, metadata_hash),
+        },
+    ]
+
+
+def expanded_calibration_artifact_status_rows(
+    *,
+    report_path: Path,
+    candidates_path: Path,
+    sector_overrides_path: Path,
+    metadata_path: Path,
+    report_hash: str | None = None,
+    candidates_hash: str | None = None,
+    sector_overrides_hash: str | None = None,
+    metadata_hash: str | None = None,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "Artifact": "Expanded calibration report",
+            "Path": "docs/calibration_expanded_report.md",
+            "Status": strict_artifact_status(report_path, report_hash),
+        },
+        {
+            "Artifact": "Expanded calibration candidates",
+            "Path": "docs/calibration_expanded_candidates.csv",
+            "Status": strict_artifact_status(candidates_path, candidates_hash),
+        },
+        {
+            "Artifact": "Sector/class overrides",
+            "Path": "docs/calibration_sector_overrides.csv",
+            "Status": strict_artifact_status(sector_overrides_path, sector_overrides_hash),
+        },
+        {
+            "Artifact": "Expanded calibration metadata",
+            "Path": "docs/calibration_expanded_metadata.json",
+            "Status": strict_artifact_status(metadata_path, metadata_hash),
         },
     ]

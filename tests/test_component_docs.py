@@ -51,6 +51,8 @@ def test_component_docs_cover_calibration_hash_states():
     assert "baseline pending" in calibration_doc.states
     assert "hash unverified" in calibration_doc.states
     assert "hash verified" in calibration_doc.states
+    assert "expanded calibration artifacts" in calibration_doc.data_inputs
+    assert "sector-specific overrides" in calibration_doc.states
 
 
 def test_component_docs_html_is_generated_from_catalog():

@@ -3,7 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 
-from src.calibration_dashboard import calibration_artifact_status_rows, shared_artifact_hash
+from src.calibration_dashboard import (
+    calibration_artifact_status_rows,
+    expanded_calibration_artifact_status_rows,
+    shared_artifact_hash,
+)
 
 
 def test_calibration_artifact_status_rows_distinguish_baseline_hash_states(tmp_path):
@@ -136,3 +140,73 @@ def test_shared_artifact_hash_requires_both_metadata_hashes_to_agree():
     assert shared_artifact_hash(expected_hash, "b" * 64) == "__HASH_MISMATCH__"
     assert shared_artifact_hash(expected_hash, None) is None
     assert shared_artifact_hash(None, expected_hash) is None
+
+
+def test_expanded_calibration_artifact_status_rows_verify_hashes(tmp_path):
+    report = tmp_path / "calibration_expanded_report.md"
+    candidates = tmp_path / "calibration_expanded_candidates.csv"
+    sector_overrides = tmp_path / "calibration_sector_overrides.csv"
+    metadata = tmp_path / "calibration_expanded_metadata.json"
+    report.write_text("# Expanded Calibration Report\n", encoding="utf-8")
+    candidates.write_text("candidate_id\nglobal_positive_score_ge_1_0\n", encoding="utf-8")
+    sector_overrides.write_text("candidate_id,sector\ntech_rule,Technology\n", encoding="utf-8")
+    metadata.write_text(json.dumps({"ticket": "B-164"}), encoding="utf-8")
+
+    rows = expanded_calibration_artifact_status_rows(
+        report_path=report,
+        candidates_path=candidates,
+        sector_overrides_path=sector_overrides,
+        metadata_path=metadata,
+        report_hash=hashlib.sha256(report.read_bytes()).hexdigest(),
+        candidates_hash=hashlib.sha256(candidates.read_bytes()).hexdigest(),
+        sector_overrides_hash=hashlib.sha256(sector_overrides.read_bytes()).hexdigest(),
+        metadata_hash=hashlib.sha256(metadata.read_bytes()).hexdigest(),
+    )
+
+    assert rows == [
+        {
+            "Artifact": "Expanded calibration report",
+            "Path": "docs/calibration_expanded_report.md",
+            "Status": "VERIFIED",
+        },
+        {
+            "Artifact": "Expanded calibration candidates",
+            "Path": "docs/calibration_expanded_candidates.csv",
+            "Status": "VERIFIED",
+        },
+        {
+            "Artifact": "Sector/class overrides",
+            "Path": "docs/calibration_sector_overrides.csv",
+            "Status": "VERIFIED",
+        },
+        {
+            "Artifact": "Expanded calibration metadata",
+            "Path": "docs/calibration_expanded_metadata.json",
+            "Status": "VERIFIED",
+        },
+    ]
+
+
+def test_expanded_calibration_artifact_status_rows_require_expected_hashes(tmp_path):
+    report = tmp_path / "calibration_expanded_report.md"
+    candidates = tmp_path / "calibration_expanded_candidates.csv"
+    sector_overrides = tmp_path / "calibration_sector_overrides.csv"
+    metadata = tmp_path / "calibration_expanded_metadata.json"
+    report.write_text("# Expanded Calibration Report\n", encoding="utf-8")
+    candidates.write_text("candidate_id\nglobal_positive_score_ge_1_0\n", encoding="utf-8")
+    sector_overrides.write_text("candidate_id,sector\ntech_rule,Technology\n", encoding="utf-8")
+    metadata.write_text(json.dumps({"ticket": "B-164"}), encoding="utf-8")
+
+    rows = expanded_calibration_artifact_status_rows(
+        report_path=report,
+        candidates_path=candidates,
+        sector_overrides_path=sector_overrides,
+        metadata_path=metadata,
+    )
+
+    assert [row["Status"] for row in rows] == [
+        "UNVERIFIED",
+        "UNVERIFIED",
+        "UNVERIFIED",
+        "UNVERIFIED",
+    ]

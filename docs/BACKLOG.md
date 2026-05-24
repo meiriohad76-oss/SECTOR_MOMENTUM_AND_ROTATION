@@ -322,6 +322,13 @@ Status legend:
 **Definition of done:** deterministic tests cover no-lookahead feature construction, split integrity, positive and negative momentum labels, metric calculations, calibration search selection, rejection gates, report generation, metadata/provenance, and secret redaction. Manual QA includes baseline run, calibrated rerun, before/after report review, `python -m pytest -q`, `python -m compileall app.py src scripts`, `git diff --check`, and Pi/GitHub deploy verification when the implementation patch is pushed.
 **Safety:** no calibrated threshold, weight, veto, state-machine behavior, provider-flow rule, alert, recommendation, broker behavior, or dashboard decision text may enter production from this ticket alone. Live promotion requires a separate reviewed backlog ticket with a frozen candidate config, rollback plan, activation flag, and evidence-gate approval.
 
+### B-164 - Expanded statistical calibration and sector-specific rule weights - IMPLEMENTED / RESEARCH ONLY
+**Goal:** use a five-year calibration window and a two-to-three-year holdout window to calibrate methodology thresholds, filters, and sector/class-specific rule weights.
+**Scope:** research-only. No live scoring, alerting, recommendation, state-machine, broker, or dashboard decision text changes.
+**Outputs:** `docs/calibration_expanded_report.md`, `docs/calibration_expanded_candidates.csv`, `docs/calibration_sector_overrides.csv`, `docs/calibration_expanded_metadata.json`, and dashboard read-only surfacing.
+**Latest result:** the manual runner generated a ready fixed split with train window `2018-06-22` to `2023-06-16` and holdout window `2023-06-23` to `2026-05-22` (2.92 years), then evaluated 45 expanded candidate rules across 13-week, 26-week, and 52-week horizons for 135 candidate rows. Current artifacts contain 4,968 point-in-time label rows and four US-sector positive-score override candidates with deterministic two-sample bootstrap confidence intervals; all rows remain research-only and `live_promotion_allowed=false`.
+**Safety:** live promotion requires a separate reviewed ticket with activation flag, frozen config, rollback plan, and evidence gate approval.
+
 ---
 
 ## Completed v3+ ideas
