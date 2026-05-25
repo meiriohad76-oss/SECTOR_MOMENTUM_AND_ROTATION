@@ -335,6 +335,14 @@ Status legend:
 **Behavior:** the dashboard now renders an `Analyze ticker` section before the per-ticker drill-down. A valid ticker from the current scored universe displays state, S score, F score, class/rank, selected flag, veto status, and the standard methodology row, plus a `VIEW FULL DRILL-DOWN` button that syncs the existing drill-down navigation.
 **QA:** static app wiring tests cover the section, parser/analyzer reuse, render order, and drill-down action. Rerun-audit tests track the new `methodology_ticker_input` widget key.
 
+### B-166 - Detailed dashboard signals and XLE Stage 2 PDF report - IMPLEMENTED
+**Goal:** provide a novice-friendly but detailed PDF explaining the dashboard's signals, meaningful values, forecast horizons, and the full XLE `STAGE_2_BULLISH` calculation trail.
+**Scope:** documentation/report artifact only. The generator reads cached dashboard data and existing scoring outputs; it does not change live scoring, state-machine behavior, recommendations, alerts, provider calls, broker behavior, or dashboard UI.
+**Files:** `scripts/generate_dashboard_signals_report.py`, `tests/test_dashboard_signals_report.py`, `docs/dashboard_signals_and_xle_stage2_report.pdf`, `docs/superpowers/specs/2026-05-25-dashboard-signals-report-detail-design.md`, `docs/superpowers/plans/2026-05-25-dashboard-signals-report-detail.md`, `requirements.txt`.
+**Behavior:** the report now includes seven-pillar signal formulas, XLE current values, thresholds, interpretations, forecast horizons, Stage 2 gate-by-gate calculations, composite `S_score` contribution math, institutional-flow component detail, price/30wMA visuals, gauges, score bars, flow bars, lifecycle explanation, and a clear decision-support disclaimer.
+**Latest XLE snapshot:** cached data as of `2026-05-22` labels XLE `STAGE_2_BULLISH` with `S_score +1.096`, `F_score +0.425`, rank `2 of top 4`, `12-1 momentum +39.2%`, `CMF21 +0.254`, `RRG Leading`, and 30-week moving-average slope `+0.47`.
+**QA:** `python -m pytest tests/test_dashboard_signals_report.py -q` -> `7 passed`; `python scripts/generate_dashboard_signals_report.py` regenerated a `%PDF-1.4` artifact sized `885,973` bytes; `python -m pytest -q` -> `537 passed`; `python -m compileall app.py src scripts` -> passed; `git diff --check` -> passed with only the existing CRLF warning on `requirements.txt`.
+
 ---
 
 ## Completed v3+ ideas
@@ -462,4 +470,4 @@ Resolved for this backlog pass:
 
 ## Last updated
 
-2026-05-23, added B-163 10-year walk-forward calibration backtest backlog.
+2026-05-25, added B-166 detailed dashboard signals and XLE Stage 2 PDF report.
