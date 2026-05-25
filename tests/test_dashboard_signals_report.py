@@ -122,6 +122,43 @@ def test_score_contribution_rows_sum_to_fixture_s_score():
     assert round(sum(row.contribution for row in rows), 3) == 1.100
 
 
+def test_report_readability_uses_larger_fonts_and_sparse_dense_pages():
+    assert report.FONTS["tiny"].size >= 21
+    assert report.FONTS["small"].size >= 23
+    assert report.FONTS["body"].size >= 28
+    assert report.SIGNAL_ROWS_PER_PAGE <= 4
+    assert report.CALCULATION_ROWS_PER_PAGE <= 5
+    assert report.SCORE_ROWS_PER_PAGE <= 4
+    assert report.FLOW_ROWS_PER_PAGE <= 5
+
+
+def test_report_builds_extra_pages_for_readable_dense_sections():
+    inputs = report.ReportInputs(
+        generated_at=datetime(2026, 5, 25, tzinfo=timezone.utc),
+        macro_phase="MID",
+        macro_note="Benchmark above 10mo SMA; yield-curve data unavailable.",
+        xle=_snapshot(),
+        price_history=[],
+    )
+
+    pages = report.build_pdf_pages(inputs)
+
+    assert len(pages) >= 13
+
+
+def test_report_readability_keeps_bars_out_of_text_lanes():
+    box = (report.MARGIN, 166, report.PAGE_SIZE[0] - report.MARGIN, 900)
+
+    score_bar_x, score_bar_w = report._score_bar_geometry(box)
+    flow_label_x, flow_value_x, flow_bar_x, flow_bar_w = report._flow_component_geometry(box)
+
+    assert score_bar_x >= box[0] + 420
+    assert score_bar_w >= 500
+    assert flow_value_x - flow_label_x >= 240
+    assert flow_bar_x - flow_value_x >= 150
+    assert flow_bar_w >= 550
+
+
 def test_report_renderer_writes_a_real_pdf(tmp_path):
     inputs = report.ReportInputs(
         generated_at=datetime(2026, 5, 25, tzinfo=timezone.utc),

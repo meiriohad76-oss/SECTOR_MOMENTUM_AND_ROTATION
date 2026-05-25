@@ -141,11 +141,22 @@ class ReportInputs:
 
 
 def _font(size: int, *, bold: bool = False):
-    names = (
+    names = [
         "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf",
+        "arialbd.ttf" if bold else "arial.ttf",
         "Arial Bold.ttf" if bold else "Arial.ttf",
-    )
-    for name in names:
+        "segoeuib.ttf" if bold else "segoeui.ttf",
+        "LiberationSans-Bold.ttf" if bold else "LiberationSans-Regular.ttf",
+    ]
+    search_dirs = [
+        Path("C:/Windows/Fonts"),
+        Path("/usr/share/fonts/truetype/dejavu"),
+        Path("/usr/share/fonts/truetype/liberation2"),
+        Path("/usr/share/fonts/truetype/msttcorefonts"),
+    ]
+    candidates = [path / name for path in search_dirs for name in names]
+    candidates.extend(Path(name) for name in names)
+    for name in candidates:
         try:
             return ImageFont.truetype(name, size)
         except OSError:
@@ -154,16 +165,21 @@ def _font(size: int, *, bold: bool = False):
 
 
 FONTS = {
-    "title": _font(50, bold=True),
-    "h1": _font(34, bold=True),
-    "h2": _font(25, bold=True),
-    "body": _font(23),
-    "small": _font(18),
-    "small_bold": _font(18, bold=True),
-    "tiny": _font(15),
-    "tiny_bold": _font(15, bold=True),
-    "mono": _font(20),
+    "title": _font(54, bold=True),
+    "h1": _font(38, bold=True),
+    "h2": _font(30, bold=True),
+    "body": _font(28),
+    "small": _font(23),
+    "small_bold": _font(23, bold=True),
+    "tiny": _font(21),
+    "tiny_bold": _font(21, bold=True),
+    "mono": _font(23),
 }
+
+SIGNAL_ROWS_PER_PAGE = 3
+CALCULATION_ROWS_PER_PAGE = 4
+SCORE_ROWS_PER_PAGE = 4
+FLOW_ROWS_PER_PAGE = 5
 
 
 def _fmt_number(value: float | None, digits: int = 2, signed: bool = False) -> str:
@@ -723,25 +739,26 @@ def _draw_signal_table(
 ) -> None:
     _panel(draw, box, title)
     x0, y0, x1, _ = box
-    y = y0 + 72
-    columns = [x0 + 22, x0 + 174, x0 + 360, x0 + 566, x0 + 722, x0 + 930]
-    headers = ["Pillar", "Measure", "Formula/input", "XLE value", "Threshold", "Read"]
-    for x, header in zip(columns, headers):
-        draw.text((x, y), header, font=FONTS["tiny_bold"], fill=MUTED)
-    y += 30
-    row_h = 102
+    y = y0 + 78
+    row_h = 376
     for idx, row in enumerate(rows):
-        fill = "#FDFEFE" if idx % 2 == 0 else "#F3F8F6"
-        draw.rectangle((x0 + 14, y - 6, x1 - 14, y + row_h - 8), fill=fill)
-        draw.text((columns[0], y), row.pillar, font=FONTS["tiny_bold"], fill=INK)
-        _draw_wrapped(draw, row.measure, (columns[1], y), font=FONTS["tiny"], width=165, fill=INK, line_gap=3)
-        _draw_wrapped(draw, row.formula, (columns[2], y), font=FONTS["tiny"], width=190, fill=MUTED, line_gap=3)
-        draw.text((columns[3], y), row.xle_value, font=FONTS["tiny_bold"], fill=BLUE)
-        _draw_wrapped(draw, row.threshold, (columns[4], y), font=FONTS["tiny"], width=190, fill=MUTED, line_gap=3)
         color = GREEN if row.status == "Bullish" else RED if row.status == "Bearish" else AMBER
-        draw.text((columns[5], y), row.status, font=FONTS["tiny_bold"], fill=color)
-        _draw_wrapped(draw, row.interpretation, (columns[5], y + 22), font=FONTS["tiny"], width=170, fill=INK, line_gap=3)
-        draw.text((columns[5], y + 76), row.horizon, font=FONTS["tiny"], fill=MUTED)
+        fill = "#FDFEFE" if idx % 2 == 0 else "#F3F8F6"
+        card = (x0 + 18, y, x1 - 18, y + row_h - 22)
+        draw.rounded_rectangle(card, radius=12, fill=fill, outline="#E0E7E4", width=1)
+        draw.text((card[0] + 20, y + 16), row.pillar.upper(), font=FONTS["small_bold"], fill=MUTED)
+        draw.text((card[0] + 20, y + 52), row.measure, font=FONTS["h2"], fill=INK)
+        draw.rounded_rectangle((card[2] - 176, y + 22, card[2] - 28, y + 62), radius=20, fill=color)
+        draw.text((card[2] - 154, y + 31), row.status, font=FONTS["tiny_bold"], fill="#FFFFFF")
+        draw.text((card[0] + 20, y + 106), "XLE value", font=FONTS["tiny_bold"], fill=MUTED)
+        _draw_wrapped(draw, row.xle_value, (card[0] + 20, y + 138), font=FONTS["h2"], width=250, fill=BLUE, line_gap=5)
+        draw.text((card[0] + 320, y + 106), "Formula/input", font=FONTS["tiny_bold"], fill=MUTED)
+        _draw_wrapped(draw, row.formula, (card[0] + 320, y + 138), font=FONTS["small"], width=330, fill=INK, line_gap=5)
+        draw.text((card[0] + 700, y + 106), "Meaningful threshold", font=FONTS["tiny_bold"], fill=MUTED)
+        _draw_wrapped(draw, row.threshold, (card[0] + 700, y + 138), font=FONTS["small"], width=330, fill=INK, line_gap=5)
+        draw.text((card[0] + 20, y + 238), "Interpretation", font=FONTS["tiny_bold"], fill=MUTED)
+        _draw_wrapped(draw, row.interpretation, (card[0] + 190, y + 238), font=FONTS["small"], width=660, fill=INK, line_gap=5)
+        draw.text((card[2] - 248, y + 308), f"Horizon: {row.horizon}", font=FONTS["small_bold"], fill=PURPLE)
         y += row_h
 
 
@@ -753,24 +770,23 @@ def _draw_calculation_table(
 ) -> None:
     _panel(draw, box, title)
     x0, y0, x1, _ = box
-    y = y0 + 76
-    columns = [x0 + 22, x0 + 206, x0 + 498, x0 + 650, x0 + 776]
-    headers = ["Gate", "Formula", "Current", "Threshold", "Why it matters"]
-    for x, header in zip(columns, headers):
-        draw.text((x, y), header, font=FONTS["tiny_bold"], fill=MUTED)
-    y += 32
-    row_h = 96
+    y = y0 + 80
+    row_h = 226
     for idx, row in enumerate(rows):
         fill = "#FDFEFE" if idx % 2 == 0 else "#F3F8F6"
-        draw.rectangle((x0 + 14, y - 6, x1 - 14, y + row_h - 8), fill=fill)
+        card = (x0 + 18, y, x1 - 18, y + row_h - 20)
+        draw.rounded_rectangle(card, radius=12, fill=fill, outline="#E0E7E4", width=1)
         mark_color = GREEN if row.passed else RED
-        draw.ellipse((columns[0], y + 4, columns[0] + 24, y + 28), fill=mark_color)
-        draw.text((columns[0] + 7, y + 5), "Y" if row.passed else "N", font=FONTS["tiny_bold"], fill="#FFFFFF")
-        _draw_wrapped(draw, row.label, (columns[0] + 34, y), font=FONTS["tiny_bold"], width=142, fill=INK, line_gap=3)
-        _draw_wrapped(draw, row.formula, (columns[1], y), font=FONTS["tiny"], width=270, fill=MUTED, line_gap=3)
-        draw.text((columns[2], y), row.current_value, font=FONTS["tiny_bold"], fill=BLUE)
-        _draw_wrapped(draw, row.threshold, (columns[3], y), font=FONTS["tiny"], width=112, fill=MUTED, line_gap=3)
-        _draw_wrapped(draw, row.explanation, (columns[4], y), font=FONTS["tiny"], width=292, fill=INK, line_gap=3)
+        draw.ellipse((card[0] + 18, y + 20, card[0] + 56, y + 58), fill=mark_color)
+        draw.text((card[0] + 30, y + 27), "Y" if row.passed else "N", font=FONTS["small_bold"], fill="#FFFFFF")
+        draw.text((card[0] + 78, y + 18), row.label, font=FONTS["h2"], fill=INK)
+        draw.text((card[2] - 210, y + 22), row.current_value, font=FONTS["h2"], fill=BLUE)
+        draw.text((card[0] + 24, y + 82), "Formula", font=FONTS["tiny_bold"], fill=MUTED)
+        _draw_wrapped(draw, row.formula, (card[0] + 24, y + 114), font=FONTS["small"], width=430, fill=INK, line_gap=5)
+        draw.text((card[0] + 494, y + 82), "Threshold", font=FONTS["tiny_bold"], fill=MUTED)
+        _draw_wrapped(draw, row.threshold, (card[0] + 494, y + 114), font=FONTS["small"], width=220, fill=INK, line_gap=5)
+        draw.text((card[0] + 760, y + 82), "Why it matters", font=FONTS["tiny_bold"], fill=MUTED)
+        _draw_wrapped(draw, row.explanation, (card[0] + 760, y + 114), font=FONTS["small"], width=290, fill=INK, line_gap=5)
         y += row_h
 
 
@@ -778,34 +794,42 @@ def _draw_score_contributions(
     draw: ImageDraw.ImageDraw,
     rows: list[ScoreContributionRow],
     box: tuple[int, int, int, int],
+    title: str = "Composite S_score math",
 ) -> None:
-    _panel(draw, box, "Composite S_score math")
+    _panel(draw, box, title)
     x0, y0, x1, _ = box
     total = sum(row.contribution for row in rows)
-    draw.text((x0 + 24, y0 + 58), f"Sum of weighted contributions: {_fmt_number(total, 3, signed=True)}", font=FONTS["body"], fill=INK)
-    y = y0 + 112
-    bar_x = x0 + 300
-    bar_w = x1 - bar_x - 48
+    draw.text((x0 + 24, y0 + 62), f"Visible contribution subtotal: {_fmt_number(total, 3, signed=True)}", font=FONTS["body"], fill=INK)
+    y = y0 + 126
+    bar_x, bar_w = _score_bar_geometry(box)
     scale = max(0.25, max(abs(row.contribution) for row in rows))
     for row in rows:
         draw.text((x0 + 24, y), row.component, font=FONTS["small_bold"], fill=INK)
-        draw.text((x0 + 24, y + 26), f"raw {row.raw_value} | z {_fmt_number(row.z_value, 2, signed=True)} | weight {row.weight:.2f}", font=FONTS["tiny"], fill=MUTED)
+        draw.text((x0 + 24, y + 34), f"raw {row.raw_value} | z {_fmt_number(row.z_value, 2, signed=True)} | weight {row.weight:.2f}", font=FONTS["small"], fill=MUTED)
         zero_x = bar_x + bar_w // 2
-        draw.line((zero_x, y - 4, zero_x, y + 42), fill=LINE, width=2)
-        draw.rounded_rectangle((bar_x, y + 7, bar_x + bar_w, y + 31), radius=12, fill="#E7ECEA")
+        draw.line((zero_x, y - 4, zero_x, y + 54), fill=LINE, width=2)
+        draw.rounded_rectangle((bar_x, y + 12, bar_x + bar_w, y + 42), radius=15, fill="#E7ECEA")
         width = int(abs(row.contribution) / scale * (bar_w // 2 - 8))
         color = GREEN if row.contribution >= 0 else RED
         if row.contribution >= 0:
-            draw.rounded_rectangle((zero_x, y + 7, zero_x + width, y + 31), radius=12, fill=color)
+            draw.rounded_rectangle((zero_x, y + 12, zero_x + width, y + 42), radius=15, fill=color)
         else:
-            draw.rounded_rectangle((zero_x - width, y + 7, zero_x, y + 31), radius=12, fill=color)
-        draw.text((x1 - 136, y + 5), _fmt_number(row.contribution, 3, signed=True), font=FONTS["small_bold"], fill=color)
-        y += 76
+            draw.rounded_rectangle((zero_x - width, y + 12, zero_x, y + 42), radius=15, fill=color)
+        label_box = (x1 - 166, y + 4, x1 - 46, y + 48)
+        draw.rounded_rectangle(label_box, radius=12, fill="#FFFFFF", outline="#D7E1DD")
+        draw.text((label_box[0] + 12, y + 8), _fmt_number(row.contribution, 3, signed=True), font=FONTS["small_bold"], fill=color)
+        _draw_wrapped(draw, row.explanation, (x0 + 24, y + 72), font=FONTS["small"], width=PAGE_SIZE[0] - 2 * MARGIN - 70, fill=MUTED, line_gap=5)
+        y += 156
 
 
-def _draw_flow_components(draw: ImageDraw.ImageDraw, snapshot: XleSnapshot, box: tuple[int, int, int, int]) -> None:
-    _panel(draw, box, "Institutional-flow component detail")
-    rows = [
+def _score_bar_geometry(box: tuple[int, int, int, int]) -> tuple[int, int]:
+    x0, _, x1, _ = box
+    bar_x = x0 + 500
+    return bar_x, x1 - bar_x - 48
+
+
+def _flow_component_rows(snapshot: XleSnapshot) -> list[tuple[str, str, str, float | None, float, float]]:
+    return [
         ("CMF21", _fmt_number(snapshot.cmf21, 3, signed=True), "accumulation if > +0.05", snapshot.cmf21, -0.25, 0.25),
         ("OBV slope", _fmt_number(snapshot.obv_slope, 4, signed=True), "positive supports accumulation", snapshot.obv_slope, -0.05, 0.05),
         ("MFI14", _fmt_number(snapshot.mfi14, 1), "50-80 constructive; > 80 can be stretched", snapshot.mfi14, 0, 100),
@@ -816,26 +840,46 @@ def _draw_flow_components(draw: ImageDraw.ImageDraw, snapshot: XleSnapshot, box:
         ("Short interest delta", _fmt_pct_points(snapshot.si_delta_15d, 1, signed=True), "falling short interest is better", snapshot.si_delta_15d, -10, 10),
         ("13F net buys", _fmt_pct_points(snapshot.thirteen_f_q, 1, signed=True), "quarterly institutional ownership proxy", snapshot.thirteen_f_q, -10, 10),
     ]
+
+
+def _draw_flow_components(
+    draw: ImageDraw.ImageDraw,
+    rows: list[tuple[str, str, str, float | None, float, float]],
+    box: tuple[int, int, int, int],
+    title: str = "Institutional-flow component detail",
+) -> None:
+    _panel(draw, box, title)
     x0, y0, x1, _ = box
-    y = y0 + 78
-    bar_x = x0 + 320
-    bar_w = x1 - bar_x - 42
+    y = y0 + 84
+    label_x, value_x, bar_x, bar_w = _flow_component_geometry(box)
     for idx, (label, value, meaning, raw, lo, hi) in enumerate(rows):
         fill = "#FDFEFE" if idx % 2 == 0 else "#F3F8F6"
-        draw.rectangle((x0 + 18, y - 5, x1 - 18, y + 54), fill=fill)
-        draw.text((x0 + 30, y), label, font=FONTS["tiny_bold"], fill=INK)
-        draw.text((x0 + 178, y), value, font=FONTS["tiny_bold"], fill=BLUE)
-        _draw_wrapped(draw, meaning, (x0 + 30, y + 24), font=FONTS["tiny"], width=250, fill=MUTED, line_gap=2)
-        draw.rounded_rectangle((bar_x, y + 12, bar_x + bar_w, y + 34), radius=11, fill="#E7ECEA")
+        draw.rounded_rectangle((x0 + 18, y - 8, x1 - 18, y + 94), radius=12, fill=fill, outline="#E0E7E4")
+        draw.text((label_x, y), label, font=FONTS["small_bold"], fill=INK)
+        draw.text((value_x, y), value, font=FONTS["small_bold"], fill=BLUE)
+        _draw_wrapped(draw, meaning, (label_x, y + 38), font=FONTS["small"], width=330, fill=MUTED, line_gap=5)
+        draw.rounded_rectangle((bar_x, y + 28, bar_x + bar_w, y + 60), radius=16, fill="#E7ECEA")
         zero_x = bar_x + int((0 - lo) / (hi - lo) * bar_w) if lo < 0 < hi else bar_x
-        draw.line((zero_x, y + 6, zero_x, y + 40), fill=LINE, width=2)
+        draw.line((zero_x, y + 20, zero_x, y + 68), fill=LINE, width=2)
         if raw is not None and not pd.isna(raw):
             clamped = max(lo, min(hi, float(raw)))
             value_x = bar_x + int((clamped - lo) / (hi - lo) * bar_w)
             color = GREEN if value_x >= zero_x else RED
-            draw.rounded_rectangle((min(zero_x, value_x), y + 12, max(zero_x, value_x), y + 34), radius=11, fill=color)
-            draw.ellipse((value_x - 8, y + 8, value_x + 8, y + 38), fill=color)
-        y += 66
+            draw.rounded_rectangle((min(zero_x, value_x), y + 28, max(zero_x, value_x), y + 60), radius=16, fill=color)
+            draw.ellipse((value_x - 10, y + 23, value_x + 10, y + 65), fill=color)
+        y += 120
+
+
+def _flow_component_geometry(box: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+    x0, _, x1, _ = box
+    label_x = x0 + 34
+    value_x = x0 + 300
+    bar_x = x0 + 460
+    return label_x, value_x, bar_x, x1 - bar_x - 42
+
+
+def _chunks(items: list, size: int) -> list[list]:
+    return [items[index:index + size] for index in range(0, len(items), size)]
 
 
 def _page_overview(inputs: ReportInputs) -> Image.Image:
@@ -922,26 +966,24 @@ def _page_pillars(inputs: ReportInputs) -> Image.Image:
     return page
 
 
-def _page_signal_deep_dive(inputs: ReportInputs, page_no: int) -> Image.Image:
+def _signal_deep_dive_pages(inputs: ReportInputs) -> list[Image.Image]:
     rows = build_signal_detail_rows(inputs.xle)
-    if page_no == 1:
-        selected = rows[:6]
-        title = "Signal Deep Dive 1"
-        subtitle = "Raw inputs, formulas, XLE values, and expected horizons"
-    else:
-        selected = rows[6:]
-        title = "Signal Deep Dive 2"
-        subtitle = "Flow, risk checks, and macro context"
-    page, draw = _new_page(title, subtitle)
-    _draw_signal_table(draw, selected, (MARGIN, 166, PAGE_SIZE[0] - MARGIN, 1060), "Detailed signal rows")
-    _panel(draw, (MARGIN, 1104, PAGE_SIZE[0] - MARGIN, 1406), "How to read this table")
-    text = (
-        "Formula/input explains the mechanical calculation. XLE value is the current cached value used by the dashboard. "
-        "Threshold is the line that usually changes the interpretation. Horizon is the rough time window where the signal is most useful. "
-        "A bullish row is useful only when it agrees with the other pillars; one strong row alone is not enough."
-    )
-    _draw_wrapped(draw, text, (MARGIN + 28, 1172), font=FONTS["body"], width=PAGE_SIZE[0] - 2 * MARGIN - 56, fill=INK)
-    return page
+    pages: list[Image.Image] = []
+    for idx, selected in enumerate(_chunks(rows, SIGNAL_ROWS_PER_PAGE), start=1):
+        page, draw = _new_page(
+            f"Signal Deep Dive {idx}",
+            "Large-type signal cards with formulas, XLE values, thresholds, and horizons",
+        )
+        _draw_signal_table(draw, selected, (MARGIN, 166, PAGE_SIZE[0] - MARGIN, 1388), "Detailed signal cards")
+        if idx == 1:
+            _panel(draw, (MARGIN, 1424, PAGE_SIZE[0] - MARGIN, 1606), "How to read these cards")
+            text = (
+                "XLE value is the current cached value used by the dashboard. The threshold is the line that usually changes the interpretation. "
+                "A bullish row matters most when it agrees with the rest of the methodology."
+            )
+            _draw_wrapped(draw, text, (MARGIN + 28, 1490), font=FONTS["small"], width=PAGE_SIZE[0] - 2 * MARGIN - 56, fill=INK)
+        pages.append(page)
+    return pages
 
 
 def _page_xle(inputs: ReportInputs) -> Image.Image:
@@ -974,63 +1016,90 @@ def _page_xle(inputs: ReportInputs) -> Image.Image:
     return page
 
 
-def _page_xle_calculations(inputs: ReportInputs) -> Image.Image:
-    page, draw = _new_page("XLE Calculation Trail", "The exact gates behind the Bullish Stage 2 label")
-    _draw_calculation_table(
-        draw,
-        build_xle_calculation_rows(inputs.xle),
-        (MARGIN, 166, PAGE_SIZE[0] - MARGIN, 1280),
-        "Stage 2 and selection calculation",
-    )
-    _panel(draw, (MARGIN, 1324, PAGE_SIZE[0] - MARGIN, 1504), "Bottom line")
-    text = (
-        "XLE receives the Bullish Stage 2 label because the trend, relative strength, rotation, breadth, and money-flow gates pass together. "
-        "If any of the strict bullish gates fails later, the label can step down to Hold, Warning, Exit, or Bearish Stage 4."
-    )
-    _draw_wrapped(draw, text, (MARGIN + 28, 1390), font=FONTS["body"], width=PAGE_SIZE[0] - 2 * MARGIN - 56, fill=INK)
-    return page
+def _xle_calculation_pages(inputs: ReportInputs) -> list[Image.Image]:
+    rows = build_xle_calculation_rows(inputs.xle)
+    pages: list[Image.Image] = []
+    for idx, selected in enumerate(_chunks(rows, CALCULATION_ROWS_PER_PAGE), start=1):
+        page, draw = _new_page("XLE Calculation Trail", f"Gate details {idx}: readable step-by-step calculations")
+        _draw_calculation_table(
+            draw,
+            selected,
+            (MARGIN, 166, PAGE_SIZE[0] - MARGIN, 1328),
+            "Stage 2 and selection calculation",
+        )
+        if idx == len(_chunks(rows, CALCULATION_ROWS_PER_PAGE)):
+            _panel(draw, (MARGIN, 1370, PAGE_SIZE[0] - MARGIN, 1568), "Bottom line")
+            text = (
+                "XLE receives the Bullish Stage 2 label because the trend, relative strength, rotation, breadth, and money-flow gates pass together. "
+                "If any strict bullish gate fails later, the label can step down to Hold, Warning, Exit, or Bearish Stage 4."
+            )
+            _draw_wrapped(draw, text, (MARGIN + 28, 1438), font=FONTS["small"], width=PAGE_SIZE[0] - 2 * MARGIN - 56, fill=INK)
+        pages.append(page)
+    return pages
 
 
-def _page_score_math(inputs: ReportInputs) -> Image.Image:
-    page, draw = _new_page("XLE Score Math", "How the weighted methodology score is assembled")
-    _draw_score_contributions(draw, build_score_contribution_rows(inputs.xle), (MARGIN, 166, PAGE_SIZE[0] - MARGIN, 820))
-    _panel(draw, (MARGIN, 862, PAGE_SIZE[0] - MARGIN, 1220), "Interpreting the S_score")
+def _score_math_pages(inputs: ReportInputs) -> list[Image.Image]:
+    rows = build_score_contribution_rows(inputs.xle)
+    pages: list[Image.Image] = []
+    for idx, selected in enumerate(_chunks(rows, SCORE_ROWS_PER_PAGE), start=1):
+        page, draw = _new_page("XLE Score Math", f"Weighted methodology contribution bars {idx}")
+        _draw_score_contributions(
+            draw,
+            selected,
+            (MARGIN, 166, PAGE_SIZE[0] - MARGIN, 880),
+            "Composite S_score math",
+        )
+        pages.append(page)
+    page, draw = _new_page("Reading The S_score", "What the composite number does and does not mean")
+    _panel(draw, (MARGIN, 166, PAGE_SIZE[0] - MARGIN, 562), "Interpreting the S_score")
     rows = [
         ("S_score > 0", "Composite evidence is better than the peer-group average."),
         ("S_score >= +1.0", "A strong reading: multiple pillars agree at the same time."),
         ("F_score < -0.5", "Hard flow veto: the asset loses ranking eligibility even if price looks good."),
         ("Rank <= class target", "The asset is selected only if it ranks inside the class allocation target."),
     ]
-    y = 932
+    y = 244
     for label, meaning in rows:
         draw.text((MARGIN + 34, y), label, font=FONTS["small_bold"], fill=BLUE)
         _draw_wrapped(draw, meaning, (MARGIN + 330, y), font=FONTS["small"], width=650, fill=INK)
-        y += 62
-    _panel(draw, (MARGIN, 1260, PAGE_SIZE[0] - MARGIN, 1460), "Important nuance")
+        y += 74
+    _panel(draw, (MARGIN, 620, PAGE_SIZE[0] - MARGIN, 850), "Important nuance")
     nuance = (
         "The score math ranks XLE against peers in its asset class. A high score is not a price target. "
         "It means XLE's current evidence stack is stronger than most comparable instruments in the same dashboard universe."
     )
-    _draw_wrapped(draw, nuance, (MARGIN + 28, 1328), font=FONTS["body"], width=PAGE_SIZE[0] - 2 * MARGIN - 56, fill=MUTED)
-    return page
+    _draw_wrapped(draw, nuance, (MARGIN + 28, 692), font=FONTS["body"], width=PAGE_SIZE[0] - 2 * MARGIN - 56, fill=MUTED)
+    pages.append(page)
+    return pages
 
 
-def _page_flow_detail(inputs: ReportInputs) -> Image.Image:
-    page, draw = _new_page("XLE Flow Detail", "Shorter-horizon money-flow evidence behind the label")
-    _draw_flow_components(draw, inputs.xle, (MARGIN, 166, PAGE_SIZE[0] - MARGIN, 842))
-    _panel(draw, (MARGIN, 886, PAGE_SIZE[0] - MARGIN, 1190), "Flow interpretation")
+def _flow_detail_pages(inputs: ReportInputs) -> list[Image.Image]:
+    rows = _flow_component_rows(inputs.xle)
+    pages: list[Image.Image] = []
+    for idx, selected in enumerate(_chunks(rows, FLOW_ROWS_PER_PAGE), start=1):
+        page, draw = _new_page("XLE Flow Detail", f"Shorter-horizon money-flow evidence {idx}")
+        _draw_flow_components(
+            draw,
+            selected,
+            (MARGIN, 166, PAGE_SIZE[0] - MARGIN, 840),
+            "Institutional-flow component detail",
+        )
+        pages.append(page)
+    page, draw = _new_page("Flow Interpretation", "How the fast money-flow layer can confirm or weaken Stage 2")
+    _panel(draw, (MARGIN, 166, PAGE_SIZE[0] - MARGIN, 510), "Flow interpretation")
     text = (
         "Flow is the dashboard's faster confirmation layer. It usually matters over one to three weeks, while the Stage 2 trend label can last longer. "
         "The current XLE flow stack is supportive because CMF21 is positive, the hard flow veto is not active, and the composite F_score is above zero."
     )
-    _draw_wrapped(draw, text, (MARGIN + 28, 954), font=FONTS["body"], width=PAGE_SIZE[0] - 2 * MARGIN - 56, fill=INK)
-    _panel(draw, (MARGIN, 1234, PAGE_SIZE[0] - MARGIN, 1482), "What can invalidate the flow confirmation")
+    _draw_wrapped(draw, text, (MARGIN + 28, 238), font=FONTS["body"], width=PAGE_SIZE[0] - 2 * MARGIN - 56, fill=INK)
+    _panel(draw, (MARGIN, 568, PAGE_SIZE[0] - MARGIN, 890), "What can invalidate the flow confirmation")
     invalidation = (
         "Watch for CMF21 falling below zero, ETF flow turning meaningfully negative, a block-up ratio below 0.7, rising distribution days, or a provider-flow z-score below -0.5. "
         "Those conditions can move a strong trend from Bullish to Warning or Exit."
     )
-    _draw_wrapped(draw, invalidation, (MARGIN + 28, 1302), font=FONTS["body"], width=PAGE_SIZE[0] - 2 * MARGIN - 56, fill=RED)
-    return page
+    _draw_wrapped(draw, invalidation, (MARGIN + 28, 640), font=FONTS["body"], width=PAGE_SIZE[0] - 2 * MARGIN - 56, fill=RED)
+    pages.append(page)
+    return pages
 
 
 def _page_charts(inputs: ReportInputs) -> Image.Image:
@@ -1051,19 +1120,22 @@ def _page_charts(inputs: ReportInputs) -> Image.Image:
     return page
 
 
-def render_pdf(inputs: ReportInputs, output_path: Path) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    pages = [
+def build_pdf_pages(inputs: ReportInputs) -> list[Image.Image]:
+    return [
         _page_overview(inputs),
         _page_pillars(inputs),
-        _page_signal_deep_dive(inputs, 1),
-        _page_signal_deep_dive(inputs, 2),
+        *_signal_deep_dive_pages(inputs),
         _page_xle(inputs),
-        _page_xle_calculations(inputs),
-        _page_score_math(inputs),
-        _page_flow_detail(inputs),
+        *_xle_calculation_pages(inputs),
+        *_score_math_pages(inputs),
+        *_flow_detail_pages(inputs),
         _page_charts(inputs),
     ]
+
+
+def render_pdf(inputs: ReportInputs, output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    pages = build_pdf_pages(inputs)
     pages[0].save(output_path, "PDF", resolution=150.0, save_all=True, append_images=pages[1:])
 
 
