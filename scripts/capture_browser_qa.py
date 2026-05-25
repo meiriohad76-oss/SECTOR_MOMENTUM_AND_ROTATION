@@ -284,7 +284,7 @@ def _run_playwright_capture(
                     for check in _wait_for_text_checks(page, target.checks, min(timeout_ms, 15_000)):
                         ok = False
                         notes.append(f"missing {check}")
-                    page.screenshot(path=str(screenshot_path), full_page=False)
+                    page.screenshot(path=str(screenshot_path), full_page=False, timeout=timeout_ms)
                     if not _image_nonblank(screenshot_path):
                         ok = False
                         notes.append("blank screenshot")

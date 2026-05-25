@@ -60,6 +60,7 @@ def test_browser_qa_script_writes_report_and_manifest():
     assert ".scroll_into_view_if_needed(" not in script
     assert "--settle-ms" in script
     assert "full_page=False" in script
+    assert "page.screenshot(path=str(screenshot_path), full_page=False, timeout=timeout_ms)" in script
     assert "Image.open(" in script
 
 

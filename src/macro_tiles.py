@@ -9,56 +9,80 @@ from .data import close_price
 
 
 MACRO_CONTEXT = (
-    {"label": "VIX", "symbol": "^VIX", "subtitle": "Volatility"},
-    {"label": "Gold", "symbol": "GLD", "subtitle": "Gold proxy"},
-    {"label": "Oil", "symbol": "USO", "subtitle": "Oil proxy"},
-    {"label": "USD", "symbol": "UUP", "subtitle": "Dollar proxy"},
+    {
+        "label": "VIX",
+        "symbol": "^VIX",
+        "subtitle": "Volatility stress proxy",
+        "tone": "higher_warn",
+        "tooltip": "Volatility proxy: VIX is an equity-volatility stress proxy. Rising VIX usually means risk appetite is worsening, which can weaken momentum picks.",
+    },
+    {
+        "label": "Gold proxy",
+        "symbol": "GLD",
+        "subtitle": "Defensive demand proxy",
+        "tone": "higher_warn",
+        "tooltip": "GLD is used as a liquid gold ETF proxy. Rising gold can indicate defensive demand or inflation concern; it is context, not a direct buy/sell rule.",
+    },
+    {
+        "label": "Oil proxy",
+        "symbol": "USO",
+        "subtitle": "USO ETF, not spot WTI",
+        "tone": "higher_warn",
+        "tooltip": "This value is the USO ETF adjusted close, not WTI spot crude. It is used only as an oil-market proxy for inflation and energy-risk context.",
+    },
+    {
+        "label": "USD proxy",
+        "symbol": "UUP",
+        "subtitle": "Dollar pressure proxy",
+        "tone": "higher_warn",
+        "tooltip": "UUP is a US dollar ETF proxy. A rising dollar can tighten global liquidity and pressure risk assets, so the dashboard treats sharp rises as a warning context.",
+    },
 )
 MACRO_CONTEXT_SYMBOLS = tuple(item["symbol"] for item in MACRO_CONTEXT)
 FRED_CONTEXT_GROUPS = (
     {
         "group": "Rates",
         "series": (
-            {"id": "DGS10", "label": "10Y yield", "unit": "percent", "tone": "higher_warn"},
-            {"id": "T10Y2Y", "label": "2s10s", "unit": "percent", "tone": "higher_up"},
+            {"id": "DGS10", "label": "10Y yield", "unit": "percent", "tone": "higher_warn", "tooltip": "10-year Treasury yield. Rising yields can raise the discount rate for equities and may pressure long-duration momentum leaders."},
+            {"id": "T10Y2Y", "label": "2s10s", "unit": "percent", "tone": "higher_up", "tooltip": "10-year minus 2-year Treasury yield curve. A steeper positive curve is usually healthier for growth expectations than an inversion."},
         ),
     },
     {
         "group": "Inflation",
         "series": (
-            {"id": "CPIAUCSL", "label": "CPI", "unit": "index", "tone": "higher_warn", "yoy": True},
-            {"id": "PCEPILFE", "label": "Core PCE", "unit": "index", "tone": "higher_warn", "yoy": True},
-            {"id": "T10YIE", "label": "10Y breakeven", "unit": "percent", "tone": "higher_warn"},
+            {"id": "CPIAUCSL", "label": "CPI", "unit": "index", "tone": "higher_warn", "yoy": True, "tooltip": "Consumer Price Index. Higher year-over-year inflation can pressure valuations and increase the risk of tighter policy."},
+            {"id": "PCEPILFE", "label": "Core PCE", "unit": "index", "tone": "higher_warn", "yoy": True, "tooltip": "Core PCE inflation. This is a key Federal Reserve inflation gauge; rising pressure can be negative for risk assets."},
+            {"id": "T10YIE", "label": "10Y breakeven", "unit": "percent", "tone": "higher_warn", "tooltip": "Market-implied 10-year inflation expectations. Rising breakevens can point to inflation pressure and affect sector leadership."},
         ),
     },
     {
         "group": "Liquidity",
         "series": (
-            {"id": "WALCL", "label": "Fed assets", "unit": "millions_usd", "tone": "higher_up"},
-            {"id": "M2SL", "label": "M2", "unit": "billions_usd", "tone": "higher_up", "yoy": True},
+            {"id": "WALCL", "label": "Fed assets", "unit": "millions_usd", "tone": "higher_up", "tooltip": "Federal Reserve balance sheet assets. More liquidity can support risk appetite; shrinking liquidity can be a headwind."},
+            {"id": "M2SL", "label": "M2", "unit": "billions_usd", "tone": "higher_up", "yoy": True, "tooltip": "M2 is broad money supply: cash, checking deposits, savings deposits, and similar liquid money. Rising M2 can support liquidity conditions."},
         ),
     },
     {
         "group": "Growth",
         "series": (
-            {"id": "CFNAI", "label": "CFNAI", "unit": "number", "tone": "higher_up"},
-            {"id": "ICSA", "label": "Claims", "unit": "number", "tone": "higher_warn"},
-            {"id": "UMCSENT", "label": "Sentiment", "unit": "number", "tone": "higher_up"},
+            {"id": "CFNAI", "label": "CFNAI", "unit": "number", "tone": "higher_up", "tooltip": "Chicago Fed National Activity Index. Higher readings indicate stronger economic activity, which can support cyclical momentum."},
+            {"id": "ICSA", "label": "Claims", "unit": "number", "tone": "higher_warn", "tooltip": "Initial jobless claims. Rising claims can signal labor-market deterioration and slower growth."},
+            {"id": "UMCSENT", "label": "Sentiment", "unit": "number", "tone": "higher_up", "tooltip": "University of Michigan consumer sentiment. Improving sentiment can support risk appetite and consumer-linked sectors."},
         ),
     },
     {
         "group": "Credit",
         "series": (
-            {"id": "BAMLH0A0HYM2", "label": "HY OAS", "unit": "percent", "tone": "higher_warn"},
-            {"id": "BAMLC0A0CM", "label": "Corp OAS", "unit": "percent", "tone": "higher_warn"},
-            {"id": "STLFSI4", "label": "Stress", "unit": "number", "tone": "higher_warn"},
+            {"id": "BAMLH0A0HYM2", "label": "HY OAS", "unit": "percent", "tone": "higher_warn", "tooltip": "High-yield option-adjusted spread. Wider spreads indicate more credit stress and can be negative for risk assets."},
+            {"id": "BAMLC0A0CM", "label": "Corp OAS", "unit": "percent", "tone": "higher_warn", "tooltip": "Investment-grade corporate option-adjusted spread. Wider spreads indicate tighter credit conditions."},
+            {"id": "STLFSI4", "label": "Stress", "unit": "number", "tone": "higher_warn", "tooltip": "St. Louis Fed Financial Stress Index. Higher stress is usually negative for broad market momentum."},
         ),
     },
     {
         "group": "Commodities",
         "series": (
-            {"id": "DCOILWTICO", "label": "WTI", "unit": "number", "tone": "higher_warn"},
-            {"id": "DHHNGSP", "label": "Nat gas", "unit": "number", "tone": "higher_warn"},
+            {"id": "DCOILWTICO", "label": "WTI", "unit": "number", "tone": "higher_warn", "tooltip": "WTI crude oil spot price from FRED. Rising oil can raise inflation pressure and affect sector rotation."},
+            {"id": "DHHNGSP", "label": "Nat gas", "unit": "number", "tone": "higher_warn", "tooltip": "Henry Hub natural gas spot price. Rising energy input costs can affect inflation and sector margins."},
         ),
     },
 )
@@ -97,6 +121,52 @@ def _delta_tone(delta: float | None, mode: str) -> str:
     return "down" if higher_is_good else "up"
 
 
+def _sentiment_label(tone: str) -> str:
+    if tone == "up":
+        return "positive"
+    if tone in {"warn", "down"}:
+        return "negative"
+    if tone == "flat":
+        return "neutral"
+    return "unavailable"
+
+
+def _trend_symbol(sentiment: str) -> str:
+    return {
+        "positive": "+",
+        "negative": "!",
+        "neutral": "=",
+        "unavailable": "?",
+    }.get(sentiment, "?")
+
+
+def _trend_label(delta: float | None, mode: str) -> str:
+    if delta is None:
+        return "data pending"
+    if math.isclose(delta, 0.0, abs_tol=0.0001):
+        return "flat"
+    higher_is_good = mode == "higher_up"
+    if delta > 0:
+        return "improving" if higher_is_good else "worsening"
+    return "worsening" if higher_is_good else "improving"
+
+
+def _gauge_pct(delta: float | None, scale: float) -> int:
+    if delta is None or math.isclose(delta, 0.0, abs_tol=0.0001):
+        return 50
+    return int(round(min(100.0, 50.0 + abs(delta) * scale)))
+
+
+def _decorate_row(row: dict[str, object], delta: float | None, mode: str, gauge_scale: float) -> dict[str, object]:
+    tone = str(row.get("tone", "warn"))
+    sentiment = _sentiment_label(tone)
+    row["sentiment_label"] = sentiment
+    row["trend_label"] = _trend_label(delta, mode)
+    row["trend_symbol"] = _trend_symbol(sentiment)
+    row["gauge_pct"] = _gauge_pct(delta, gauge_scale)
+    return row
+
+
 def _fred_series_stats(series: pd.Series | None) -> dict[str, float | str] | None:
     if series is None:
         return None
@@ -121,7 +191,7 @@ def _fred_series_stats(series: pd.Series | None) -> dict[str, float | str] | Non
 
 
 def _pending_fred_row(item: Mapping[str, str], group: str) -> dict[str, str]:
-    return {
+    row: dict[str, object] = {
         "group": group,
         "series_id": item["id"],
         "label": item["label"],
@@ -130,7 +200,13 @@ def _pending_fred_row(item: Mapping[str, str], group: str) -> dict[str, str]:
         "tone": "warn",
         "subtitle": item["id"],
         "latest_date": "",
+        "tooltip": item.get("tooltip", f"{item['label']} macro context from FRED."),
     }
+    row["sentiment_label"] = "unavailable"
+    row["trend_label"] = "data pending"
+    row["trend_symbol"] = "?"
+    row["gauge_pct"] = 50
+    return row
 
 
 def _fred_row(item: Mapping[str, str], group: str, series: pd.Series | None) -> dict[str, str]:
@@ -144,13 +220,19 @@ def _fred_row(item: Mapping[str, str], group: str, series: pd.Series | None) -> 
     if item.get("yoy") and isinstance(yoy_pct, float):
         change = f"{yoy_pct:+.1f}% YoY"
         tone = _delta_tone(yoy_pct, str(item.get("tone", "higher_up")))
+        trend_delta = yoy_pct
+        gauge_scale = 10.0
     elif isinstance(delta, float):
         suffix = " pp" if unit == "percent" else ""
         change = f"{delta:+.2f}{suffix}"
         tone = _delta_tone(delta, str(item.get("tone", "higher_up")))
+        trend_delta = delta
+        gauge_scale = 50.0 if unit == "percent" else 1.0
     else:
         tone = "flat"
-    return {
+        trend_delta = None
+        gauge_scale = 1.0
+    return _decorate_row({
         "group": group,
         "series_id": item["id"],
         "label": item["label"],
@@ -159,7 +241,8 @@ def _fred_row(item: Mapping[str, str], group: str, series: pd.Series | None) -> 
         "tone": tone,
         "subtitle": str(stats["latest_date"]),
         "latest_date": str(stats["latest_date"]),
-    }
+        "tooltip": item.get("tooltip", f"{item['label']} macro context from FRED."),
+    }, trend_delta, str(item.get("tone", "higher_up")), gauge_scale)
 
 
 def fred_macro_tile_groups(fred_data: Mapping[str, pd.Series]) -> list[dict[str, object]]:
@@ -205,30 +288,46 @@ def _tone(change_pct: float | None, label: str) -> str:
     return "up" if change_pct > 0 else "down"
 
 
+def _proxy_tone(change_pct: float | None, mode: str) -> str:
+    return _delta_tone(change_pct, mode)
+
+
 def _row_for(item: Mapping[str, str], frame: pd.DataFrame | None) -> dict[str, str]:
     if frame is None or frame.empty:
-        return {
+        row: dict[str, object] = {
             "label": item["label"],
             "symbol": item["symbol"],
             "value": "DATA PENDING",
             "change": "-",
             "tone": "warn",
             "subtitle": item["subtitle"],
+            "tooltip": item.get("tooltip", f"{item['label']} market proxy."),
         }
+        row["sentiment_label"] = "unavailable"
+        row["trend_label"] = "data pending"
+        row["trend_symbol"] = "?"
+        row["gauge_pct"] = 50
+        return row
 
     try:
         prices = close_price(frame).dropna()
     except Exception:
         prices = pd.Series(dtype=float)
     if len(prices) < 1:
-        return {
+        row = {
             "label": item["label"],
             "symbol": item["symbol"],
             "value": "DATA PENDING",
             "change": "-",
             "tone": "warn",
             "subtitle": item["subtitle"],
+            "tooltip": item.get("tooltip", f"{item['label']} market proxy."),
         }
+        row["sentiment_label"] = "unavailable"
+        row["trend_label"] = "data pending"
+        row["trend_symbol"] = "?"
+        row["gauge_pct"] = 50
+        return row
 
     last = float(prices.iloc[-1])
     change_pct = None
@@ -237,14 +336,16 @@ def _row_for(item: Mapping[str, str], frame: pd.DataFrame | None) -> dict[str, s
         if not math.isclose(prev, 0.0):
             change_pct = (last / prev - 1.0) * 100.0
 
-    return {
+    mode = str(item.get("tone", "higher_up"))
+    return _decorate_row({
         "label": item["label"],
         "symbol": item["symbol"],
         "value": _format_value(last),
         "change": f"{change_pct:+.1f}%" if change_pct is not None else "-",
-        "tone": _tone(change_pct, item["label"]),
+        "tone": _proxy_tone(change_pct, mode),
         "subtitle": item["subtitle"],
-    }
+        "tooltip": item.get("tooltip", f"{item['label']} market proxy."),
+    }, change_pct, mode, 4.0)
 
 
 def macro_tile_rows(ohlcv: Mapping[str, pd.DataFrame]) -> list[dict[str, str]]:
@@ -253,12 +354,17 @@ def macro_tile_rows(ohlcv: Mapping[str, pd.DataFrame]) -> list[dict[str, str]]:
 
 def session_range_tile(frame: pd.DataFrame | None, symbol: str) -> dict[str, str]:
     base = {
-        "label": "Session range",
+        "label": f"{symbol} range",
         "symbol": symbol,
         "value": "DATA PENDING",
         "change": "-",
         "tone": "warn",
         "subtitle": "latest bar",
+        "sentiment_label": "unavailable",
+        "trend_label": "data pending",
+        "trend_symbol": "?",
+        "gauge_pct": 50,
+        "tooltip": f"{symbol} latest high-low range. It shows where the latest close sits inside the session: near high suggests buying pressure; near low suggests selling pressure.",
     }
     if frame is None or frame.empty:
         return base
@@ -275,26 +381,40 @@ def session_range_tile(frame: pd.DataFrame | None, symbol: str) -> dict[str, str
         return base
 
     span = high - low
+    position = 0.5
     if math.isclose(span, 0.0):
         tone = "flat"
         subtitle = "flat range"
+        sentiment = "neutral"
+        trend = "balanced"
     else:
         position = (close - low) / span
         if position >= 0.75:
             tone = "up"
-            subtitle = "near high"
+            subtitle = "close near high"
+            sentiment = "positive"
+            trend = "buying pressure"
         elif position <= 0.25:
             tone = "down"
-            subtitle = "near low"
+            subtitle = "close near low"
+            sentiment = "negative"
+            trend = "selling pressure"
         else:
             tone = "flat"
-            subtitle = "mid range"
+            subtitle = "close mid range"
+            sentiment = "neutral"
+            trend = "balanced"
 
     return {
-        "label": "Session range",
+        "label": f"{symbol} range",
         "symbol": symbol,
         "value": _format_value(close),
         "change": f"H {_format_value(high)} / L {_format_value(low)}",
         "tone": tone,
         "subtitle": subtitle,
+        "sentiment_label": sentiment,
+        "trend_label": trend,
+        "trend_symbol": _trend_symbol(sentiment),
+        "gauge_pct": int(round(position * 100)) if not math.isclose(span, 0.0) else 50,
+        "tooltip": f"{symbol} latest high-low range. It shows where the latest close sits inside the session: near high suggests buying pressure; near low suggests selling pressure.",
     }

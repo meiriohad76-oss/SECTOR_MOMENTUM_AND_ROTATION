@@ -32,12 +32,18 @@ def test_macro_tile_rows_compute_last_value_and_percent_change():
         }
     )
 
-    assert [row["label"] for row in rows] == ["VIX", "Gold", "Oil", "USD"]
+    assert [row["label"] for row in rows] == ["VIX", "Gold proxy", "Oil proxy", "USD proxy"]
     assert rows[0]["value"] == "18.00"
     assert rows[0]["change"] == "+20.0%"
     assert rows[0]["tone"] == "warn"
+    assert rows[0]["sentiment_label"] == "negative"
+    assert rows[0]["trend_label"] == "worsening"
+    assert rows[0]["gauge_pct"] > 50
     assert rows[2]["change"] == "-2.0%"
-    assert rows[2]["tone"] == "down"
+    assert rows[2]["tone"] == "up"
+    assert rows[2]["subtitle"] == "USO ETF, not spot WTI"
+    assert "USO" in rows[2]["tooltip"]
+    assert "not WTI spot" in rows[2]["tooltip"]
     assert rows[3]["tone"] == "flat"
 
 
@@ -47,6 +53,9 @@ def test_macro_tile_rows_use_data_pending_for_missing_symbol():
     assert rows[0]["value"] == "DATA PENDING"
     assert rows[0]["change"] == "-"
     assert rows[0]["tone"] == "warn"
+    assert rows[0]["trend_label"] == "data pending"
+    assert rows[0]["sentiment_label"] == "unavailable"
+    assert "Volatility" in rows[0]["tooltip"]
 
 
 def test_session_range_tile_uses_latest_high_low_and_close():
@@ -57,12 +66,16 @@ def test_session_range_tile_uses_latest_high_low_and_close():
 
     row = session_range_tile(frame, symbol="SPY")
 
-    assert row["label"] == "Session range"
+    assert row["label"] == "SPY range"
     assert row["symbol"] == "SPY"
     assert row["value"] == "454.00"
     assert row["change"] == "H 455.00 / L 449.00"
     assert row["tone"] == "up"
-    assert row["subtitle"] == "near high"
+    assert row["subtitle"] == "close near high"
+    assert row["sentiment_label"] == "positive"
+    assert row["trend_label"] == "buying pressure"
+    assert row["gauge_pct"] == 83
+    assert "latest high-low range" in row["tooltip"]
 
 
 def test_session_range_tile_uses_data_pending_when_range_missing():
@@ -71,6 +84,7 @@ def test_session_range_tile_uses_data_pending_when_range_missing():
     assert row["value"] == "DATA PENDING"
     assert row["change"] == "-"
     assert row["tone"] == "warn"
+    assert row["sentiment_label"] == "unavailable"
 
 
 def test_session_range_tile_rejects_non_finite_latest_values():
@@ -115,10 +129,16 @@ def test_fred_macro_tile_groups_format_read_only_context():
     assert rates[0]["label"] == "10Y yield"
     assert rates[0]["value"] == "4.60%"
     assert rates[0]["change"] == "+0.20 pp"
+    assert rates[0]["sentiment_label"] == "negative"
+    assert rates[0]["trend_label"] == "worsening"
+    assert rates[0]["gauge_pct"] > 50
+    assert "discount rate" in rates[0]["tooltip"]
     assert rates[1]["label"] == "2s10s"
     assert rates[1]["value"] == "0.50%"
     assert groups[1]["rows"][0]["label"] == "CPI"
     assert groups[1]["rows"][0]["change"] == "+3.1% YoY"
+    assert groups[2]["rows"][1]["label"] == "M2"
+    assert "broad money supply" in groups[2]["rows"][1]["tooltip"]
     assert groups[2]["rows"][0]["value"] == "6.70T"
     assert groups[3]["rows"][0]["tone"] == "up"
     assert groups[4]["rows"][0]["tone"] == "up"
@@ -131,6 +151,7 @@ def test_fred_macro_tile_groups_use_data_pending_for_missing_series():
     assert groups[0]["rows"][0]["value"] == "DATA PENDING"
     assert groups[0]["rows"][0]["change"] == "-"
     assert groups[0]["rows"][0]["tone"] == "warn"
+    assert groups[0]["rows"][0]["sentiment_label"] == "unavailable"
 
 
 def test_fred_macro_snapshot_is_clean_journal_metadata():

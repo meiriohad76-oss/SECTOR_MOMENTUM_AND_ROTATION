@@ -23,7 +23,7 @@ def test_empty_picks_render_defensive_basket():
     assert "defensive_basket_rows(scored)" in app_source
     assert "No picks meet the gates" in app_source
     assert "TLT / GLD / BIL" in app_source
-    assert '_render_drill_buttons("defensive_drill"' in app_source
+    assert '_render_drill_selector("defensive_drill"' in app_source
 
 
 def test_empty_and_loading_css_exists():

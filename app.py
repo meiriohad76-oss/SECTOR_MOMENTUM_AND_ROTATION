@@ -102,8 +102,19 @@ from src.structured_logging import configure_structured_logging, log_event
 from src.table_preview import table_row_rrg_preview_html
 from src.transition_pulse import transition_pulse_class, transition_row_pulse_class
 from src.ui_states import defensive_basket_rows, loading_skeleton_slots
-from src.universe import ALL_TICKERS, SCORED_TICKERS, UNIVERSE_BY_CLASS, BENCH
-from src.universe import US_SECTORS
+from src.universe import (
+    ALL_TICKERS,
+    BENCH,
+    COUNTRIES,
+    CRYPTO,
+    FACTORS,
+    MEGA_CAP_STOCKS,
+    SCORED_TICKERS,
+    THEMES,
+    UNIVERSE_BY_CLASS,
+    US_INDUSTRIES,
+    US_SECTORS,
+)
 from src.visuals import (
     rrg_chart_dark,
     sector_spaghetti_chart,
@@ -121,6 +132,38 @@ APP_VERSION = "v2.4.9"
 APP_LOGGER = configure_structured_logging()
 DRILL_RANGE_OPTIONS = ("3M", "6M", "1Y", "3Y", "MAX")
 DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + ["^TNX", "^IRX"]))
+TICKER_DISPLAY_NAMES = {
+    **dict(zip(US_SECTORS, [
+        "Technology sector", "Financials sector", "Energy sector", "Health care sector",
+        "Industrials sector", "Consumer discretionary sector", "Consumer staples sector",
+        "Utilities sector", "Materials sector", "Real estate sector", "Communication services sector",
+    ])),
+    **dict(zip(US_INDUSTRIES, [
+        "Semiconductors", "Semiconductors", "Software", "Medical devices", "Healthcare providers",
+        "Regional banks", "Insurance", "Home construction", "Homebuilders", "Retail",
+        "Oil and gas exploration", "Oil services", "Gold miners", "China internet", "Internet",
+        "Aerospace and defense", "Airlines", "Biotech", "Biotech",
+    ])),
+    **dict(zip(COUNTRIES, [
+        "All-world ex-US", "Emerging markets", "Developed ex-US", "Emerging markets",
+        "Japan", "Germany", "United Kingdom", "India", "China", "China large-cap",
+        "Brazil", "Australia", "Canada", "Mexico", "South Africa", "South Korea",
+        "Taiwan", "Singapore", "Indonesia", "Saudi Arabia",
+    ])),
+    **dict(zip(FACTORS, [
+        "Momentum factor", "Quality factor", "Minimum volatility factor", "Value factor",
+        "Small-size factor", "Large-cap growth factor", "Large-cap value factor",
+        "Small-cap factor", "Mid-cap factor", "Large-cap core factor",
+    ])),
+    **dict(zip(THEMES, [
+        "Innovation theme", "Cybersecurity theme", "Agribusiness theme", "Uranium theme",
+        "Lithium and batteries theme", "Solar theme", "Clean energy theme", "Robotics and AI theme",
+    ])),
+    **dict(zip(CRYPTO, ["Bitcoin futures", "Spot bitcoin", "Ethereum exposure"])),
+    **dict(zip(MEGA_CAP_STOCKS, [
+        "NVIDIA", "Apple", "Microsoft", "Amazon", "Alphabet", "Meta Platforms", "Tesla",
+    ])),
+}
 
 
 def _md(html: str):
@@ -213,6 +256,15 @@ STATE_TIPS = {
     "EXIT":             "FORWARD CALL: 10-30% drawdown over the next 4-13 weeks is the median outcome if the breakdown holds. Triggered by close < 30wMA, OR Mansfield RS < 0, OR Antonacci failed, OR RRG -> Lagging, OR CMF < -0.10, OR ETF redemptions > 1.5% AUM. Sell on Monday open.",
     "BEARISH_STAGE_4":  "FORWARD CALL: continued decline expected. Median Stage-4 duration is 10-22 weeks. Gates confirmed: price < 30wMA + MA slope negative + RRG Lagging 3+ wks + CMF confirmed negative. Avoid long; short candidate.",
     "STAGE_1_BASING":   "FORWARD CALL: possible Stage-2 setup forming over the next 4-13 weeks if remaining gates fill. Recovered from Stage 4: price reclaimed 30wMA but slope still flat AND CMF turned positive. Watchlist.",
+}
+
+STATE_STRENGTH_RANK = {
+    "BEARISH_STAGE_4": 0,
+    "EXIT": 1,
+    "WARNING": 2,
+    "STAGE_1_BASING": 3,
+    "HOLD": 4,
+    "STAGE_2_BULLISH": 5,
 }
 
 
@@ -721,21 +773,95 @@ phase_idx = PHASE_IDX.get(regime.phase_hint, -1)
 # =============================== render helpers ==================================
 
 
+DRILL_SELECTOR_PLACEHOLDER = "__choose_drill_ticker__"
+
+
 def _go_to_drill(ticker: str) -> None:
     if select_drill_ticker(st.session_state, st.query_params, ticker, AVAILABLE_TICKERS):
         st.rerun()
 
 
-def _render_drill_buttons(prefix: str, tickers: list[str], max_columns: int = 4) -> None:
+def _go_to_selected_drill(widget_key: str) -> None:
+    selected = st.session_state.get(widget_key)
+    if selected == DRILL_SELECTOR_PLACEHOLDER:
+        return
+    if isinstance(selected, str) and selected:
+        _go_to_drill(selected)
+
+
+def _ticker_display_name(ticker: str) -> str:
+    return TICKER_DISPLAY_NAMES.get(ticker, ticker)
+
+
+def _drill_option_label(ticker: str) -> str:
+    if ticker == DRILL_SELECTOR_PLACEHOLDER:
+        return "Choose ticker..."
+    if ticker not in scored.index:
+        return f"{ticker} | {_ticker_display_name(ticker)}"
+    row = scored.loc[ticker]
+    state = str(row.get("state") or "UNKNOWN").replace("_", " ")
+    score = row.get("S_score")
+    score_text = "n/a" if score is None or pd.isna(score) else f"{float(score):+.2f}"
+    return f"{ticker} | {_ticker_display_name(ticker)} | {state} | S {score_text}"
+
+
+def _render_drill_selector(prefix: str, tickers: list[str], label: str) -> None:
     drill_tickers = [ticker for ticker in dict.fromkeys(tickers) if ticker in scored.index]
     if not drill_tickers:
         return
-    _md('<div class="drill-buttons-slot"></div>')
-    cols = st.columns(min(len(drill_tickers), max_columns))
-    for idx, ticker in enumerate(drill_tickers):
-        with cols[idx % len(cols)]:
-            if st.button(f"DRILL {ticker}", key=f"{prefix}_{idx}_{ticker}", use_container_width=True):
-                _go_to_drill(ticker)
+    key = f"{prefix}_select"
+    current_ticker = str(st.session_state.get("drill_ticker", ""))
+    select_options = drill_tickers
+    default_ticker = current_ticker
+    if current_ticker not in drill_tickers:
+        select_options = [DRILL_SELECTOR_PLACEHOLDER, *drill_tickers]
+        default_ticker = DRILL_SELECTOR_PLACEHOLDER
+    if st.session_state.get(key) != default_ticker:
+        st.session_state[key] = default_ticker
+    _md('<div class="drill-selector-slot"></div>')
+    st.selectbox(
+        label,
+        select_options,
+        key=key,
+        format_func=_drill_option_label,
+        help="Choose a ticker from this section and the dashboard will open its detailed methodology drill-down.",
+        on_change=_go_to_selected_drill,
+        args=(key,),
+    )
+
+
+def _macro_tile_html(row: dict[str, object], extra_class: str = "") -> str:
+    tone = str(row.get("tone", "warn"))
+    sentiment_class = str(row.get("sentiment_label", "unavailable")).replace(" ", "-")
+    sentiment_label = str(row.get("sentiment_label", "unavailable")).upper()
+    trend_label = str(row.get("trend_label", "data pending"))
+    trend_symbol = str(row.get("trend_symbol", "?"))
+    gauge_pct = max(0, min(100, int(row.get("gauge_pct") or 50)))
+    return f"""
+    <div class="tile macro-tile {extra_class} {tone}" data-tip="{_esc(str(row.get('tooltip', '')))}" data-tip-pos="below">
+      <div class="tile-label">{_esc(str(row.get('label', '')))}<span class="tile-delta">{_esc(str(row.get('symbol', row.get('series_id', ''))))}</span></div>
+      <div class="tile-value {tone}">{_esc(str(row.get('value', 'DATA PENDING')))}</div>
+      <div class="macro-signal {sentiment_class}">
+        <span class="signal-symbol">{_esc(trend_symbol)}</span>
+        <span>{_esc(sentiment_label)}</span>
+        <span class="trend">{_esc(trend_label)}</span>
+      </div>
+      <div class="macro-gauge" style="--gauge:{gauge_pct}%"><span></span></div>
+      <div class="tile-sub">{_esc(str(row.get('change', '-')))} / {_esc(str(row.get('subtitle', '')))}</div>
+    </div>
+    """
+
+
+def _transition_sentiment(row: dict) -> tuple[str, str, str]:
+    from_state = str(row.get("from") or "")
+    to_state = str(row.get("to") or "")
+    from_rank = STATE_STRENGTH_RANK.get(from_state)
+    to_rank = STATE_STRENGTH_RANK.get(to_state)
+    if from_rank is None or to_rank is None or from_rank == to_rank:
+        return "transition-neutral", "neutral", "="
+    if to_rank > from_rank:
+        return "transition-positive", "positive", "+"
+    return "transition-negative", "negative", "!"
 
 
 def _score_text(value: object) -> str:
@@ -1099,33 +1225,11 @@ def render_status():
     )
 
     session_row = session_range_tile(ohlcv.get(BENCH["US"]), BENCH["US"])
-    session_tile_html = f"""
-    <div class="tile macro-tile">
-      <div class="tile-label">{_esc(session_row['label'])}<span class="tile-delta">{_esc(session_row['symbol'])}</span></div>
-      <div class="tile-value {session_row['tone']}">{_esc(session_row['value'])}</div>
-      <div class="tile-sub">{_esc(session_row['change'])} / {_esc(session_row['subtitle'])}</div>
-    </div>
-    """
-    macro_tiles_html = ""
-    for row in macro_tile_rows(ohlcv):
-        macro_tiles_html += f"""
-        <div class="tile macro-tile">
-          <div class="tile-label">{_esc(row['label'])}<span class="tile-delta">{_esc(row['symbol'])}</span></div>
-          <div class="tile-value {row['tone']}">{_esc(row['value'])}</div>
-          <div class="tile-sub">{_esc(row['change'])} Â· {_esc(row['subtitle'])}</div>
-        </div>
-        """
+    session_tile_html = _macro_tile_html(session_row)
+    macro_tiles_html = "".join(_macro_tile_html(row) for row in macro_tile_rows(ohlcv))
     fred_macro_groups_html = ""
     for group in fred_macro_tile_groups(_fred_data):
-        rows_html = ""
-        for row in group["rows"]:
-            rows_html += f"""
-            <div class="tile macro-tile fred-macro-tile">
-              <div class="tile-label">{_esc(row['label'])}<span class="tile-delta">{_esc(row['series_id'])}</span></div>
-              <div class="tile-value {row['tone']}">{_esc(row['value'])}</div>
-              <div class="tile-sub">{_esc(row['change'])} / {_esc(row['subtitle'])}</div>
-            </div>
-            """
+        rows_html = "".join(_macro_tile_html(row, extra_class="fred-macro-tile") for row in group["rows"])
         fred_macro_groups_html += f"""
         <div class="fred-macro-group">
           <div class="fred-macro-group-label">{_esc(group['group'])}</div>
@@ -1194,10 +1298,12 @@ def render_alerts():
         when = r.get("date", "")
         ticker = str(r.get("ticker", "")).upper()
         pulse_class = transition_row_pulse_class(r)
+        sentiment_class, sentiment_label, sentiment_symbol = _transition_sentiment(r)
         rows += f"""
         <div class="alert-row {new_state} {pulse_class}">
           <span class="dot" style="background:{dot_color}"></span>
           <span class="t">{_esc(ticker)}</span>
+          <span class="transition-badge {sentiment_class}"><span>{sentiment_symbol}</span>{sentiment_label}</span>
           <span class="change">
             <span class="from">{from_state.replace('_', ' ')}</span>
             <span class="arrow">→</span>
@@ -1208,7 +1314,7 @@ def render_alerts():
         </div>
         """
     if not rows:
-        rows = '<div class="alert-row"><span class="dot" style="background:var(--muted-2)"></span><span class="t">—</span><span class="change">no state changes yet — state machine starts logging on first run</span><span class="when"></span><span class="chev"></span></div>'
+        rows = '<div class="alert-row"><span class="dot" style="background:var(--muted-2)"></span><span class="t">&mdash;</span><span class="transition-badge transition-neutral"><span>=</span>neutral</span><span class="change">no state changes yet &mdash; state machine starts logging on first run</span><span class="when"></span><span class="chev"></span></div>'
 
     html = f"""
     <section class="section">
@@ -1220,14 +1326,15 @@ def render_alerts():
     </section>
     """
     _md(html)
-    _render_drill_buttons(
+    _render_drill_selector(
         "alert_drill",
         [str(r.get("ticker", "")).upper() for r in transitions[:8]],
+        "DRILL-DOWN FROM RECENT TRANSITIONS",
     )
 
 
 def render_picks():
-    selected_picks = scored[scored["selected"]].sort_values(["class", "rank_in_class"])
+    selected_picks = scored[scored["selected"]].sort_values(["S_score", "F_score", "mom_12_1"], ascending=[False, False, False])
     if selected_picks.empty:
         basket_rows = defensive_basket_rows(scored)
         cards_html = ""
@@ -1280,11 +1387,11 @@ def render_picks():
           </div>
         </section>
         """)
-        _render_drill_buttons("defensive_drill", [str(row["ticker"]) for row in basket_rows if row["available"]])
+        _render_drill_selector("defensive_drill", [str(row["ticker"]) for row in basket_rows if row["available"]], "DRILL-DOWN FROM DEFENSIVE BASKET")
         return
 
     cards_html = ""
-    for tkr, p in selected_picks.iterrows():
+    for pick_rank, (tkr, p) in enumerate(selected_picks.iterrows(), start=1):
         state = p["state"]
         s = p["S_score"]
         f = p["F_score"]
@@ -1308,7 +1415,7 @@ def render_picks():
         <div class="pick {state} {pulse_class}">
           <div class="pick-top">
             <div>
-              <div class="pick-ticker">{tkr}</div>
+              <div class="pick-ticker"><span class="pick-rank">#{pick_rank}</span>{tkr}</div>
               <div class="pick-class">{klass_lbl}</div>
             </div>
             <span class="pill {state}" data-tip="{_esc(STATE_TIPS.get(state, ""))}">{state.replace('_', ' ')}</span>
@@ -1331,19 +1438,19 @@ def render_picks():
     <section class="section">
       <div class="section-head">
         <h2>Picks <span class="count">{len(selected_picks)} active</span></h2>
-        <div class="right">SORTED BY COMPOSITE</div>
+        <div class="right">SORTED BY S SCORE</div>
       </div>
       <div class="picks-grid">{cards_html}</div>
     </section>
     """
     _md(html)
-    _render_drill_buttons("pick_drill", selected_picks.index.tolist())
+    _render_drill_selector("pick_drill", selected_picks.index.tolist(), "DRILL-DOWN FROM PICKS")
 
 
 def render_rrg():
     _md('<section class="section"><div class="section-head">'
                 f'<h2>Relative Rotation Graph <span class="count">{st.session_state.klass}</span></h2>'
-                '<div class="right">DRILL BUTTONS → TICKER DETAIL</div></div></section>')
+                '<div class="right">SELECT A TICKER FOR DETAIL</div></div></section>')
 
     # class selector (Streamlit native buttons styled by our CSS)
     cls_list = list(UNIVERSE_BY_CLASS.keys()) + ["ALL"]
@@ -1385,13 +1492,13 @@ def render_rrg():
                               ("Lagging", "lagging"), ("Improving", "improving")]:
             tickers = quads[q]
             count = len(tickers)
-            ticks = " · ".join(tickers) if tickers else "—"
+            ticks = " / ".join(f"{ticker} | {_ticker_display_name(ticker)}" for ticker in tickers[:8]) if tickers else "-"
             _md(f'<div class="quad-card {color_cls}">'
                 f'<div class="qlbl tip-cue" data-tip="{_esc(INDICATOR_TIPS["tip_q_" + q.lower()])}">{q}</div>'
                 f'<div class="qcount">{count}</div>'
                 f'<div class="qtick">{ticks}</div>'
                 f'</div>',)
-            _render_drill_buttons(f"rrg_drill_{q.lower()}", tickers[:8], max_columns=2)
+            _render_drill_selector(f"rrg_drill_{q.lower()}", tickers[:8], "DRILL-DOWN FROM RRG")
 
 
 def render_sector_spaghetti():
@@ -1911,7 +2018,7 @@ def _render_custom_universe_analysis(result):
         )
 
     st.dataframe(custom_universe_rows_frame(analysis), hide_index=True, use_container_width=True)
-    _render_drill_buttons("custom_universe_drill", analysis.available_tickers[:8])
+    _render_drill_selector("custom_universe_drill", analysis.available_tickers[:8], "DRILL-DOWN FROM CUSTOM UNIVERSE")
 
 
 def render_custom_universe_builder():
