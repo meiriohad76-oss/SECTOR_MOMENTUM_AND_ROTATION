@@ -1,18 +1,194 @@
 """Pillar 7 - volume & institutional money flow.
 
 LIVE from OHLCV: CMF, OBV slope, MFI, RVOL, distribution days, OBV divergence.
-STUBBED (return neutral until wired): ETF SHO, block trades, dark pool,
-short interest, 13F. Toggle STUB_MODE = False after wiring providers.
+ETF primary flow can be enabled with FLOW_STUB_MODE=false plus Massive/source
+configuration. Other provider-backed signals stay neutral until wired.
 """
 from __future__ import annotations
 
-from typing import Optional
+import csv
+from datetime import datetime
+import io
+import json
+import os
+import re
+import zipfile
+from dataclasses import dataclass
+from typing import Iterable, Optional
 
 import numpy as np
 import pandas as pd
+import requests
+
+
+def _resolve_secret(name: str) -> Optional[str]:
+    try:
+        import streamlit as st  # type: ignore
+        from streamlit.errors import StreamlitSecretNotFoundError  # type: ignore
+
+        if hasattr(st, "secrets"):
+            try:
+                value = st.secrets.get(name)
+                if value:
+                    return str(value).strip()
+            except (KeyError, StreamlitSecretNotFoundError):
+                pass
+    except ImportError:
+        pass
+    value = os.environ.get(name)
+    return value.strip() if value else None
+
+
+def _config_flag(name: str, default: bool) -> bool:
+    value = _resolve_secret(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off"}
 
 
 STUB_MODE = True
+ETF_PRIMARY_FLOW_STUB_MODE = _config_flag("FLOW_STUB_MODE", True)
+MASSIVE_TRADES_STUB_MODE = _config_flag("MASSIVE_TRADES_STUB_MODE", True)
+FINRA_ATS_STUB_MODE = _config_flag("FINRA_ATS_STUB_MODE", True)
+FINRA_SHORT_INTEREST_STUB_MODE = _config_flag("FINRA_SHORT_INTEREST_STUB_MODE", True)
+SEC_13F_STUB_MODE = _config_flag("SEC_13F_STUB_MODE", True)
+MASSIVE_BROWSER_URL = "https://render.joinmassive.com/browser"
+MASSIVE_STOCK_TRADES_URL_TEMPLATE = "https://api.massive.com/v3/trades/{ticker}"
+FINRA_ATS_WEEKLY_SUMMARY_URL = "https://api.finra.org/data/group/otcMarket/name/weeklySummary"
+FINRA_SHORT_INTEREST_URL = "https://api.finra.org/data/group/otcmarket/name/consolidatedShortInterest"
+PRIMARY_FLOW_SOURCE_ENV_PREFIX = "ETF_PRIMARY_FLOW_URL_"
+BLOCK_TRADE_MIN_SHARES = 10_000
+BLOCK_TRADE_MIN_NOTIONAL = 200_000.0
+
+
+@dataclass(frozen=True)
+class PrimaryFlowSnapshot:
+    as_of: str
+    shares_outstanding: float
+    nav: float
+    aum: float
+
+
+def _date_sort_key(value: str):
+    text = str(value).strip()
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y"):
+        try:
+            return (0, datetime.strptime(text, fmt).date())
+        except ValueError:
+            continue
+    try:
+        parsed = pd.to_datetime(text, errors="raise")
+        return (0, parsed.date())
+    except Exception:
+        return (1, text)
+
+
+def _has_parseable_date(value: str) -> bool:
+    return _date_sort_key(value)[0] == 0
+
+
+def _parse_float(value) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return None
+    multiplier = 1.0
+    suffix = text[-1:].upper()
+    if suffix in {"K", "M", "B", "T"}:
+        multiplier = {
+            "K": 1_000.0,
+            "M": 1_000_000.0,
+            "B": 1_000_000_000.0,
+            "T": 1_000_000_000_000.0,
+        }[suffix]
+        text = text[:-1]
+    try:
+        return float(text.replace(",", "").replace("$", "")) * multiplier
+    except ValueError:
+        pass
+    text = re.sub(r"[^0-9.\-]", "", text)
+    if not text:
+        return None
+    try:
+        return float(text) * multiplier
+    except ValueError:
+        return None
+
+
+def _pick(record: dict, names: Iterable[str]):
+    normalized = {str(k).strip().lower().replace(" ", "_"): v for k, v in record.items()}
+    for name in names:
+        key = name.lower().replace(" ", "_")
+        if key in normalized:
+            return normalized[key]
+    return None
+
+
+def _snapshot_from_record(record: dict) -> Optional[PrimaryFlowSnapshot]:
+    as_of = _pick(record, ["as_of", "as of", "date", "trade_date", "holdings_date"])
+    shares = _parse_float(_pick(record, ["shares_outstanding", "shares outstanding", "sho", "sharesOutstanding"]))
+    nav = _parse_float(_pick(record, ["nav", "net_asset_value", "net asset value"]))
+    aum = _parse_float(_pick(record, ["aum", "net_assets", "net assets", "total_net_assets", "total net assets"]))
+    if as_of is None or shares is None or nav is None or aum is None or aum == 0:
+        return None
+    return PrimaryFlowSnapshot(str(as_of).strip(), shares, nav, aum)
+
+
+def _records_from_json(payload: str) -> list[dict]:
+    parsed = json.loads(payload)
+    if isinstance(parsed, list):
+        return [item for item in parsed if isinstance(item, dict)]
+    if isinstance(parsed, dict):
+        for key in ("records", "data", "snapshots", "rows"):
+            rows = parsed.get(key)
+            if isinstance(rows, list):
+                return [item for item in rows if isinstance(item, dict)]
+    return []
+
+
+def _records_from_csv(payload: str) -> list[dict]:
+    lines = [line for line in payload.splitlines() if line.strip()]
+    for idx, line in enumerate(lines):
+        lowered = line.lower()
+        if ("shares" in lowered or "sho" in lowered) and ("nav" in lowered or "net asset" in lowered):
+            reader = csv.DictReader(io.StringIO("\n".join(lines[idx:])))
+            return [row for row in reader]
+    reader = csv.DictReader(io.StringIO(payload))
+    return [row for row in reader] if reader.fieldnames else []
+
+
+def parse_primary_flow_snapshots(payload: str) -> list[PrimaryFlowSnapshot]:
+    if not payload or not payload.strip():
+        return []
+    records: list[dict]
+    try:
+        records = _records_from_json(payload)
+    except json.JSONDecodeError:
+        records = _records_from_csv(payload)
+    snapshots = [_snapshot_from_record(record) for record in records]
+    return sorted([snapshot for snapshot in snapshots if snapshot is not None], key=lambda item: _date_sort_key(item.as_of))
+
+
+def primary_flow_5d_pct_from_snapshots(
+    snapshots: list[PrimaryFlowSnapshot],
+    lookback_observations: int = 5,
+) -> Optional[float]:
+    dated_snapshots = [snapshot for snapshot in snapshots if _has_parseable_date(snapshot.as_of)]
+    if len(dated_snapshots) <= lookback_observations:
+        return None
+    ordered = sorted(dated_snapshots, key=lambda item: _date_sort_key(item.as_of))
+    latest = ordered[-1]
+    if latest.aum == 0:
+        return None
+    window = ordered[-lookback_observations - 1:]
+    estimated_net_flow = sum(
+        (current.shares_outstanding - prior.shares_outstanding) * current.nav
+        for prior, current in zip(window, window[1:])
+    )
+    return float(estimated_net_flow / latest.aum * 100.0)
 
 
 def chaikin_money_flow(df, period=21):
@@ -92,34 +268,388 @@ def obv_price_divergence(df, lookback=20):
     return bool(price_new_high and not obv_new_high)
 
 
+def _primary_flow_source_url(ticker: str) -> Optional[str]:
+    key = f"{PRIMARY_FLOW_SOURCE_ENV_PREFIX}{ticker.upper().replace('-', '_')}"
+    return _resolve_secret(key)
+
+
+def _fetch_massive_browser_content(
+    source_url: str,
+    api_key: Optional[str] = None,
+    timeout: int = 20,
+) -> Optional[str]:
+    token = api_key or _resolve_secret("MASSIVE_API_KEY")
+    if not token:
+        return None
+    try:
+        response = requests.get(
+            MASSIVE_BROWSER_URL,
+            params={
+                "url": source_url,
+                "format": "raw",
+                "expiration": 0,
+            },
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        return response.text
+    except requests.RequestException:
+        return None
+
+
+def _fetch_primary_flow_payload(ticker: str) -> Optional[str]:
+    source_url = _primary_flow_source_url(ticker)
+    if not source_url:
+        return None
+    return _fetch_massive_browser_content(source_url)
+
+
 def etf_primary_flow_5d_pct(ticker):
-    if STUB_MODE:
+    if ETF_PRIMARY_FLOW_STUB_MODE:
         return 0.0
-    raise NotImplementedError("Wire iShares/SSGA SHO CSV here.")
+    try:
+        payload = _fetch_primary_flow_payload(ticker)
+    except requests.RequestException:
+        return 0.0
+    if not payload:
+        return 0.0
+    snapshots = parse_primary_flow_snapshots(payload)
+    value = primary_flow_5d_pct_from_snapshots(snapshots)
+    return float(value) if value is not None else 0.0
+
+
+def _neutral_float(value: Optional[float], neutral: float) -> float:
+    if value is None:
+        return neutral
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return neutral
+    return number if np.isfinite(number) else neutral
+
+
+def _trade_timestamp(trade: dict) -> float:
+    value = _pick(trade, ["sip_timestamp", "participant_timestamp", "trf_timestamp", "timestamp", "t"])
+    parsed = _parse_float(value)
+    return parsed if parsed is not None else 0.0
+
+
+def _trade_price_and_size(trade: dict) -> tuple[Optional[float], Optional[float]]:
+    return (
+        _parse_float(_pick(trade, ["p", "price"])),
+        _parse_float(_pick(trade, ["s", "size", "volume"])),
+    )
+
+
+def block_trade_upside_ratio_from_massive_trades(trades: list[dict]) -> Optional[float]:
+    clean_trades = []
+    for trade in trades:
+        correction = _parse_float(_pick(trade, ["correction", "c"]))
+        if correction not in (None, 0.0):
+            continue
+        price, size = _trade_price_and_size(trade)
+        if price is None or size is None or price <= 0 or size <= 0:
+            continue
+        clean_trades.append((float(_trade_timestamp(trade)), price, size))
+    clean_trades.sort(key=lambda item: item[0])
+
+    upside_notional = 0.0
+    downside_notional = 0.0
+    previous_price: Optional[float] = None
+    for _, price, size in clean_trades:
+        notional = price * size
+        is_block = size >= BLOCK_TRADE_MIN_SHARES or notional >= BLOCK_TRADE_MIN_NOTIONAL
+        if is_block and previous_price is not None:
+            if price > previous_price:
+                upside_notional += notional
+            elif price < previous_price:
+                downside_notional += notional
+        previous_price = price
+
+    if upside_notional == 0.0 and downside_notional == 0.0:
+        return None
+    if downside_notional == 0.0:
+        return 2.0
+    return upside_notional / downside_notional
+
+
+def _fetch_massive_stock_trades(
+    ticker: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = 5_000,
+    timeout: int = 20,
+) -> list[dict]:
+    token = _resolve_secret("MASSIVE_API_KEY")
+    if not token:
+        return []
+    params: dict[str, str | int] = {
+        "limit": int(limit),
+        "sort": "timestamp",
+        "order": "desc",
+    }
+    if start_date:
+        params["timestamp.gte"] = start_date
+    if end_date:
+        params["timestamp.lt"] = end_date
+    response = requests.get(
+        MASSIVE_STOCK_TRADES_URL_TEMPLATE.format(ticker=str(ticker).upper()),
+        params=params,
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        return []
+    results = payload.get("results", [])
+    return [item for item in results if isinstance(item, dict)] if isinstance(results, list) else []
+
+
+def _provider_block_trade_upside_ratio(ticker) -> Optional[float]:
+    return block_trade_upside_ratio_from_massive_trades(_fetch_massive_stock_trades(ticker))
 
 
 def block_trade_upside_ratio(ticker):
-    if STUB_MODE:
+    if MASSIVE_TRADES_STUB_MODE:
         return 1.0
-    raise NotImplementedError("Wire Polygon trade-tape here.")
+    try:
+        return _neutral_float(_provider_block_trade_upside_ratio(ticker), 1.0)
+    except requests.RequestException:
+        return 1.0
+
+
+def _provider_dark_pool_pct(ticker) -> Optional[float]:
+    return dark_pool_pct_from_finra_ats_records(_fetch_finra_ats_weekly_summary(ticker))
+
+
+def dark_pool_pct_from_finra_ats_records(records: list[dict]) -> Optional[float]:
+    rows = [record for record in records if isinstance(record, dict)]
+    if not rows:
+        return None
+    latest_key = max(_record_date_key(record) for record in rows)
+    latest_rows = [record for record in rows if _record_date_key(record) == latest_key]
+    ats_shares = 0.0
+    total_shares = 0.0
+    for record in latest_rows:
+        shares = _parse_float(_pick(record, ["totalWeeklyShareQuantity", "totalWeeklyShares", "shares"]))
+        if shares is None or shares < 0:
+            continue
+        total_shares += shares
+        summary_type = str(_pick(record, ["summaryTypeCode", "summary_type"]) or "").upper()
+        if "ATS" in summary_type:
+            ats_shares += shares
+    if total_shares <= 0:
+        return None
+    return ats_shares / total_shares
+
+
+def _fetch_finra_ats_weekly_summary(ticker: str, limit: int = 40, timeout: int = 20) -> list[dict]:
+    payload = {
+        "fields": [
+            "issueSymbolIdentifier",
+            "weekStartDate",
+            "summaryTypeCode",
+            "totalWeeklyShareQuantity",
+            "totalWeeklyTradeCount",
+        ],
+        "compareFilters": [
+            {
+                "compareType": "EQUAL",
+                "fieldName": "issueSymbolIdentifier",
+                "fieldValue": str(ticker).upper(),
+            }
+        ],
+        "limit": int(limit),
+    }
+    response = requests.post(
+        FINRA_ATS_WEEKLY_SUMMARY_URL,
+        json=payload,
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    data = response.json()
+    if isinstance(data, list):
+        return [item for item in data if isinstance(item, dict)]
+    if isinstance(data, dict):
+        records = data.get("data") or data.get("results") or data.get("rows") or []
+        return [item for item in records if isinstance(item, dict)] if isinstance(records, list) else []
+    return []
 
 
 def dark_pool_pct(ticker):
-    if STUB_MODE:
+    if FINRA_ATS_STUB_MODE:
         return 0.40
-    raise NotImplementedError("Wire FINRA ATS Transparency feed here.")
+    try:
+        return _neutral_float(_provider_dark_pool_pct(ticker), 0.40)
+    except requests.RequestException:
+        return 0.40
+
+
+def _provider_short_interest_delta_15d(ticker) -> Optional[float]:
+    return short_interest_delta_from_finra_records(_fetch_finra_short_interest(ticker))
+
+
+def _record_date_key(record: dict):
+    return _date_sort_key(
+        str(_pick(record, ["settlementDate", "settlement_date", "weekStartDate", "week_start_date", "date"]) or "")
+    )
+
+
+def short_interest_delta_from_finra_records(records: list[dict]) -> Optional[float]:
+    ordered = sorted([record for record in records if isinstance(record, dict)], key=_record_date_key)
+    if not ordered:
+        return None
+    latest = ordered[-1]
+    reported = _parse_float(
+        _pick(latest, ["changePercent", "change_percent", "changePercentQuantity", "change percent"])
+    )
+    if reported is not None:
+        return reported
+
+    latest_position = _parse_float(
+        _pick(latest, ["currentShortPositionQuantity", "shortPositionQuantity", "short_position"])
+    )
+    previous_position = _parse_float(
+        _pick(latest, ["previousShortPositionQuantity", "previous_short_position"])
+    )
+    if previous_position is None and len(ordered) >= 2:
+        previous_position = _parse_float(
+            _pick(ordered[-2], ["currentShortPositionQuantity", "shortPositionQuantity", "short_position"])
+        )
+    if latest_position is None or previous_position in (None, 0.0):
+        return None
+    return (latest_position - previous_position) / previous_position * 100.0
+
+
+def _fetch_finra_short_interest(ticker: str, limit: int = 4, timeout: int = 20) -> list[dict]:
+    payload = {
+        "fields": [
+            "symbolCode",
+            "settlementDate",
+            "currentShortPositionQuantity",
+            "previousShortPositionQuantity",
+            "changePercent",
+            "daysToCoverQuantity",
+        ],
+        "compareFilters": [
+            {
+                "compareType": "EQUAL",
+                "fieldName": "symbolCode",
+                "fieldValue": str(ticker).upper(),
+            }
+        ],
+        "limit": int(limit),
+    }
+    response = requests.post(
+        FINRA_SHORT_INTEREST_URL,
+        json=payload,
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    data = response.json()
+    if isinstance(data, list):
+        return [item for item in data if isinstance(item, dict)]
+    if isinstance(data, dict):
+        records = data.get("data") or data.get("results") or data.get("rows") or []
+        return [item for item in records if isinstance(item, dict)] if isinstance(records, list) else []
+    return []
 
 
 def short_interest_delta_15d(ticker):
-    if STUB_MODE:
+    if FINRA_SHORT_INTEREST_STUB_MODE:
         return 0.0
-    raise NotImplementedError("Wire FINRA Reg SHO bi-monthly file here.")
+    try:
+        return _neutral_float(_provider_short_interest_delta_15d(ticker), 0.0)
+    except requests.RequestException:
+        return 0.0
+
+
+def _provider_thirteen_f_net_buys_q(ticker) -> Optional[float]:
+    cusips = _sec_13f_cusips_for_ticker(ticker)
+    if not cusips:
+        return None
+    return thirteen_f_net_buys_from_sec_records(_fetch_sec_13f_records(), cusips)
+
+
+def _sec_13f_cusips_for_ticker(ticker: str) -> list[str]:
+    value = _resolve_secret(f"SEC_13F_CUSIP_{str(ticker).upper().replace('-', '_')}")
+    if not value:
+        return []
+    return [item.strip().upper() for item in str(value).split(",") if item.strip()]
+
+
+def _sec_record_period_key(record: dict):
+    return _date_sort_key(
+        str(_pick(record, ["REPORTCALENDARORQUARTER", "reportCalendarOrQuarter", "periodOfReport", "period"]) or "")
+    )
+
+
+def thirteen_f_net_buys_from_sec_records(records: list[dict], cusips: list[str]) -> Optional[float]:
+    wanted = {cusip.upper().replace(" ", "") for cusip in cusips}
+    rows = []
+    for record in records:
+        cusip = str(_pick(record, ["CUSIP", "cusip"]) or "").upper().replace(" ", "")
+        if cusip not in wanted:
+            continue
+        shares = _parse_float(_pick(record, ["SSHPRNAMT", "sshPrnamt", "shares", "value"]))
+        if shares is None:
+            continue
+        rows.append((_sec_record_period_key(record), shares))
+    if len(rows) < 2:
+        return None
+    totals: dict[tuple, float] = {}
+    for period_key, shares in rows:
+        totals[period_key] = totals.get(period_key, 0.0) + shares
+    if len(totals) < 2:
+        return None
+    ordered_periods = sorted(totals)
+    previous = totals[ordered_periods[-2]]
+    latest = totals[ordered_periods[-1]]
+    if previous == 0:
+        return None
+    return (latest - previous) / previous * 100.0
+
+
+def _records_from_tsv(payload: str) -> list[dict]:
+    reader = csv.DictReader(io.StringIO(payload), delimiter="\t")
+    return [row for row in reader] if reader.fieldnames else []
+
+
+def _fetch_sec_13f_records(
+    data_url: Optional[str] = None,
+    user_agent: Optional[str] = None,
+    timeout: int = 20,
+) -> list[dict]:
+    url = data_url or _resolve_secret("SEC_13F_DATA_URL")
+    agent = user_agent or _resolve_secret("SEC_USER_AGENT")
+    if not url or not agent:
+        return []
+    response = requests.get(url, headers={"User-Agent": agent}, timeout=timeout)
+    response.raise_for_status()
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        for name in archive.namelist():
+            upper = name.upper()
+            if "INFOTABLE" not in upper or not upper.endswith((".TSV", ".TXT", ".CSV")):
+                continue
+            raw = archive.read(name).decode("utf-8-sig")
+            if upper.endswith(".CSV"):
+                reader = csv.DictReader(io.StringIO(raw))
+                return [row for row in reader] if reader.fieldnames else []
+            return _records_from_tsv(raw)
+    return []
 
 
 def thirteen_f_net_buys_q(ticker):
-    if STUB_MODE:
+    if SEC_13F_STUB_MODE:
         return 0.0
-    raise NotImplementedError("Wire SEC EDGAR Form 13F-HR ingestion here.")
+    try:
+        return _neutral_float(_provider_thirteen_f_net_buys_q(ticker), 0.0)
+    except requests.RequestException:
+        return 0.0
 
 
 def compute_flow_signals(ohlcv):

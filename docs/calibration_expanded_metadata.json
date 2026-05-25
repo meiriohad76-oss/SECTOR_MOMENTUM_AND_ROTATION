@@ -1,0 +1,40 @@
+{
+  "artifacts": {
+    "candidates_sha256": "66095b1c45217798ddf616845a9320cdd220bee3d8c8f367b5c20baf6647f24f",
+    "report_sha256": "f5f7e52f5f26204950a9834af242de868e261116830101f043c7bc0951e99e8a",
+    "sector_overrides_sha256": "86b9e7fee8ce75f991345053e377bb353849735943a5f3cc75d1338368acd10b"
+  },
+  "candidate_rows": 432,
+  "candidate_rule_count": 144,
+  "horizons_weeks": [
+    13,
+    26,
+    52
+  ],
+  "label_rows": 4968,
+  "live_promotion_allowed": false,
+  "purpose": "research_only_expanded_statistical_calibration",
+  "research_only": true,
+  "safety": {
+    "candidate_promotion": "separate_ticket_required",
+    "dashboard_behavior": "read_only_artifacts",
+    "live_scoring_change": "none"
+  },
+  "sector_override_rows": 0,
+  "split": {
+    "holdout": {
+      "end": "2026-05-22",
+      "start": "2023-06-23",
+      "years": 2.92
+    },
+    "no_lookahead_verified": true,
+    "profile": "fixed_5y_train_2y_to_3y_holdout",
+    "status": "ready",
+    "train": {
+      "end": "2023-06-16",
+      "start": "2018-06-22"
+    }
+  },
+  "split_profile": "fixed_5y_train_2y_to_3y_holdout",
+  "ticket": "B-164"
+}

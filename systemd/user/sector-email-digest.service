@@ -1,0 +1,18 @@
+# Sector Rotation Email Digest - user systemd one-shot unit
+#
+# Install without sudo:
+#   mkdir -p ~/.config/systemd/user
+#   cp systemd/user/sector-email-digest.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now sector-email-digest.timer
+
+[Unit]
+Description=Sector Rotation Email Digest
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/SECTOR_MOMENTUM_AND_ROTATION
+Environment=PYTHONUNBUFFERED=1
+ExecStart=%h/SECTOR_MOMENTUM_AND_ROTATION/.venv/bin/python scripts/send_email_digest.py

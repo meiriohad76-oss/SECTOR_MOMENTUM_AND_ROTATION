@@ -54,6 +54,42 @@ From another machine on your LAN, open `http://<pi-ip>:8501`. You should see the
 
 `Ctrl+C` to stop. Now we install it as a service so it runs on boot.
 
+## Configure local secrets
+
+Provider keys are intentionally not committed. Put Pi-local secrets in `.streamlit/secrets.toml` under the repo root and keep the file readable only by the service user:
+
+```bash
+cd ~/sector-rotation-dashboard
+mkdir -p .streamlit
+chmod 700 .streamlit
+nano .streamlit/secrets.toml
+chmod 600 .streamlit/secrets.toml
+```
+
+For Massive OHLCV validation, set:
+
+```toml
+MASSIVE_API_KEY = "..."
+```
+
+For FRED macro validation, set:
+
+```toml
+FRED_API_KEY = "..."
+```
+
+Validate without writing backtest artifacts:
+
+```bash
+OHLCV_PROVIDER=massive ./.venv/bin/python scripts/run_backtest.py --live-smoke --smoke-period 2mo
+```
+
+Expected success:
+
+```text
+Live backtest smoke passed for 14 tickers with provider=massive period=2mo; artifacts were not written.
+```
+
 ## Auto-start with systemd
 
 The repo ships a service unit at `systemd/sector-dashboard.service`. Install it:
@@ -70,6 +106,19 @@ sudo systemctl status sector-dashboard
 ```
 
 You should see `active (running)`. The dashboard is now reachable at `http://<pi-ip>:8501` and will restart on boot or after a crash.
+
+### Optional public methodology landing service
+
+B-152 ships a static public landing page under `public/`. To serve it from the same Pi, install `systemd/methodology-landing.service`, adjust the user/path, and bind it to localhost port 8500:
+
+```bash
+sudo cp systemd/methodology-landing.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now methodology-landing
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8500/
+```
+
+Use Cloudflare Tunnel to expose `http://127.0.0.1:8500` on the public root while keeping the Streamlit dashboard on `http://127.0.0.1:8501`.
 
 ### Useful commands
 
@@ -106,6 +155,68 @@ Append:
 
 This hits the dashboard at 22:00 daily, which forces a state-machine pass.
 
+## Optional: schedule the 08:00 ET email digest
+
+B-120 ships a LOW-severity digest script and a systemd timer template. Before enabling the timer, configure the SMTP values in `.streamlit/secrets.toml`, then run a no-send diagnostic:
+
+```bash
+cd ~/sector-rotation-dashboard
+./.venv/bin/python scripts/send_email_digest.py --dry-run
+```
+
+Install the timer without sudo on AHADPI5-style user services:
+
+```bash
+cd ~/SECTOR_MOMENTUM_AND_ROTATION
+mkdir -p ~/.config/systemd/user
+cp systemd/user/sector-email-digest.service ~/.config/systemd/user/
+cp systemd/user/sector-email-digest.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now sector-email-digest.timer
+systemctl --user list-timers sector-email-digest.timer
+```
+
+The user unit assumes the checkout is at `~/SECTOR_MOMENTUM_AND_ROTATION`. If your checkout path differs, edit `WorkingDirectory=` and `ExecStart=` in `~/.config/systemd/user/sector-email-digest.service`.
+
+Alternatively, install the root-level system timer:
+
+```bash
+sudo cp systemd/sector-email-digest.service /etc/systemd/system/
+sudo cp systemd/sector-email-digest.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now sector-email-digest.timer
+systemctl list-timers sector-email-digest.timer
+```
+
+Adjust the `User=`, `Group=`, and `WorkingDirectory=` values in `/etc/systemd/system/sector-email-digest.service` if your Pi user or checkout path differs. The timer runs at `08:00 America/New_York`; without SMTP secrets or eligible LOW-severity transitions, the job exits cleanly with `email_digest=skipped`.
+
+## Optional: publish transition RSS and iCal feeds
+
+B-122 can write local feed artifacts and optional static copies under `public/feeds/`, which are served by the public methodology landing service when that service is enabled:
+
+```bash
+cd ~/sector-rotation-dashboard
+./.venv/bin/python scripts/export_transition_feeds.py \
+  --publish-dir public/feeds \
+  --public-base-url https://www.ahaddashboards.uk/feeds/
+```
+
+This writes `data/feeds/transitions.rss`, `data/feeds/transitions.ics`, `public/feeds/transitions.rss`, and `public/feeds/transitions.ics`. The generated files are ignored by git and Docker packaging. If you do not expose the public landing service, omit `--publish-dir` and sync `data/feeds/` with your preferred hosting target instead.
+
+To keep the artifacts fresh without sudo, install the user timer:
+
+```bash
+cd ~/SECTOR_MOMENTUM_AND_ROTATION
+mkdir -p ~/.config/systemd/user
+cp systemd/user/sector-transition-feeds.service ~/.config/systemd/user/
+cp systemd/user/sector-transition-feeds.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now sector-transition-feeds.timer
+systemctl --user list-timers sector-transition-feeds.timer
+```
+
+The transition-feed timer exports every 15 minutes into `data/feeds/` and `public/feeds/`. Public validation is complete only when the external route serves RSS XML from `/feeds/transitions.rss` and iCal text from `/feeds/transitions.ics`.
+
 ## Resource notes
 
 On a Pi 4 with 4 GB RAM and the full 67-ticker universe:
@@ -118,4 +229,4 @@ If you see memory pressure, edit `src/universe.py` to trim the universe (e.g. dr
 
 ## Next: expose it publicly
 
-Right now the dashboard is only reachable from your home LAN. To expose it on `dashboard.yourdomain.com` securely without port-forwarding, see [`DEPLOY_CLOUDFLARE_TUNNEL.md`](DEPLOY_CLOUDFLARE_TUNNEL.md).
+Right now the dashboard is only reachable from your home LAN. To expose the public methodology root and protected dashboard securely without port-forwarding, see [`DEPLOY_CLOUDFLARE_TUNNEL.md`](DEPLOY_CLOUDFLARE_TUNNEL.md).

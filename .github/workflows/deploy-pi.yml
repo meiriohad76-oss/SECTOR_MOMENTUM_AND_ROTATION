@@ -1,0 +1,77 @@
+name: Deploy to Raspberry Pi
+
+on:
+  push:
+    branches: [backlog-stepwise-qa]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-pi
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, sector-pi]
+    timeout-minutes: 15
+    env:
+      PI_HOST: ${{ secrets.PI_HOST }}
+      PI_USER: ${{ secrets.PI_USER }}
+      PI_SSH_KEY: ${{ secrets.PI_SSH_KEY }}
+      PI_KNOWN_HOSTS: ${{ secrets.PI_KNOWN_HOSTS }}
+      PI_REPO_PATH: ${{ secrets.PI_REPO_PATH }}
+      PI_SERVICE_NAME: ${{ secrets.PI_SERVICE_NAME || 'sector-dashboard' }}
+    steps:
+      - name: Validate deploy secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in PI_HOST PI_USER PI_SSH_KEY PI_KNOWN_HOSTS PI_REPO_PATH; do
+            if [ -z "${!name}" ]; then
+              echo "::error ::Missing required secret $name"
+              exit 1
+            fi
+          done
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$PI_SSH_KEY" > ~/.ssh/pi_deploy_key
+          chmod 600 ~/.ssh/pi_deploy_key
+          printf '%s\n' "$PI_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy and smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/pi_deploy_key -o BatchMode=yes -o ConnectTimeout=10 "$PI_USER@$PI_HOST" \
+            "PI_REPO_PATH='$PI_REPO_PATH' PI_SERVICE_NAME='$PI_SERVICE_NAME' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$PI_REPO_PATH"
+          git fetch origin backlog-stepwise-qa
+          git checkout backlog-stepwise-qa
+          git pull --ff-only origin backlog-stepwise-qa
+          ./.venv/bin/python -m pip install -r requirements.txt
+          ./.venv/bin/python -m pytest -q
+
+          old_pid=$(systemctl show "$PI_SERVICE_NAME" -p MainPID --value || true)
+          if [ -n "$old_pid" ] && [ "$old_pid" != "0" ]; then
+            kill -TERM "$old_pid" 2>/dev/null || true
+          fi
+
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            active=$(systemctl is-active "$PI_SERVICE_NAME" || true)
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://127.0.0.1:8501/?ticker=XLK" || true)
+            echo "poll_$i active=$active http=$code"
+            if [ "$active" = "active" ] && [ "$code" = "200" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          systemctl status "$PI_SERVICE_NAME" --no-pager
+          exit 1
+          REMOTE

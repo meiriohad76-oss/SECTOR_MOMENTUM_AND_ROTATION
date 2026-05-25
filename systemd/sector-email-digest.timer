@@ -1,0 +1,15 @@
+# Sector Rotation Email Digest - 08:00 US/Eastern schedule
+#
+# Install with:
+#   sudo cp systemd/sector-email-digest.timer /etc/systemd/system/
+
+[Unit]
+Description=Run Sector Rotation Email Digest daily at 08:00 ET
+
+[Timer]
+OnCalendar=*-*-* 08:00:00 America/New_York
+Persistent=true
+Unit=sector-email-digest.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,87 @@
+{
+  "baseline_config_sha256": "70d9b9ba8879ed98142d330c3611312aeab956850115484a2a16533c6cffb69f",
+  "calibration_split_summary": {
+    "coverage_years": 7.92,
+    "effective_calibration_years": 5,
+    "final_holdout": {
+      "end": "2026-05-22",
+      "start": "2025-05-23"
+    },
+    "fold_count": 2,
+    "folds": [
+      {
+        "calibration_end": "2023-06-16",
+        "calibration_start": "2018-06-22",
+        "calibration_years": 5,
+        "final_holdout_end": "2026-05-22",
+        "final_holdout_start": "2025-05-23",
+        "name": "fold_01",
+        "validation_end": "2024-06-21",
+        "validation_start": "2023-06-23"
+      },
+      {
+        "calibration_end": "2024-06-21",
+        "calibration_start": "2019-06-28",
+        "calibration_years": 5,
+        "final_holdout_end": "2026-05-22",
+        "final_holdout_start": "2025-05-23",
+        "name": "fold_02",
+        "validation_end": "2025-05-16",
+        "validation_start": "2024-06-28"
+      }
+    ],
+    "history_window_reason": "available history is shorter than 10 years but meets the configured minimum",
+    "history_window_status": "accepted_short_history",
+    "minimum_accepted_years": 5,
+    "no_lookahead_verified": true,
+    "requested_years": 10,
+    "status": "ready",
+    "window": {
+      "end": "2026-05-22",
+      "start": "2018-06-22"
+    }
+  },
+  "candidate_config_available": true,
+  "candidate_config_sha256": "d0657434f1ab2a2659901d7f6e48a5ca8e24763a232a5df68c3badf9269d1696",
+  "candidate_config_status": "rejected_final_holdout_no_data",
+  "candidate_rows": 20,
+  "candidate_search_status": "completed",
+  "candidates_sha256": "509156e4f09c4a7b4e532e721b003e27dcac9e229b44451ec4b3a15237fb93e5",
+  "class_count": 2,
+  "generated_at_utc": "2026-05-24T19:08:12.126898Z",
+  "horizons_weeks": [
+    4,
+    13,
+    26,
+    52
+  ],
+  "label_end": "2026-05-22",
+  "label_rows": 4968,
+  "label_start": "2018-06-22",
+  "live_promotion_allowed": false,
+  "ohlcv_source": {
+    "cache_policy": "normal",
+    "fetched_count": 0,
+    "fresh_cache_hit_count": 0,
+    "missing_count": 0,
+    "provider": "",
+    "stale_cache_hit_count": 0,
+    "warnings": []
+  },
+  "purpose": "research_only_walk_forward_calibration_candidate_search_and_rerun_gate",
+  "report_sha256": "c72c8c55a1cca9a572c2771fbd7af070e5772073f6e61cf9f7004e2862955fa2",
+  "research_only": true,
+  "safety": {
+    "calibrated_rerun": "rejected_final_holdout_no_data",
+    "candidate_promotion": "separate_ticket_required",
+    "final_holdout": "not_evaluated",
+    "live_scoring_change": "none",
+    "parameter_tuning": "research_only_candidate_search"
+  },
+  "selected_candidate_count": 1,
+  "slice": "B-163.8",
+  "summary_rows": 24,
+  "summary_sha256": "3bec57028ab59142e5f4ac24099a2ea341c5f81fc7c0ee6393223d99c786582d",
+  "ticker_count": 12,
+  "ticket": "B-163"
+}

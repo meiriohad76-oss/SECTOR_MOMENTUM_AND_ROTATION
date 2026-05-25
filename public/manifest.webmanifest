@@ -1,0 +1,18 @@
+{
+  "name": "Sector Momentum Alerts",
+  "short_name": "Sector Alerts",
+  "description": "Installable high-severity alert shell for the sector momentum dashboard.",
+  "start_url": "/pwa.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "/assets/methodology-preview.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
