@@ -6,16 +6,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def test_app_wires_custom_universe_builder_without_new_fetch_path():
+def test_app_wires_custom_universe_builder_with_ad_hoc_scoring_and_submit_button():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
     assert "from src.custom_universe import" in app_source
+    assert "from src.ad_hoc_analysis import score_ad_hoc_tickers" in app_source
     assert "def render_custom_universe_builder():" in app_source
+    assert "def _custom_universe_scored_frame_for_result(result):" in app_source
     assert "parse_custom_universe_text(" in app_source
     assert "parse_custom_universe_file(" in app_source
-    assert "analyze_custom_universe(result.tickers, scored)" in app_source
+    assert "_custom_universe_scored_frame_for_result(result)" in app_source
+    assert "score_ad_hoc_tickers(" in app_source
+    assert 'with st.form("custom_universe_paste_form"):' in app_source
+    assert 'st.form_submit_button("ANALYZE CUSTOM TICKERS"' in app_source
+    assert "custom_universe_submitted_text" in app_source
     assert "custom_universe_rows_frame(analysis)" in app_source
-    assert "fetch_ohlcv(result.tickers" not in app_source
     assert "apply_state_machine(result.tickers" not in app_source
 
 

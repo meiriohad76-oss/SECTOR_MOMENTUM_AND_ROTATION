@@ -142,7 +142,7 @@ from src.visuals import (
 )
 
 
-APP_VERSION = "v2.4.10"
+APP_VERSION = "v2.4.11"
 APP_LOGGER = configure_structured_logging()
 DRILL_RANGE_OPTIONS = ("3M", "6M", "1Y", "3Y", "MAX")
 DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + ["^TNX", "^IRX"]))
@@ -520,6 +520,8 @@ if "portfolio_single_source" not in st.session_state:
     st.session_state.portfolio_single_source = st.session_state.drill_ticker
 if "custom_universe_text" not in st.session_state:
     st.session_state.custom_universe_text = ""
+if "custom_universe_submitted_text" not in st.session_state:
+    st.session_state.custom_universe_submitted_text = ""
 if "table_open" not in st.session_state:
     st.session_state.table_open = True
 if "table_sort" not in st.session_state:
@@ -2044,6 +2046,29 @@ def _custom_universe_result_from_upload(uploaded_file):
     return parse_custom_universe_file(uploaded_file.getvalue(), uploaded_file.name or "")
 
 
+def _custom_universe_scored_frame_for_result(result):
+    analysis = analyze_custom_universe(result.tickers, scored)
+    ad_hoc_result = None
+    if not analysis.missing_tickers:
+        return scored, analysis, ad_hoc_result
+
+    missing = tuple(sorted(set(analysis.missing_tickers)))
+    ohlcv_result = _load_ad_hoc_data(missing, period="3y")
+    ad_hoc_ohlcv = {**ohlcv, **ohlcv_result.data}
+    ad_hoc_result = score_ad_hoc_tickers(
+        missing,
+        ad_hoc_ohlcv,
+        phase=regime.phase_hint,
+        bench_ticker=BENCH["US"],
+        bil_ticker=BENCH["TBILL"],
+    )
+    if ad_hoc_result.scored.empty:
+        return scored, analysis, ad_hoc_result
+
+    analysis_scored = pd.concat([scored, ad_hoc_result.scored], axis=0)
+    return analysis_scored, analyze_custom_universe(result.tickers, analysis_scored), ad_hoc_result
+
+
 def _render_custom_universe_analysis(result):
     for error in result.errors:
         prefix = f"Row {error.row_number}: " if error.row_number is not None else ""
@@ -2058,13 +2083,14 @@ def _render_custom_universe_analysis(result):
         return
 
     try:
-        analysis = analyze_custom_universe(result.tickers, scored)
+        _, analysis, ad_hoc_result = _custom_universe_scored_frame_for_result(result)
     except ValueError as exc:
         st.error(str(exc))
         return
 
+    _render_ad_hoc_status(ad_hoc_result)
     if analysis.missing_tickers:
-        st.warning("Missing from scored universe: " + ", ".join(analysis.missing_tickers))
+        st.warning("Could not analyze because market data was unavailable: " + ", ".join(analysis.missing_tickers))
 
     _md(
         f"""
@@ -2123,15 +2149,21 @@ def render_custom_universe_builder():
     )
 
     if mode == "Paste tickers":
-        tickers = st.text_area(
-            "Custom tickers",
-            key="custom_universe_text",
-            placeholder="XLK XLF SOXX NVDA",
-            height=90,
-        )
-        result = parse_custom_universe_text(tickers)
-        _render_custom_universe_analysis(result)
-        _render_save_watchlist_controls(result)
+        with st.form("custom_universe_paste_form"):
+            tickers = st.text_area(
+                "Custom tickers",
+                key="custom_universe_text",
+                placeholder="XLK XLF SOXX NVDA",
+                height=90,
+            )
+            submitted = st.form_submit_button("ANALYZE CUSTOM TICKERS", type="primary")
+        if submitted:
+            st.session_state.custom_universe_submitted_text = tickers
+        submitted_text = st.session_state.get("custom_universe_submitted_text", "")
+        if submitted_text:
+            result = parse_custom_universe_text(submitted_text)
+            _render_custom_universe_analysis(result)
+            _render_save_watchlist_controls(result)
         return
 
     uploaded = st.file_uploader(
