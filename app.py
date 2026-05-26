@@ -2555,7 +2555,7 @@ def render_evidence_gate_lab():
         )
 
 
-def render_backtest_lab():
+def _render_backtest_lab_content():
     _md(
         """
         <section class="section" id="backtest-lab">
@@ -2582,8 +2582,8 @@ def render_backtest_lab():
         _md(f'<div class="chart-help"><b>Artifact set:</b> generated at <code>{_esc(str(generated_at))}</code>.</div>')
 
     if report_ready:
-        with st.expander("Manual backtest report", expanded=False):
-            st.markdown(BACKTEST_REPORT_PATH.read_text(encoding="utf-8"))
+        st.markdown("#### Manual backtest report")
+        st.markdown(BACKTEST_REPORT_PATH.read_text(encoding="utf-8"))
     else:
         _md(
             """
@@ -2633,6 +2633,11 @@ def render_backtest_lab():
         )
 
 
+def render_backtest_lab():
+    with st.expander("Backtest lab - B-011 manual artifacts", expanded=False):
+        _render_backtest_lab_content()
+
+
 def _trade_result_from_upload(uploaded_file):
     payload = uploaded_file.getvalue()
     filename = (uploaded_file.name or "").lower()
@@ -2650,7 +2655,7 @@ def _render_trade_input_errors(result: TradeInputResult) -> None:
         st.warning(f"{prefix}{error.message}{suffix}")
 
 
-def render_personal_trade_backtest():
+def _render_personal_trade_backtest_content():
     _md(
         """
         <section class="section" id="personal-trade-backtest">
@@ -2699,6 +2704,11 @@ def render_personal_trade_backtest():
     trade_backtest = evaluate_trade_history(result.trades, states)
     st.dataframe(trade_alignment_summary_frame(trade_backtest), hide_index=True, width="stretch")
     st.dataframe(trade_alignment_frame(trade_backtest), hide_index=True, width="stretch")
+
+
+def render_personal_trade_backtest():
+    with st.expander("Personal trade backtest - B-132 trade history", expanded=False):
+        _render_personal_trade_backtest_content()
 
 
 def _debrief_summary_frame(rows: list[dict]) -> pd.DataFrame:
@@ -2895,12 +2905,12 @@ _render_timed("render_drill", render_drill)
 _render_timed("render_comparison_view", render_comparison_view)
 _render_timed("render_portfolio_analyzer", render_portfolio_analyzer)
 _render_timed("render_custom_universe_builder", render_custom_universe_builder)
-_render_timed("render_backtest_lab", render_backtest_lab)
 _render_timed("render_calibration_lab", render_calibration_lab)
 _render_timed("render_evidence_gate_lab", render_evidence_gate_lab)
-_render_timed("render_personal_trade_backtest", render_personal_trade_backtest)
 _render_timed("render_debrief_lab", render_debrief_lab)
 _render_timed("render_full_table", render_full_table)
+_render_timed("render_personal_trade_backtest", render_personal_trade_backtest)
+_render_timed("render_backtest_lab", render_backtest_lab)
 _render_timed("render_footer", render_footer)
 _PERF_FINAL_SNAPSHOT = session_snapshot(st.session_state)
 log_event(APP_LOGGER, "dashboard_performance_audit",

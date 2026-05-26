@@ -24,12 +24,14 @@ def test_app_wires_custom_universe_builder_with_ad_hoc_scoring_and_submit_button
     assert "apply_state_machine(result.tickers" not in app_source
 
 
-def test_custom_universe_renders_between_portfolio_and_backtest_labs():
+def test_custom_universe_renders_before_calibration_and_bottom_backtest_labs():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
     render_order = [
         '_render_timed("render_portfolio_analyzer", render_portfolio_analyzer)',
         '_render_timed("render_custom_universe_builder", render_custom_universe_builder)',
+        '_render_timed("render_calibration_lab", render_calibration_lab)',
+        '_render_timed("render_full_table", render_full_table)',
         '_render_timed("render_backtest_lab", render_backtest_lab)',
     ]
     positions = [app_source.index(call) for call in render_order]

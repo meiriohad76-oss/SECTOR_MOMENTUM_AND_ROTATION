@@ -86,14 +86,15 @@ def test_app_surfaces_calibration_artifacts_without_running_calibration():
     assert "run_backtest.main(" not in app_source
 
 
-def test_calibration_lab_renders_between_backtest_and_evidence_gates():
+def test_calibration_lab_renders_before_evidence_gates_and_bottom_backtest():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
     render_order = [
-        '_render_timed("render_backtest_lab", render_backtest_lab)',
         '_render_timed("render_calibration_lab", render_calibration_lab)',
         '_render_timed("render_evidence_gate_lab", render_evidence_gate_lab)',
         '_render_timed("render_debrief_lab", render_debrief_lab)',
+        '_render_timed("render_full_table", render_full_table)',
+        '_render_timed("render_backtest_lab", render_backtest_lab)',
     ]
     positions = [app_source.index(call) for call in render_order]
 

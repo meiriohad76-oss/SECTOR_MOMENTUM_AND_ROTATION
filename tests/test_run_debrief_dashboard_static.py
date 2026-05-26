@@ -26,13 +26,14 @@ def test_app_surfaces_run_debrief_without_fetching_data_inside_section():
     assert "st.warning(" in debrief_source
 
 
-def test_debrief_lab_renders_after_backtest_before_full_table():
+def test_debrief_lab_renders_before_full_table_and_bottom_backtest():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
     render_order = [
-        '_render_timed("render_backtest_lab", render_backtest_lab)',
         '_render_timed("render_debrief_lab", render_debrief_lab)',
         '_render_timed("render_full_table", render_full_table)',
+        '_render_timed("render_personal_trade_backtest", render_personal_trade_backtest)',
+        '_render_timed("render_backtest_lab", render_backtest_lab)',
     ]
     positions = [app_source.index(call) for call in render_order]
 
