@@ -101,7 +101,11 @@ from src.scoring import compute_composite, apply_state_machine, recent_transitio
 from src.structured_logging import configure_structured_logging, log_event
 from src.table_preview import table_row_rrg_preview_html
 from src.transition_pulse import transition_pulse_class, transition_row_pulse_class
-from src.ui_states import defensive_basket_rows, loading_skeleton_slots
+from src.ui_states import (
+    defensive_basket_rows,
+    loading_skeleton_slots,
+    provider_status_banner_html as build_provider_status_banner_html,
+)
 from src.universe import (
     ALL_TICKERS,
     BENCH,
@@ -500,18 +504,7 @@ def _load_data(period: str = "3y"):
 
 
 def provider_status_banner_html(ohlcv_result):
-    if not (ohlcv_result.used_stale_cache or ohlcv_result.missing or ohlcv_result.warnings):
-        return ""
-    label = "Provider degraded" if ohlcv_result.used_stale_cache else "Provider gap"
-    details = " ".join(_esc(message) for message in ohlcv_result.warnings)
-    if not details:
-        details = "Market data provider returned a partial response."
-    return f"""
-    <div class="provider-status-banner" role="status">
-      <span class="label">{_esc(label)}</span>
-      <span>{details}</span>
-    </div>
-    """
+    return build_provider_status_banner_html(ohlcv_result)
 
 
 def render_provider_status_banner(ohlcv_result) -> None:
@@ -940,8 +933,8 @@ def render_ticker_analyzer():
         </div>
         """
     )
-    st.dataframe(analysis_rows_frame(analysis), hide_index=True, use_container_width=True)
-    if st.button(f"VIEW FULL DRILL-DOWN {ticker}", key=f"ticker_analyzer_drill_{ticker}", use_container_width=True):
+    st.dataframe(analysis_rows_frame(analysis), hide_index=True, width="stretch")
+    if st.button(f"VIEW FULL DRILL-DOWN {ticker}", key=f"ticker_analyzer_drill_{ticker}", width="stretch"):
         _go_to_drill(ticker)
 
 
@@ -1074,7 +1067,7 @@ def render_view_preferences():
                 "Load",
                 key="preference_profile_load",
                 disabled=selected_profile is None,
-                use_container_width=True,
+                width="stretch",
                 on_click=_load_preference_profile,
                 args=(selected_profile_name,),
             )
@@ -1082,7 +1075,7 @@ def render_view_preferences():
             st.button(
                 "Save",
                 key="preference_profile_save",
-                use_container_width=True,
+                width="stretch",
                 on_click=_save_preference_profile,
             )
         with p5:
@@ -1090,7 +1083,7 @@ def render_view_preferences():
                 "Delete",
                 key="preference_profile_delete",
                 disabled=selected_profile is None,
-                use_container_width=True,
+                width="stretch",
                 on_click=_delete_preference_profile,
                 args=(selected_profile_name,),
             )
@@ -1108,7 +1101,7 @@ def render_header_controls():
             "↻",
             key="refresh_btn",
             help="Refresh data",
-            use_container_width=True,
+            width="stretch",
             on_click=refresh_market_data,
             args=(_load_data,),
         )
@@ -1118,7 +1111,7 @@ def render_header_controls():
             icon,
             key="theme_btn",
             help="Toggle theme",
-            use_container_width=True,
+            width="stretch",
             on_click=toggle_theme,
             args=(st.session_state,),
         )
@@ -1128,14 +1121,12 @@ def render_bluf():
     if not should_render_bluf(st.session_state.bluf_mode):
         return
     compact = is_compact_bluf(st.session_state.bluf_mode)
-    instruction = "Use drill controls below for detail." if compact else "Click any action card → drill-down."
     sub = (
         f"Forward calls: {bluf['exits_count']} tickers expected to underperform soon, "
         f"{bluf['warns_count']} showing topping signals, "
         f"{bluf['buys_count']} predicted to lead the next 4-26 weeks. "
         f"Universe: {len(scored)} instruments. "
-        f"Risk regime is {('on' if regime.risk_on else 'off')} ({regime.phase_hint.lower()} cycle). "
-        f"{instruction}"
+        f"Risk regime is {('on' if regime.risk_on else 'off')} ({regime.phase_hint.lower()} cycle)."
     )
     compact_class = " compact" if compact else ""
     head_html = f"""
@@ -1481,7 +1472,7 @@ def render_rrg():
         if not rrg_sub.empty:
             st.plotly_chart(
                 rrg_chart_dark(rrg_sub, title=""),
-                use_container_width=True,
+                width="stretch",
                 config={"displayModeBar": False},
             )
         else:
@@ -1516,7 +1507,7 @@ def render_sector_spaghetti():
     if not fig.data:
         st.info("Sector relative-strength chart is unavailable until sector and SPY price data are loaded.")
         return
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
 
 def render_drill():
@@ -1596,14 +1587,14 @@ def render_drill():
     c1, c2 = st.columns(2)
     with c1:
         st.plotly_chart(price_chart_with_30wma(ohlcv[sel], sel, visible_since=visible_since),
-                        use_container_width=True, config={"displayModeBar": False})
+                        width="stretch", config={"displayModeBar": False})
         _md('<div class="chart-help"><b>Weinstein Stage 2 visual check.</b> Want price (solid line) above the dashed <b>30-week SMA</b>, with the MA sloping <b>upward</b>. Stage 2 confirmed when both hold AND Mansfield RS &gt; 0. Price crossing below the MA on a weekly close is the canonical EXIT trigger.</div>')
     with c2:
         st.plotly_chart(cmf_chart(ohlcv[sel], sel, visible_since=visible_since),
-                        use_container_width=True, config={"displayModeBar": False})
+                        width="stretch", config={"displayModeBar": False})
         _md('<div class="chart-help"><b>Chaikin Money Flow (21d) — volume-weighted accumulation/distribution.</b> Above <span style="color:var(--green)">+0.10</span> = strong accumulation (institutional buying). Below <span style="color:var(--red)">-0.10</span> = strong distribution. Sustained negative CMF during a Stage-2 advance is an early Stage-3 topping warning.</div>')
     st.plotly_chart(obv_chart(ohlcv[sel], sel, visible_since=visible_since),
-                    use_container_width=True, config={"displayModeBar": False})
+                    width="stretch", config={"displayModeBar": False})
     _md('<div class="chart-help"><b>Price vs OBV — bearish divergence detector.</b> When price (left axis) makes a new high but OBV (right axis) does <b>not</b>, institutional money isn\'t following the rally. One of the cleanest pre-breakdown signals. Bullish divergence (OBV new high, price not) often marks Stage-1 accumulation bottoms.</div>')
 
 
@@ -1884,9 +1875,9 @@ def _render_portfolio_analysis(result):
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.dataframe(exposure_frame(analysis.state_exposure, "State"), hide_index=True, use_container_width=True)
+        st.dataframe(exposure_frame(analysis.state_exposure, "State"), hide_index=True, width="stretch")
     with c2:
-        st.dataframe(exposure_frame(analysis.class_exposure, "Class"), hide_index=True, use_container_width=True)
+        st.dataframe(exposure_frame(analysis.class_exposure, "Class"), hide_index=True, width="stretch")
     with c3:
         actions = analysis.action_tickers
         _md(
@@ -1899,7 +1890,7 @@ def _render_portfolio_analysis(result):
             """
         )
 
-    st.dataframe(analysis_rows_frame(analysis), hide_index=True, use_container_width=True)
+    st.dataframe(analysis_rows_frame(analysis), hide_index=True, width="stretch")
 
     pnl = analyze_position_pnl(result.holdings, latest_prices_from_ohlcv(ohlcv))
     if not pnl.rows:
@@ -1907,8 +1898,8 @@ def _render_portfolio_analysis(result):
     with st.expander("P&L tracker (B-131)", expanded=False):
         if pnl.missing_tickers:
             st.caption("P&L inputs missing for: " + ", ".join(pnl.missing_tickers))
-        st.dataframe(pnl_summary_frame(pnl), hide_index=True, use_container_width=True)
-        st.dataframe(pnl_rows_frame(pnl), hide_index=True, use_container_width=True)
+        st.dataframe(pnl_summary_frame(pnl), hide_index=True, width="stretch")
+        st.dataframe(pnl_rows_frame(pnl), hide_index=True, width="stretch")
 
 
 def render_portfolio_analyzer():
@@ -2002,9 +1993,9 @@ def _render_custom_universe_analysis(result):
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.dataframe(summary_counts_frame(analysis.class_counts, "Class"), hide_index=True, use_container_width=True)
+        st.dataframe(summary_counts_frame(analysis.class_counts, "Class"), hide_index=True, width="stretch")
     with c2:
-        st.dataframe(summary_counts_frame(analysis.state_counts, "State"), hide_index=True, use_container_width=True)
+        st.dataframe(summary_counts_frame(analysis.state_counts, "State"), hide_index=True, width="stretch")
     with c3:
         actions = analysis.action_tickers
         _md(
@@ -2017,7 +2008,7 @@ def _render_custom_universe_analysis(result):
             """
         )
 
-    st.dataframe(custom_universe_rows_frame(analysis), hide_index=True, use_container_width=True)
+    st.dataframe(custom_universe_rows_frame(analysis), hide_index=True, width="stretch")
     _render_drill_selector("custom_universe_drill", analysis.available_tickers[:8], "DRILL-DOWN FROM CUSTOM UNIVERSE")
 
 
@@ -2171,7 +2162,7 @@ def render_calibration_lab():
         "calibration_split_summary"
     )
 
-    st.dataframe(pd.DataFrame(status_rows), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(status_rows), hide_index=True, width="stretch")
 
     if split_summary:
         split_status = str(split_summary.get("status", "unknown"))
@@ -2254,7 +2245,7 @@ def render_calibration_lab():
 
     summary = _read_csv_artifact(CALIBRATION_SUMMARY_PATH)
     if not summary.empty:
-        st.dataframe(summary, hide_index=True, use_container_width=True)
+        st.dataframe(summary, hide_index=True, width="stretch")
 
     candidates = (
         _read_csv_artifact(CALIBRATION_CANDIDATES_PATH)
@@ -2263,7 +2254,7 @@ def render_calibration_lab():
     )
     if not candidates.empty and candidate_artifact_verified:
         with st.expander("Calibration candidates", expanded=False):
-            st.dataframe(candidates, hide_index=True, use_container_width=True)
+            st.dataframe(candidates, hide_index=True, width="stretch")
     elif CALIBRATION_CANDIDATES_PATH.exists() and candidate_status == "UNVERIFIED":
         _md(
             """
@@ -2318,7 +2309,7 @@ def render_calibration_lab():
         </div>
         """
     )
-    st.dataframe(pd.DataFrame(expanded_status_rows), hide_index=True, use_container_width=True)
+    st.dataframe(pd.DataFrame(expanded_status_rows), hide_index=True, width="stretch")
     expanded_report_status = expanded_status_rows[0]["Status"]
     expanded_candidates_status = expanded_status_rows[1]["Status"]
     sector_overrides_status = expanded_status_rows[2]["Status"]
@@ -2354,7 +2345,7 @@ def render_calibration_lab():
     )
     if not expanded_candidates.empty:
         with st.expander("Expanded calibration candidates", expanded=False):
-            st.dataframe(expanded_candidates, hide_index=True, use_container_width=True)
+            st.dataframe(expanded_candidates, hide_index=True, width="stretch")
     elif CALIBRATION_EXPANDED_CANDIDATES_PATH.exists() and expanded_candidates_status == "UNVERIFIED":
         _md(
             """
@@ -2372,7 +2363,7 @@ def render_calibration_lab():
     )
     if not sector_overrides.empty:
         with st.expander("Sector-specific research overrides", expanded=False):
-            st.dataframe(sector_overrides, hide_index=True, use_container_width=True)
+            st.dataframe(sector_overrides, hide_index=True, width="stretch")
     elif CALIBRATION_SECTOR_OVERRIDES_PATH.exists() and sector_overrides_status == "UNVERIFIED":
         _md(
             """
@@ -2430,7 +2421,7 @@ def render_evidence_gate_lab():
         </div>
         """
     )
-    st.dataframe(gate_rows, hide_index=True, use_container_width=True)
+    st.dataframe(gate_rows, hide_index=True, width="stretch")
 
     if EVIDENCE_GATE_REPORT_PATH.exists():
         with st.expander("Evidence gate report", expanded=False):
@@ -2505,7 +2496,7 @@ def render_backtest_lab():
             </div>
             """
         )
-        st.line_chart(normalized_equity_frame(equity), use_container_width=True)
+        st.line_chart(normalized_equity_frame(equity), width="stretch")
         _md(
             """
             <div class="chart-help">
@@ -2514,7 +2505,7 @@ def render_backtest_lab():
             </div>
             """
         )
-        st.line_chart(drawdown_frame(equity), use_container_width=True)
+        st.line_chart(drawdown_frame(equity), width="stretch")
     else:
         _md(
             """
@@ -2589,8 +2580,8 @@ def render_personal_trade_backtest():
     if not result.trades:
         return
     trade_backtest = evaluate_trade_history(result.trades, states)
-    st.dataframe(trade_alignment_summary_frame(trade_backtest), hide_index=True, use_container_width=True)
-    st.dataframe(trade_alignment_frame(trade_backtest), hide_index=True, use_container_width=True)
+    st.dataframe(trade_alignment_summary_frame(trade_backtest), hide_index=True, width="stretch")
+    st.dataframe(trade_alignment_frame(trade_backtest), hide_index=True, width="stretch")
 
 
 def _debrief_summary_frame(rows: list[dict]) -> pd.DataFrame:
@@ -2725,7 +2716,7 @@ def render_debrief_lab():
             data=pd.DataFrame(outcome_rows).to_csv(index=False),
             file_name="run_debrief_outcomes.csv",
             mime="text/csv",
-            use_container_width=True,
+            width="stretch",
         )
     with export_right:
         st.download_button(
@@ -2733,13 +2724,13 @@ def render_debrief_lab():
             data=report_markdown,
             file_name="run_debrief_report.md",
             mime="text/markdown",
-            use_container_width=True,
+            width="stretch",
         )
 
-    st.dataframe(summary, hide_index=True, use_container_width=True)
+    st.dataframe(summary, hide_index=True, width="stretch")
     if not macro_summary.empty:
         with st.expander("Macro-conditioned outcomes", expanded=False):
-            st.dataframe(macro_summary, hide_index=True, use_container_width=True)
+            st.dataframe(macro_summary, hide_index=True, width="stretch")
     if candidates.empty:
         _md(
             """
@@ -2750,7 +2741,7 @@ def render_debrief_lab():
         )
     else:
         with st.expander("Threshold review candidates", expanded=False):
-            st.dataframe(candidates, hide_index=True, use_container_width=True)
+            st.dataframe(candidates, hide_index=True, width="stretch")
 
 
 def render_footer():

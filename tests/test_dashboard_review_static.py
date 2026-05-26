@@ -74,3 +74,10 @@ def test_dashboard_review_source_has_no_mojibake_markers():
     for path in checked_paths:
         source = path.read_text(encoding="utf-8")
         assert not any(marker in source for marker in bad_markers), path
+
+
+def test_dashboard_review_app_uses_current_streamlit_width_api():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+
+    assert "use_container_width=" not in app_source
+    assert 'width="stretch"' in app_source

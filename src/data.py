@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, timedelta
 import os
+import time
 from typing import Iterable
 
 import pandas as pd
@@ -23,6 +24,8 @@ MASSIVE_AGGS_URL_TEMPLATE = (
     "https://api.massive.com/v2/aggs/ticker/{ticker}/range/"
     "{multiplier}/{timespan}/{from_date}/{to_date}"
 )
+PROVIDER_RETRY_ATTEMPTS = 2
+PROVIDER_RETRY_BACKOFF_SECONDS = 0.10
 
 
 @dataclass(frozen=True)
@@ -35,6 +38,13 @@ class OhlcvFetchResult:
     missing: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
     used_stale_cache: bool = False
+    provider_retry_count: int = 0
+
+
+@dataclass(frozen=True)
+class _ProviderFetchResult:
+    data: dict[str, pd.DataFrame]
+    retry_count: int = 0
 
 
 def _resolve_secret(name: str) -> str | None:
@@ -172,17 +182,18 @@ def _fetch_massive_ohlcv(
     period: str = "3y",
     interval: str = "1d",
     api_key: str | None = None,
-) -> dict[str, pd.DataFrame]:
+) -> _ProviderFetchResult:
     token = api_key or _resolve_secret("MASSIVE_API_KEY")
     if not token:
-        return {}
+        return _ProviderFetchResult({})
     try:
         multiplier, timespan = _massive_interval(interval)
         from_date, to_date = _period_to_date_range(period)
     except ValueError:
-        return {}
+        return _ProviderFetchResult({})
 
     out: dict[str, pd.DataFrame] = {}
+    retry_count = 0
     for ticker in tickers:
         symbol = str(ticker).upper()
         url = MASSIVE_AGGS_URL_TEMPLATE.format(
@@ -192,45 +203,60 @@ def _fetch_massive_ohlcv(
             from_date=from_date,
             to_date=to_date,
         )
-        try:
-            request_options = {
-                "params": {"adjusted": "true", "sort": "asc", "limit": 50000},
-                "headers": {"Authorization": f"Bearer {token}"},
-                "timeout": 30,
-            }
-            verify = _massive_ssl_verify_setting()
-            if verify is not None:
-                request_options["verify"] = verify
-            response = requests.get(url, **request_options)
-            response.raise_for_status()
-            payload = response.json()
-        except (requests.RequestException, ValueError):
+        payload = None
+        for attempt in range(1, PROVIDER_RETRY_ATTEMPTS + 1):
+            try:
+                request_options = {
+                    "params": {"adjusted": "true", "sort": "asc", "limit": 50000},
+                    "headers": {"Authorization": f"Bearer {token}"},
+                    "timeout": 30,
+                }
+                verify = _massive_ssl_verify_setting()
+                if verify is not None:
+                    request_options["verify"] = verify
+                response = requests.get(url, **request_options)
+                response.raise_for_status()
+                payload = response.json()
+                break
+            except (requests.RequestException, ValueError):
+                if attempt >= PROVIDER_RETRY_ATTEMPTS:
+                    break
+                retry_count += 1
+                time.sleep(PROVIDER_RETRY_BACKOFF_SECONDS * attempt)
+        if payload is None:
             continue
         if not isinstance(payload, dict):
             continue
         df = _frame_from_massive_results(payload.get("results", []))
         if not df.empty and len(df) > 30:
             out[symbol] = df
-    return out
+    return _ProviderFetchResult(out, retry_count)
 
 
 def _fetch_yfinance_ohlcv(
     tickers: list[str],
     period: str = "3y",
     interval: str = "1d",
-) -> dict[str, pd.DataFrame]:
-    try:
-        raw = yf.download(
-            tickers=tickers,
-            period=period,
-            interval=interval,
-            auto_adjust=False,
-            progress=False,
-            threads=True,
-            group_by="column",
-        )
-    except Exception:
-        return {}
+) -> _ProviderFetchResult:
+    retry_count = 0
+    raw = pd.DataFrame()
+    for attempt in range(1, PROVIDER_RETRY_ATTEMPTS + 1):
+        try:
+            raw = yf.download(
+                tickers=tickers,
+                period=period,
+                interval=interval,
+                auto_adjust=False,
+                progress=False,
+                threads=True,
+                group_by="column",
+            )
+            break
+        except Exception:
+            if attempt >= PROVIDER_RETRY_ATTEMPTS:
+                return _ProviderFetchResult({}, retry_count)
+            retry_count += 1
+            time.sleep(PROVIDER_RETRY_BACKOFF_SECONDS * attempt)
     out: dict[str, pd.DataFrame] = {}
     for t in tickers:
         try:
@@ -239,7 +265,7 @@ def _fetch_yfinance_ohlcv(
                 out[t] = df
         except Exception:
             continue
-    return out
+    return _ProviderFetchResult(out, retry_count)
 
 
 def fetch_ohlcv(
@@ -269,6 +295,11 @@ def _warning_symbol_text(count: int) -> str:
     return "symbol" if count == 1 else "symbols"
 
 
+def _provider_retry_warning(provider_name: str, retry_count: int) -> str:
+    request_text = "request" if retry_count == 1 else "requests"
+    return f"Provider retry recovered {retry_count} {provider_name} {request_text} before data loaded."
+
+
 def fetch_ohlcv_result(
     tickers: Iterable[str],
     period: str = "3y",
@@ -287,11 +318,14 @@ def fetch_ohlcv_result(
             cached = {}
     missing = [ticker for ticker in tickers if ticker not in cached]
     fetched: dict[str, pd.DataFrame] = {}
+    provider_retry_count = 0
     if missing:
         if provider_name == "massive":
-            fetched = _fetch_massive_ohlcv(missing, period=period, interval=interval)
+            provider_result = _fetch_massive_ohlcv(missing, period=period, interval=interval)
         else:
-            fetched = _fetch_yfinance_ohlcv(missing, period=period, interval=interval)
+            provider_result = _fetch_yfinance_ohlcv(missing, period=period, interval=interval)
+        fetched = provider_result.data
+        provider_retry_count = provider_result.retry_count
         if fetched and use_cache and ohlcv_cache_enabled():
             try:
                 write_cached_ohlcv(fetched, provider=provider_name, interval=interval)
@@ -322,6 +356,8 @@ def fetch_ohlcv_result(
             missing_after_fallback.append(str(ticker))
 
     warnings: list[str] = []
+    if provider_retry_count and fetched:
+        warnings.append(_provider_retry_warning(provider_name, provider_retry_count))
     if stale_cached:
         count = len(stale_cached)
         warnings.append(
@@ -343,6 +379,7 @@ def fetch_ohlcv_result(
         missing=tuple(missing_after_fallback),
         warnings=tuple(warnings),
         used_stale_cache=bool(stale_cached),
+        provider_retry_count=provider_retry_count,
     )
 
 

@@ -329,7 +329,7 @@ The remaining provider seams have independent safety flags. Leave each unset/`tr
 
 ## State transition alerts
 
-`apply_state_machine()` writes `state.json` first, then sends optional transition alerts through Telegram, Slack, Discord, and/or Mattermost. Leave alert secrets unset to disable network calls. To enable alerts, configure `TELEGRAM_BOT_TOKEN` plus `TELEGRAM_CHAT_ID`, and/or `SLACK_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL`, or `MATTERMOST_WEBHOOK_URL`, in Streamlit secrets or environment variables.
+`apply_state_machine()` writes `state.json` first, then sends optional transition alerts through Telegram, Slack, Discord, and/or Mattermost. Alert delivery deduplicates repeated transition rows and retries transient HTTP failures with bounded backoff. Leave alert secrets unset to disable network calls. To enable alerts, configure `TELEGRAM_BOT_TOKEN` plus `TELEGRAM_CHAT_ID`, and/or `SLACK_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL`, or `MATTERMOST_WEBHOOK_URL`, in Streamlit secrets or environment variables.
 
 B-123 adds a Discord/Mattermost-only smoke script so webhook configuration can be checked without touching Telegram or Slack:
 

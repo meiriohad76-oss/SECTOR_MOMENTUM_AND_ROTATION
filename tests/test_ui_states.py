@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.ui_states import DEFENSIVE_BASKET, defensive_basket_rows, loading_skeleton_slots
+from src.ui_states import (
+    DEFENSIVE_BASKET,
+    defensive_basket_rows,
+    loading_skeleton_slots,
+    provider_status_banner_html,
+)
 
 
 def test_defensive_basket_order_is_tlt_gld_bil():
@@ -48,3 +53,17 @@ def test_loading_skeleton_slots_clamps_to_non_negative_count():
     assert loading_skeleton_slots(3) == (0, 1, 2)
     assert loading_skeleton_slots(0) == ()
     assert loading_skeleton_slots(-2) == ()
+
+
+def test_provider_status_banner_reports_recovered_retry_before_gap_label():
+    class Result:
+        used_stale_cache = False
+        missing = ("XLE",)
+        warnings = ("Provider retry recovered 1 yfinance request before data loaded.",)
+        provider_retry_count = 1
+
+    html = provider_status_banner_html(Result())
+
+    assert "Provider recovered" in html
+    assert "Provider gap" not in html
+    assert "Provider retry recovered 1 yfinance request before data loaded." in html

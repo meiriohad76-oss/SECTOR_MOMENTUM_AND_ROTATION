@@ -71,10 +71,16 @@ def test_app_uses_preferences_for_bluf_density_and_sparklines():
     assert '<div class="app {shell_class}">' not in app_source
     assert "should_render_bluf(st.session_state.bluf_mode)" in app_source
     assert "is_compact_bluf(st.session_state.bluf_mode)" in app_source
-    assert "Use drill controls below for detail." in app_source
     assert "sparkline_mode(st.session_state.sparkline_style)" in app_source
     assert "PALETTE_OPTIONS" in app_source
     assert 'st.radio(\n                "Palette",' in app_source
+
+
+def test_bluf_copy_does_not_reference_removed_card_click_drilldowns():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+
+    assert "Click any action card" not in app_source
+    assert "Use drill controls below" not in app_source
 
 
 def test_css_contains_compact_density_rules():

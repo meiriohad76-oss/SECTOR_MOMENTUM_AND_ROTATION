@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from email.message import EmailMessage
 import os
 import smtplib
+import time
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -18,6 +19,8 @@ DISCORD_MATTERMOST_WEBHOOKS = {
     "discord": ("DISCORD_WEBHOOK_URL", "content"),
     "mattermost": ("MATTERMOST_WEBHOOK_URL", "text"),
 }
+ALERT_RETRY_ATTEMPTS = 3
+ALERT_RETRY_BACKOFF_SECONDS = 0.25
 
 
 def _resolve_secret(name: str) -> Optional[str]:
@@ -36,6 +39,41 @@ def format_transition_alert(transition: dict) -> str:
 def _alert_text(transitions: list[dict]) -> str:
     lines = [format_transition_alert(transition) for transition in transitions]
     return "\n".join(lines)
+
+
+def _transition_dedupe_key(transition: dict) -> tuple[str, str, str, str]:
+    return (
+        str(transition.get("ticker", "")).strip().upper(),
+        str(transition.get("from", "")).strip(),
+        str(transition.get("to", "")).strip(),
+        str(transition.get("date", "")).strip(),
+    )
+
+
+def _dedupe_transitions(transitions: list[dict]) -> list[dict]:
+    seen: set[tuple[str, str, str, str]] = set()
+    unique: list[dict] = []
+    for transition in transitions:
+        key = _transition_dedupe_key(transition)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(dict(transition))
+    return unique
+
+
+def _post_json_with_retry(url: str, payload: dict, *, timeout: int) -> bool:
+    for attempt in range(1, ALERT_RETRY_ATTEMPTS + 1):
+        try:
+            response = requests.post(url, json=payload, timeout=timeout)
+            response.raise_for_status()
+        except requests.RequestException:
+            if attempt >= ALERT_RETRY_ATTEMPTS:
+                return False
+            time.sleep(ALERT_RETRY_BACKOFF_SECONDS * attempt)
+        else:
+            return True
+    return False
 
 
 def _split_recipients(value: str | None) -> list[str]:
@@ -155,28 +193,18 @@ def send_telegram_slack_test_alert(text: str, timeout: int = 5) -> dict[str, str
     slack_webhook_url = _resolve_secret("SLACK_WEBHOOK_URL")
 
     if telegram_token and telegram_chat_id:
-        try:
-            response = requests.post(
-                f"https://api.telegram.org/bot{telegram_token}/sendMessage",
-                json={"chat_id": telegram_chat_id, "text": text},
-                timeout=timeout,
-            )
-            response.raise_for_status()
-        except requests.RequestException:
-            results["telegram"] = "failed"
-        else:
-            results["telegram"] = "sent"
+        sent = _post_json_with_retry(
+            f"https://api.telegram.org/bot{telegram_token}/sendMessage",
+            {"chat_id": telegram_chat_id, "text": text},
+            timeout=timeout,
+        )
+        results["telegram"] = "sent" if sent else "failed"
     else:
         results["telegram"] = "skipped"
 
     if slack_webhook_url:
-        try:
-            response = requests.post(slack_webhook_url, json={"text": text}, timeout=timeout)
-            response.raise_for_status()
-        except requests.RequestException:
-            results["slack"] = "failed"
-        else:
-            results["slack"] = "sent"
+        sent = _post_json_with_retry(slack_webhook_url, {"text": text}, timeout=timeout)
+        results["slack"] = "sent" if sent else "failed"
     else:
         results["slack"] = "skipped"
 
@@ -197,13 +225,8 @@ def send_discord_mattermost_test_alert(text: str, timeout: int = 5) -> dict[str,
         if not webhook_url:
             results[name] = "skipped"
             continue
-        try:
-            response = requests.post(webhook_url, json={payload_key: text}, timeout=timeout)
-            response.raise_for_status()
-        except requests.RequestException:
-            results[name] = "failed"
-        else:
-            results[name] = "sent"
+        sent = _post_json_with_retry(webhook_url, {payload_key: text}, timeout=timeout)
+        results[name] = "sent" if sent else "failed"
     return results
 
 
@@ -211,6 +234,10 @@ def send_transition_alerts(transitions: list[dict], timeout: int = 5) -> None:
     if not transitions:
         return
 
-    text = _alert_text(transitions)
+    unique_transitions = _dedupe_transitions(transitions)
+    if not unique_transitions:
+        return
+
+    text = _alert_text(unique_transitions)
     send_telegram_slack_test_alert(text, timeout=timeout)
     send_discord_mattermost_test_alert(text, timeout=timeout)

@@ -239,6 +239,34 @@ def test_fetch_ohlcv_yfinance_returns_empty_on_download_error(monkeypatch):
     assert data.fetch_ohlcv(["XLK"], provider="yfinance") == {}
 
 
+def test_fetch_ohlcv_result_retries_yfinance_transient_error(monkeypatch):
+    dates = pd.bdate_range("2024-01-01", periods=40)
+    columns = pd.MultiIndex.from_product(
+        [["Open", "High", "Low", "Close", "Adj Close", "Volume"], ["XLK"]]
+    )
+    raw = pd.DataFrame(1.0, index=dates, columns=columns)
+    calls = []
+    sleeps = []
+
+    def flaky_download(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            raise RuntimeError("temporary provider error")
+        return raw
+
+    monkeypatch.setattr(data.yf, "download", flaky_download)
+    monkeypatch.setattr(data.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    result = data.fetch_ohlcv_result(["XLK"], period="1y", provider="yfinance")
+
+    assert list(result.data) == ["XLK"]
+    assert result.provider_retry_count == 1
+    assert sleeps == [data.PROVIDER_RETRY_BACKOFF_SECONDS]
+    assert result.warnings == (
+        "Provider retry recovered 1 yfinance request before data loaded.",
+    )
+
+
 def test_fetch_ohlcv_result_uses_stale_cache_when_yfinance_is_unavailable(tmp_path, monkeypatch):
     from src import ohlcv_store
 

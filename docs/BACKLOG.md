@@ -170,9 +170,9 @@ Status legend:
 **Status:** Telegram bot and Slack webhook channels plus a no-secret-leak smoke script are implemented in `backlog-stepwise-qa`; live validation awaits alert secrets.
 **Files:** `src/alerts.py`, `src/scoring.py`, `scripts/smoke_telegram_slack_alerts.py`, `tests/test_alerts.py`, `tests/test_scoring.py`, `tests/test_telegram_slack_smoke_script.py`, `.streamlit/secrets.toml.example`, `README.md`.
 **Activation:** leave `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and `SLACK_WEBHOOK_URL` unset to disable network calls. Configure Telegram and/or Slack secrets, validate config presence with `./.venv/bin/python scripts/smoke_telegram_slack_alerts.py --dry-run`, then send an explicit synthetic message with `./.venv/bin/python scripts/smoke_telegram_slack_alerts.py --send-test`.
-**Behavior:** `apply_state_machine()` persists `state.json` and the transition log before sending alerts. Provider failures are swallowed so scoring does not fail because an alert endpoint is down. The smoke script checks or tests only Telegram/Slack and does not print bot tokens, chat IDs, or webhook URLs.
+**Behavior:** `apply_state_machine()` persists `state.json` and the transition log before sending alerts. Alert sends deduplicate repeated same-run transition rows, use bounded retry/backoff for transient HTTP failures, and swallow provider failures so scoring does not fail because an alert endpoint is down. The smoke script checks or tests only Telegram/Slack and does not print bot tokens, chat IDs, or webhook URLs.
 **Readiness:** `./.venv/bin/python scripts/check_ops_readiness.py` reports sanitized B-021 Telegram/Slack config labels without printing tokens or webhook URLs.
-**Deferred:** Pushover, retry/backoff, dedup, and macro-channel alerts remain future backlog work.
+**Deferred:** Pushover and macro-channel alerts remain future backlog work.
 
 ### B-120 · Email digest at 08:00 ET — IMPLEMENTED / USER TIMER LIVE VALIDATED / SMTP CONFIG PENDING
 **Status:** LOW-severity daily email digest helpers, script entry point, dry-run diagnostics, root systemd templates, and non-sudo user timer templates are implemented in `backlog-stepwise-qa`; the AHADPI5 user timer is installed and live-validated, while live delivery still awaits SMTP secrets.
@@ -249,10 +249,11 @@ Status legend:
 
 ### B-026 · Empty + loading state design — IMPLEMENTED
 **Status:** dashboard-native empty and loading states are implemented in `backlog-stepwise-qa`.
-**Files:** `src/ui_states.py`, `app.py`, `static/style.css`, `tests/test_ui_states.py`, `tests/test_empty_loading_states_static.py`.
+**Files:** `src/ui_states.py`, `src/data.py`, `app.py`, `static/style.css`, `tests/test_ui_states.py`, `tests/test_empty_loading_states_static.py`, `tests/test_data.py`, `tests/test_provider_fallback_app_static.py`.
 **Empty state:** when no picks meet gates, the `Picks` section shows a risk-off basket focused on `TLT / GLD / BIL`, using scored state/S/F values when available and `DATA PENDING` fallbacks when not.
 **Loading state:** first-page market-data fetch and indicator computation use a temporary inline skeleton placeholder with accessible `aria-busy` state, per-card shimmer animation, and reduced-motion handling; the old `st.spinner()` wrappers are removed.
-**Deferred:** async fetching, stale-cache banners, and provider retry UX remain future reliability/polish work.
+**Provider retry UX:** market-data provider calls use bounded retry/backoff for transient failures. If retry succeeds, the dashboard surfaces a `Provider recovered` status banner; stale-cache and missing-symbol banners remain covered by B-146.
+**Deferred:** async fetching remains future reliability/polish work.
 
 ---
 

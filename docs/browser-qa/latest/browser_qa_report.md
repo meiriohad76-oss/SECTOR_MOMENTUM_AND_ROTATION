@@ -1,6 +1,6 @@
 # Browser QA Evidence
 
-Generated: `2026-05-25T19:17:37Z`
+Generated: `2026-05-26T02:46:18Z`
 
 Targets: `9/9` passed
 
@@ -13,8 +13,8 @@ Targets: `9/9` passed
 | `desktop-transition-pulse` | `desktop` | B-114 | **PASS** | `docs/browser-qa/latest/desktop-transition-pulse.png` | focused text: Recent transitions visible=true top=773 height=22 scrollTop=2495; visible selector: .alert-row.pulse-transition; nonblank screenshot |
 | `desktop-provider-status-banner` | `desktop` | B-146 | **PASS** | `docs/browser-qa/latest/desktop-provider-status-banner.png` | focused text: Provider gap visible=true top=123 height=16 scrollTop=0; visible selector: .provider-status-banner; nonblank screenshot |
 | `desktop-full-matrix-table` | `desktop` | B-113 | **PASS** | `docs/browser-qa/latest/desktop-full-matrix-table.png` | focused text: FULL 7 visible=true top=418 height=26 scrollTop=13070; hovered first full-table row; visible selector: .full-table tbody tr:first-child .row-preview; nonblank screenshot |
-| `tablet-dashboard` | `tablet` | B-110, B-112, B-115 | **PASS** | `docs/browser-qa/latest/tablet-dashboard.png` | focused text: Risk regime visible=true top=418 height=22 scrollTop=894; nonblank screenshot |
-| `mobile-dashboard` | `mobile` | B-110, B-112, B-114, B-116, B-117 | **PASS** | `docs/browser-qa/latest/mobile-dashboard.png` | focused text: BLUF visible=true top=380 height=22 scrollTop=169; nonblank screenshot |
+| `tablet-dashboard` | `tablet` | B-110, B-112, B-115 | **PASS** | `docs/browser-qa/latest/tablet-dashboard.png` | focused text: Risk regime visible=true top=418 height=22 scrollTop=872; nonblank screenshot |
+| `mobile-dashboard` | `mobile` | B-110, B-112, B-114, B-116, B-117 | **PASS** | `docs/browser-qa/latest/mobile-dashboard.png` | focused text: BLUF visible=true top=549 height=22 scrollTop=0; nonblank screenshot |
 
 Checks:
 - `desktop-overview`: `text:SENTIMENT BOARD`, `text:BLUF`, `text:VIEW OPTIONS`

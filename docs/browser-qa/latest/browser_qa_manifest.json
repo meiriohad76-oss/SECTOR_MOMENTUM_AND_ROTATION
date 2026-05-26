@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-05-25T19:17:37Z",
-  "qa_mode": "local-dashboard-ux-review",
+  "generated_at": "2026-05-26T02:46:18Z",
+  "qa_mode": "local-dashboard-post-review-final",
   "results": [
     {
       "target_id": "desktop-overview",
@@ -183,7 +183,7 @@
       "actions": [],
       "ok": true,
       "notes": [
-        "focused text: Risk regime visible=true top=418 height=22 scrollTop=894",
+        "focused text: Risk regime visible=true top=418 height=22 scrollTop=872",
         "nonblank screenshot"
       ]
     },
@@ -208,7 +208,7 @@
       "actions": [],
       "ok": true,
       "notes": [
-        "focused text: BLUF visible=true top=380 height=22 scrollTop=169",
+        "focused text: BLUF visible=true top=549 height=22 scrollTop=0",
         "nonblank screenshot"
       ]
     }

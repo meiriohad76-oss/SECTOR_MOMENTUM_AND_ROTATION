@@ -53,6 +53,66 @@ def test_send_transition_alerts_posts_to_telegram_and_slack(monkeypatch):
     assert "XLK transitioned HOLD -> WARNING" in calls[1][1]["json"]["text"]
 
 
+def test_send_transition_alerts_deduplicates_repeated_transition_rows(monkeypatch):
+    calls = []
+
+    def fake_secret(name):
+        values = {
+            "SLACK_WEBHOOK_URL": "https://hooks.slack.test/abc",
+        }
+        return values.get(name)
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+    def fake_post(url, **kwargs):
+        calls.append((url, kwargs))
+        return FakeResponse()
+
+    monkeypatch.setattr(alerts, "_resolve_secret", fake_secret)
+    monkeypatch.setattr(alerts.requests, "post", fake_post)
+
+    duplicate = {"ticker": "XLK", "from": "HOLD", "to": "WARNING", "date": "2026-05-20"}
+    alerts.send_transition_alerts([duplicate, dict(duplicate)], timeout=7)
+
+    assert len(calls) == 1
+    assert calls[0][1]["json"]["text"].count("XLK transitioned HOLD -> WARNING") == 1
+
+
+def test_send_transition_alerts_retries_transient_http_failure(monkeypatch):
+    calls = []
+    sleeps = []
+
+    def fake_secret(name):
+        values = {
+            "SLACK_WEBHOOK_URL": "https://hooks.slack.test/abc",
+        }
+        return values.get(name)
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+    def flaky_post(url, **kwargs):
+        calls.append((url, kwargs))
+        if len(calls) == 1:
+            raise alerts.requests.Timeout("temporary alert timeout")
+        return FakeResponse()
+
+    monkeypatch.setattr(alerts, "_resolve_secret", fake_secret)
+    monkeypatch.setattr(alerts.requests, "post", flaky_post)
+    monkeypatch.setattr(alerts.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    alerts.send_transition_alerts(
+        [{"ticker": "XLK", "from": "HOLD", "to": "WARNING", "date": "2026-05-20"}],
+        timeout=7,
+    )
+
+    assert len(calls) == 2
+    assert sleeps == [alerts.ALERT_RETRY_BACKOFF_SECONDS]
+
+
 def test_telegram_slack_alert_status_reports_config_without_secret_values(monkeypatch):
     def fake_secret(name):
         values = {

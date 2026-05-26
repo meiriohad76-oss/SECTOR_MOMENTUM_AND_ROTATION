@@ -1,6 +1,7 @@
 """Pure helpers for dashboard empty and loading states."""
 from __future__ import annotations
 
+from html import escape
 from typing import Any
 
 import pandas as pd
@@ -63,3 +64,27 @@ def defensive_basket_rows(scored_df: pd.DataFrame) -> list[dict[str, object]]:
 
 def loading_skeleton_slots(count: int = 4) -> tuple[int, ...]:
     return tuple(range(max(0, int(count))))
+
+
+def provider_status_banner_html(ohlcv_result: Any) -> str:
+    if not (
+        getattr(ohlcv_result, "used_stale_cache", False)
+        or getattr(ohlcv_result, "missing", ())
+        or getattr(ohlcv_result, "warnings", ())
+    ):
+        return ""
+    if getattr(ohlcv_result, "used_stale_cache", False):
+        label = "Provider degraded"
+    elif getattr(ohlcv_result, "provider_retry_count", 0):
+        label = "Provider recovered"
+    else:
+        label = "Provider gap"
+    details = " ".join(escape(str(message), quote=True) for message in ohlcv_result.warnings)
+    if not details:
+        details = "Market data provider returned a partial response."
+    return f"""
+    <div class="provider-status-banner" role="status">
+      <span class="label">{escape(label, quote=True)}</span>
+      <span>{details}</span>
+    </div>
+    """
