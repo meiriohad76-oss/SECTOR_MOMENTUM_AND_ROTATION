@@ -1386,7 +1386,7 @@ def render_status():
 
     session_row = session_range_tile(ohlcv.get(BENCH["US"]), BENCH["US"])
     session_tile_html = _macro_tile_html(session_row)
-    macro_tiles_html = "".join(_macro_tile_html(row) for row in macro_tile_rows(ohlcv))
+    macro_tiles_html = "".join(_macro_tile_html(row) for row in macro_tile_rows(ohlcv, fred_data=_fred_data))
     fred_macro_groups_html = ""
     for group in fred_macro_tile_groups(_fred_data):
         rows_html = "".join(_macro_tile_html(row, extra_class="fred-macro-tile") for row in group["rows"])

@@ -47,6 +47,7 @@ FRED_SERIES = {
     "STLFSI4": "St. Louis Fed Financial Stress Index",
     "DCOILWTICO": "WTI crude oil price",
     "DHHNGSP": "Henry Hub natural gas price",
+    "DTWEXBGS": "Nominal Broad U.S. Dollar Index",
 }
 
 

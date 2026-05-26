@@ -67,10 +67,10 @@ Status legend:
 **Evidence:** `docs/superpowers/plans/2026-05-21-b102-mega-cap-stocks.md`.
 
 ### B-103 - Macro context header tiles - IMPLEMENTED
-**Status:** VIX, gold, oil, and USD context tiles render in the Market state header in `backlog-stepwise-qa`.
+**Status:** VIX, gold ETF proxy, WTI spot, and broad USD context tiles render in the Market state header in `backlog-stepwise-qa`.
 **Files:** `src/macro_tiles.py`, `tests/test_macro_tiles.py`, `tests/test_macro_tiles_app_static.py`, `app.py`, `static/style.css`.
-**Symbols:** `^VIX`, `GLD`, `USO`, and `UUP`.
-**Behavior:** context symbols are fetched with the dashboard OHLCV payload; missing data renders as `DATA PENDING`; macro context does not change methodology scoring or state-machine behavior.
+**Sources:** `^VIX` and `GLD` are fetched with the dashboard OHLCV payload. Oil now uses FRED `DCOILWTICO` WTI spot, and USD now uses FRED `DTWEXBGS` broad dollar index. `USO` and `UUP` are no longer used as header macro proxies. Gold remains explicitly labeled as a `GLD` ETF proxy because the configured FRED feed does not provide a stable current spot-gold series.
+**Behavior:** missing OHLCV or FRED context renders as `DATA PENDING`; macro context does not change methodology scoring or state-machine behavior.
 **Evidence:** `docs/superpowers/plans/2026-05-21-b103-macro-context-tiles.md`.
 
 ### B-104 - Session high/low tile - IMPLEMENTED

@@ -17,28 +17,15 @@ MACRO_CONTEXT = (
         "tooltip": "Volatility proxy: VIX is an equity-volatility stress proxy. Rising VIX usually means risk appetite is worsening, which can weaken momentum picks.",
     },
     {
-        "label": "Gold proxy",
+        "label": "Gold ETF proxy",
         "symbol": "GLD",
-        "subtitle": "Defensive demand proxy",
+        "subtitle": "GLD ETF, tradable gold exposure",
         "tone": "higher_warn",
-        "tooltip": "GLD is used as a liquid gold ETF proxy. Rising gold can indicate defensive demand or inflation concern; it is context, not a direct buy/sell rule.",
-    },
-    {
-        "label": "Oil proxy",
-        "symbol": "USO",
-        "subtitle": "USO ETF, not spot WTI",
-        "tone": "higher_warn",
-        "tooltip": "This value is the USO ETF adjusted close, not WTI spot crude. It is used only as an oil-market proxy for inflation and energy-risk context.",
-    },
-    {
-        "label": "USD proxy",
-        "symbol": "UUP",
-        "subtitle": "Dollar pressure proxy",
-        "tone": "higher_warn",
-        "tooltip": "UUP is a US dollar ETF proxy. A rising dollar can tighten global liquidity and pressure risk assets, so the dashboard treats sharp rises as a warning context.",
+        "tooltip": "GLD is a liquid gold ETF proxy, not spot gold. It is kept as a tradable defensive-demand context because the configured FRED feed does not provide a stable current spot-gold series.",
     },
 )
 MACRO_CONTEXT_SYMBOLS = tuple(item["symbol"] for item in MACRO_CONTEXT)
+FRED_HEADER_CONTEXT_IDS = ("DCOILWTICO", "DTWEXBGS")
 FRED_CONTEXT_GROUPS = (
     {
         "group": "Rates",
@@ -81,8 +68,14 @@ FRED_CONTEXT_GROUPS = (
     {
         "group": "Commodities",
         "series": (
-            {"id": "DCOILWTICO", "label": "WTI", "unit": "number", "tone": "higher_warn", "tooltip": "WTI crude oil spot price from FRED. Rising oil can raise inflation pressure and affect sector rotation."},
+            {"id": "DCOILWTICO", "label": "WTI spot", "unit": "number", "tone": "higher_warn", "tooltip": "WTI crude oil spot price from FRED. Rising oil can raise inflation pressure and affect sector rotation."},
             {"id": "DHHNGSP", "label": "Nat gas", "unit": "number", "tone": "higher_warn", "tooltip": "Henry Hub natural gas spot price. Rising energy input costs can affect inflation and sector margins."},
+        ),
+    },
+    {
+        "group": "FX",
+        "series": (
+            {"id": "DTWEXBGS", "label": "USD broad", "unit": "index", "tone": "higher_warn", "tooltip": "Broad U.S. Dollar Index from FRED. A rising dollar can tighten global liquidity and pressure risk assets."},
         ),
     },
 )
@@ -278,6 +271,15 @@ def fred_macro_snapshot(fred_data: Mapping[str, pd.Series]) -> dict[str, dict[st
     return snapshot
 
 
+def _fred_context_item_by_id(series_id: str) -> tuple[Mapping[str, str], str] | None:
+    for group in FRED_CONTEXT_GROUPS:
+        group_name = str(group["group"])
+        for item in group["series"]:
+            if item["id"] == series_id:
+                return item, group_name
+    return None
+
+
 def _tone(change_pct: float | None, label: str) -> str:
     if change_pct is None:
         return "warn"
@@ -348,8 +350,19 @@ def _row_for(item: Mapping[str, str], frame: pd.DataFrame | None) -> dict[str, s
     }, change_pct, mode, 4.0)
 
 
-def macro_tile_rows(ohlcv: Mapping[str, pd.DataFrame]) -> list[dict[str, str]]:
-    return [_row_for(item, ohlcv.get(item["symbol"])) for item in MACRO_CONTEXT]
+def macro_tile_rows(
+    ohlcv: Mapping[str, pd.DataFrame],
+    fred_data: Mapping[str, pd.Series] | None = None,
+) -> list[dict[str, str]]:
+    rows = [_row_for(item, ohlcv.get(item["symbol"])) for item in MACRO_CONTEXT]
+    fred_payload = fred_data or {}
+    for series_id in FRED_HEADER_CONTEXT_IDS:
+        item_and_group = _fred_context_item_by_id(series_id)
+        if item_and_group is None:
+            continue
+        item, group_name = item_and_group
+        rows.append(_fred_row(item, group_name, fred_payload.get(series_id)))
+    return rows
 
 
 def session_range_tile(frame: pd.DataFrame | None, symbol: str) -> dict[str, str]:

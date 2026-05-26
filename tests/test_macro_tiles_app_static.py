@@ -22,7 +22,7 @@ def test_app_fetches_macro_context_symbols_for_header_tiles():
     assert "compute_flow_signals(scoring_ohlcv)" in app_source
     assert "session_range_tile(ohlcv.get(BENCH[\"US\"]), BENCH[\"US\"])" in app_source
     assert "session_tile_html" in app_source
-    assert "macro_tile_rows(ohlcv)" in app_source
+    assert "macro_tile_rows(ohlcv, fred_data=_fred_data)" in app_source
     assert "macro_tiles_html" in app_source
     assert "fred_macro_tile_groups(_fred_data)" in app_source
     assert "fred_macro_groups_html" in app_source

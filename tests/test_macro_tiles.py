@@ -3,6 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from src.macro_tiles import (
+    FRED_HEADER_CONTEXT_IDS,
     MACRO_CONTEXT_SYMBOLS,
     fred_macro_snapshot,
     fred_macro_tile_groups,
@@ -18,33 +19,52 @@ def _frame(values):
     )
 
 
-def test_macro_context_symbols_are_display_only_market_proxies():
-    assert tuple(MACRO_CONTEXT_SYMBOLS) == ("^VIX", "GLD", "USO", "UUP")
+def test_macro_context_symbols_avoid_oil_and_dollar_etf_proxies():
+    assert tuple(MACRO_CONTEXT_SYMBOLS) == ("^VIX", "GLD")
+    assert tuple(FRED_HEADER_CONTEXT_IDS) == ("DCOILWTICO", "DTWEXBGS")
 
 
-def test_macro_tile_rows_compute_last_value_and_percent_change():
+def test_macro_tile_rows_use_fred_for_wti_and_usd_when_available():
     rows = macro_tile_rows(
         {
             "^VIX": _frame([15.0, 18.0]),
             "GLD": _frame([200.0, 202.0]),
-            "USO": _frame([70.0, 68.6]),
-            "UUP": _frame([28.0, 28.0]),
-        }
+        },
+        fred_data={
+            "DCOILWTICO": pd.Series([100.0, 112.2], index=pd.date_range("2026-05-01", periods=2)),
+            "DTWEXBGS": pd.Series([120.0, 121.5], index=pd.date_range("2026-05-01", periods=2)),
+        },
     )
 
-    assert [row["label"] for row in rows] == ["VIX", "Gold proxy", "Oil proxy", "USD proxy"]
+    assert [row["label"] for row in rows] == ["VIX", "Gold ETF proxy", "WTI spot", "USD broad"]
     assert rows[0]["value"] == "18.00"
     assert rows[0]["change"] == "+20.0%"
     assert rows[0]["tone"] == "warn"
     assert rows[0]["sentiment_label"] == "negative"
     assert rows[0]["trend_label"] == "worsening"
     assert rows[0]["gauge_pct"] > 50
-    assert rows[2]["change"] == "-2.0%"
-    assert rows[2]["tone"] == "up"
-    assert rows[2]["subtitle"] == "USO ETF, not spot WTI"
-    assert "USO" in rows[2]["tooltip"]
-    assert "not WTI spot" in rows[2]["tooltip"]
-    assert rows[3]["tone"] == "flat"
+    assert rows[1]["subtitle"] == "GLD ETF, tradable gold exposure"
+    assert rows[2]["series_id"] == "DCOILWTICO"
+    assert rows[2]["value"] == "112.20"
+    assert rows[2]["subtitle"] == "2026-05-02"
+    assert "spot price from FRED" in rows[2]["tooltip"]
+    assert "USO" not in rows[2]["tooltip"]
+    assert rows[3]["series_id"] == "DTWEXBGS"
+    assert rows[3]["value"] == "121.50"
+    assert rows[3]["sentiment_label"] == "negative"
+    assert "Broad U.S. Dollar Index" in rows[3]["tooltip"]
+
+
+def test_macro_tile_rows_show_pending_for_fred_macro_when_fred_missing():
+    rows = macro_tile_rows({"^VIX": _frame([15.0]), "GLD": _frame([200.0])}, fred_data={})
+
+    assert [row["label"] for row in rows] == ["VIX", "Gold ETF proxy", "WTI spot", "USD broad"]
+    assert rows[2]["value"] == "DATA PENDING"
+    assert rows[2]["series_id"] == "DCOILWTICO"
+    assert rows[2]["subtitle"] == "DCOILWTICO"
+    assert "WTI crude oil spot price" in rows[2]["tooltip"]
+    assert rows[3]["value"] == "DATA PENDING"
+    assert rows[3]["series_id"] == "DTWEXBGS"
 
 
 def test_macro_tile_rows_use_data_pending_for_missing_symbol():
@@ -124,6 +144,7 @@ def test_fred_macro_tile_groups_format_read_only_context():
         "Growth",
         "Credit",
         "Commodities",
+        "FX",
     ]
     rates = groups[0]["rows"]
     assert rates[0]["label"] == "10Y yield"
@@ -143,6 +164,8 @@ def test_fred_macro_tile_groups_format_read_only_context():
     assert groups[3]["rows"][0]["tone"] == "up"
     assert groups[4]["rows"][0]["tone"] == "up"
     assert groups[5]["rows"][0]["value"] == "112.20"
+    assert groups[6]["rows"][0]["label"] == "USD broad"
+    assert groups[6]["rows"][0]["value"] == "DATA PENDING"
 
 
 def test_fred_macro_tile_groups_use_data_pending_for_missing_series():

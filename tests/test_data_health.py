@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
+from src.fred_data import FRED_SERIES
 from src.data_health import (
     dashboard_health_summary,
     data_health_rows,
@@ -106,7 +107,7 @@ def test_fred_health_covers_regime_classifier_series_not_only_visible_tiles():
     fred_row = next(row for row in rows if row["source"] == "FRED macro/regime")
 
     assert "INDPRO" not in fred_row["detail"]
-    assert "20" in fred_row["detail"]
+    assert f"5/{len(FRED_SERIES)} series loaded" in fred_row["detail"]
     assert "business-cycle tilt" in fred_row["role"]
 
 

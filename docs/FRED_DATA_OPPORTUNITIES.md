@@ -102,6 +102,12 @@ Use: risk-off confirmation, credit-stress dashboard tiles, and alert/debrief con
 
 Use: energy/inflation context and sector debrief overlays.
 
+### FX And Dollar Pressure
+
+- `DTWEXBGS` - nominal broad U.S. dollar index
+
+Use: liquidity and global-risk context, replacing the old `UUP` ETF proxy in the Market state header.
+
 ## Series To Recheck Before Using
 
 The live scan did not return usable data for these IDs in the current environment:
