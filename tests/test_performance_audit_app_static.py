@@ -97,15 +97,17 @@ def test_visual_only_reuse_refreshes_read_only_transition_rows():
     )
 
 
-def test_visual_controls_use_precompute_callbacks():
+def test_visual_controls_use_precompute_bridge_actions():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
     header_section = app_source[
         app_source.index("def render_header_controls():") : app_source.index("def render_bluf():")
     ]
 
-    assert "on_click=refresh_market_data" in header_section
-    assert "args=(_load_data,)" in header_section
-    assert "on_click=toggle_theme" in header_section
-    assert "args=(st.session_state,)" in header_section
+    assert "st.iframe(" in header_section
+    assert "floating_control_bridge_html(" in header_section
+    assert "apply_control_bridge_query_actions(" in app_source
+    assert "refresh_market_data(_load_data)" in app_source
+    assert "on_click=refresh_market_data" not in header_section
+    assert "on_click=toggle_theme" not in header_section
     assert "st.rerun()" not in header_section

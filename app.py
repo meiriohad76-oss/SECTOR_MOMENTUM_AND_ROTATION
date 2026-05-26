@@ -16,17 +16,25 @@ import pandas as pd
 import streamlit as st
 
 from src.backtest import drawdown_frame, normalized_equity_frame
+from src.browser_qa_data import browser_qa_ohlcv_result
 from src.calibration_dashboard import (
     calibration_artifact_status_rows,
     expanded_calibration_artifact_status_rows,
     shared_artifact_hash,
+)
+from src.component_bridge import (
+    apply_control_bridge_query_actions,
+    drill_bridge_attrs,
+    drill_click_bridge_html,
+    floating_control_bridge_html,
+    rrg_plotly_click_bridge_html,
 )
 from src.component_docs import DASHBOARD_COMPONENT_DOCS, component_docs_html
 from src.comparison_view import (
     comparison_card_rows,
     initialize_comparison_tickers,
 )
-from src.controls import refresh_market_data, toggle_theme
+from src.controls import refresh_market_data
 from src.custom_universe import (
     analyze_custom_universe,
     custom_universe_rows_frame,
@@ -41,6 +49,7 @@ from src.indicators import compute_all_indicators
 from src.macro import assess_regime
 from src.macro_tiles import MACRO_CONTEXT_SYMBOLS, fred_macro_snapshot, fred_macro_tile_groups, macro_tile_rows, session_range_tile
 from src.navigation import initialize_drill_ticker, select_drill_ticker
+from src.ohlcv_prefetch import prefetch_status, submit_ohlcv_prefetch
 from src.personal_trades import (
     TradeInputResult,
     evaluate_trade_history,
@@ -447,6 +456,39 @@ section.main > div.block-container { padding-top: 0; padding-bottom: 0; max-widt
 .element-container .stPlotlyChart { background: transparent !important; }
 """
 
+
+# =============================== data load (cached) ==============================
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _load_data(period: str = "3y"):
+    tickers = DATA_SYMBOLS
+    if _browser_qa_mode_enabled():
+        return browser_qa_ohlcv_result(tickers, period=period)
+    return fetch_ohlcv_result(tickers, period=period)
+
+
+def _refresh_loaded_data() -> None:
+    refresh_market_data(_load_data)
+
+
+def _apply_control_bridge_actions() -> None:
+    result = apply_control_bridge_query_actions(
+        st.session_state,
+        st.query_params,
+        refresh_callback=_refresh_loaded_data,
+    )
+    if result.should_rerun:
+        st.rerun()
+
+
+def _start_ohlcv_cache_prefetch() -> None:
+    if _browser_qa_mode_enabled():
+        return
+    future = submit_ohlcv_prefetch(DATA_SYMBOLS, period="3y")
+    st.session_state["ohlcv_prefetch_future"] = future
+    st.session_state["ohlcv_prefetch_status"] = prefetch_status(future)
+
+
 if "theme" not in st.session_state:
     st.session_state.theme = "dark"
 if "klass" not in st.session_state:
@@ -470,6 +512,7 @@ if "table_open" not in st.session_state:
 if "table_sort" not in st.session_state:
     st.session_state.table_sort = "S_score:desc"
 initialize_preferences(st.session_state)
+_apply_control_bridge_actions()
 if _browser_qa_mode_enabled():
     qa_palette = _browser_qa_query_value("browser_qa_palette")
     if qa_palette in PALETTE_OPTIONS:
@@ -491,16 +534,6 @@ _md(
     f'document.documentElement.classList.add("{_density_class}");'
     f'</script>',
 )
-
-
-# =============================== data load (cached) ==============================
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def _load_data(period: str = "3y"):
-    tickers = DATA_SYMBOLS
-    if _browser_qa_mode_enabled():
-        return fetch_ohlcv_result(tickers, period=period, provider="yfinance")
-    return fetch_ohlcv_result(tickers, period=period)
 
 
 def provider_status_banner_html(ohlcv_result):
@@ -662,6 +695,9 @@ else:
 
 AVAILABLE_TICKERS = sorted(scored.index.tolist())
 initialize_drill_ticker(st.session_state, st.query_params, AVAILABLE_TICKERS)
+if _REUSED_COMPUTE_SNAPSHOT is False:
+    with PERF_AUDIT.section("ohlcv_prefetch"):
+        _start_ohlcv_cache_prefetch()
 
 
 # =============================== derive view-model ===============================
@@ -1094,27 +1130,18 @@ def render_view_preferences():
 
 
 def render_header_controls():
-    _md('<div class="header-controls-slot"></div>')
-    ctrl_col1, ctrl_col2 = st.columns(2)
-    with ctrl_col1:
-        st.button(
-            "↻",
-            key="refresh_btn",
-            help="Refresh data",
-            width="stretch",
-            on_click=refresh_market_data,
-            args=(_load_data,),
-        )
-    with ctrl_col2:
-        icon = "☀" if st.session_state.theme == "dark" else "☾"
-        st.button(
-            icon,
-            key="theme_btn",
-            help="Toggle theme",
-            width="stretch",
-            on_click=toggle_theme,
-            args=(st.session_state,),
-        )
+    st.iframe(drill_click_bridge_html(), height=1, tab_index=-1)
+    st.iframe(
+        floating_control_bridge_html(
+            theme=st.session_state.theme,
+            bluf_mode=st.session_state.bluf_mode,
+            density=st.session_state.view_density,
+            sparkline=st.session_state.sparkline_style,
+            palette=st.session_state.color_palette,
+        ),
+        height=1,
+        tab_index=-1,
+    )
 
 
 def render_bluf():
@@ -1157,12 +1184,13 @@ def render_bluf():
     """
     cards = []
     for a in bluf["actions"]:
+        first_ticker = next((it["t"] for it in a["tickers"] if it.get("t")), "")
         items_html = "".join(
-            f'<li><span class="t">{it["t"]}</span><span class="n">{it["note"]}</span></li>'
+            f'<li {drill_bridge_attrs(it["t"], label=it["note"])}><span class="t">{it["t"]}</span><span class="n">{it["note"]}</span></li>'
             for it in a["tickers"]
         ) or '<li><span class="t">—</span><span class="n">none</span></li>'
         card_html = f"""
-        <div class="action-card {a['kind']}">
+        <div class="action-card {a['kind']}" {drill_bridge_attrs(first_ticker, label=a['label'])}>
           <div class="action-head">
             <div class="action-label">{a['label']}</div>
             <div class="action-eta">{a['eta']}</div>
@@ -1291,7 +1319,7 @@ def render_alerts():
         pulse_class = transition_row_pulse_class(r)
         sentiment_class, sentiment_label, sentiment_symbol = _transition_sentiment(r)
         rows += f"""
-        <div class="alert-row {new_state} {pulse_class}">
+        <div class="alert-row {new_state} {pulse_class}" {drill_bridge_attrs(ticker, label=new_state)}>
           <span class="dot" style="background:{dot_color}"></span>
           <span class="t">{_esc(ticker)}</span>
           <span class="transition-badge {sentiment_class}"><span>{sentiment_symbol}</span>{sentiment_label}</span>
@@ -1343,7 +1371,7 @@ def render_picks():
             s_class = "" if s_score is None else ("pos" if float(s_score) >= 0 else "neg")
             f_class = "" if f_score is None else ("pos" if float(f_score) >= 0 else "neg")
             cards_html += f"""
-            <div class="pick defensive-card {pill_class}{unavailable_class}">
+            <div class="pick defensive-card {pill_class}{unavailable_class}" {drill_bridge_attrs(ticker, label=str(row["role"])) if available else ""}>
               <div class="pick-top">
                 <div>
                   <div class="pick-ticker">{ticker}</div>
@@ -1403,7 +1431,7 @@ def render_picks():
         pulse_class = transition_pulse_class(tkr, transitions)
 
         cards_html += f"""
-        <div class="pick {state} {pulse_class}">
+        <div class="pick {state} {pulse_class}" {drill_bridge_attrs(tkr, label=klass_lbl)}>
           <div class="pick-top">
             <div>
               <div class="pick-ticker"><span class="pick-rank">#{pick_rank}</span>{tkr}</div>
@@ -1470,10 +1498,9 @@ def render_rrg():
 
     with left_col:
         if not rrg_sub.empty:
-            st.plotly_chart(
-                rrg_chart_dark(rrg_sub, title=""),
-                width="stretch",
-                config={"displayModeBar": False},
+            st.iframe(
+                rrg_plotly_click_bridge_html(rrg_chart_dark(rrg_sub, title="")),
+                height=620,
             )
         else:
             st.info("No data for this class.")
@@ -1484,7 +1511,7 @@ def render_rrg():
             tickers = quads[q]
             count = len(tickers)
             ticks = " / ".join(f"{ticker} | {_ticker_display_name(ticker)}" for ticker in tickers[:8]) if tickers else "-"
-            _md(f'<div class="quad-card {color_cls}">'
+            _md(f'<div class="quad-card {color_cls}" {drill_bridge_attrs(tickers[0], label=q) if tickers else ""}>'
                 f'<div class="qlbl tip-cue" data-tip="{_esc(INDICATOR_TIPS["tip_q_" + q.lower()])}">{q}</div>'
                 f'<div class="qcount">{count}</div>'
                 f'<div class="qtick">{ticks}</div>'

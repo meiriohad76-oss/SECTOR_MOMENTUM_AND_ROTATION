@@ -229,23 +229,23 @@ Status legend:
 **Safety:** research/reporting only; no live scoring, state-machine, alerting, provider-flow, veto, portfolio, or broker behavior changes.
 
 ### B-023 · Click-through from cards/alerts/RRG → drill-down — IMPLEMENTED
-**Status:** Native Streamlit drill buttons and `?ticker=...` deep links are implemented in `backlog-stepwise-qa`.
-**Files:** `src/navigation.py`, `app.py`, `tests/test_navigation.py`, `README.md`.
-**Behavior:** alert, pick, and RRG context controls update `st.session_state.drill_ticker` plus the URL query param, then rerun into the existing per-ticker drill-down.
-**Deferred:** whole-card HTML clicks and Plotly dot-click capture still need a custom component or event bridge.
+**Status:** Native selectors, `?ticker=...` deep links, whole-card HTML clicks, and Plotly RRG point-click capture are implemented in `backlog-stepwise-qa`.
+**Files:** `src/navigation.py`, `src/component_bridge.py`, `app.py`, `static/style.css`, `tests/test_navigation.py`, `tests/test_component_bridge.py`, `tests/test_component_bridge_app_static.py`, `README.md`.
+**Behavior:** alert rows, pick cards, BLUF action cards, RRG quadrant cards, and RRG Plotly dots expose accessible `data-drill-ticker` bridge targets. The custom component bridge updates the `ticker` query param, then the existing drill-down hydration path updates `st.session_state.drill_ticker`.
+**Safety:** the bridge only changes URL drill selection; it does not fetch data, mutate scoring, write state-machine transitions, send alerts, or expose provider credentials.
 
 ### B-024 · Floating refresh / theme buttons in the header — IMPLEMENTED
-**Status:** Native Streamlit refresh/theme controls render immediately after the header and are fixed top-right via CSS.
-**Files:** `src/controls.py`, `app.py`, `static/style.css`, `tests/test_controls.py`, `tests/test_header_controls_static.py`.
-**Behavior:** refresh clears cached market data and reruns; theme toggles dark/light session state and reruns.
-**Deferred:** custom component bridge remains future polish; animated fetching feedback is handled by the B-026 shimmer loading state.
+**Status:** A custom floating header/preference component renders refresh, theme, BLUF mode, density, sparkline, and palette controls.
+**Files:** `src/controls.py`, `src/component_bridge.py`, `app.py`, `static/style.css`, `tests/test_controls.py`, `tests/test_header_controls_static.py`, `tests/test_component_bridge.py`, `tests/test_component_bridge_app_static.py`.
+**Behavior:** component actions update short-lived `bridge_*` query params. Python consumes and clears those params before visual snapshotting, clears cached market data for refresh, toggles theme, or applies validated display preferences, then reruns with clean state.
+**Safety:** display preference changes remain visual-only for performance reuse; refresh clears data cache but does not log secrets or alter scoring thresholds.
 
 ### B-025 · TweaksPanel parity (BLUF Compact / Hidden modes) — IMPLEMENTED
 **Status:** Native Streamlit `VIEW OPTIONS` expander and local preference profiles are implemented near the header.
 **Files:** `src/preferences.py`, `app.py`, `src/visuals.py`, `static/style.css`, `.gitignore`, `.dockerignore`, `tests/test_preferences.py`, `tests/test_visuals.py`, `tests/test_view_preferences_static.py`.
 **Controls:** BLUF mode (`Verdict`, `Compact`, `Hidden`), density (`Comfortable`, `Compact`), sparkline style (`Filled`, `Line`, `Off`), palette, and save/load/delete named local preference profiles.
 **Behavior:** preference profiles persist to ignored local JSON at `data/preference_profiles.json`; profiles store only display preferences and do not fetch data, mutate scoring, write the state machine, send alerts, or expose secrets.
-**Deferred:** custom floating React-style panel and additional palettes remain future preference polish.
+**Bridge:** the floating custom header/preference component now provides quick access to the same display preferences while the native `VIEW OPTIONS` expander remains available for profile save/load/delete.
 
 ### B-026 · Empty + loading state design — IMPLEMENTED
 **Status:** dashboard-native empty and loading states are implemented in `backlog-stepwise-qa`.
@@ -253,7 +253,7 @@ Status legend:
 **Empty state:** when no picks meet gates, the `Picks` section shows a risk-off basket focused on `TLT / GLD / BIL`, using scored state/S/F values when available and `DATA PENDING` fallbacks when not.
 **Loading state:** first-page market-data fetch and indicator computation use a temporary inline skeleton placeholder with accessible `aria-busy` state, per-card shimmer animation, and reduced-motion handling; the old `st.spinner()` wrappers are removed.
 **Provider retry UX:** market-data provider calls use bounded retry/backoff for transient failures. If retry succeeds, the dashboard surfaces a `Provider recovered` status banner; stale-cache and missing-symbol banners remain covered by B-146.
-**Deferred:** async fetching remains future reliability/polish work.
+**Async fetching:** `src/ohlcv_prefetch.py` now warms the persistent OHLCV cache in a deduped daemon background task after a successful foreground load. Scoring still reads only the foreground `_load_data("3y")` result, so no partial or background data can alter the current run.
 
 ---
 

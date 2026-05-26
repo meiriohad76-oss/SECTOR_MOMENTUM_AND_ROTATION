@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-05-26T02:46:18Z",
-  "qa_mode": "local-dashboard-post-review-final",
+  "generated_at": "2026-05-26T04:44:24Z",
+  "qa_mode": "local-dashboard-component-bridge",
   "results": [
     {
       "target_id": "desktop-overview",
@@ -20,7 +20,7 @@
       "actions": [],
       "ok": true,
       "notes": [
-        "focused text: SENTIMENT BOARD visible=true top=177 height=24 scrollTop=0",
+        "focused text: SENTIMENT BOARD visible=true top=128 height=24 scrollTop=0",
         "nonblank screenshot"
       ]
     },
@@ -46,7 +46,7 @@
       "notes": [
         "expanded: VIEW OPTIONS",
         "checked radio: Solarized",
-        "focused text: Palette visible=true top=450 height=22 scrollTop=0",
+        "focused text: Palette visible=true top=363 height=22 scrollTop=0",
         "nonblank screenshot"
       ]
     },
@@ -69,7 +69,7 @@
       "actions": [],
       "ok": true,
       "notes": [
-        "focused text: US SECTOR RELATIVE STRENGTH visible=true top=429 height=17 scrollTop=5370",
+        "focused text: US SECTOR RELATIVE STRENGTH visible=true top=429 height=17 scrollTop=5604",
         "nonblank screenshot"
       ]
     },
@@ -88,7 +88,7 @@
       "actions": [],
       "ok": true,
       "notes": [
-        "focused text: COMPARE TICKERS visible=true top=418 height=22 scrollTop=7940",
+        "focused text: COMPARE TICKERS visible=true top=418 height=22 scrollTop=8174",
         "nonblank screenshot"
       ]
     },
@@ -111,7 +111,7 @@
       ],
       "ok": true,
       "notes": [
-        "focused text: Recent transitions visible=true top=773 height=22 scrollTop=2495",
+        "focused text: Recent transitions visible=true top=418 height=22 scrollTop=2929",
         "visible selector: .alert-row.pulse-transition",
         "nonblank screenshot"
       ]
@@ -158,7 +158,7 @@
       ],
       "ok": true,
       "notes": [
-        "focused text: FULL 7 visible=true top=418 height=26 scrollTop=13070",
+        "focused text: FULL 7 visible=true top=907 height=26 scrollTop=12819",
         "hovered first full-table row",
         "visible selector: .full-table tbody tr:first-child .row-preview",
         "nonblank screenshot"
@@ -183,7 +183,7 @@
       "actions": [],
       "ok": true,
       "notes": [
-        "focused text: Risk regime visible=true top=418 height=22 scrollTop=872",
+        "focused text: Risk regime visible=true top=418 height=22 scrollTop=737",
         "nonblank screenshot"
       ]
     },
@@ -208,7 +208,7 @@
       "actions": [],
       "ok": true,
       "notes": [
-        "focused text: BLUF visible=true top=549 height=22 scrollTop=0",
+        "focused text: BLUF visible=true top=388 height=22 scrollTop=0",
         "nonblank screenshot"
       ]
     }

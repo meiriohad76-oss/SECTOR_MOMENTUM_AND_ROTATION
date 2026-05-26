@@ -460,6 +460,13 @@ body {
 .action-card.warn::before { background: var(--st-warn); }
 .action-card.buy::before  { background: var(--st-stage2); }
 .action-card:hover { background: var(--panel-hover); }
+[data-drill-ticker] {
+  cursor: pointer;
+}
+[data-drill-ticker]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
 
 .action-head {
   display: flex;

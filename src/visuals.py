@@ -112,6 +112,29 @@ def _clip_to_visible_since(
     return data.loc[data.index >= cutoff]
 
 
+def _padded_axis_range(
+    values: pd.Series,
+    *,
+    anchors: tuple[float, ...] = (),
+    fallback: tuple[float, float] = (-0.5, 0.5),
+    pad_ratio: float = 0.12,
+    min_pad: float = 0.05,
+) -> list[float]:
+    numeric = pd.to_numeric(pd.concat([values, pd.Series(anchors)]), errors="coerce").dropna()
+    if numeric.empty:
+        return [fallback[0], fallback[1]]
+    finite = numeric[np.isfinite(numeric)]
+    if finite.empty:
+        return [fallback[0], fallback[1]]
+    low = float(finite.min())
+    high = float(finite.max())
+    if low == high:
+        pad = max(abs(high) * pad_ratio, min_pad)
+    else:
+        pad = max((high - low) * pad_ratio, min_pad)
+    return [low - pad, high + pad]
+
+
 def price_chart_with_30wma(
     df_daily: pd.DataFrame,
     ticker: str,
@@ -151,8 +174,8 @@ def cmf_chart(
     fig.add_hline(y=-0.10, line=dict(color="#D5562C", dash="dot"))
     fig.update_layout(
         title=f"{ticker} — Chaikin Money Flow (21d)",
-        height=320,
-        yaxis=dict(range=[-0.5, 0.5]),
+        height=400,
+        yaxis=dict(range=_padded_axis_range(visible_cmf, anchors=(-0.10, 0.0, 0.10))),
         margin=dict(l=40, r=40, t=60, b=40),
         plot_bgcolor="#FAFAFA",
     )

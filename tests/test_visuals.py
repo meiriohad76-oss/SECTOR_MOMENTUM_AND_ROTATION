@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from src.visuals import (
+    cmf_chart,
     filter_ohlcv_lookback,
     price_chart_with_30wma,
     relative_strength_lines_frame,
@@ -201,3 +202,30 @@ def test_price_chart_with_30wma_visible_since_preserves_sma_warmup():
     assert min(close_trace.x) >= visible_since
     assert min(sma_trace.x) >= visible_since
     assert any(pd.notna(value) for value in sma_trace.y)
+
+
+def test_cmf_chart_matches_price_chart_height_and_pads_extreme_values():
+    dates = pd.bdate_range("2026-01-01", periods=80)
+    frame = pd.DataFrame(
+        {
+            "open": [10.0] * len(dates),
+            "high": [11.0] * len(dates),
+            "low": [9.0] * len(dates),
+            "close": [11.0] * len(dates),
+            "volume": [1_000_000] * len(dates),
+            "adj_close": [11.0] * len(dates),
+        },
+        index=dates,
+    )
+    visible_since = dates[-45]
+
+    price_fig = price_chart_with_30wma(frame, "XLK", visible_since=visible_since)
+    cmf_fig = cmf_chart(frame, "XLK", visible_since=visible_since)
+
+    cmf_trace = cmf_fig.data[0]
+    y_values = [float(value) for value in cmf_trace.y if pd.notna(value)]
+    y_min, y_max = cmf_fig.layout.yaxis.range
+
+    assert cmf_fig.layout.height == price_fig.layout.height
+    assert y_min < min(y_values)
+    assert y_max > max(y_values)

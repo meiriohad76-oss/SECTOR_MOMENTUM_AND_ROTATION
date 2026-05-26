@@ -144,6 +144,8 @@ def test_session_snapshot_tracks_interactive_widget_keys_and_ignores_audit_state
             "save_watchlist_name": "Core",
             "sort_choice": "S_score:desc",
             "performance_last_snapshot": (("theme", "light"),),
+            "ohlcv_prefetch_future": object(),
+            "ohlcv_prefetch_status": "running",
         }
     )
     values = dict(snapshot)
@@ -163,6 +165,8 @@ def test_session_snapshot_tracks_interactive_widget_keys_and_ignores_audit_state
     assert values["save_watchlist_name"] == "Core"
     assert values["sort_choice"] == "S_score:desc"
     assert "performance_last_snapshot" not in values
+    assert "ohlcv_prefetch_future" not in values
+    assert "ohlcv_prefetch_status" not in values
 
 
 def test_dashboard_performance_audit_records_section_durations():

@@ -1,20 +1,20 @@
 # Browser QA Evidence
 
-Generated: `2026-05-26T02:46:18Z`
+Generated: `2026-05-26T04:44:24Z`
 
 Targets: `9/9` passed
 
 | Target | Viewport | Tickets | Status | Screenshot | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `desktop-overview` | `desktop` | B-110, B-147 | **PASS** | `docs/browser-qa/latest/desktop-overview.png` | focused text: SENTIMENT BOARD visible=true top=177 height=24 scrollTop=0; nonblank screenshot |
-| `desktop-palette-view-options` | `desktop` | B-117 | **PASS** | `docs/browser-qa/latest/desktop-palette-view-options.png` | expanded: VIEW OPTIONS; checked radio: Solarized; focused text: Palette visible=true top=450 height=22 scrollTop=0; nonblank screenshot |
-| `desktop-rrg-spaghetti-drill` | `desktop` | B-111, B-112, B-116 | **PASS** | `docs/browser-qa/latest/desktop-rrg-spaghetti-drill.png` | focused text: US SECTOR RELATIVE STRENGTH visible=true top=429 height=17 scrollTop=5370; nonblank screenshot |
-| `desktop-comparison-view` | `desktop` | B-115 | **PASS** | `docs/browser-qa/latest/desktop-comparison-view.png` | focused text: COMPARE TICKERS visible=true top=418 height=22 scrollTop=7940; nonblank screenshot |
-| `desktop-transition-pulse` | `desktop` | B-114 | **PASS** | `docs/browser-qa/latest/desktop-transition-pulse.png` | focused text: Recent transitions visible=true top=773 height=22 scrollTop=2495; visible selector: .alert-row.pulse-transition; nonblank screenshot |
+| `desktop-overview` | `desktop` | B-110, B-147 | **PASS** | `docs/browser-qa/latest/desktop-overview.png` | focused text: SENTIMENT BOARD visible=true top=128 height=24 scrollTop=0; nonblank screenshot |
+| `desktop-palette-view-options` | `desktop` | B-117 | **PASS** | `docs/browser-qa/latest/desktop-palette-view-options.png` | expanded: VIEW OPTIONS; checked radio: Solarized; focused text: Palette visible=true top=363 height=22 scrollTop=0; nonblank screenshot |
+| `desktop-rrg-spaghetti-drill` | `desktop` | B-111, B-112, B-116 | **PASS** | `docs/browser-qa/latest/desktop-rrg-spaghetti-drill.png` | focused text: US SECTOR RELATIVE STRENGTH visible=true top=429 height=17 scrollTop=5604; nonblank screenshot |
+| `desktop-comparison-view` | `desktop` | B-115 | **PASS** | `docs/browser-qa/latest/desktop-comparison-view.png` | focused text: COMPARE TICKERS visible=true top=418 height=22 scrollTop=8174; nonblank screenshot |
+| `desktop-transition-pulse` | `desktop` | B-114 | **PASS** | `docs/browser-qa/latest/desktop-transition-pulse.png` | focused text: Recent transitions visible=true top=418 height=22 scrollTop=2929; visible selector: .alert-row.pulse-transition; nonblank screenshot |
 | `desktop-provider-status-banner` | `desktop` | B-146 | **PASS** | `docs/browser-qa/latest/desktop-provider-status-banner.png` | focused text: Provider gap visible=true top=123 height=16 scrollTop=0; visible selector: .provider-status-banner; nonblank screenshot |
-| `desktop-full-matrix-table` | `desktop` | B-113 | **PASS** | `docs/browser-qa/latest/desktop-full-matrix-table.png` | focused text: FULL 7 visible=true top=418 height=26 scrollTop=13070; hovered first full-table row; visible selector: .full-table tbody tr:first-child .row-preview; nonblank screenshot |
-| `tablet-dashboard` | `tablet` | B-110, B-112, B-115 | **PASS** | `docs/browser-qa/latest/tablet-dashboard.png` | focused text: Risk regime visible=true top=418 height=22 scrollTop=872; nonblank screenshot |
-| `mobile-dashboard` | `mobile` | B-110, B-112, B-114, B-116, B-117 | **PASS** | `docs/browser-qa/latest/mobile-dashboard.png` | focused text: BLUF visible=true top=549 height=22 scrollTop=0; nonblank screenshot |
+| `desktop-full-matrix-table` | `desktop` | B-113 | **PASS** | `docs/browser-qa/latest/desktop-full-matrix-table.png` | focused text: FULL 7 visible=true top=907 height=26 scrollTop=12819; hovered first full-table row; visible selector: .full-table tbody tr:first-child .row-preview; nonblank screenshot |
+| `tablet-dashboard` | `tablet` | B-110, B-112, B-115 | **PASS** | `docs/browser-qa/latest/tablet-dashboard.png` | focused text: Risk regime visible=true top=418 height=22 scrollTop=737; nonblank screenshot |
+| `mobile-dashboard` | `mobile` | B-110, B-112, B-114, B-116, B-117 | **PASS** | `docs/browser-qa/latest/mobile-dashboard.png` | focused text: BLUF visible=true top=388 height=22 scrollTop=0; nonblank screenshot |
 
 Checks:
 - `desktop-overview`: `text:SENTIMENT BOARD`, `text:BLUF`, `text:VIEW OPTIONS`

@@ -8,6 +8,9 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def test_header_controls_render_after_header_and_bottom_controls_removed():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    header_section = app_source[
+        app_source.index("def render_header_controls():") : app_source.index("def render_bluf():")
+    ]
 
     assert '_render_timed("render_header", render_header)' in app_source
     assert '_render_timed("render_header_controls", render_header_controls)' in app_source
@@ -16,17 +19,16 @@ def test_header_controls_render_after_header_and_bottom_controls_removed():
     )
     assert "ctrl_col1, ctrl_col2, _ = st.columns([1, 1, 18])" not in app_source
     assert "_load_data.clear()" not in app_source
-    assert "on_click=refresh_market_data" in app_source
-    assert "args=(_load_data,)" in app_source
-    assert "on_click=toggle_theme" in app_source
-    assert "args=(st.session_state,)" in app_source
+    assert "st.iframe(" in header_section
+    assert "floating_control_bridge_html(" in header_section
+    assert "drill_click_bridge_html()" in header_section
+    assert "on_click=refresh_market_data" not in header_section
+    assert "on_click=toggle_theme" not in header_section
 
 
-def test_header_controls_css_targets_streamlit_wrapper():
+def test_header_controls_css_targets_custom_bridge_and_clickable_cards():
     css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
 
-    assert ".element-container:has(.header-controls-slot) + div[data-testid=\"stHorizontalBlock\"]" in css
-    assert "padding-right: 96px;" in css
-    assert "position: fixed;" in css
-    assert "top: 12px;" in css
-    assert "right: 28px;" in css
+    assert "[data-drill-ticker]" in css
+    assert "cursor: pointer;" in css
+    assert "[data-drill-ticker]:focus-visible" in css
