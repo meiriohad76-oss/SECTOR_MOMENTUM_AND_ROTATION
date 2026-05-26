@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import zipfile
 
 import pandas as pd
 import pytest
@@ -117,12 +118,46 @@ def test_parse_holdings_excel_accepts_xlsx_bytes():
     assert [holding.weight for holding in result.holdings] == pytest.approx([0.6, 0.4])
 
 
+def test_parse_holdings_excel_ignores_unsupported_conditional_formatting_metadata():
+    frame = pd.DataFrame({"Ticker": ["orcl", "xlf"], "Weight": ["60%", "40%"]})
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        frame.to_excel(writer, index=False)
+    workbook = _inject_invalid_conditional_formatting(buffer.getvalue())
+
+    result = portfolio.parse_holdings_excel(workbook)
+
+    assert result.errors == []
+    assert [holding.ticker for holding in result.holdings] == ["ORCL", "XLF"]
+    assert [holding.weight for holding in result.holdings] == pytest.approx([0.6, 0.4])
+
+
 def test_parse_holdings_excel_reports_unreadable_workbook_bytes():
     result = portfolio.parse_holdings_excel(b"not an excel file")
 
     assert result.holdings == []
     assert len(result.errors) == 1
     assert "could not read Excel file" in result.errors[0].message
+
+
+def _inject_invalid_conditional_formatting(payload: bytes) -> bytes:
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(payload), "r") as zin:
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                data = zin.read(item.filename)
+                if item.filename == "xl/worksheets/sheet1.xml":
+                    xml = data.decode("utf-8")
+                    unsupported_rule = (
+                        '<conditionalFormatting sqref="A2:A3">'
+                        '<cfRule type="cellIs" priority="1" operator="notContainsText">'
+                        "<formula>XLK</formula>"
+                        "</cfRule>"
+                        "</conditionalFormatting>"
+                    )
+                    data = xml.replace("</worksheet>", unsupported_rule + "</worksheet>").encode("utf-8")
+                zout.writestr(item, data)
+    return out.getvalue()
 
 
 def _scored_fixture() -> pd.DataFrame:

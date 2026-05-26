@@ -5,6 +5,8 @@ from dataclasses import dataclass
 import io
 import re
 from typing import Iterable
+import zipfile
+import xml.etree.ElementTree as ET
 
 import pandas as pd
 
@@ -71,6 +73,7 @@ COLUMN_ALIASES = {
     "account": ("account", "account name"),
     "notes": ("notes", "note", "comment", "comments"),
 }
+OPTIONAL_XLSX_WORKSHEET_METADATA = {"conditionalFormatting", "extLst"}
 
 
 def parse_single_ticker(value: str) -> PortfolioInputResult:
@@ -197,10 +200,65 @@ def parse_holdings_csv(payload: str | bytes) -> PortfolioInputResult:
 
 def parse_holdings_excel(payload: bytes) -> PortfolioInputResult:
     try:
-        frame = pd.read_excel(io.BytesIO(payload), dtype=str, keep_default_na=False)
+        frame = _read_excel_frame(payload)
     except (ImportError, OSError, ValueError, pd.errors.ParserError) as exc:
         return PortfolioInputResult([], [PortfolioInputError(f"could not read Excel file: {exc}")])
     return parse_holdings_frame(frame)
+
+
+def _read_excel_frame(payload: bytes) -> pd.DataFrame:
+    try:
+        return pd.read_excel(io.BytesIO(payload), dtype=str, keep_default_na=False)
+    except ValueError:
+        sanitized = _sanitize_xlsx_optional_metadata(payload)
+        if sanitized is None:
+            raise
+        return pd.read_excel(io.BytesIO(sanitized), dtype=str, keep_default_na=False)
+
+
+def _sanitize_xlsx_optional_metadata(payload: bytes) -> bytes | None:
+    if not zipfile.is_zipfile(io.BytesIO(payload)):
+        return None
+
+    out = io.BytesIO()
+    changed = False
+    with zipfile.ZipFile(io.BytesIO(payload), "r") as zin:
+        with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                data = zin.read(item.filename)
+                if item.filename.startswith("xl/worksheets/") and item.filename.endswith(".xml"):
+                    stripped = _strip_optional_worksheet_metadata(data)
+                    changed = changed or stripped != data
+                    data = stripped
+                zout.writestr(item, data)
+    return out.getvalue() if changed else None
+
+
+def _strip_optional_worksheet_metadata(payload: bytes) -> bytes:
+    try:
+        root = ET.fromstring(payload)
+    except ET.ParseError:
+        return payload
+
+    changed = False
+
+    def strip_children(parent) -> None:
+        nonlocal changed
+        for child in list(parent):
+            if _xml_local_name(child.tag) in OPTIONAL_XLSX_WORKSHEET_METADATA:
+                parent.remove(child)
+                changed = True
+                continue
+            strip_children(child)
+
+    strip_children(root)
+    if not changed:
+        return payload
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
+def _xml_local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1] if "}" in tag else tag
 
 
 def parse_holdings_frame(frame: pd.DataFrame) -> PortfolioInputResult:
