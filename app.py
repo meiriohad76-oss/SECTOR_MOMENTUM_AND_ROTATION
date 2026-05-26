@@ -16,6 +16,7 @@ import pandas as pd
 import streamlit as st
 
 from src.backtest import drawdown_frame, normalized_equity_frame
+from src.ad_hoc_analysis import score_ad_hoc_tickers
 from src.browser_qa_data import browser_qa_ohlcv_result
 from src.calibration_dashboard import (
     calibration_artifact_status_rows,
@@ -141,7 +142,7 @@ from src.visuals import (
 )
 
 
-APP_VERSION = "v2.4.9"
+APP_VERSION = "v2.4.10"
 APP_LOGGER = configure_structured_logging()
 DRILL_RANGE_OPTIONS = ("3M", "6M", "1Y", "3Y", "MAX")
 DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + ["^TNX", "^IRX"]))
@@ -469,6 +470,14 @@ def _load_data(period: str = "3y"):
     if _browser_qa_mode_enabled():
         return browser_qa_ohlcv_result(tickers, period=period)
     return fetch_ohlcv_result(tickers, period=period)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _load_ad_hoc_data(tickers: tuple[str, ...], period: str = "3y"):
+    symbols = tuple(dict.fromkeys([*tickers, BENCH["US"], BENCH["TBILL"]]))
+    if _browser_qa_mode_enabled():
+        return browser_qa_ohlcv_result(symbols, period=period)
+    return fetch_ohlcv_result(symbols, period=period)
 
 
 def _refresh_loaded_data() -> None:
@@ -903,6 +912,46 @@ def _score_text(value: object) -> str:
     return f"{float(value):+.3f}"
 
 
+def _analysis_scored_frame_for_result(result):
+    analysis = analyze_holdings(result.holdings, scored)
+    ad_hoc_result = None
+    if not analysis.missing_tickers:
+        return scored, analysis, ad_hoc_result
+
+    missing = tuple(sorted(set(analysis.missing_tickers)))
+    ohlcv_result = _load_ad_hoc_data(missing, period="3y")
+    ad_hoc_ohlcv = {**ohlcv, **ohlcv_result.data}
+    ad_hoc_result = score_ad_hoc_tickers(
+        missing,
+        ad_hoc_ohlcv,
+        phase=regime.phase_hint,
+        bench_ticker=BENCH["US"],
+        bil_ticker=BENCH["TBILL"],
+    )
+    if ad_hoc_result.scored.empty:
+        return scored, analysis, ad_hoc_result
+
+    analysis_scored = pd.concat([scored, ad_hoc_result.scored], axis=0)
+    return analysis_scored, analyze_holdings(result.holdings, analysis_scored), ad_hoc_result
+
+
+def _render_ad_hoc_status(ad_hoc_result, *, compact: bool = False) -> None:
+    if ad_hoc_result is None:
+        return
+    if not ad_hoc_result.scored.empty:
+        tickers = ", ".join(ad_hoc_result.scored.index.tolist())
+        message = (
+            f"Ad hoc methodology snapshot: {tickers} was scored from fetched OHLCV. "
+            "It is read-only and not saved into the dashboard universe."
+        )
+        if compact:
+            st.caption(message)
+        else:
+            st.info(message)
+    for warning in ad_hoc_result.warnings:
+        st.warning(warning)
+
+
 def render_ticker_analyzer():
     _md(
         f"""
@@ -925,16 +974,19 @@ def render_ticker_analyzer():
 
     ticker = result.holdings[0].ticker
     try:
-        analysis = analyze_holdings(result.holdings, scored)
+        analysis_scored, analysis, ad_hoc_result = _analysis_scored_frame_for_result(result)
     except ValueError as exc:
         st.error(str(exc))
         return
 
     if analysis.missing_tickers:
-        st.warning(f"{ticker} is not in the current scored universe.")
+        _render_ad_hoc_status(ad_hoc_result, compact=True)
+        st.warning(f"{ticker} could not be analyzed because market data was unavailable.")
         return
 
-    row = scored.loc[ticker]
+    _render_ad_hoc_status(ad_hoc_result, compact=True)
+    row = analysis_scored.loc[ticker]
+    is_ad_hoc = bool(row.get("ad_hoc", False))
     state = str(row.get("state") or "UNKNOWN")
     asset_class = str(row.get("class") or "UNKNOWN")
     s_score = row.get("S_score")
@@ -974,7 +1026,7 @@ def render_ticker_analyzer():
         """
     )
     st.dataframe(analysis_rows_frame(analysis), hide_index=True, width="stretch")
-    if st.button(f"VIEW FULL DRILL-DOWN {ticker}", key=f"ticker_analyzer_drill_{ticker}", width="stretch"):
+    if (not is_ad_hoc) and st.button(f"VIEW FULL DRILL-DOWN {ticker}", key=f"ticker_analyzer_drill_{ticker}", width="stretch"):
         _go_to_drill(ticker)
 
 
@@ -1897,13 +1949,14 @@ def _render_portfolio_analysis(result):
         return
 
     try:
-        analysis = analyze_holdings(result.holdings, scored)
+        _, analysis, ad_hoc_result = _analysis_scored_frame_for_result(result)
     except ValueError as exc:
         st.error(str(exc))
         return
 
+    _render_ad_hoc_status(ad_hoc_result)
     if analysis.missing_tickers:
-        st.warning("Missing from scored universe: " + ", ".join(analysis.missing_tickers))
+        st.warning("Could not analyze because market data was unavailable: " + ", ".join(analysis.missing_tickers))
 
     c1, c2, c3 = st.columns(3)
     with c1:
