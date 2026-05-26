@@ -46,3 +46,15 @@ def test_header_refresh_button_forces_readable_nested_streamlit_text():
     assert 'div[data-testid="stButton"] > button[kind="secondary"] p' in css
     assert 'div[data-testid="stButton"] > button[kind="secondary"] span' in css
     assert "color: var(--ticker-label) !important;" in css
+
+
+def test_header_native_controls_align_and_use_readable_labels():
+    css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
+
+    assert 'div[class*="st-key-header_refresh_data_button"] div[data-testid="stButton"]' in css
+    assert 'div[class*="st-key-header_theme_toggle"] div[data-testid="stButton"]' in css
+    assert "margin-top: 28px;" in css
+    assert 'div[data-testid="stSelectbox"] label' in css
+    assert 'div[data-testid="stSelectbox"] label p' in css
+    assert 'div[data-testid="stSelectbox"] label span' in css
+    assert "color: var(--ticker-label) !important;" in css

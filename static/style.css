@@ -327,6 +327,36 @@ body {
   color: var(--accent);
   background: var(--panel-hover);
 }
+div[class*="st-key-header_refresh_data_button"] div[data-testid="stButton"],
+div[class*="st-key-header_theme_toggle"] div[data-testid="stButton"] {
+  margin-top: 28px;
+}
+div[class*="st-key-header_refresh_data_button"] div[data-testid="stButton"] > button,
+div[class*="st-key-header_theme_toggle"] div[data-testid="stButton"] > button {
+  color: var(--ticker-label) !important;
+}
+div[class*="st-key-header_refresh_data_button"] div[data-testid="stButton"] > button p,
+div[class*="st-key-header_refresh_data_button"] div[data-testid="stButton"] > button span,
+div[class*="st-key-header_theme_toggle"] div[data-testid="stButton"] > button p,
+div[class*="st-key-header_theme_toggle"] div[data-testid="stButton"] > button span {
+  color: var(--ticker-label) !important;
+}
+div[data-testid="stSelectbox"] label,
+div[data-testid="stSelectbox"] label p,
+div[data-testid="stSelectbox"] label span {
+  color: var(--ticker-label) !important;
+}
+div[data-testid="stSelectbox"] [data-baseweb="select"] * {
+  color: var(--ticker-label) !important;
+}
+div[data-testid="stTextInput"] label,
+div[data-testid="stTextInput"] label p,
+div[data-testid="stTextInput"] label span,
+div[data-testid="stTextArea"] label,
+div[data-testid="stTextArea"] label p,
+div[data-testid="stTextArea"] label span {
+  color: var(--ticker-label) !important;
+}
 
 /* ---------- Section header ---------- */
 .section {
