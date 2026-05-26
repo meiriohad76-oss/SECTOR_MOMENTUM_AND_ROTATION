@@ -255,7 +255,7 @@ def test_fetch_ohlcv_result_retries_yfinance_transient_error(monkeypatch):
         return raw
 
     monkeypatch.setattr(data.yf, "download", flaky_download)
-    monkeypatch.setattr(data.time, "sleep", lambda seconds: sleeps.append(seconds))
+    monkeypatch.setattr(data, "_provider_retry_sleep", lambda seconds: sleeps.append(seconds))
 
     result = data.fetch_ohlcv_result(["XLK"], period="1y", provider="yfinance")
 

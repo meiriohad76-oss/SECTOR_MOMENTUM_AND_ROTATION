@@ -48,6 +48,10 @@ class _ProviderFetchResult:
     retry_count: int = 0
 
 
+def _provider_retry_sleep(seconds: float) -> None:
+    time.sleep(seconds)
+
+
 def _resolve_secret(name: str) -> str | None:
     value = os.environ.get(name)
     if value:
@@ -223,7 +227,7 @@ def _fetch_massive_ohlcv(
                 if attempt >= PROVIDER_RETRY_ATTEMPTS:
                     break
                 retry_count += 1
-                time.sleep(PROVIDER_RETRY_BACKOFF_SECONDS * attempt)
+                _provider_retry_sleep(PROVIDER_RETRY_BACKOFF_SECONDS * attempt)
         if payload is None:
             continue
         if not isinstance(payload, dict):
@@ -257,7 +261,7 @@ def _fetch_yfinance_ohlcv(
             if attempt >= PROVIDER_RETRY_ATTEMPTS:
                 return _ProviderFetchResult({}, retry_count)
             retry_count += 1
-            time.sleep(PROVIDER_RETRY_BACKOFF_SECONDS * attempt)
+            _provider_retry_sleep(PROVIDER_RETRY_BACKOFF_SECONDS * attempt)
     out: dict[str, pd.DataFrame] = {}
     for t in tickers:
         try:

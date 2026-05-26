@@ -9,8 +9,6 @@ ROOT = Path(__file__).resolve().parent.parent
 def test_app_applies_control_bridge_actions_before_visual_snapshot():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
-    assert "import streamlit.components.v1 as components" not in app_source
-    assert "st.iframe(" in app_source
     assert "apply_control_bridge_query_actions" in app_source
     assert "refresh_market_data(_load_data)" in app_source
     assert "_apply_control_bridge_actions()" in app_source
@@ -22,19 +20,20 @@ def test_app_applies_control_bridge_actions_before_visual_snapshot():
     )
 
 
-def test_app_renders_floating_header_preference_component():
+def test_app_renders_native_header_controls():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
     header_section = app_source[
         app_source.index("def render_header_controls():") : app_source.index("def render_bluf():")
     ]
 
-    assert "st.iframe(" in header_section
-    assert "floating_control_bridge_html(" in header_section
-    assert "drill_click_bridge_html()" in header_section
-    assert "height=1" in header_section
-    assert "height=0" not in header_section
-    assert "on_click=refresh_market_data" not in header_section
-    assert "on_click=toggle_theme" not in header_section
+    assert "st.button(\"REFRESH\"" in header_section
+    assert "on_click=_refresh_loaded_data" in header_section
+    assert "st.button(theme_label" in header_section
+    assert "on_click=toggle_theme" in header_section
+    assert '"VIEW",' in header_section
+    assert '"PALETTE",' in header_section
+    assert "floating_control_bridge_html(" not in header_section
+    assert "drill_click_bridge_html()" not in header_section
 
 
 def test_app_adds_whole_card_drill_attributes_to_clickable_surfaces():

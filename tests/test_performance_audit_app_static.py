@@ -104,10 +104,10 @@ def test_visual_controls_use_precompute_bridge_actions():
         app_source.index("def render_header_controls():") : app_source.index("def render_bluf():")
     ]
 
-    assert "st.iframe(" in header_section
-    assert "floating_control_bridge_html(" in header_section
+    assert "st.button(\"REFRESH\"" in header_section
+    assert '"VIEW",' in header_section
     assert "apply_control_bridge_query_actions(" in app_source
     assert "refresh_market_data(_load_data)" in app_source
-    assert "on_click=refresh_market_data" not in header_section
-    assert "on_click=toggle_theme" not in header_section
+    assert "on_click=_refresh_loaded_data" in header_section
+    assert "on_click=toggle_theme" in header_section
     assert "st.rerun()" not in header_section

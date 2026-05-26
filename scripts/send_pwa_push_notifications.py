@@ -17,12 +17,12 @@ from src.pwa_push import (  # noqa: E402
     send_web_push_notifications,
     write_notification_feed,
 )
-from src.scoring import recent_transitions  # noqa: E402
 from src.config_resolver import resolve_config_value  # noqa: E402
 
 
 FEED_PATH = ROOT / "public" / "notification-feed.json"
 SUBSCRIPTIONS_PATH = ROOT / "data" / "pwa_push_subscriptions.json"
+STATE_FILE = Path(os.environ.get("STATE_FILE", ROOT / "state.json"))
 
 
 def _resolve_config(name: str) -> str | None:
@@ -31,6 +31,20 @@ def _resolve_config(name: str) -> str | None:
 
 def _config_label(value: str | None) -> str:
     return "configured" if value else "missing"
+
+
+def recent_transitions(n: int = 25) -> list[dict]:
+    """Read recent transition rows without importing the full scoring stack."""
+    if not STATE_FILE.exists():
+        return []
+    try:
+        payload = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    rows = payload.get("transitions", [])
+    if not isinstance(rows, list):
+        return []
+    return list(reversed(rows))[:n]
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

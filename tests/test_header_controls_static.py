@@ -19,11 +19,16 @@ def test_header_controls_render_after_header_and_bottom_controls_removed():
     )
     assert "ctrl_col1, ctrl_col2, _ = st.columns([1, 1, 18])" not in app_source
     assert "_load_data.clear()" not in app_source
-    assert "st.iframe(" in header_section
-    assert "floating_control_bridge_html(" in header_section
-    assert "drill_click_bridge_html()" in header_section
-    assert "on_click=refresh_market_data" not in header_section
-    assert "on_click=toggle_theme" not in header_section
+    assert "st.button(\"REFRESH\"" in header_section
+    assert "on_click=_refresh_loaded_data" in header_section
+    assert "st.button(theme_label" in header_section
+    assert "on_click=toggle_theme" in header_section
+    assert '"VIEW",' in header_section
+    assert '"DENSITY",' in header_section
+    assert '"SPARK",' in header_section
+    assert '"PALETTE",' in header_section
+    assert "floating_control_bridge_html(" not in header_section
+    assert "drill_click_bridge_html()" not in header_section
 
 
 def test_header_controls_css_targets_custom_bridge_and_clickable_cards():

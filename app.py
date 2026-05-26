@@ -26,8 +26,6 @@ from src.calibration_dashboard import (
 from src.component_bridge import (
     apply_control_bridge_query_actions,
     drill_bridge_attrs,
-    drill_click_bridge_html,
-    floating_control_bridge_html,
     rrg_plotly_click_bridge_html,
 )
 from src.component_docs import DASHBOARD_COMPONENT_DOCS, component_docs_html
@@ -35,7 +33,7 @@ from src.comparison_view import (
     comparison_card_rows,
     initialize_comparison_tickers,
 )
-from src.controls import refresh_market_data
+from src.controls import refresh_market_data, toggle_theme
 from src.custom_universe import (
     analyze_custom_universe,
     custom_universe_rows_frame,
@@ -1228,19 +1226,63 @@ def render_view_preferences():
             st.caption(st.session_state.preference_profile_message)
 
 
+def _sync_header_preference_widget(widget_key: str, target_key: str) -> None:
+    st.session_state[widget_key] = st.session_state.get(target_key)
+
+
+def _apply_header_preference(widget_key: str, target_key: str, allowed: tuple[str, ...]) -> None:
+    value = st.session_state.get(widget_key)
+    if value in allowed:
+        st.session_state[target_key] = value
+
+
 def render_header_controls():
-    st.iframe(drill_click_bridge_html(), height=1, tab_index=-1)
-    st.iframe(
-        floating_control_bridge_html(
-            theme=st.session_state.theme,
-            bluf_mode=st.session_state.bluf_mode,
-            density=st.session_state.view_density,
-            sparkline=st.session_state.sparkline_style,
-            palette=st.session_state.color_palette,
-        ),
-        height=1,
-        tab_index=-1,
-    )
+    for widget_key, target_key in (
+        ("header_bluf_mode", "bluf_mode"),
+        ("header_view_density", "view_density"),
+        ("header_sparkline_style", "sparkline_style"),
+        ("header_color_palette", "color_palette"),
+    ):
+        _sync_header_preference_widget(widget_key, target_key)
+
+    refresh_col, theme_col, view_col, density_col, spark_col, palette_col = st.columns([1, 1, 1.15, 1.15, 1.15, 1.15])
+    with refresh_col:
+        st.button("REFRESH", key="header_refresh_data_button", width="stretch", on_click=_refresh_loaded_data)
+    with theme_col:
+        theme_label = "LIGHT" if st.session_state.theme == "dark" else "DARK"
+        st.button(theme_label, key="header_theme_toggle", width="stretch", on_click=toggle_theme, args=(st.session_state,))
+    with view_col:
+        st.selectbox(
+            "VIEW",
+            BLUF_MODES,
+            key="header_bluf_mode",
+            on_change=_apply_header_preference,
+            args=("header_bluf_mode", "bluf_mode", BLUF_MODES),
+        )
+    with density_col:
+        st.selectbox(
+            "DENSITY",
+            DENSITY_MODES,
+            key="header_view_density",
+            on_change=_apply_header_preference,
+            args=("header_view_density", "view_density", DENSITY_MODES),
+        )
+    with spark_col:
+        st.selectbox(
+            "SPARK",
+            SPARKLINE_STYLES,
+            key="header_sparkline_style",
+            on_change=_apply_header_preference,
+            args=("header_sparkline_style", "sparkline_style", SPARKLINE_STYLES),
+        )
+    with palette_col:
+        st.selectbox(
+            "PALETTE",
+            PALETTE_OPTIONS,
+            key="header_color_palette",
+            on_change=_apply_header_preference,
+            args=("header_color_palette", "color_palette", PALETTE_OPTIONS),
+        )
 
 
 def render_bluf():
