@@ -1647,6 +1647,7 @@ def render_comparison_view():
         </section>
         """
     )
+    _md('<div class="comparison-selector-slot"></div>')
     st.multiselect("COMPARE TICKERS",
         options,
         default=[ticker for ticker in st.session_state.comparison_tickers if ticker in options][:4],

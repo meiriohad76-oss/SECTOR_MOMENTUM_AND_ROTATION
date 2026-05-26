@@ -1542,6 +1542,19 @@ div[class*="st-key-cls_"] div[data-testid="stButton"] > button[kind="primary"] p
 .comparison-card.EXIT { border-left-color: var(--st-exit); }
 .comparison-card.BEARISH_STAGE_4 { border-left-color: var(--st-bear); }
 .comparison-card.STAGE_1_BASING { border-left-color: var(--st-basing); }
+.comparison-selector-slot {
+  display: none;
+}
+.comparison-selector-slot + div[data-testid="stMultiSelect"] label,
+.element-container:has(.comparison-selector-slot) + div[data-testid="stMultiSelect"] label,
+div[class*="st-key-comparison_tickers"] label,
+div[class*="st-key-comparison_tickers"] [data-testid="stWidgetLabel"] p {
+  color: var(--fg-dim);
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 .comparison-head {
   display: flex;
   align-items: flex-start;
@@ -1556,17 +1569,19 @@ div[class*="st-key-cls_"] div[data-testid="stButton"] > button[kind="primary"] p
   letter-spacing: 0.04em;
 }
 .comparison-class {
-  color: var(--muted);
-  font-size: 0.7rem;
+  color: var(--fg-dim);
+  font-size: 0.74rem;
   margin-top: 2px;
 }
 .comparison-card .state {
-  color: var(--muted);
+  color: var(--ticker-label);
   font-family: var(--font-mono);
   font-size: 0.6rem;
+  font-weight: 700;
   text-align: right;
   text-transform: uppercase;
   line-height: 1.35;
+  text-shadow: var(--ticker-label-shadow);
 }
 .comparison-metrics {
   display: grid;
@@ -1582,7 +1597,7 @@ div[class*="st-key-cls_"] div[data-testid="stButton"] > button[kind="primary"] p
 .comparison-metrics span,
 .comparison-flags span {
   display: block;
-  color: var(--muted);
+  color: var(--fg-dim);
   font-family: var(--font-mono);
   font-size: 0.58rem;
   letter-spacing: 0.1em;
@@ -1590,8 +1605,11 @@ div[class*="st-key-cls_"] div[data-testid="stButton"] > button[kind="primary"] p
 .comparison-metrics b {
   display: block;
   margin-top: 4px;
+  color: var(--ticker-label);
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-shadow: var(--ticker-label-shadow);
 }
 .comparison-flags {
   display: flex;
