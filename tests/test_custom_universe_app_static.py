@@ -17,12 +17,10 @@ def test_app_wires_custom_universe_builder_with_ad_hoc_scoring_and_submit_button
     assert "parse_custom_universe_file(" in app_source
     assert "_custom_universe_scored_frame_for_result(result)" in app_source
     assert "score_ad_hoc_tickers(" in app_source
-    assert 'with st.form("custom_universe_paste_form"):' not in app_source
-    assert "st.form_submit_button(" not in app_source[
-        app_source.index("def render_custom_universe_builder():") : app_source.index("def _load_backtest_metadata():")
-    ]
-    assert 'st.button("ANALYZE CUSTOM TICKERS"' in app_source
+    assert 'with st.form("custom_universe_paste_form"' in app_source
+    assert 'st.form_submit_button("ANALYZE CUSTOM TICKERS"' in app_source
     assert "custom_universe_submitted_text" in app_source
+    assert 'submitted_text = st.session_state.get("custom_universe_submitted_text", "") or tickers' in app_source
     assert "custom_universe_rows_frame(analysis)" in app_source
     assert "apply_state_machine(result.tickers" not in app_source
 

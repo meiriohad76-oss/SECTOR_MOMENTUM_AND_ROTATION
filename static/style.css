@@ -357,6 +357,9 @@ div[data-testid="stTextArea"] label p,
 div[data-testid="stTextArea"] label span {
   color: var(--ticker-label) !important;
 }
+.form-action-spacer {
+  height: 28px;
+}
 
 /* ---------- Section header ---------- */
 .section {

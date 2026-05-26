@@ -162,12 +162,15 @@ def test_session_snapshot_tracks_interactive_widget_keys_and_ignores_audit_state
         {
             "theme": "dark",
             "methodology_ticker_input": "NVDA",
+            "methodology_ticker_submitted_text": "NVDA",
             "comparison_tickers": ["XLK", "XLF"],
             "portfolio_analyzer_mode": "Portfolio",
             "portfolio_single_ticker": "XLK",
+            "portfolio_single_submitted_ticker": "XLK",
             "portfolio_single_source": "XLF",
             "custom_universe_mode": "Paste tickers",
             "custom_universe_text": "XLK XLF",
+            "custom_universe_submitted_text": "XLK XLF",
             "saved_portfolio_select": "Retirement",
             "loaded_portfolio_name": "Retirement",
             "save_portfolio_name": "Retirement",
@@ -188,11 +191,14 @@ def test_session_snapshot_tracks_interactive_widget_keys_and_ignores_audit_state
 
     assert values["comparison_tickers"] == "['XLK', 'XLF']"
     assert values["methodology_ticker_input"] == "NVDA"
+    assert values["methodology_ticker_submitted_text"] == "NVDA"
     assert values["portfolio_analyzer_mode"] == "Portfolio"
     assert values["portfolio_single_ticker"] == "XLK"
+    assert values["portfolio_single_submitted_ticker"] == "XLK"
     assert values["portfolio_single_source"] == "XLF"
     assert values["custom_universe_mode"] == "Paste tickers"
     assert values["custom_universe_text"] == "XLK XLF"
+    assert values["custom_universe_submitted_text"] == "XLK XLF"
     assert values["saved_portfolio_select"] == "Retirement"
     assert values["loaded_portfolio_name"] == "Retirement"
     assert values["save_portfolio_name"] == "Retirement"

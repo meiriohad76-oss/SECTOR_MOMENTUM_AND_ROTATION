@@ -535,12 +535,16 @@ if "drill_ticker" not in st.session_state:
     st.session_state.drill_ticker = "XLK"
 if "methodology_ticker_input" not in st.session_state:
     st.session_state.methodology_ticker_input = st.session_state.drill_ticker
+if "methodology_ticker_submitted_text" not in st.session_state:
+    st.session_state.methodology_ticker_submitted_text = st.session_state.methodology_ticker_input
 if "drill_range" not in st.session_state:
     st.session_state.drill_range = "1Y"
 elif st.session_state.drill_range not in DRILL_RANGE_OPTIONS:
     st.session_state.drill_range = "1Y"
 if "portfolio_single_ticker" not in st.session_state:
     st.session_state.portfolio_single_ticker = st.session_state.drill_ticker
+if "portfolio_single_submitted_ticker" not in st.session_state:
+    st.session_state.portfolio_single_submitted_ticker = st.session_state.portfolio_single_ticker
 if "portfolio_single_source" not in st.session_state:
     st.session_state.portfolio_single_source = st.session_state.drill_ticker
 if "custom_universe_text" not in st.session_state:
@@ -1005,8 +1009,18 @@ def render_ticker_analyzer():
         """
     )
 
-    ticker_text = st.text_input("Ticker to analyze", key="methodology_ticker_input", placeholder="XLK")
-    result = parse_single_ticker(ticker_text)
+    with st.form("ticker_analyzer_form", clear_on_submit=False):
+        input_col, action_col = st.columns([3, 1])
+        with input_col:
+            ticker_text = st.text_input("Ticker to analyze", key="methodology_ticker_input", placeholder="XLK")
+        with action_col:
+            _md('<div class="form-action-spacer"></div>')
+            submitted = st.form_submit_button("ANALYZE TICKER", type="primary", width="stretch")
+    if submitted:
+        st.session_state.methodology_ticker_submitted_text = ticker_text
+
+    submitted_text = st.session_state.get("methodology_ticker_submitted_text", ticker_text)
+    result = parse_single_ticker(submitted_text)
     for error in result.errors:
         st.warning(error.message)
 
@@ -2132,6 +2146,7 @@ def _render_portfolio_analysis(result):
 def render_portfolio_analyzer():
     if st.session_state.portfolio_single_source != st.session_state.drill_ticker:
         st.session_state.portfolio_single_ticker = st.session_state.drill_ticker
+        st.session_state.portfolio_single_submitted_ticker = st.session_state.drill_ticker
         st.session_state.portfolio_single_source = st.session_state.drill_ticker
 
     _md(
@@ -2159,15 +2174,25 @@ def render_portfolio_analyzer():
     )
 
     if mode == "Ticker":
-        ticker = st.text_input(
-            "Ticker",
-            key="portfolio_single_ticker",
-            placeholder="XLK",
-        )
-        if ticker:
-            result = parse_single_ticker(ticker)
+        with st.form("portfolio_single_ticker_form", clear_on_submit=False):
+            input_col, action_col = st.columns([3, 1])
+            with input_col:
+                ticker = st.text_input(
+                    "Ticker",
+                    key="portfolio_single_ticker",
+                    placeholder="XLK",
+                )
+            with action_col:
+                _md('<div class="form-action-spacer"></div>')
+                submitted = st.form_submit_button("ANALYZE TICKER", type="primary", width="stretch")
+        if submitted:
+            st.session_state.portfolio_single_submitted_ticker = ticker
+
+        submitted_ticker = st.session_state.get("portfolio_single_submitted_ticker", ticker)
+        if submitted_ticker:
+            result = parse_single_ticker(submitted_ticker)
             _render_portfolio_analysis(result)
-            _render_save_portfolio_controls(result, default_name=ticker.upper())
+            _render_save_portfolio_controls(result, default_name=submitted_ticker.upper())
         return
 
     uploaded = st.file_uploader(
@@ -2290,16 +2315,17 @@ def render_custom_universe_builder():
     )
 
     if mode == "Paste tickers":
-        tickers = st.text_area(
-            "Custom tickers",
-            key="custom_universe_text",
-            placeholder="XLK XLF SOXX NVDA",
-            height=90,
-        )
-        submitted = st.button("ANALYZE CUSTOM TICKERS", type="primary", key="custom_universe_submit")
+        with st.form("custom_universe_paste_form", clear_on_submit=False):
+            tickers = st.text_area(
+                "Custom tickers",
+                key="custom_universe_text",
+                placeholder="XLK XLF SOXX NVDA",
+                height=90,
+            )
+            submitted = st.form_submit_button("ANALYZE CUSTOM TICKERS", type="primary", width="stretch")
         if submitted:
             st.session_state.custom_universe_submitted_text = tickers
-        submitted_text = st.session_state.get("custom_universe_submitted_text", "")
+        submitted_text = st.session_state.get("custom_universe_submitted_text", "") or tickers
         if submitted_text:
             result = parse_custom_universe_text(submitted_text)
             _render_custom_universe_analysis(result)
