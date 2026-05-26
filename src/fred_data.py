@@ -108,7 +108,10 @@ def fetch_fred(
         try:
             s = fred.get_series(series_id, observation_start=start_date)
             if s is not None and not s.empty:
-                out[series_id] = s.dropna()
+                cleaned = s.dropna().sort_index()
+                if cleaned.index.has_duplicates:
+                    cleaned = cleaned.groupby(level=0).last()
+                out[series_id] = cleaned
         except Exception:
             # Bad key, network blip, series renamed - skip and continue
             continue

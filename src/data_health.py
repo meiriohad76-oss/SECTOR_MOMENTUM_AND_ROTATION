@@ -184,7 +184,11 @@ def _latest_series_date(series: pd.Series | None) -> pd.Timestamp | None:
         return None
     if cleaned.empty:
         return None
-    return _date_timestamp(cleaned.index[-1])
+    try:
+        latest_index = pd.DatetimeIndex(pd.to_datetime(cleaned.index)).dropna().max()
+    except Exception:
+        return None
+    return _date_timestamp(latest_index)
 
 
 def _fred_health_row(fred_data: Mapping[str, pd.Series], *, now: pd.Timestamp) -> dict[str, object]:
@@ -216,14 +220,14 @@ def _fred_health_row(fred_data: Mapping[str, pd.Series], *, now: pd.Timestamp) -
         detail_parts.append(f"{len(stale)} stale: {', '.join(stale[:4])}")
     if missing:
         detail_parts.append(f"{missing} missing")
-    detail_parts.append("FRED release dates can legitimately lag market dates")
+    detail_parts.append("FRED freshness is cadence/release-lag adjusted")
 
     return {
         "source": "FRED macro/regime",
         "role": "Critical when configured: business-cycle tilt and macro context",
         "status": status,
         "latest": str(latest.date()) if latest is not None else "-",
-        "freshness": format_age_label(latest, now),
+        "freshness": f"latest available: {format_age_label(latest, now)}",
         "coverage": f"{len(stale)} stale series" if stale else "",
         "detail": "; ".join(detail_parts),
     }

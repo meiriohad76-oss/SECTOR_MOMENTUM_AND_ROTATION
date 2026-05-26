@@ -41,7 +41,10 @@ def test_fetch_fred_uses_injected_client_and_skips_bad_series(monkeypatch):
             calls.append((self.api_key, series_id, observation_start))
             if series_id == "T10Y3M":
                 raise RuntimeError("temporary provider error")
-            return pd.Series([1.0, None, 3.0], index=pd.date_range("2026-01-01", periods=3))
+            return pd.Series(
+                [3.0, 1.0, 4.0, None],
+                index=pd.to_datetime(["2026-01-03", "2026-01-01", "2026-01-03", "2026-01-02"]),
+            )
 
     monkeypatch.setenv("FRED_API_KEY", "fred-secret")
 
@@ -49,7 +52,8 @@ def test_fetch_fred_uses_injected_client_and_skips_bad_series(monkeypatch):
 
     assert "T10Y2Y" in out
     assert "T10Y3M" not in out
-    assert out["T10Y2Y"].tolist() == [1.0, 3.0]
+    assert out["T10Y2Y"].index.tolist() == list(pd.to_datetime(["2026-01-01", "2026-01-03"]))
+    assert out["T10Y2Y"].tolist() == [1.0, 4.0]
     assert calls[0] == ("fred-secret", "T10Y2Y", "2020-01-01")
 
 

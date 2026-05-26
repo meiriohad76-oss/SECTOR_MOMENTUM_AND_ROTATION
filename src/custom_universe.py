@@ -37,6 +37,11 @@ class CustomUniverseAnalysisRow:
     asset_class: str | None
     s_score: float | None
     f_score: float | None
+    stage: float | None
+    rrg_quadrant: str | None
+    mom_12_1: float | None
+    cmf21: float | None
+    breadth_50d: float | None
     rank_in_class: float | None
     selected: bool | None
     veto: bool | None
@@ -61,6 +66,11 @@ DISPLAY_COLUMNS = [
     "State",
     "S",
     "F",
+    "Stage",
+    "RRG",
+    "12-1 Mom",
+    "CMF21",
+    "Breadth 50D",
     "Class Rank",
     "Selected",
     "Veto",
@@ -166,6 +176,11 @@ def analyze_custom_universe(tickers: list[str], scored_df: pd.DataFrame) -> Cust
             asset_class=asset_class,
             s_score=_optional_float(scored.get("S_score")),
             f_score=_optional_float(scored.get("F_score")),
+            stage=_optional_float(scored.get("stage")),
+            rrg_quadrant=_optional_text(scored.get("rrg_quadrant")),
+            mom_12_1=_optional_float(scored.get("mom_12_1")),
+            cmf21=_optional_float(scored.get("cmf21")),
+            breadth_50d=_optional_float(scored.get("breadth_50d")),
             rank_in_class=_optional_float(scored.get("rank_in_class")),
             selected=selected,
             veto=_optional_bool(scored.get("veto")),
@@ -185,6 +200,11 @@ def analyze_custom_universe(tickers: list[str], scored_df: pd.DataFrame) -> Cust
                 asset_class=None,
                 s_score=None,
                 f_score=None,
+                stage=None,
+                rrg_quadrant=None,
+                mom_12_1=None,
+                cmf21=None,
+                breadth_50d=None,
                 rank_in_class=None,
                 selected=None,
                 veto=None,
@@ -216,6 +236,11 @@ def custom_universe_rows_frame(analysis: CustomUniverseAnalysis) -> pd.DataFrame
                 "State": "MISSING" if row.missing else _display_label(row.state),
                 "S": _format_number(row.s_score),
                 "F": _format_number(row.f_score),
+                "Stage": _format_stage(row.stage),
+                "RRG": _display_label(row.rrg_quadrant),
+                "12-1 Mom": _format_percent(row.mom_12_1),
+                "CMF21": _format_signed_number(row.cmf21),
+                "Breadth 50D": _format_unsigned_percent(row.breadth_50d),
                 "Class Rank": _format_rank(row.rank_in_class),
                 "Selected": _format_bool(row.selected),
                 "Veto": _format_bool(row.veto),
@@ -341,6 +366,28 @@ def _display_label(value: str | None) -> str:
 def _format_number(value: float | None) -> str:
     parsed = _optional_float(value)
     return "-" if parsed is None else f"{parsed:.2f}"
+
+
+def _format_signed_number(value: float | None) -> str:
+    parsed = _optional_float(value)
+    return "-" if parsed is None else f"{parsed:+.2f}"
+
+
+def _format_percent(value: float | None, decimals: int = 1) -> str:
+    parsed = _optional_float(value)
+    return "-" if parsed is None else f"{parsed:+.{decimals}%}"
+
+
+def _format_unsigned_percent(value: float | None) -> str:
+    parsed = _optional_float(value)
+    return "-" if parsed is None else f"{parsed:.0%}"
+
+
+def _format_stage(value: float | None) -> str:
+    parsed = _optional_float(value)
+    if parsed is None:
+        return "-"
+    return str(int(parsed)) if float(parsed).is_integer() else f"{parsed:.1f}"
 
 
 def _format_rank(value: float | int | None) -> str:

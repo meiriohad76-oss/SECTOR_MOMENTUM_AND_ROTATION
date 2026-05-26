@@ -8,7 +8,7 @@ import json
 from datetime import datetime, timezone
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Mapping, Optional
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -94,6 +94,7 @@ def compute_composite(
     flow_df: pd.DataFrame,
     flow_z: pd.Series,
     phase: str,
+    class_overrides: Mapping[str, str] | None = None,
 ) -> pd.DataFrame:
     """Master composite S_i per §5.  Cross-sectional z-scoring is done within
     each universe class so we don't compare a country ETF against a US sector."""
@@ -102,7 +103,8 @@ def compute_composite(
     df["F_score"] = flow_z
 
     # Universe class for grouped z-scoring
-    df["class"] = [class_of(t) for t in df.index]
+    class_overrides = class_overrides or {}
+    df["class"] = [class_overrides.get(str(t), class_of(str(t))) for t in df.index]
     # Cycle tilt only meaningful for US sectors
     df["cycle_tilt"] = [cycle_tilt(t, phase) for t in df.index]
 

@@ -55,10 +55,11 @@ def test_data_health_rows_show_ohlcv_and_fred_staleness():
     assert "2/2 symbols loaded" in by_source["Market OHLCV"]["detail"]
     assert by_source["Market OHLCV"]["role"] == "Critical: price, volume, trend, momentum, and market proxies"
     assert by_source["FRED macro/regime"]["status"] == "warning"
+    assert by_source["FRED macro/regime"]["freshness"] == "latest available: 5d old"
     assert by_source["FRED macro/regime"]["coverage"] == "2 stale series"
     assert "2 stale" in by_source["FRED macro/regime"]["detail"]
     assert "DCOILWTICO 16d old" in by_source["FRED macro/regime"]["detail"]
-    assert "FRED release dates can legitimately lag market dates" in by_source["FRED macro/regime"]["detail"]
+    assert "cadence/release-lag adjusted" in by_source["FRED macro/regime"]["detail"]
     assert by_source["FRED macro/regime"]["role"] == "Critical when configured: business-cycle tilt and macro context"
     assert by_source["Provider-flow feeds"]["status"] == "info"
     assert "neutral/stub" in by_source["Provider-flow feeds"]["detail"]
@@ -139,9 +140,36 @@ def test_fred_health_allows_normal_monthly_observation_date_lag():
     fred_row = next(row for row in rows if row["source"] == "FRED macro/regime")
 
     assert fred_row["status"] == "healthy"
+    assert fred_row["freshness"] == "latest available: 4d old"
     assert fred_row["coverage"] == ""
     for series_id in monthly_release_lag_dates:
         assert series_id not in fred_row["detail"]
+
+
+def test_fred_health_uses_latest_available_date_even_when_series_is_unsorted():
+    fred_data = {
+        series_id: pd.Series([1.0], index=pd.to_datetime(["2026-05-22"]))
+        for series_id in FRED_SERIES
+    }
+    fred_data["DGS10"] = pd.Series(
+        [4.1, 4.4, 4.2],
+        index=pd.to_datetime(["2026-05-19", "2026-05-23", "2026-05-20"]),
+    )
+
+    rows = data_health_rows(
+        ohlcv={"SPY": _ohlcv_frame("2026-05-26")},
+        expected_symbols=("SPY",),
+        ohlcv_result=SimpleNamespace(provider="massive", missing=(), stale_cache_hits=(), warnings=()),
+        fred_data=fred_data,
+        compute_created_at=1_779_760_000.0,
+        now=pd.Timestamp("2026-05-26T16:00:00Z"),
+        provider_flow_stubbed=False,
+    )
+
+    fred_row = next(row for row in rows if row["source"] == "FRED macro/regime")
+
+    assert fred_row["latest"] == "2026-05-23"
+    assert fred_row["freshness"] == "latest available: 3d old"
 
 
 def test_fred_health_covers_regime_classifier_series_not_only_visible_tiles():

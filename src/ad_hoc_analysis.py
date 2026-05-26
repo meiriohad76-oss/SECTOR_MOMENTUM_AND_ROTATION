@@ -25,6 +25,7 @@ class AdHocTickerScoreResult:
     scored: pd.DataFrame
     missing_tickers: list[str]
     warnings: list[str]
+    peer_count: int = 0
 
 
 def score_ad_hoc_tickers(
@@ -66,11 +67,20 @@ def score_ad_hoc_tickers(
     if not available_tickers:
         return AdHocTickerScoreResult(pd.DataFrame(), missing_tickers, warnings)
 
+    peer_tickers = _peer_context_tickers(ohlcv, available_tickers, bench_ticker, bil_ticker)
+    for ticker in peer_tickers:
+        if ticker in scoring_ohlcv:
+            continue
+        frame = _lookup_ohlcv(ohlcv, ticker)
+        if frame is not None and not frame.empty:
+            scoring_ohlcv[ticker] = frame
+
     try:
         indicators_df = compute_all_indicators(scoring_ohlcv, bench_ticker, bil_ticker, max_workers=1)
         flow_df = compute_flow_signals(scoring_ohlcv)
         flow_z = flow_composite_z(flow_df)
-        scored = compute_composite(indicators_df, flow_df, flow_z, phase=phase)
+        class_overrides = {ticker: AD_HOC_CLASS for ticker in peer_tickers}
+        scored = compute_composite(indicators_df, flow_df, flow_z, phase=phase, class_overrides=class_overrides)
     except ValueError as exc:
         warnings.append(f"Could not score ad hoc tickers: {exc}")
         return AdHocTickerScoreResult(pd.DataFrame(), requested, warnings)
@@ -82,11 +92,10 @@ def score_ad_hoc_tickers(
             warnings.append(f"Insufficient indicator history for ad hoc ticker: {ticker}")
         return AdHocTickerScoreResult(pd.DataFrame(), missing, warnings)
 
-    scored["class"] = AD_HOC_CLASS
     scored["top_n_target"] = 0
     scored["selected"] = pd.Series([False] * len(scored), index=scored.index, dtype=object)
     scored["state"] = [decide_state(row) for _, row in scored.iterrows()]
-    scored["analysis_scope"] = "ad_hoc"
+    scored["analysis_scope"] = "ad_hoc_peer_relative"
     scored["ad_hoc"] = True
     missing_after_scoring = [ticker for ticker in available_tickers if ticker not in scored.index]
     for ticker in missing_after_scoring:
@@ -96,6 +105,7 @@ def score_ad_hoc_tickers(
         scored=scored,
         missing_tickers=list(dict.fromkeys(missing_tickers + missing_after_scoring)),
         warnings=warnings,
+        peer_count=len(peer_tickers),
     )
 
 
@@ -116,3 +126,19 @@ def _lookup_ohlcv(ohlcv: Mapping[str, pd.DataFrame], ticker: str) -> pd.DataFram
     if key is None:
         return None
     return ohlcv[key]
+
+
+def _peer_context_tickers(
+    ohlcv: Mapping[str, pd.DataFrame],
+    requested: Iterable[str],
+    bench_ticker: str,
+    bil_ticker: str,
+) -> list[str]:
+    blocked = {str(bench_ticker).upper(), str(bil_ticker).upper()}
+    out: list[str] = []
+    for ticker in list(requested) + [str(key) for key in ohlcv]:
+        normalized = normalize_ticker(ticker)
+        if normalized is None or normalized in blocked or normalized in out:
+            continue
+        out.append(normalized)
+    return out

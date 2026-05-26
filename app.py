@@ -2290,14 +2290,13 @@ def render_custom_universe_builder():
     )
 
     if mode == "Paste tickers":
-        with st.form("custom_universe_paste_form"):
-            tickers = st.text_area(
-                "Custom tickers",
-                key="custom_universe_text",
-                placeholder="XLK XLF SOXX NVDA",
-                height=90,
-            )
-            submitted = st.form_submit_button("ANALYZE CUSTOM TICKERS", type="primary")
+        tickers = st.text_area(
+            "Custom tickers",
+            key="custom_universe_text",
+            placeholder="XLK XLF SOXX NVDA",
+            height=90,
+        )
+        submitted = st.button("ANALYZE CUSTOM TICKERS", type="primary", key="custom_universe_submit")
         if submitted:
             st.session_state.custom_universe_submitted_text = tickers
         submitted_text = st.session_state.get("custom_universe_submitted_text", "")

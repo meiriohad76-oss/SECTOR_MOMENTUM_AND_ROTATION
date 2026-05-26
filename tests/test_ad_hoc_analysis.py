@@ -34,6 +34,28 @@ def test_score_ad_hoc_tickers_builds_read_only_snapshot_without_state_write(
     assert not state_path.exists()
 
 
+def test_score_ad_hoc_tickers_uses_peer_context_for_composite_scores(
+    ohlcv_frame_factory,
+):
+    ohlcv = {
+        "DRAM": ohlcv_frame_factory(start_price=95, daily_return=0.0012),
+        "XLK": ohlcv_frame_factory(start_price=110, daily_return=0.0015),
+        "XLF": ohlcv_frame_factory(start_price=75, daily_return=0.0004),
+        "XLE": ohlcv_frame_factory(start_price=60, daily_return=-0.0002),
+        "SPY": ohlcv_frame_factory(start_price=100, daily_return=0.0010),
+        "BIL": ohlcv_frame_factory(start_price=90, daily_return=0.0001),
+    }
+
+    result = score_ad_hoc_tickers(["dram"], ohlcv, phase="MID")
+
+    assert result.peer_count >= 4
+    row = result.scored.loc["DRAM"]
+    assert row["analysis_scope"] == "ad_hoc_peer_relative"
+    assert pd.notna(row["S_score"])
+    assert pd.notna(row["S_score_after_veto"])
+    assert pd.notna(row["rank_in_class"])
+
+
 def test_score_ad_hoc_tickers_reports_missing_market_data(ohlcv_frame_factory):
     ohlcv = {
         "SPY": ohlcv_frame_factory(start_price=100, daily_return=0.0010),
