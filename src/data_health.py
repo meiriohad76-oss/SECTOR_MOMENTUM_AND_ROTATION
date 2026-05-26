@@ -14,17 +14,23 @@ OHLCV_FRESH_DAYS = 5
 OHLCV_STALE_DAYS = 10
 FRED_DEFAULT_FRESH_DAYS = 7
 FRED_SERIES_FRESH_DAYS = {
-    "CPIAUCSL": 60,
-    "INDPRO": 60,
-    "RECPROUSM156N": 60,
-    "PCEPILFE": 60,
-    "UNRATE": 45,
+    "CPIAUCSL": 70,
+    "INDPRO": 70,
+    # Monthly FRED observations are usually dated at the start of the measured period.
+    # Give them release-lag tolerance so current monthly data is not flagged stale.
+    "RECPROUSM156N": 100,
+    "PCEPILFE": 100,
+    "UNRATE": 70,
     "WALCL": 14,
-    "M2SL": 45,
-    "CFNAI": 45,
+    "M2SL": 70,
+    "CFNAI": 70,
     "ICSA": 14,
-    "UMCSENT": 45,
+    "UMCSENT": 70,
     "NFCI": 14,
+    "STLFSI4": 14,
+    "DCOILWTICO": 14,
+    "DHHNGSP": 14,
+    "DTWEXBGS": 14,
 }
 
 
@@ -218,6 +224,7 @@ def _fred_health_row(fred_data: Mapping[str, pd.Series], *, now: pd.Timestamp) -
         "status": status,
         "latest": str(latest.date()) if latest is not None else "-",
         "freshness": format_age_label(latest, now),
+        "coverage": f"{len(stale)} stale series" if stale else "",
         "detail": "; ".join(detail_parts),
     }
 
