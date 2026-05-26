@@ -1492,6 +1492,24 @@ div[data-testid="stButton"] > button {
   min-height: 40px;
   color: var(--fg);
 }
+div[data-testid="stButton"] > button[kind="secondary"] {
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  color: var(--ticker-label) !important;
+}
+div[data-testid="stButton"] > button[kind="secondary"] p,
+div[data-testid="stButton"] > button[kind="secondary"] span {
+  color: var(--ticker-label) !important;
+}
+div[data-testid="stButton"] > button[kind="secondary"]:hover {
+  background: var(--panel-hover);
+  border-color: var(--accent);
+}
+div[data-testid="stButton"] > button[kind="secondary"]:disabled,
+div[data-testid="stButton"] > button[kind="secondary"]:disabled p,
+div[data-testid="stButton"] > button[kind="secondary"]:disabled span {
+  color: var(--muted-2) !important;
+}
 
 div[class*="st-key-cls_"] div[data-testid="stButton"] > button {
   min-height: 50px;

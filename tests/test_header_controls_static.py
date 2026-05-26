@@ -37,3 +37,12 @@ def test_header_controls_css_targets_custom_bridge_and_clickable_cards():
     assert "[data-drill-ticker]" in css
     assert "cursor: pointer;" in css
     assert "[data-drill-ticker]:focus-visible" in css
+
+
+def test_header_refresh_button_forces_readable_nested_streamlit_text():
+    css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
+
+    assert 'div[data-testid="stButton"] > button[kind="secondary"]' in css
+    assert 'div[data-testid="stButton"] > button[kind="secondary"] p' in css
+    assert 'div[data-testid="stButton"] > button[kind="secondary"] span' in css
+    assert "color: var(--ticker-label) !important;" in css
