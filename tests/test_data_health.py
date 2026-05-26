@@ -50,10 +50,20 @@ def test_data_health_rows_show_ohlcv_and_fred_staleness():
 
     by_source = {row["source"]: row for row in rows}
 
+    assert by_source["Market OHLCV"]["lane_id"] == "market_ohlcv"
+    assert by_source["Market OHLCV"]["refresh_label"] == "Refresh market OHLCV"
+    assert by_source["Market OHLCV"]["refresh_key"] == "data_health_refresh_market_ohlcv"
+    assert by_source["Market OHLCV"]["sla"] == "fresh <=5d; stale >10d"
+    assert by_source["Market OHLCV"]["severity_symbol"] == "OK"
     assert by_source["Market OHLCV"]["status"] == "healthy"
     assert by_source["Market OHLCV"]["freshness"] == "4d old"
     assert "2/2 symbols loaded" in by_source["Market OHLCV"]["detail"]
     assert by_source["Market OHLCV"]["role"] == "Critical: price, volume, trend, momentum, and market proxies"
+    assert by_source["FRED macro/regime"]["lane_id"] == "fred_macro"
+    assert by_source["FRED macro/regime"]["refresh_label"] == "Refresh FRED macro"
+    assert by_source["FRED macro/regime"]["refresh_key"] == "data_health_refresh_fred_macro"
+    assert by_source["FRED macro/regime"]["sla"] == "series cadence adjusted"
+    assert by_source["FRED macro/regime"]["severity_symbol"] == "WARN"
     assert by_source["FRED macro/regime"]["status"] == "warning"
     assert by_source["FRED macro/regime"]["freshness"] == "latest available: 5d old"
     assert by_source["FRED macro/regime"]["coverage"] == "2 stale series"
@@ -61,8 +71,34 @@ def test_data_health_rows_show_ohlcv_and_fred_staleness():
     assert "DCOILWTICO 16d old" in by_source["FRED macro/regime"]["detail"]
     assert "cadence/release-lag adjusted" in by_source["FRED macro/regime"]["detail"]
     assert by_source["FRED macro/regime"]["role"] == "Critical when configured: business-cycle tilt and macro context"
+    assert by_source["Provider-flow feeds"]["lane_id"] == "provider_flow"
+    assert by_source["Provider-flow feeds"]["refresh_label"] == "Recompute flow signals"
+    assert by_source["Provider-flow feeds"]["refresh_key"] == "data_health_refresh_provider_flow"
+    assert by_source["Provider-flow feeds"]["severity_symbol"] == "INFO"
     assert by_source["Provider-flow feeds"]["status"] == "info"
+    assert by_source["Provider-flow feeds"]["sla"] == "recomputes from current OHLCV"
+    assert by_source["Provider-flow feeds"]["freshness"] == "derived from market lane"
     assert "neutral/stub" in by_source["Provider-flow feeds"]["detail"]
+
+
+def test_data_health_rows_include_refreshable_compute_lane_metadata():
+    rows = data_health_rows(
+        ohlcv={"SPY": _ohlcv_frame("2026-05-26")},
+        expected_symbols=("SPY",),
+        ohlcv_result=SimpleNamespace(provider="massive", missing=(), stale_cache_hits=(), warnings=()),
+        fred_data={},
+        compute_created_at=1_779_760_000.0,
+        now=pd.Timestamp("2026-05-26T16:00:00Z"),
+        provider_flow_stubbed=True,
+    )
+
+    compute_row = next(row for row in rows if row["source"] == "Dashboard compute")
+
+    assert compute_row["lane_id"] == "dashboard_compute"
+    assert compute_row["refresh_label"] == "Recompute dashboard"
+    assert compute_row["refresh_key"] == "data_health_refresh_dashboard_compute"
+    assert compute_row["sla"] == "snapshot <=60m"
+    assert compute_row["severity_symbol"] in {"OK", "WARN"}
 
 
 def test_ohlcv_health_headline_uses_latest_bar_age_and_details_oldest_loaded_bar():

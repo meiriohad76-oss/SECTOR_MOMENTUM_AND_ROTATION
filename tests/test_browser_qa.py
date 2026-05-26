@@ -38,6 +38,17 @@ def test_browser_qa_targets_cover_visual_residual_risks():
     assert "expect-visible:.alert-row.pulse-transition" in by_id["desktop-transition-pulse"].actions
     assert by_id["desktop-provider-status-banner"].tickets == ("B-146",)
     assert "expect-visible:.provider-status-banner" in by_id["desktop-provider-status-banner"].actions
+    assert by_id["desktop-data-health-lanes"].tickets == ("B-147",)
+    assert "text:Refresh market OHLCV" in by_id["desktop-data-health-lanes"].checks
+    assert "text:Refresh FRED macro" in by_id["desktop-data-health-lanes"].checks
+    assert "text:Recompute dashboard" in by_id["desktop-data-health-lanes"].checks
+    assert "text:Recompute flow signals" in by_id["desktop-data-health-lanes"].checks
+    assert "text:Refresh all lanes" in by_id["desktop-data-health-lanes"].checks
+    assert "expect-visible:.data-health-panel" in by_id["desktop-data-health-lanes"].actions
+    assert (
+        'expect-visible:div[class*="st-key-data_health_refresh_market_ohlcv"] button'
+        in by_id["desktop-data-health-lanes"].actions
+    )
     assert by_id["desktop-comparison-view"].focus_text == "COMPARE TICKERS"
     assert by_id["desktop-full-matrix-table"].focus_text == "FULL 7"
     assert "hover:first-full-table-row" in by_id["desktop-full-matrix-table"].actions

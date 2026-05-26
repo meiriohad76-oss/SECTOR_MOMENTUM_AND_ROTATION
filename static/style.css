@@ -297,28 +297,32 @@ body {
 .element-container:has(.header-controls-slot) + div[data-testid="stHorizontalBlock"] {
   position: fixed;
   top: 12px;
-  right: 28px;
-  width: 78px;
+  right: 16px;
+  width: min(720px, calc(100vw - 32px));
   z-index: 1000;
   gap: 8px !important;
+  align-items: flex-start;
 }
 .header-controls-slot + div[data-testid="stHorizontalBlock"] [data-testid="column"],
 .element-container:has(.header-controls-slot) + div[data-testid="stHorizontalBlock"] [data-testid="column"] {
-  width: 34px !important;
-  flex: 0 0 34px !important;
+  min-width: 74px;
+  flex: 1 1 0 !important;
 }
 .header-controls-slot + div[data-testid="stHorizontalBlock"] button,
 .element-container:has(.header-controls-slot) + div[data-testid="stHorizontalBlock"] button {
-  width: 34px;
+  width: 100%;
+  min-width: 74px;
   height: 34px;
   min-height: 34px;
-  padding: 0;
+  padding: 0 8px;
   border-radius: var(--radius);
   border: 1px solid var(--border-strong);
   background: var(--panel);
   color: var(--fg-dim);
   font-family: var(--font-mono);
+  font-size: 0.72rem;
   line-height: 1;
+  white-space: nowrap;
   transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
 }
 .header-controls-slot + div[data-testid="stHorizontalBlock"] button:hover,
@@ -346,8 +350,13 @@ div[data-testid="stSelectbox"] label p,
 div[data-testid="stSelectbox"] label span {
   color: var(--ticker-label) !important;
 }
+div[data-testid="stSelectbox"] [data-baseweb="select"] > div {
+  background: var(--panel) !important;
+  border-color: var(--border-strong) !important;
+}
 div[data-testid="stSelectbox"] [data-baseweb="select"] * {
   color: var(--ticker-label) !important;
+  -webkit-text-fill-color: var(--ticker-label) !important;
 }
 div[data-testid="stTextInput"] label,
 div[data-testid="stTextInput"] label p,
@@ -2243,6 +2252,46 @@ div[class*="block-container"] {
 }
 .data-health-card p {
   margin: 10px 0 0;
+}
+.data-health-refresh-grid {
+  margin-top: 12px;
+}
+.element-container:has(.data-health-refresh-grid) + div[data-testid="stHorizontalBlock"] {
+  gap: 10px !important;
+  margin-top: 12px;
+}
+.element-container:has(.data-health-refresh-grid) + div[data-testid="stHorizontalBlock"] [data-testid="column"] {
+  min-width: 180px;
+}
+div[class*="st-key-data_health_refresh_market_ohlcv"] div[data-testid="stButton"] > button,
+div[class*="st-key-data_health_refresh_fred_macro"] div[data-testid="stButton"] > button,
+div[class*="st-key-data_health_refresh_dashboard_compute"] div[data-testid="stButton"] > button,
+div[class*="st-key-data_health_refresh_provider_flow"] div[data-testid="stButton"] > button,
+div[class*="st-key-data_health_refresh_all_button"] div[data-testid="stButton"] > button {
+  min-height: 42px;
+  color: var(--ticker-label) !important;
+  white-space: normal;
+}
+div[class*="st-key-data_health_refresh_market_ohlcv"] div[data-testid="stButton"] > button p,
+div[class*="st-key-data_health_refresh_market_ohlcv"] div[data-testid="stButton"] > button span,
+div[class*="st-key-data_health_refresh_fred_macro"] div[data-testid="stButton"] > button p,
+div[class*="st-key-data_health_refresh_fred_macro"] div[data-testid="stButton"] > button span,
+div[class*="st-key-data_health_refresh_dashboard_compute"] div[data-testid="stButton"] > button p,
+div[class*="st-key-data_health_refresh_dashboard_compute"] div[data-testid="stButton"] > button span,
+div[class*="st-key-data_health_refresh_provider_flow"] div[data-testid="stButton"] > button p,
+div[class*="st-key-data_health_refresh_provider_flow"] div[data-testid="stButton"] > button span,
+div[class*="st-key-data_health_refresh_all_button"] div[data-testid="stButton"] > button p,
+div[class*="st-key-data_health_refresh_all_button"] div[data-testid="stButton"] > button span {
+  color: var(--ticker-label) !important;
+}
+.lane-refresh-caption {
+  color: var(--ticker-label);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  margin-top: 6px;
+  text-align: center;
+  text-shadow: var(--ticker-label-shadow);
 }
 
 /* ---------- Tile help (drill-down) ---------- */

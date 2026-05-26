@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-05-26T04:44:24Z",
-  "qa_mode": "local-dashboard-component-bridge",
+  "generated_at": "2026-05-26T20:27:19Z",
+  "qa_mode": "browser-qa-secret-free",
   "results": [
     {
       "target_id": "desktop-overview",
@@ -9,7 +9,7 @@
         "B-110",
         "B-147"
       ],
-      "url": "http://127.0.0.1:8502/?ticker=XLK",
+      "url": "http://127.0.0.1:8503/?ticker=XLK",
       "screenshot": "docs/browser-qa/latest/desktop-overview.png",
       "checks": [
         "text:SENTIMENT BOARD",
@@ -30,7 +30,7 @@
       "tickets": [
         "B-117"
       ],
-      "url": "http://127.0.0.1:8502/?ticker=XLK&browser_qa_palette=Solarized",
+      "url": "http://127.0.0.1:8503/?ticker=XLK&browser_qa_palette=Solarized",
       "screenshot": "docs/browser-qa/latest/desktop-palette-view-options.png",
       "checks": [
         "text:VIEW OPTIONS",
@@ -46,7 +46,7 @@
       "notes": [
         "expanded: VIEW OPTIONS",
         "checked radio: Solarized",
-        "focused text: Palette visible=true top=363 height=22 scrollTop=0",
+        "focused text: Palette visible=true top=429 height=22 scrollTop=0",
         "nonblank screenshot"
       ]
     },
@@ -58,7 +58,7 @@
         "B-112",
         "B-116"
       ],
-      "url": "http://127.0.0.1:8502/?ticker=XLK",
+      "url": "http://127.0.0.1:8503/?ticker=XLK",
       "screenshot": "docs/browser-qa/latest/desktop-rrg-spaghetti-drill.png",
       "checks": [
         "text:SECTOR SPAGHETTI",
@@ -69,7 +69,7 @@
       "actions": [],
       "ok": true,
       "notes": [
-        "focused text: US SECTOR RELATIVE STRENGTH visible=true top=429 height=17 scrollTop=5604",
+        "focused text: US SECTOR RELATIVE STRENGTH visible=true top=429 height=17 scrollTop=6486",
         "nonblank screenshot"
       ]
     },
@@ -79,7 +79,7 @@
       "tickets": [
         "B-115"
       ],
-      "url": "http://127.0.0.1:8502/?ticker=XLK",
+      "url": "http://127.0.0.1:8503/?ticker=XLK",
       "screenshot": "docs/browser-qa/latest/desktop-comparison-view.png",
       "checks": [
         "text:COMPARE TICKERS"
@@ -88,7 +88,7 @@
       "actions": [],
       "ok": true,
       "notes": [
-        "focused text: COMPARE TICKERS visible=true top=418 height=22 scrollTop=8174",
+        "focused text: COMPARE TICKERS visible=true top=418 height=22 scrollTop=9104",
         "nonblank screenshot"
       ]
     },
@@ -98,7 +98,7 @@
       "tickets": [
         "B-114"
       ],
-      "url": "http://127.0.0.1:8502/?ticker=XLK&browser_qa_transition=1",
+      "url": "http://127.0.0.1:8503/?ticker=XLK&browser_qa_transition=1",
       "screenshot": "docs/browser-qa/latest/desktop-transition-pulse.png",
       "checks": [
         "text:Recent transitions",
@@ -111,7 +111,7 @@
       ],
       "ok": true,
       "notes": [
-        "focused text: Recent transitions visible=true top=418 height=22 scrollTop=2929",
+        "focused text: Recent transitions visible=true top=418 height=22 scrollTop=3811",
         "visible selector: .alert-row.pulse-transition",
         "nonblank screenshot"
       ]
@@ -122,7 +122,7 @@
       "tickets": [
         "B-146"
       ],
-      "url": "http://127.0.0.1:8502/?ticker=XLK&browser_qa_provider_banner=1",
+      "url": "http://127.0.0.1:8503/?ticker=XLK&browser_qa_provider_banner=1",
       "screenshot": "docs/browser-qa/latest/desktop-provider-status-banner.png",
       "checks": [
         "text:Provider gap",
@@ -140,12 +140,41 @@
       ]
     },
     {
+      "target_id": "desktop-data-health-lanes",
+      "viewport": "desktop",
+      "tickets": [
+        "B-147"
+      ],
+      "url": "http://127.0.0.1:8503/?ticker=XLK",
+      "screenshot": "docs/browser-qa/latest/desktop-data-health-lanes.png",
+      "checks": [
+        "text:Data and dashboard health",
+        "text:Refresh market OHLCV",
+        "text:Refresh FRED macro",
+        "text:Recompute dashboard",
+        "text:Recompute flow signals",
+        "text:Refresh all lanes"
+      ],
+      "setup_actions": [],
+      "actions": [
+        "expect-visible:.data-health-panel",
+        "expect-visible:div[class*=\"st-key-data_health_refresh_market_ohlcv\"] button"
+      ],
+      "ok": true,
+      "notes": [
+        "focused text: Data and dashboard health visible=true top=418 height=18 scrollTop=658",
+        "visible selector: .data-health-panel",
+        "visible selector: div[class*=\"st-key-data_health_refresh_market_ohlcv\"] button",
+        "nonblank screenshot"
+      ]
+    },
+    {
       "target_id": "desktop-full-matrix-table",
       "viewport": "desktop",
       "tickets": [
         "B-113"
       ],
-      "url": "http://127.0.0.1:8502/?ticker=XLK",
+      "url": "http://127.0.0.1:8503/?ticker=XLK",
       "screenshot": "docs/browser-qa/latest/desktop-full-matrix-table.png",
       "checks": [
         "text:FULL 7",
@@ -158,7 +187,7 @@
       ],
       "ok": true,
       "notes": [
-        "focused text: FULL 7 visible=true top=907 height=26 scrollTop=12819",
+        "focused text: FULL 7 visible=true top=418 height=26 scrollTop=13037",
         "hovered first full-table row",
         "visible selector: .full-table tbody tr:first-child .row-preview",
         "nonblank screenshot"
@@ -172,7 +201,7 @@
         "B-112",
         "B-115"
       ],
-      "url": "http://127.0.0.1:8502/?ticker=XLK",
+      "url": "http://127.0.0.1:8503/?ticker=XLK",
       "screenshot": "docs/browser-qa/latest/tablet-dashboard.png",
       "checks": [
         "text:SENTIMENT BOARD",
@@ -183,7 +212,7 @@
       "actions": [],
       "ok": true,
       "notes": [
-        "focused text: Risk regime visible=true top=418 height=22 scrollTop=737",
+        "focused text: Risk regime visible=true top=669 height=45 scrollTop=0",
         "nonblank screenshot"
       ]
     },
@@ -197,7 +226,7 @@
         "B-116",
         "B-117"
       ],
-      "url": "http://127.0.0.1:8502/?ticker=XLK",
+      "url": "http://127.0.0.1:8503/?ticker=XLK",
       "screenshot": "docs/browser-qa/latest/mobile-dashboard.png",
       "checks": [
         "text:SENTIMENT BOARD",
@@ -208,7 +237,7 @@
       "actions": [],
       "ok": true,
       "notes": [
-        "focused text: BLUF visible=true top=388 height=22 scrollTop=0",
+        "focused text: BLUF visible=true top=380 height=22 scrollTop=474",
         "nonblank screenshot"
       ]
     }

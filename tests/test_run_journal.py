@@ -358,3 +358,51 @@ def test_append_dashboard_run_persists_built_snapshot_and_decisions(tmp_path):
     assert details["scores"][0]["ticker"] == "XLK"
     assert details["scores"][0]["pillar_scores"]["mom_12_1"] == pytest.approx(0.12)
     assert details["decisions"][0]["action"] == "BUY"
+
+
+def test_append_dashboard_run_can_skip_duplicate_content_digest(tmp_path):
+    db_path = tmp_path / "runs.sqlite"
+    scored = pd.DataFrame(
+        {"class": ["US Sectors"], "state": ["STAGE_2_BULLISH"], "S_score": [0.91], "F_score": [0.33]},
+        index=["XLK"],
+    )
+    bluf = {
+        "actions": [
+            {
+                "kind": "buy",
+                "label": "BUY CANDIDATES",
+                "eta": "ENTER ON DIP",
+                "state": "STAGE_2_BULLISH",
+                "tickers": [{"t": "XLK", "note": "S +0.91"}],
+            }
+        ]
+    }
+
+    first = append_dashboard_run(
+        db_path,
+        scored,
+        bluf,
+        started_at_utc="2026-05-21T05:00:00Z",
+        git_sha="abc1234",
+        app_version="v2.4.2",
+        provider="massive",
+        metadata={"phase": "MID"},
+        dedupe_content=True,
+    )
+    second = append_dashboard_run(
+        db_path,
+        scored,
+        bluf,
+        started_at_utc="2026-05-21T05:05:00Z",
+        git_sha="abc1234",
+        app_version="v2.4.2",
+        provider="massive",
+        metadata={"phase": "MID"},
+        dedupe_content=True,
+    )
+
+    assert first.ok is True
+    assert second.ok is True
+    assert second.skipped_duplicate is True
+    assert second.run_id == first.run_id
+    assert [row["run_id"] for row in list_runs(db_path)] == [first.run_id]

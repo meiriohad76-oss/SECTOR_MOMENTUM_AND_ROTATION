@@ -19,7 +19,8 @@ def test_header_controls_render_after_header_and_bottom_controls_removed():
     )
     assert "ctrl_col1, ctrl_col2, _ = st.columns([1, 1, 18])" not in app_source
     assert "_load_data.clear()" not in app_source
-    assert "st.button(\"REFRESH\"" in header_section
+    assert '<div class="header-controls-slot"></div>' in header_section
+    assert 'st.button("Refresh"' in header_section
     assert "on_click=_refresh_loaded_data" in header_section
     assert "st.button(theme_label" in header_section
     assert "on_click=toggle_theme" in header_section
@@ -54,7 +55,13 @@ def test_header_native_controls_align_and_use_readable_labels():
     assert 'div[class*="st-key-header_refresh_data_button"] div[data-testid="stButton"]' in css
     assert 'div[class*="st-key-header_theme_toggle"] div[data-testid="stButton"]' in css
     assert "margin-top: 28px;" in css
+    assert "width: min(720px, calc(100vw - 32px));" in css
+    assert "min-width: 74px;" in css
+    assert "flex: 1 1 0 !important;" in css
     assert 'div[data-testid="stSelectbox"] label' in css
     assert 'div[data-testid="stSelectbox"] label p' in css
     assert 'div[data-testid="stSelectbox"] label span' in css
+    assert 'div[data-testid="stSelectbox"] [data-baseweb="select"] > div' in css
+    assert "background: var(--panel) !important;" in css
+    assert "-webkit-text-fill-color: var(--ticker-label) !important;" in css
     assert "color: var(--ticker-label) !important;" in css

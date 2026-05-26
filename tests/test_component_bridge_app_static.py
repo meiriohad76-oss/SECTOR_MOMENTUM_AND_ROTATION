@@ -26,7 +26,7 @@ def test_app_renders_native_header_controls():
         app_source.index("def render_header_controls():") : app_source.index("def render_bluf():")
     ]
 
-    assert "st.button(\"REFRESH\"" in header_section
+    assert 'st.button("Refresh"' in header_section
     assert "on_click=_refresh_loaded_data" in header_section
     assert "st.button(theme_label" in header_section
     assert "on_click=toggle_theme" in header_section

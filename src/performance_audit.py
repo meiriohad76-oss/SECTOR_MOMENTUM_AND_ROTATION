@@ -24,9 +24,17 @@ VISUAL_STATE_KEYS = (
     "table_sort_field_choice",
     "table_sort_direction_choice",
 )
+DATA_REFRESH_STATE_KEYS = (
+    "data_refresh_token",
+    "fred_refresh_token",
+    "flow_refresh_token",
+    "compute_refresh_token",
+    "data_refresh_requested_at",
+    "data_refresh_lane",
+)
 COMPUTE_SNAPSHOT_KEYS = ("ohlcv_result", "ohlcv", "fred_data", "regime", "scored", "created_at")
 DASHBOARD_COMPUTE_SNAPSHOT_TTL_SECONDS = 3600
-SESSION_STATE_KEYS = VISUAL_STATE_KEYS + (
+SESSION_STATE_KEYS = VISUAL_STATE_KEYS + DATA_REFRESH_STATE_KEYS + (
     "klass",
     "methodology_ticker_input",
     "methodology_ticker_submitted_text",

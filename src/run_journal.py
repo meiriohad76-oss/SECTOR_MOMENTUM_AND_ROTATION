@@ -51,6 +51,7 @@ class JournalAppendResult:
     ok: bool
     run_id: str | None = None
     error: str | None = None
+    skipped_duplicate: bool = False
 
 
 PILLAR_SCORE_COLUMNS = (
@@ -317,6 +318,7 @@ def append_dashboard_run(
     app_version: str | None = None,
     provider: str | None = None,
     metadata: Mapping[str, Any] | None = None,
+    dedupe_content: bool = False,
 ) -> JournalAppendResult:
     run: RunRecord | None = None
     try:
@@ -329,6 +331,11 @@ def append_dashboard_run(
             provider=provider,
             metadata=metadata,
         )
+        if dedupe_content:
+            content_digest = run.run_id.rsplit("-", 1)[-1]
+            existing_run_id = _existing_run_id_for_content_digest(db_path, content_digest)
+            if existing_run_id is not None:
+                return JournalAppendResult(ok=True, run_id=existing_run_id, skipped_duplicate=True)
         append_run(db_path, run, scored_rows=scored_rows, decisions=decisions)
     except Exception as exc:
         return JournalAppendResult(
@@ -337,6 +344,22 @@ def append_dashboard_run(
             error=f"{type(exc).__name__}: {exc}",
         )
     return JournalAppendResult(ok=True, run_id=run.run_id)
+
+
+def _existing_run_id_for_content_digest(db_path: str | Path, content_digest: str) -> str | None:
+    initialize_journal(db_path)
+    with sqlite3.connect(Path(db_path)) as conn:
+        row = conn.execute(
+            """
+            SELECT run_id
+            FROM runs
+            WHERE run_id LIKE ?
+            ORDER BY started_at_utc DESC, created_at_utc DESC
+            LIMIT 1
+            """,
+            (f"%-{content_digest}",),
+        ).fetchone()
+    return str(row[0]) if row else None
 
 
 def initialize_journal(db_path: str | Path = DEFAULT_JOURNAL_PATH) -> None:

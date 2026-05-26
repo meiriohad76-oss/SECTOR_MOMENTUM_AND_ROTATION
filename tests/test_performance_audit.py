@@ -110,6 +110,32 @@ def test_classify_interactive_rerun_when_non_visual_state_changes():
     assert result.changed_keys == ("klass",)
 
 
+def test_refresh_tokens_force_interactive_rerun_classification():
+    previous = performance_audit.session_snapshot(
+        {
+            "theme": "dark",
+            "data_refresh_token": "market_ohlcv:old",
+            "fred_refresh_token": "",
+            "flow_refresh_token": "",
+            "compute_refresh_token": "",
+        }
+    )
+    current = performance_audit.session_snapshot(
+        {
+            "theme": "dark",
+            "data_refresh_token": "market_ohlcv:new",
+            "fred_refresh_token": "",
+            "flow_refresh_token": "",
+            "compute_refresh_token": "",
+        }
+    )
+
+    result = performance_audit.classify_rerun(previous, current)
+
+    assert result.kind == "interactive"
+    assert result.changed_keys == ("data_refresh_token",)
+
+
 def test_should_reuse_dashboard_compute_only_for_visual_only_complete_snapshot():
     classification = performance_audit.RerunClassification("visual_only", ("theme",))
     snapshot = {

@@ -32,6 +32,24 @@ FRED_SERIES_FRESH_DAYS = {
     "DHHNGSP": 14,
     "DTWEXBGS": 14,
 }
+LANE_REFRESH_LABELS = {
+    "market_ohlcv": "Refresh market OHLCV",
+    "fred_macro": "Refresh FRED macro",
+    "dashboard_compute": "Recompute dashboard",
+    "provider_flow": "Recompute flow signals",
+}
+LANE_SLA_LABELS = {
+    "market_ohlcv": f"fresh <={OHLCV_FRESH_DAYS}d; stale >{OHLCV_STALE_DAYS}d",
+    "fred_macro": "series cadence adjusted",
+    "dashboard_compute": "snapshot <=60m",
+    "provider_flow": "recomputes from current OHLCV",
+}
+STATUS_SYMBOLS = {
+    "healthy": "OK",
+    "info": "INFO",
+    "warning": "WARN",
+    "stale": "STALE",
+}
 
 
 def _now_timestamp(now: pd.Timestamp | datetime | None = None) -> pd.Timestamp:
@@ -92,6 +110,16 @@ def _status_rank(status: str) -> int:
     return {"healthy": 0, "info": 0, "warning": 1, "stale": 2}.get(status, 1)
 
 
+def _lane_metadata(lane_id: str, status: str) -> dict[str, object]:
+    return {
+        "lane_id": lane_id,
+        "sla": LANE_SLA_LABELS[lane_id],
+        "refresh_label": LANE_REFRESH_LABELS[lane_id],
+        "refresh_key": f"data_health_refresh_{lane_id}",
+        "severity_symbol": STATUS_SYMBOLS.get(status, "WARN"),
+    }
+
+
 def _ohlcv_health_row(
     ohlcv: Mapping[str, pd.DataFrame],
     expected_symbols: Iterable[str],
@@ -144,11 +172,14 @@ def _ohlcv_health_row(
         detail_parts.append("provider warnings present")
 
     return {
+        **_lane_metadata("market_ohlcv", status),
         "source": "Market OHLCV",
         "role": "Critical: price, volume, trend, momentum, and market proxies",
         "status": status,
         "latest": str(latest.date()) if latest is not None else "-",
         "freshness": format_age_label(latest, now),
+        "age_days": latest_age,
+        "oldest_age_days": oldest_age,
         "coverage": f"oldest {oldest.date()} ({oldest_age}d old)" if oldest is not None and oldest_age is not None else "",
         "detail": "; ".join(detail_parts),
     }
@@ -223,11 +254,13 @@ def _fred_health_row(fred_data: Mapping[str, pd.Series], *, now: pd.Timestamp) -
     detail_parts.append("FRED freshness is cadence/release-lag adjusted")
 
     return {
+        **_lane_metadata("fred_macro", status),
         "source": "FRED macro/regime",
         "role": "Critical when configured: business-cycle tilt and macro context",
         "status": status,
         "latest": str(latest.date()) if latest is not None else "-",
         "freshness": f"latest available: {format_age_label(latest, now)}",
+        "age_days": _age_days(latest, now),
         "coverage": f"{len(stale)} stale series" if stale else "",
         "detail": "; ".join(detail_parts),
     }
@@ -235,10 +268,12 @@ def _fred_health_row(fred_data: Mapping[str, pd.Series], *, now: pd.Timestamp) -
 
 def _compute_health_row(compute_created_at: float | int | None, *, now: pd.Timestamp) -> dict[str, object]:
     if compute_created_at is None:
+        status = "warning"
         return {
+            **_lane_metadata("dashboard_compute", status),
             "source": "Dashboard compute",
             "role": "Critical: current rendered analysis snapshot",
-            "status": "warning",
+            "status": status,
             "latest": "-",
             "freshness": "missing",
             "detail": "No compute timestamp was recorded for this render.",
@@ -253,11 +288,13 @@ def _compute_health_row(compute_created_at: float | int | None, *, now: pd.Times
         age_minutes = max(0, int((now - created).total_seconds() // 60))
     status = "healthy" if age_minutes is not None and age_minutes <= 60 else "warning"
     return {
+        **_lane_metadata("dashboard_compute", status),
         "source": "Dashboard compute",
         "role": "Critical: current rendered analysis snapshot",
         "status": status,
         "latest": created.strftime("%Y-%m-%d %H:%M UTC") if created is not None else "-",
         "freshness": f"{age_minutes}m old" if age_minutes is not None else "missing",
+        "age_minutes": age_minutes,
         "detail": "Analysis snapshot reused for visual-only changes for up to 60 minutes.",
     }
 
@@ -273,11 +310,12 @@ def _provider_flow_health_row(provider_flow_stubbed: bool) -> dict[str, object]:
         detail = "Provider-backed flow feeds are enabled; check provider warnings above for data gaps."
         status = "healthy"
     return {
+        **_lane_metadata("provider_flow", status),
         "source": "Provider-flow feeds",
         "role": "Optional provider feeds; OHLCV-derived flow remains active",
         "status": status,
         "latest": "-",
-        "freshness": "configuration",
+        "freshness": "derived from market lane",
         "detail": detail,
     }
 

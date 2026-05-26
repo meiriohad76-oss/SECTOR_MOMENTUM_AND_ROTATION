@@ -499,14 +499,58 @@ def _load_fred(refresh_token: str | None = None) -> dict:
         return {}
 
 
-def _refresh_loaded_data() -> None:
-    refresh_market_data(_load_data)
-    refresh_market_data(_load_ad_hoc_data)
-    refresh_market_data(_load_fred)
-    st.session_state.pop("dashboard_compute_snapshot", None)
+def _refresh_data_lane(lane_id: str) -> None:
+    lane_id = lane_id if lane_id in {"all", "market_ohlcv", "fred_macro", "dashboard_compute", "provider_flow"} else "all"
     requested_at = datetime.now(timezone.utc).isoformat()
+    cleared_caches: list[str] = []
+
+    if lane_id in {"all", "market_ohlcv"}:
+        refresh_market_data(_load_data)
+        refresh_market_data(_load_ad_hoc_data)
+        st.session_state.data_refresh_token = f"{lane_id}:{requested_at}"
+        cleared_caches.extend(["market_ohlcv", "ad_hoc_ohlcv"])
+    if lane_id in {"all", "fred_macro"}:
+        refresh_market_data(_load_fred)
+        st.session_state.fred_refresh_token = f"{lane_id}:{requested_at}"
+        cleared_caches.append("fred_macro")
+    if lane_id in {"all", "provider_flow"}:
+        st.session_state.flow_refresh_token = f"{lane_id}:{requested_at}"
+    if lane_id in {"all", "dashboard_compute"}:
+        st.session_state.compute_refresh_token = f"{lane_id}:{requested_at}"
+
+    st.session_state.pop("dashboard_compute_snapshot", None)
     st.session_state.data_refresh_requested_at = requested_at
-    st.session_state.data_refresh_token = requested_at
+    st.session_state.data_refresh_lane = lane_id
+    log_event(APP_LOGGER, "data_lane_refresh_requested",
+        lane_id=lane_id,
+        requested_at=requested_at,
+        caches_cleared=cleared_caches,
+    )
+
+
+def _refresh_loaded_data() -> None:
+    _refresh_data_lane("all")
+
+
+def _mark_data_refresh_completed(ohlcv_result_obj) -> None:
+    requested_at = st.session_state.get("data_refresh_requested_at")
+    if not requested_at or st.session_state.get("data_refresh_completed_request_at") == requested_at:
+        return
+    completed_at = datetime.now(timezone.utc).isoformat()
+    st.session_state.data_refresh_completed_request_at = requested_at
+    st.session_state.data_refresh_completed_at = completed_at
+    log_event(APP_LOGGER, "data_lane_refresh_completed",
+        lane_id=st.session_state.get("data_refresh_lane"),
+        requested_at=requested_at,
+        completed_at=completed_at,
+        provider=getattr(ohlcv_result_obj, "provider", "unknown"),
+        fetched_count=len(getattr(ohlcv_result_obj, "data", {}) or {}),
+        fresh_cache_hit_count=len(getattr(ohlcv_result_obj, "fresh_cache_hits", ()) or ()),
+        stale_cache_hit_count=len(getattr(ohlcv_result_obj, "stale_cache_hits", ()) or ()),
+        missing_ohlcv_count=len(getattr(ohlcv_result_obj, "missing", ()) or ()),
+        provider_warning_count=len(getattr(ohlcv_result_obj, "warnings", ()) or ()),
+        cache_refresh_forced=bool(getattr(ohlcv_result_obj, "cache_refresh_forced", False)),
+    )
 
 
 def _apply_control_bridge_actions() -> None:
@@ -641,7 +685,8 @@ def _current_git_sha() -> str | None:
     return result.stdout.strip() or None
 
 
-def _record_dashboard_run(scored_df, bluf_payload, regime_obj, transitions_rows, ohlcv_payload, fred_snapshot) -> None:
+def _record_dashboard_run(scored_df, bluf_payload, regime_obj, transitions_rows, ohlcv_payload, ohlcv_result_obj, fred_snapshot) -> None:
+    provider = str(getattr(ohlcv_result_obj, "provider", "") or _select_ohlcv_provider(None))
     metadata = {
         "phase": regime_obj.phase_hint,
         "risk_on": regime_obj.risk_on,
@@ -651,6 +696,14 @@ def _record_dashboard_run(scored_df, bluf_payload, regime_obj, transitions_rows,
         "transition_count_14d": len(transitions_rows),
         "benchmarks": {"us": BENCH["US"], "tbill": BENCH["TBILL"]},
         "missing_ohlcv": sorted(set(DATA_SYMBOLS) - set(ohlcv_payload)),
+        "ohlcv_provider": provider,
+        "fresh_cache_hit_count": len(getattr(ohlcv_result_obj, "fresh_cache_hits", ()) or ()),
+        "stale_cache_hit_count": len(getattr(ohlcv_result_obj, "stale_cache_hits", ()) or ()),
+        "missing_ohlcv_provider": sorted(getattr(ohlcv_result_obj, "missing", ()) or ()),
+        "provider_warning_count": len(getattr(ohlcv_result_obj, "warnings", ()) or ()),
+        "cache_refresh_forced": bool(getattr(ohlcv_result_obj, "cache_refresh_forced", False)),
+        "data_refresh_lane": st.session_state.get("data_refresh_lane"),
+        "data_refresh_requested_at": st.session_state.get("data_refresh_requested_at"),
         "bluf_counts": {
             "exits": bluf_payload.get("exits_count", 0),
             "warnings": bluf_payload.get("warns_count", 0),
@@ -658,7 +711,6 @@ def _record_dashboard_run(scored_df, bluf_payload, regime_obj, transitions_rows,
         },
     }
     git_sha = _current_git_sha()
-    provider = _select_ohlcv_provider(None)
     fingerprint = dashboard_run_fingerprint(
         scored_df,
         bluf_payload,
@@ -678,10 +730,19 @@ def _record_dashboard_run(scored_df, bluf_payload, regime_obj, transitions_rows,
         app_version=APP_VERSION,
         provider=provider,
         metadata=metadata,
+        dedupe_content=True,
     )
     if result.ok:
         st.session_state.run_journal_last_run_id = result.run_id
         st.session_state.run_journal_last_fingerprint = fingerprint
+        if result.skipped_duplicate:
+            log_event(APP_LOGGER, "dashboard_run_duplicate_skipped",
+                run_id=result.run_id,
+                provider=provider,
+                ticker_count=len(scored_df),
+                git_sha=git_sha,
+            )
+            return
         log_event(APP_LOGGER, "dashboard_run_recorded",
             run_id=result.run_id,
             provider=provider,
@@ -716,6 +777,7 @@ else:
     try:
         with PERF_AUDIT.section("load_data"):
             refresh_token = st.session_state.get("data_refresh_token")
+            fred_refresh_token = st.session_state.get("fred_refresh_token")
             ohlcv_result = _load_data("3y", refresh_token=refresh_token)
             render_provider_status_banner(ohlcv_result)
             _render_browser_qa_provider_banner()
@@ -733,7 +795,7 @@ else:
             indicators_df = compute_all_indicators(scoring_ohlcv, bench_ticker, bil_ticker)
             flow_df = compute_flow_signals(scoring_ohlcv)
             flow_z = flow_composite_z(flow_df)
-            _fred_data = _load_fred(refresh_token=refresh_token)
+            _fred_data = _load_fred(refresh_token=fred_refresh_token)
             regime = assess_regime(ohlcv[bench_ticker], ohlcv.get("^TNX"), ohlcv.get("^IRX"), fred_cache=_fred_data)
             scored = compute_composite(indicators_df, flow_df, flow_z, phase=regime.phase_hint)
             scored = apply_state_machine(scored)
@@ -849,7 +911,7 @@ bluf = _build_bluf(scored)
 transitions = recent_transitions(n=14)
 transitions = _browser_qa_transitions(scored) + transitions
 if not _REUSED_COMPUTE_SNAPSHOT:
-    _record_dashboard_run(scored, bluf, regime, transitions, ohlcv, fred_macro_snapshot(_fred_data))
+    _record_dashboard_run(scored, bluf, regime, transitions, ohlcv, ohlcv_result, fred_macro_snapshot(_fred_data))
 
 # Phase index for the phase bar
 PHASE_IDX = {"EARLY": 0, "MID": 1, "LATE": 2, "RECESSION": 3, "UNKNOWN": -1}
@@ -1251,6 +1313,7 @@ def _apply_header_preference(widget_key: str, target_key: str, allowed: tuple[st
 
 
 def render_header_controls():
+    _md('<div class="header-controls-slot"></div>')
     for widget_key, target_key in (
         ("header_bluf_mode", "bluf_mode"),
         ("header_view_density", "view_density"),
@@ -1261,9 +1324,9 @@ def render_header_controls():
 
     refresh_col, theme_col, view_col, density_col, spark_col, palette_col = st.columns([1, 1, 1.15, 1.15, 1.15, 1.15])
     with refresh_col:
-        st.button("REFRESH", key="header_refresh_data_button", width="stretch", on_click=_refresh_loaded_data)
+        st.button("Refresh", key="header_refresh_data_button", width="stretch", on_click=_refresh_loaded_data)
     with theme_col:
-        theme_label = "LIGHT" if st.session_state.theme == "dark" else "DARK"
+        theme_label = "Light" if st.session_state.theme == "dark" else "Dark"
         st.button(theme_label, key="header_theme_toggle", width="stretch", on_click=toggle_theme, args=(st.session_state,))
     with view_col:
         st.selectbox(
@@ -1375,14 +1438,18 @@ def render_data_health():
         status = str(row.get("status", "warning"))
         latest_text = _esc(str(row.get("latest", "-")))
         coverage = str(row.get("coverage") or "")
+        sla = str(row.get("sla") or "")
+        severity = str(row.get("severity_symbol") or status.upper())
         subline = f"latest {latest_text}"
         if coverage:
             subline += f" | {coverage}"
+        if sla:
+            subline += f" | SLA {sla}"
         cards_html += f"""
         <div class="data-health-card {status}">
           <div class="data-health-card-head">
             <span>{_esc(str(row.get('source', 'Source')))}</span>
-            <b>{_esc(status.upper())}</b>
+            <b>{_esc(severity)} · {_esc(status.upper())}</b>
           </div>
           <div class="data-health-main">{_esc(str(row.get('freshness', '-')))}</div>
           <div class="data-health-sub">{_esc(subline)}</div>
@@ -1405,7 +1472,19 @@ def render_data_health():
         </section>
         """
     )
-    if st.button("REFRESH DATA NOW", key="data_health_refresh_button", on_click=_refresh_loaded_data, width="stretch"):
+    _md('<div class="data-health-refresh-grid">')
+    refresh_cols = st.columns(len(rows))
+    for idx, row in enumerate(rows):
+        with refresh_cols[idx]:
+            refresh_label = str(row.get("refresh_label", "Refresh lane"))
+            refresh_key = str(row.get("refresh_key", f"data_health_refresh_{idx}"))
+            st.button(refresh_label, key=refresh_key, on_click=_refresh_data_lane, args=(str(row.get("lane_id")),), width="stretch")
+            _md(
+                f'<div class="lane-refresh-caption">{_esc(str(row.get("severity_symbol", "")))} · '
+                f'{_esc(str(row.get("freshness", "-")))} · {_esc(str(row.get("sla", "")))}</div>'
+            )
+    _md("</div>")
+    if st.button("Refresh all lanes", key="data_health_refresh_all_button", on_click=_refresh_loaded_data, width="stretch"):
         pass
 
 
@@ -2960,6 +3039,36 @@ def _debrief_macro_frame(rows: list[dict]) -> pd.DataFrame:
     return frame[[column for column in display_columns if column in frame.columns]]
 
 
+def _latest_ohlcv_signature(ohlcv_payload) -> tuple[tuple[str, str, int], ...]:
+    signature = []
+    for ticker, frame in sorted((str(symbol), data) for symbol, data in ohlcv_payload.items()):
+        try:
+            index = pd.DatetimeIndex(pd.to_datetime(frame.index)).dropna()
+            latest = str(pd.Timestamp(index.max()).date()) if len(index) else "missing"
+            rows = int(len(frame))
+        except Exception:
+            latest = "missing"
+            rows = 0
+        signature.append((ticker.upper(), latest, rows))
+    return tuple(signature)
+
+
+def _journal_mtime_ns(path: Path) -> int:
+    try:
+        return int(path.stat().st_mtime_ns)
+    except OSError:
+        return 0
+
+
+def _debrief_cache_key(ohlcv_payload, *, limit: int) -> tuple:
+    return (
+        str(DEFAULT_JOURNAL_PATH),
+        _journal_mtime_ns(DEFAULT_JOURNAL_PATH),
+        int(limit),
+        _latest_ohlcv_signature(ohlcv_payload),
+    )
+
+
 def render_debrief_lab():
     _md(
         """
@@ -2973,16 +3082,46 @@ def render_debrief_lab():
     )
 
     try:
-        records = debrief_journal(DEFAULT_JOURNAL_PATH, ohlcv, limit=100)
-        summary_rows = summarize_debriefs(records)
-        macro_rows = summarize_debriefs_by_macro_condition(records, horizon="4w")
-        candidate_rows = threshold_review_candidates(records, horizon="4w", min_abs_return=0.02)
-        outcome_rows = debrief_outcome_rows(records)
-        report_markdown = build_debrief_markdown_report(
-            records,
-            summary_rows=summary_rows,
-            macro_rows=macro_rows,
-            candidate_rows=candidate_rows,
+        cache_key = _debrief_cache_key(ohlcv, limit=100)
+        cached = st.session_state.get("debrief_lab_cache")
+        cache_hit = isinstance(cached, dict) and cached.get("key") == cache_key
+        if cache_hit:
+            payload = cached["payload"]
+        else:
+            with PERF_AUDIT.section("debrief_lab_compute"):
+                records = debrief_journal(DEFAULT_JOURNAL_PATH, ohlcv, limit=100)
+                summary_rows = summarize_debriefs(records)
+                macro_rows = summarize_debriefs_by_macro_condition(records, horizon="4w")
+                candidate_rows = threshold_review_candidates(records, horizon="4w", min_abs_return=0.02)
+                outcome_rows = debrief_outcome_rows(records)
+                report_markdown = build_debrief_markdown_report(
+                    records,
+                    summary_rows=summary_rows,
+                    macro_rows=macro_rows,
+                    candidate_rows=candidate_rows,
+                )
+                payload = {
+                    "records": records,
+                    "summary_rows": summary_rows,
+                    "macro_rows": macro_rows,
+                    "candidate_rows": candidate_rows,
+                    "outcome_rows": outcome_rows,
+                    "report_markdown": report_markdown,
+                }
+                st.session_state.debrief_lab_cache = {"key": cache_key, "payload": payload}
+        records = payload["records"]
+        summary_rows = payload["summary_rows"]
+        macro_rows = payload["macro_rows"]
+        candidate_rows = payload["candidate_rows"]
+        outcome_rows = payload["outcome_rows"]
+        report_markdown = payload["report_markdown"]
+        log_event(APP_LOGGER, "debrief_lab_rendered",
+            cache_hit=cache_hit,
+            record_count=len(records),
+            summary_count=len(summary_rows),
+            macro_count=len(macro_rows),
+            candidate_count=len(candidate_rows),
+            outcome_count=len(outcome_rows),
         )
         summary = _debrief_summary_frame(summary_rows)
         macro_summary = _debrief_macro_frame(macro_rows)
@@ -3079,6 +3218,7 @@ _render_timed("render_full_table", render_full_table)
 _render_timed("render_personal_trade_backtest", render_personal_trade_backtest)
 _render_timed("render_backtest_lab", render_backtest_lab)
 _render_timed("render_footer", render_footer)
+_mark_data_refresh_completed(ohlcv_result)
 _PERF_FINAL_SNAPSHOT = session_snapshot(st.session_state)
 log_event(APP_LOGGER, "dashboard_performance_audit",
     rerun_kind=_PERF_RERUN.kind,
@@ -3087,5 +3227,14 @@ log_event(APP_LOGGER, "dashboard_performance_audit",
     provider=ohlcv_result.provider,
     scored_count=len(scored),
     reused_compute_snapshot=_REUSED_COMPUTE_SNAPSHOT,
+    data_refresh_lane=st.session_state.get("data_refresh_lane"),
+    data_refresh_requested_at=st.session_state.get("data_refresh_requested_at"),
+    ohlcv_fetched_count=len(getattr(ohlcv_result, "data", {}) or {}),
+    fresh_cache_hit_count=len(getattr(ohlcv_result, "fresh_cache_hits", ()) or ()),
+    stale_cache_hit_count=len(getattr(ohlcv_result, "stale_cache_hits", ()) or ()),
+    missing_ohlcv_count=len(getattr(ohlcv_result, "missing", ()) or ()),
+    provider_warning_count=len(getattr(ohlcv_result, "warnings", ()) or ()),
+    cache_refresh_forced=bool(getattr(ohlcv_result, "cache_refresh_forced", False)),
+    fred_series_count=len(_fred_data),
 )
 st.session_state.performance_last_snapshot = _PERF_FINAL_SNAPSHOT

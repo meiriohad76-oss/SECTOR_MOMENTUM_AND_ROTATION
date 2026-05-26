@@ -159,6 +159,27 @@ def browser_qa_targets() -> tuple[BrowserQaTarget, ...]:
             ),
         ),
         BrowserQaTarget(
+            target_id="desktop-data-health-lanes",
+            viewport="desktop",
+            width=1440,
+            height=1100,
+            path="/?ticker=XLK",
+            tickets=("B-147",),
+            checks=(
+                "text:Data and dashboard health",
+                "text:Refresh market OHLCV",
+                "text:Refresh FRED macro",
+                "text:Recompute dashboard",
+                "text:Recompute flow signals",
+                "text:Refresh all lanes",
+            ),
+            focus_text="Data and dashboard health",
+            actions=(
+                "expect-visible:.data-health-panel",
+                'expect-visible:div[class*="st-key-data_health_refresh_market_ohlcv"] button',
+            ),
+        ),
+        BrowserQaTarget(
             target_id="desktop-full-matrix-table",
             viewport="desktop",
             width=1440,

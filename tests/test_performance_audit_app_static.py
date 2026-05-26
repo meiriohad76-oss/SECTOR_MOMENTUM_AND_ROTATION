@@ -29,6 +29,15 @@ def test_app_wires_performance_audit_to_structured_logging():
     assert "changed_keys=_PERF_RERUN.changed_keys" in app_source
     assert "sections_ms=PERF_AUDIT.durations_ms" in app_source
     assert "reused_compute_snapshot=_REUSED_COMPUTE_SNAPSHOT" in app_source
+    assert "data_refresh_lane=st.session_state.get(\"data_refresh_lane\")" in app_source
+    assert "data_refresh_requested_at=st.session_state.get(\"data_refresh_requested_at\")" in app_source
+    assert "ohlcv_fetched_count=len(getattr(ohlcv_result, \"data\", {}) or {})" in app_source
+    assert "fresh_cache_hit_count=len(getattr(ohlcv_result, \"fresh_cache_hits\", ()) or ())" in app_source
+    assert "stale_cache_hit_count=len(getattr(ohlcv_result, \"stale_cache_hits\", ()) or ())" in app_source
+    assert "missing_ohlcv_count=len(getattr(ohlcv_result, \"missing\", ()) or ())" in app_source
+    assert "provider_warning_count=len(getattr(ohlcv_result, \"warnings\", ()) or ())" in app_source
+    assert "cache_refresh_forced=bool(getattr(ohlcv_result, \"cache_refresh_forced\", False))" in app_source
+    assert "fred_series_count=len(_fred_data)" in app_source
     assert "_PERF_FINAL_SNAPSHOT = session_snapshot(st.session_state)" in app_source
     assert "st.session_state.performance_last_snapshot = _PERF_FINAL_SNAPSHOT" in app_source
 
@@ -56,6 +65,21 @@ def test_app_times_major_render_sections():
     assert '_render_timed("render_bluf", render_bluf)' in app_source
     assert '_render_timed("render_drill", render_drill)' in app_source
     assert '_render_timed("render_footer", render_footer)' in app_source
+
+
+def test_debrief_lab_uses_session_cache_and_logs_cache_health():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    debrief_section = app_source[
+        app_source.index("def render_debrief_lab():") : app_source.index("# =============================== compose page")
+    ]
+
+    assert "debrief_lab_cache" in debrief_section
+    assert "_debrief_cache_key(ohlcv, limit=100)" in debrief_section
+    assert "with PERF_AUDIT.section(\"debrief_lab_compute\"):" in debrief_section
+    assert 'log_event(APP_LOGGER, "debrief_lab_rendered"' in debrief_section
+    assert "cache_hit=cache_hit" in debrief_section
+    assert "record_count=len(records)" in debrief_section
+    assert "outcome_count=len(outcome_rows)" in debrief_section
 
 
 def test_app_reuses_compute_snapshot_before_expensive_sections():
@@ -104,7 +128,7 @@ def test_visual_controls_use_precompute_bridge_actions():
         app_source.index("def render_header_controls():") : app_source.index("def render_bluf():")
     ]
 
-    assert "st.button(\"REFRESH\"" in header_section
+    assert 'st.button("Refresh"' in header_section
     assert '"VIEW",' in header_section
     assert "apply_control_bridge_query_actions(" in app_source
     assert "refresh_market_data(_load_data)" in app_source
