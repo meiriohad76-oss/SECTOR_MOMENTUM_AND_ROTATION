@@ -1457,6 +1457,32 @@ div[data-testid="stButton"] > button {
   color: var(--fg);
 }
 
+div[class*="st-key-cls_"] div[data-testid="stButton"] > button {
+  min-height: 50px;
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+div[class*="st-key-cls_"] div[data-testid="stButton"] > button[kind="secondary"] {
+  background: var(--panel);
+  border: 1px solid var(--border-strong);
+  color: var(--ticker-label) !important;
+  box-shadow: none;
+}
+div[class*="st-key-cls_"] div[data-testid="stButton"] > button[kind="secondary"] p {
+  color: var(--ticker-label) !important;
+}
+div[class*="st-key-cls_"] div[data-testid="stButton"] > button[kind="secondary"]:hover {
+  background: var(--panel-hover);
+  border-color: var(--accent);
+}
+div[class*="st-key-cls_"] div[data-testid="stButton"] > button[kind="primary"] p {
+  color: #ffffff !important;
+}
+
 .drill-metrics {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

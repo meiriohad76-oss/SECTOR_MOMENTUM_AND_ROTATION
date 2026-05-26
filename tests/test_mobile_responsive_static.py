@@ -36,6 +36,18 @@ def test_mobile_responsive_css_covers_phone_layouts():
     assert ".macro-tile .tile-value { white-space: normal; }" in css_source
 
 
+def test_rrg_class_controls_have_readable_native_button_contrast():
+    css_source = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
+
+    assert 'class*="st-key-cls_"' in css_source
+    assert 'button[kind="secondary"]' in css_source
+    assert 'button[kind="secondary"] p' in css_source
+    assert "background: var(--panel);" in css_source
+    assert "color: var(--ticker-label) !important;" in css_source
+    assert 'button[kind="primary"] p' in css_source
+    assert "color: #ffffff !important;" in css_source
+
+
 def test_mobile_table_scroll_rule_wins_after_tooltip_overflow_reset():
     css_source = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
 
