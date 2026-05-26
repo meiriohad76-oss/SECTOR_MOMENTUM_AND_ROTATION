@@ -15,8 +15,8 @@ def test_app_uses_fetch_result_and_renders_provider_status_banner():
     assert "def provider_status_banner_html(ohlcv_result)" in app_source
     assert "return build_provider_status_banner_html(ohlcv_result)" in app_source
     assert "def render_provider_status_banner(ohlcv_result) -> None:" in app_source
-    assert "return fetch_ohlcv_result(tickers, period=period)" in app_source
-    assert "ohlcv_result = _load_data(\"3y\")" in app_source
+    assert "return fetch_ohlcv_result(tickers, period=period, force_refresh=bool(refresh_token))" in app_source
+    assert 'ohlcv_result = _load_data("3y", refresh_token=refresh_token)' in app_source
     assert "render_provider_status_banner(ohlcv_result)" in app_source
     assert "ohlcv = ohlcv_result.data" in app_source
     assert "used_stale_cache" in ui_states_source

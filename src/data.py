@@ -39,6 +39,7 @@ class OhlcvFetchResult:
     warnings: tuple[str, ...] = ()
     used_stale_cache: bool = False
     provider_retry_count: int = 0
+    cache_refresh_forced: bool = False
 
 
 @dataclass(frozen=True)
@@ -306,12 +307,14 @@ def fetch_ohlcv_result(
     interval: str = "1d",
     provider: str | None = None,
     use_cache: bool = True,
+    force_refresh: bool = False,
 ) -> OhlcvFetchResult:
     """Fetch OHLCV and return provider/cache metadata for operator status UI."""
     tickers = list(dict.fromkeys(tickers))  # de-dup preserving order
     provider_name = _select_ohlcv_provider(provider)
     cached: dict[str, pd.DataFrame] = {}
-    if use_cache and ohlcv_cache_enabled():
+    cache_enabled = use_cache and ohlcv_cache_enabled()
+    if cache_enabled and not force_refresh:
         try:
             cached = read_cached_ohlcv(tickers, period=period, interval=interval)
         except Exception:
@@ -326,14 +329,14 @@ def fetch_ohlcv_result(
             provider_result = _fetch_yfinance_ohlcv(missing, period=period, interval=interval)
         fetched = provider_result.data
         provider_retry_count = provider_result.retry_count
-        if fetched and use_cache and ohlcv_cache_enabled():
+        if fetched and cache_enabled:
             try:
                 write_cached_ohlcv(fetched, provider=provider_name, interval=interval)
             except Exception:
                 pass
     stale_cached: dict[str, pd.DataFrame] = {}
     provider_misses = [ticker for ticker in missing if ticker not in fetched and str(ticker).upper() not in fetched]
-    if provider_name == "yfinance" and provider_misses and use_cache and ohlcv_cache_enabled():
+    if provider_name == "yfinance" and provider_misses and cache_enabled:
         try:
             stale_cached = read_cached_ohlcv(
                 provider_misses,
@@ -380,6 +383,7 @@ def fetch_ohlcv_result(
         warnings=tuple(warnings),
         used_stale_cache=bool(stale_cached),
         provider_retry_count=provider_retry_count,
+        cache_refresh_forced=bool(force_refresh),
     )
 
 

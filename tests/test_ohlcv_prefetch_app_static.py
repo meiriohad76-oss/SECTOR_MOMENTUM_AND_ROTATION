@@ -32,7 +32,7 @@ def test_prefetch_does_not_feed_scoring_or_provider_status():
         )
     ]
 
-    assert 'ohlcv_result = _load_data("3y")' in app_source
+    assert 'ohlcv_result = _load_data("3y", refresh_token=refresh_token)' in app_source
     assert "submit_ohlcv_prefetch" not in compute_section
     assert "ohlcv_prefetch_future" not in compute_section
     assert "prefetch_status" not in compute_section

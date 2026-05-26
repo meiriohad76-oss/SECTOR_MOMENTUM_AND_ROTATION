@@ -126,6 +126,8 @@ def _ohlcv_health_row(
         f"{len(latest_dates)}/{len(expected)} symbols loaded",
         f"provider {getattr(ohlcv_result, 'provider', 'unknown')}",
     ]
+    if getattr(ohlcv_result, "cache_refresh_forced", False):
+        detail_parts.append("manual refresh bypassed persistent cache")
     if oldest is not None and oldest_age is not None:
         detail_parts.append(f"oldest loaded bar {oldest.date()} ({oldest_age}d old)")
     if stale_cache_hits:

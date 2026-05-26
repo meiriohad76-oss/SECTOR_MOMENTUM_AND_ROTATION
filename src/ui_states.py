@@ -71,17 +71,23 @@ def provider_status_banner_html(ohlcv_result: Any) -> str:
         getattr(ohlcv_result, "used_stale_cache", False)
         or getattr(ohlcv_result, "missing", ())
         or getattr(ohlcv_result, "warnings", ())
+        or getattr(ohlcv_result, "cache_refresh_forced", False)
     ):
         return ""
     if getattr(ohlcv_result, "used_stale_cache", False):
         label = "Provider degraded"
     elif getattr(ohlcv_result, "provider_retry_count", 0):
         label = "Provider recovered"
+    elif getattr(ohlcv_result, "cache_refresh_forced", False):
+        label = "Provider refresh complete"
     else:
         label = "Provider gap"
     details = " ".join(escape(str(message), quote=True) for message in ohlcv_result.warnings)
     if not details:
-        details = "Market data provider returned a partial response."
+        if getattr(ohlcv_result, "cache_refresh_forced", False):
+            details = "Manual refresh bypassed the persistent OHLCV cache and updated successful provider rows."
+        else:
+            details = "Market data provider returned a partial response."
     return f"""
     <div class="provider-status-banner" role="status">
       <span class="label">{escape(label, quote=True)}</span>

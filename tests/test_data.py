@@ -369,6 +369,59 @@ def test_fetch_ohlcv_result_can_bypass_fresh_cache_for_validation(tmp_path, monk
     assert result.data["XLK"]["close"].iloc[-1] == provider_frame["close"].iloc[-1]
 
 
+def test_fetch_ohlcv_result_force_refresh_bypasses_cache_read_and_updates_cache(tmp_path, monkeypatch):
+    from src import ohlcv_store
+
+    cache_path = tmp_path / "ohlcv.duckdb"
+    today = pd.Timestamp.today().normalize()
+    fixture_end = pd.offsets.BDay().rollback(today)
+    cached_dates = pd.bdate_range(end=fixture_end, periods=50)
+    cached_frame = pd.DataFrame(
+        {
+            "open": range(50),
+            "high": range(1, 51),
+            "low": range(50),
+            "close": range(100, 150),
+            "volume": [1_000_000] * 50,
+            "adj_close": range(100, 150),
+        },
+        index=cached_dates,
+    )
+    provider_frame = cached_frame.copy()
+    provider_frame["close"] = provider_frame["close"] + 1000
+    provider_frame["adj_close"] = provider_frame["close"]
+    ohlcv_store.write_cached_ohlcv({"XLK": cached_frame}, cache_path=cache_path, provider="unit-test")
+    monkeypatch.setenv("OHLCV_CACHE_PATH", str(cache_path))
+    monkeypatch.setenv("OHLCV_CACHE_ENABLED", "true")
+
+    def fake_download(**kwargs):
+        columns = pd.MultiIndex.from_product(
+            [["Open", "High", "Low", "Close", "Adj Close", "Volume"], ["XLK"]]
+        )
+        raw = pd.DataFrame(index=provider_frame.index, columns=columns)
+        for source, column in [
+            ("open", "Open"),
+            ("high", "High"),
+            ("low", "Low"),
+            ("close", "Close"),
+            ("adj_close", "Adj Close"),
+            ("volume", "Volume"),
+        ]:
+            raw[(column, "XLK")] = provider_frame[source]
+        return raw
+
+    monkeypatch.setattr(data.yf, "download", fake_download)
+
+    result = data.fetch_ohlcv_result(["XLK"], period="2mo", provider="yfinance", force_refresh=True)
+    refreshed_cache = ohlcv_store.read_cached_ohlcv(["XLK"], period="2mo", cache_path=cache_path)
+
+    assert result.cache_refresh_forced is True
+    assert result.fresh_cache_hits == ()
+    assert result.fetched == ("XLK",)
+    assert result.data["XLK"]["close"].iloc[-1] == provider_frame["close"].iloc[-1]
+    assert refreshed_cache["XLK"]["close"].iloc[-1] == provider_frame["close"].iloc[-1]
+
+
 def test_fetch_ohlcv_explicit_yfinance_ignores_massive_environment(monkeypatch):
     monkeypatch.setenv("OHLCV_PROVIDER", "massive")
     monkeypatch.setenv("MASSIVE_API_KEY", "secret")

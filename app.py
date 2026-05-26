@@ -472,23 +472,23 @@ section.main > div.block-container { padding-top: 0; padding-bottom: 0; max-widt
 # =============================== data load (cached) ==============================
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def _load_data(period: str = "3y"):
+def _load_data(period: str = "3y", refresh_token: str | None = None):
     tickers = DATA_SYMBOLS
     if _browser_qa_mode_enabled():
         return browser_qa_ohlcv_result(tickers, period=period)
-    return fetch_ohlcv_result(tickers, period=period)
+    return fetch_ohlcv_result(tickers, period=period, force_refresh=bool(refresh_token))
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def _load_ad_hoc_data(tickers: tuple[str, ...], period: str = "3y"):
+def _load_ad_hoc_data(tickers: tuple[str, ...], period: str = "3y", refresh_token: str | None = None):
     symbols = tuple(dict.fromkeys([*tickers, BENCH["US"], BENCH["TBILL"]]))
     if _browser_qa_mode_enabled():
         return browser_qa_ohlcv_result(symbols, period=period)
-    return fetch_ohlcv_result(symbols, period=period)
+    return fetch_ohlcv_result(symbols, period=period, force_refresh=bool(refresh_token))
 
 
 @st.cache_data(ttl=21600, show_spinner=False)  # FRED updates monthly/weekly, cache 6h
-def _load_fred() -> dict:
+def _load_fred(refresh_token: str | None = None) -> dict:
     """Fetch FRED macro series. Empty dict if no API key configured."""
     if _browser_qa_mode_enabled():
         return {}
@@ -506,7 +506,9 @@ def _refresh_loaded_data() -> None:
     refresh_market_data(_load_ad_hoc_data)
     refresh_market_data(_load_fred)
     st.session_state.pop("dashboard_compute_snapshot", None)
-    st.session_state.data_refresh_requested_at = datetime.now(timezone.utc).isoformat()
+    requested_at = datetime.now(timezone.utc).isoformat()
+    st.session_state.data_refresh_requested_at = requested_at
+    st.session_state.data_refresh_token = requested_at
 
 
 def _apply_control_bridge_actions() -> None:
@@ -711,7 +713,8 @@ else:
     render_loading_state(loading_placeholder, "Loading market data", card_count=4)
     try:
         with PERF_AUDIT.section("load_data"):
-            ohlcv_result = _load_data("3y")
+            refresh_token = st.session_state.get("data_refresh_token")
+            ohlcv_result = _load_data("3y", refresh_token=refresh_token)
             render_provider_status_banner(ohlcv_result)
             _render_browser_qa_provider_banner()
             ohlcv = ohlcv_result.data
@@ -728,7 +731,7 @@ else:
             indicators_df = compute_all_indicators(scoring_ohlcv, bench_ticker, bil_ticker)
             flow_df = compute_flow_signals(scoring_ohlcv)
             flow_z = flow_composite_z(flow_df)
-            _fred_data = _load_fred()
+            _fred_data = _load_fred(refresh_token=refresh_token)
             regime = assess_regime(ohlcv[bench_ticker], ohlcv.get("^TNX"), ohlcv.get("^IRX"), fred_cache=_fred_data)
             scored = compute_composite(indicators_df, flow_df, flow_z, phase=regime.phase_hint)
             scored = apply_state_machine(scored)
@@ -958,7 +961,8 @@ def _analysis_scored_frame_for_result(result):
         return scored, analysis, ad_hoc_result
 
     missing = tuple(sorted(set(analysis.missing_tickers)))
-    ohlcv_result = _load_ad_hoc_data(missing, period="3y")
+    refresh_token = st.session_state.get("data_refresh_token")
+    ohlcv_result = _load_ad_hoc_data(missing, period="3y", refresh_token=refresh_token)
     ad_hoc_ohlcv = {**ohlcv, **ohlcv_result.data}
     ad_hoc_result = score_ad_hoc_tickers(
         missing,
@@ -2142,7 +2146,8 @@ def _custom_universe_scored_frame_for_result(result):
         return scored, analysis, ad_hoc_result
 
     missing = tuple(sorted(set(analysis.missing_tickers)))
-    ohlcv_result = _load_ad_hoc_data(missing, period="3y")
+    refresh_token = st.session_state.get("data_refresh_token")
+    ohlcv_result = _load_ad_hoc_data(missing, period="3y", refresh_token=refresh_token)
     ad_hoc_ohlcv = {**ohlcv, **ohlcv_result.data}
     ad_hoc_result = score_ad_hoc_tickers(
         missing,

@@ -39,6 +39,24 @@ def test_refresh_action_clears_all_dashboard_data_caches_and_compute_snapshot():
     assert "refresh_market_data(_load_fred)" in refresh_section
     assert 'st.session_state.pop("dashboard_compute_snapshot", None)' in refresh_section
     assert "data_refresh_requested_at" in refresh_section
+    assert "data_refresh_token" in refresh_section
+
+
+def test_refresh_token_forces_provider_reload_without_reusing_persistent_cache():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    load_section = app_source[
+        app_source.index("def _load_data(") : app_source.index("def _refresh_loaded_data() -> None:")
+    ]
+    compute_section = app_source[
+        app_source.index("with PERF_AUDIT.section(\"load_data\")") : app_source.index(
+            "with PERF_AUDIT.section(\"compute_signals\")"
+        )
+    ]
+
+    assert "refresh_token: str | None = None" in load_section
+    assert "force_refresh=bool(refresh_token)" in load_section
+    assert 'refresh_token = st.session_state.get("data_refresh_token")' in compute_section
+    assert '_load_data("3y", refresh_token=refresh_token)' in compute_section
 
 
 def test_data_health_css_supports_status_cards():

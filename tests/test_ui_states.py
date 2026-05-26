@@ -67,3 +67,17 @@ def test_provider_status_banner_reports_recovered_retry_before_gap_label():
     assert "Provider recovered" in html
     assert "Provider gap" not in html
     assert "Provider retry recovered 1 yfinance request before data loaded." in html
+
+
+def test_provider_status_banner_reports_manual_provider_refresh():
+    class Result:
+        used_stale_cache = False
+        missing = ()
+        warnings = ()
+        provider_retry_count = 0
+        cache_refresh_forced = True
+
+    html = provider_status_banner_html(Result())
+
+    assert "Provider refresh complete" in html
+    assert "bypassed the persistent OHLCV cache" in html
