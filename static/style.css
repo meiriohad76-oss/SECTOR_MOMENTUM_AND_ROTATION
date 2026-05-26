@@ -1163,6 +1163,29 @@ html.density-compact .pick-spark {
 .quad-card.improving .qcount { color: var(--blue); }
 
 /* ---------- Full table ---------- */
+.matrix-sort-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 0;
+  color: var(--fg-dim);
+  font-size: 0.78rem;
+}
+.matrix-sort-summary b {
+  color: var(--fg);
+}
+.matrix-sort-summary span {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
 .full-table {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -1187,6 +1210,19 @@ html.density-compact .pick-spark {
   background: var(--panel-2);
   position: sticky;
   top: 0;
+}
+.full-table .sort-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.full-table .sort-active {
+  color: var(--accent);
+}
+.full-table .sort-arrow {
+  font-size: 0.76rem;
+  color: var(--accent);
 }
 .full-table td {
   padding: 8px 12px;

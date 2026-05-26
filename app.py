@@ -109,6 +109,12 @@ from src.saved_inputs import (
 )
 from src.scoring import compute_composite, apply_state_machine, recent_transitions
 from src.structured_logging import configure_structured_logging, log_event
+from src.table_sort import (
+    FULL_TABLE_SORT_DIRECTIONS,
+    FULL_TABLE_SORT_FIELDS,
+    normalize_full_table_sort,
+    sort_full_table_frame,
+)
 from src.table_preview import table_row_rrg_preview_html
 from src.transition_pulse import transition_pulse_class, transition_row_pulse_class
 from src.ui_states import (
@@ -526,6 +532,30 @@ if "table_open" not in st.session_state:
     st.session_state.table_open = True
 if "table_sort" not in st.session_state:
     st.session_state.table_sort = "S_score:desc"
+_legacy_table_sort = str(st.session_state.table_sort or "S_score:desc").split(":", 1)
+_table_sort_field, _table_sort_direction = normalize_full_table_sort(
+    _legacy_table_sort[0],
+    _legacy_table_sort[1] if len(_legacy_table_sort) > 1 else "desc",
+)
+if "table_sort_field" not in st.session_state:
+    st.session_state.table_sort_field = _table_sort_field
+if "table_sort_direction" not in st.session_state:
+    st.session_state.table_sort_direction = _table_sort_direction
+st.session_state.table_sort_field, st.session_state.table_sort_direction = normalize_full_table_sort(
+    st.session_state.table_sort_field,
+    st.session_state.table_sort_direction,
+)
+if "table_sort_field_choice" not in st.session_state:
+    st.session_state.table_sort_field_choice = st.session_state.table_sort_field
+if "table_sort_direction_choice" not in st.session_state:
+    st.session_state.table_sort_direction_choice = st.session_state.table_sort_direction
+st.session_state.table_sort_field_choice, st.session_state.table_sort_direction_choice = normalize_full_table_sort(
+    st.session_state.table_sort_field_choice,
+    st.session_state.table_sort_direction_choice,
+)
+st.session_state.table_sort_field = st.session_state.table_sort_field_choice
+st.session_state.table_sort_direction = st.session_state.table_sort_direction_choice
+st.session_state.table_sort = f"{st.session_state.table_sort_field}:{st.session_state.table_sort_direction}"
 initialize_preferences(st.session_state)
 _apply_control_bridge_actions()
 if _browser_qa_mode_enabled():
@@ -1743,8 +1773,20 @@ def render_comparison_view():
     _md(f'<div class="comparison-grid">{cards}</div>')
 
 
+def _full_table_sort_header(label: str, field: str, active_field: str, active_direction: str, tip: str = "") -> str:
+    classes = "tip-cue sort-label" if tip else "sort-label"
+    if field == active_field:
+        classes += " sort-active"
+        arrow = "&darr;" if active_direction == "desc" else "&uarr;"
+        arrow_html = f'<span class="sort-arrow">{arrow}</span>'
+    else:
+        arrow_html = ""
+    tip_attr = f' data-tip="{_esc(tip)}"' if tip else ""
+    return f'<span class="{classes}"{tip_attr}>{_esc(label)}{arrow_html}</span>'
+
+
 def render_full_table():
-    toggle_col, sort_col, _ = st.columns([2, 3, 5])
+    toggle_col, field_col, direction_col, status_col = st.columns([2, 3, 2, 3])
     with toggle_col:
         if st.button(("▾ HIDE" if st.session_state.table_open else "▸ SHOW") + "  FULL 7-PILLAR MATRIX",
                      key="table_toggle"):
@@ -1754,47 +1796,41 @@ def render_full_table():
     if not st.session_state.table_open:
         return
 
-    SORT_OPTIONS = {
-        "S_score:desc":     "S (composite) — high to low",
-        "S_score:asc":      "S (composite) — low to high",
-        "F_score:desc":     "F (flow) — high to low",
-        "F_score:asc":      "F (flow) — low to high",
-        "mom_12_1:desc":    "Momentum — high to low",
-        "mom_12_1:asc":     "Momentum — low to high",
-        "state:asc":        "State (BULLISH → BEARISH)",
-        "class:asc":        "Asset class",
-        "ticker:asc":       "Ticker (A → Z)",
-    }
-    with sort_col:
-        choice = st.selectbox(
-            "Sort by",
-            options=list(SORT_OPTIONS.keys()),
-            format_func=lambda k: SORT_OPTIONS[k],
-            index=list(SORT_OPTIONS.keys()).index(st.session_state.table_sort),
-            key="sort_choice",
-            label_visibility="collapsed",
+    sort_fields = list(FULL_TABLE_SORT_FIELDS.keys())
+    sort_directions = list(FULL_TABLE_SORT_DIRECTIONS.keys())
+    current_field, current_direction = normalize_full_table_sort(
+        st.session_state.table_sort_field_choice,
+        st.session_state.table_sort_direction_choice,
+    )
+    with field_col:
+        selected_field = st.selectbox("Sort field",
+            options=sort_fields,
+            format_func=lambda key: FULL_TABLE_SORT_FIELDS[key],
+            index=sort_fields.index(current_field),
+            key="table_sort_field_choice",
         )
-        if choice != st.session_state.table_sort:
-            st.session_state.table_sort = choice
-            st.rerun()
+    with direction_col:
+        selected_direction = st.segmented_control("Direction",
+            options=sort_directions,
+            default=current_direction,
+            format_func=lambda key: FULL_TABLE_SORT_DIRECTIONS[key],
+            key="table_sort_direction_choice",
+        )
+    selected_field, selected_direction = normalize_full_table_sort(selected_field, selected_direction)
+    st.session_state.table_sort_field = selected_field
+    st.session_state.table_sort_direction = selected_direction
+    st.session_state.table_sort = f"{selected_field}:{selected_direction}"
+    with status_col:
+        _md(
+            f"""
+            <div class="matrix-sort-summary">
+              Sorted by <b>{_esc(FULL_TABLE_SORT_FIELDS[selected_field])}</b>
+              <span>{_esc(FULL_TABLE_SORT_DIRECTIONS[selected_direction])}</span>
+            </div>
+            """
+        )
 
-    # Sort the scored df according to the chosen column
-    col, direction = st.session_state.table_sort.split(":")
-    ascending = (direction == "asc")
-    if col == "state":
-        # custom order from best to worst
-        state_order = ["STAGE_2_BULLISH", "HOLD", "STAGE_1_BASING", "WARNING", "EXIT", "BEARISH_STAGE_4"]
-        scored_sorted = scored.copy()
-        scored_sorted["_state_rank"] = scored_sorted["state"].map(
-            {s: i for i, s in enumerate(state_order)}
-        ).fillna(99)
-        scored_sorted = scored_sorted.sort_values("_state_rank", ascending=True).drop(columns=["_state_rank"])
-    elif col == "ticker":
-        scored_sorted = scored.sort_index(ascending=ascending)
-    elif col == "class":
-        scored_sorted = scored.sort_values(["class", "S_score"], ascending=[ascending, False])
-    else:
-        scored_sorted = scored.sort_values(col, ascending=ascending, na_position="last")
+    scored_sorted = sort_full_table_frame(scored, selected_field, selected_direction)
 
     rows_html = ""
     # 7 pillar booleans:
@@ -1840,8 +1876,8 @@ def render_full_table():
         """
 
     pillars_th = "".join(
-        f'<th class="num"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS[k])}">{p}</span></th>' for p, k in
-        [("MOM","tip_MOM"),("FABER","tip_col_FABER"),("STAGE2","tip_col_STAGE2"),("ANT","tip_col_ANT"),("RRG","tip_RRG"),("BREADTH","tip_col_BREADTH"),("FLOW","tip_col_FLOW")]
+        f'<th class="num">{_full_table_sort_header(p, field, selected_field, selected_direction, INDICATOR_TIPS[k])}</th>' for p, field, k in
+        [("MOM","mom_12_1","tip_MOM"),("FABER","faber","tip_col_FABER"),("STAGE2","stage","tip_col_STAGE2"),("ANT","antonacci","tip_col_ANT"),("RRG","rrg_quadrant","tip_RRG"),("BREADTH","breadth_50d","tip_col_BREADTH"),("FLOW","F_score","tip_col_FLOW")]
     )
 
     html = f"""
@@ -1853,13 +1889,13 @@ def render_full_table():
         <table>
           <thead>
             <tr>
-              <th>Ticker</th>
-              <th>Class</th>
-              <th>State</th>
+              <th>{_full_table_sort_header("Ticker", "ticker", selected_field, selected_direction)}</th>
+              <th>{_full_table_sort_header("Class", "class", selected_field, selected_direction)}</th>
+              <th>{_full_table_sort_header("State", "state", selected_field, selected_direction)}</th>
               {pillars_th}
-              <th class="num"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_S'])}">S</span></th>
-              <th class="num"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_F'])}">F</span></th>
-              <th class="num"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_MOM'])}">MOM</span></th>
+              <th class="num">{_full_table_sort_header("S", "S_score", selected_field, selected_direction, INDICATOR_TIPS['tip_S'])}</th>
+              <th class="num">{_full_table_sort_header("F", "F_score", selected_field, selected_direction, INDICATOR_TIPS['tip_F'])}</th>
+              <th class="num">{_full_table_sort_header("MOM", "mom_12_1", selected_field, selected_direction, INDICATOR_TIPS['tip_MOM'])}</th>
             </tr>
           </thead>
           <tbody>{rows_html}</tbody>

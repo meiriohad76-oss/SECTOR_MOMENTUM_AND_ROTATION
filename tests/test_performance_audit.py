@@ -68,6 +68,38 @@ def test_preference_profile_controls_are_visual_only_state():
     )
 
 
+def test_full_table_sort_controls_are_visual_only_state():
+    previous = performance_audit.session_snapshot(
+        {
+            "table_sort": "S_score:desc",
+            "table_sort_field": "S_score",
+            "table_sort_direction": "desc",
+            "table_sort_field_choice": "S_score",
+            "table_sort_direction_choice": "desc",
+        }
+    )
+    current = performance_audit.session_snapshot(
+        {
+            "table_sort": "F_score:asc",
+            "table_sort_field": "F_score",
+            "table_sort_direction": "asc",
+            "table_sort_field_choice": "F_score",
+            "table_sort_direction_choice": "asc",
+        }
+    )
+
+    result = performance_audit.classify_rerun(previous, current)
+
+    assert result.kind == "visual_only"
+    assert result.changed_keys == (
+        "table_sort",
+        "table_sort_field",
+        "table_sort_direction",
+        "table_sort_field_choice",
+        "table_sort_direction_choice",
+    )
+
+
 def test_classify_interactive_rerun_when_non_visual_state_changes():
     previous = performance_audit.session_snapshot({"theme": "dark", "klass": "US Sectors"})
     current = performance_audit.session_snapshot({"theme": "dark", "klass": "ALL"})
@@ -142,7 +174,11 @@ def test_session_snapshot_tracks_interactive_widget_keys_and_ignores_audit_state
             "saved_watchlist_select": "Core",
             "loaded_watchlist_name": "Core",
             "save_watchlist_name": "Core",
-            "sort_choice": "S_score:desc",
+            "table_sort": "S_score:desc",
+            "table_sort_field": "S_score",
+            "table_sort_direction": "desc",
+            "table_sort_field_choice": "S_score",
+            "table_sort_direction_choice": "desc",
             "performance_last_snapshot": (("theme", "light"),),
             "ohlcv_prefetch_future": object(),
             "ohlcv_prefetch_status": "running",
@@ -163,7 +199,11 @@ def test_session_snapshot_tracks_interactive_widget_keys_and_ignores_audit_state
     assert values["saved_watchlist_select"] == "Core"
     assert values["loaded_watchlist_name"] == "Core"
     assert values["save_watchlist_name"] == "Core"
-    assert values["sort_choice"] == "S_score:desc"
+    assert values["table_sort"] == "S_score:desc"
+    assert values["table_sort_field"] == "S_score"
+    assert values["table_sort_direction"] == "desc"
+    assert values["table_sort_field_choice"] == "S_score"
+    assert values["table_sort_direction_choice"] == "desc"
     assert "performance_last_snapshot" not in values
     assert "ohlcv_prefetch_future" not in values
     assert "ohlcv_prefetch_status" not in values

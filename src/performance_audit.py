@@ -18,6 +18,11 @@ VISUAL_STATE_KEYS = (
     "preference_profile_name",
     "preference_profile_error",
     "preference_profile_message",
+    "table_sort",
+    "table_sort_field",
+    "table_sort_direction",
+    "table_sort_field_choice",
+    "table_sort_direction_choice",
 )
 COMPUTE_SNAPSHOT_KEYS = ("ohlcv_result", "ohlcv", "fred_data", "regime", "scored", "created_at")
 DASHBOARD_COMPUTE_SNAPSHOT_TTL_SECONDS = 3600
@@ -41,8 +46,6 @@ SESSION_STATE_KEYS = VISUAL_STATE_KEYS + (
     "loaded_watchlist_name",
     "save_watchlist_name",
     "table_open",
-    "table_sort",
-    "sort_choice",
 )
 
 
