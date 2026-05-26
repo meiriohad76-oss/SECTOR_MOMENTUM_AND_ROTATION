@@ -38,7 +38,7 @@ def test_component_docs_rows_are_operator_scannable():
         "Section": "Shell",
         "Render Function": "render_header",
         "Data Inputs": "clock, app version, current theme",
-        "States": "live timestamp, next refresh label",
+        "States": "render timestamp, cache window label",
         "QA": "static app wiring, responsive CSS",
     }
     assert all(row["Component"] for row in rows)

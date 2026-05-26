@@ -2108,6 +2108,92 @@ div[class*="block-container"] {
   text-transform: uppercase;
 }
 
+/* ---------- Data health ---------- */
+.data-health-panel {
+  margin-top: 16px;
+}
+.data-health-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--fg-dim);
+}
+.data-health-summary span {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.data-health-summary b {
+  color: var(--fg);
+  font-size: 0.88rem;
+}
+.data-health-summary.healthy span { color: var(--green); }
+.data-health-summary.warning span { color: var(--amber); }
+.data-health-summary.stale span { color: var(--red); }
+.data-health-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.data-health-card {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--muted);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 12px;
+}
+.data-health-card.healthy { border-left-color: var(--green); }
+.data-health-card.info { border-left-color: var(--blue); }
+.data-health-card.warning { border-left-color: var(--amber); }
+.data-health-card.stale { border-left-color: var(--red); }
+.data-health-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+.data-health-card-head b { color: var(--fg); }
+.data-health-main {
+  margin-top: 10px;
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.data-health-sub,
+.data-health-role,
+.data-health-card p {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+.data-health-sub {
+  margin-top: 2px;
+  font-family: var(--font-mono);
+}
+.data-health-role {
+  margin-top: 8px;
+  color: var(--fg-dim);
+  font-weight: 800;
+}
+.data-health-card p {
+  margin: 10px 0 0;
+}
+
 /* ---------- Tile help (drill-down) ---------- */
 .tile-help {
   font-size: 0.74rem;

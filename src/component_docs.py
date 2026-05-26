@@ -22,7 +22,7 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         section="Shell",
         render_function="render_header",
         data_inputs=("clock", "app version", "current theme"),
-        states=("live timestamp", "next refresh label"),
+        states=("render timestamp", "cache window label"),
         qa=("static app wiring", "responsive CSS"),
     ),
     ComponentDoc(
@@ -64,6 +64,14 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         data_inputs=("scored snapshot", "regime", "BLUF view-model"),
         states=("compact mode", "hidden mode", "action counts"),
         qa=("static app wiring", "run-journal coverage"),
+    ),
+    ComponentDoc(
+        name="Data health",
+        section="Decision surface",
+        render_function="render_data_health",
+        data_inputs=("OHLCV metadata", "FRED macro snapshot", "compute timestamp", "provider-flow config"),
+        states=("healthy", "warning", "stale", "manual refresh"),
+        qa=("data health tests", "dashboard static tests"),
     ),
     ComponentDoc(
         name="Market state",

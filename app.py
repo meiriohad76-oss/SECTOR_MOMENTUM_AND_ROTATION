@@ -43,6 +43,7 @@ from src.custom_universe import (
     parse_custom_universe_text,
     summary_counts_frame,
 )
+from src.data_health import dashboard_health_summary, data_health_rows
 from src.data import fetch_ohlcv_result, _select_ohlcv_provider
 from src.evidence_gates import evaluate_promotion_gate, promotion_gate_decisions_frame
 from src.flow import compute_flow_signals, flow_composite_z, STUB_MODE
@@ -486,8 +487,26 @@ def _load_ad_hoc_data(tickers: tuple[str, ...], period: str = "3y"):
     return fetch_ohlcv_result(symbols, period=period)
 
 
+@st.cache_data(ttl=21600, show_spinner=False)  # FRED updates monthly/weekly, cache 6h
+def _load_fred() -> dict:
+    """Fetch FRED macro series. Empty dict if no API key configured."""
+    if _browser_qa_mode_enabled():
+        return {}
+    try:
+        from src.fred_data import fetch_fred, fred_available
+        if not fred_available():
+            return {}
+        return fetch_fred()
+    except Exception:
+        return {}
+
+
 def _refresh_loaded_data() -> None:
     refresh_market_data(_load_data)
+    refresh_market_data(_load_ad_hoc_data)
+    refresh_market_data(_load_fred)
+    st.session_state.pop("dashboard_compute_snapshot", None)
+    st.session_state.data_refresh_requested_at = datetime.now(timezone.utc).isoformat()
 
 
 def _apply_control_bridge_actions() -> None:
@@ -603,20 +622,6 @@ def _render_browser_qa_provider_banner() -> None:
     )
 
 
-@st.cache_data(ttl=21600, show_spinner=False)  # FRED updates monthly/weekly, cache 6h
-def _load_fred() -> dict:
-    """Fetch FRED macro series. Empty dict if no API key configured."""
-    if _browser_qa_mode_enabled():
-        return {}
-    try:
-        from src.fred_data import fetch_fred, fred_available
-        if not fred_available():
-            return {}
-        return fetch_fred()
-    except Exception:
-        return {}
-
-
 def _current_git_sha() -> str | None:
     try:
         result = subprocess.run(
@@ -698,6 +703,7 @@ if _REUSED_COMPUTE_SNAPSHOT:
         _fred_data = compute_snapshot["fred_data"]
         regime = compute_snapshot["regime"]
         scored = compute_snapshot["scored"]
+        dashboard_compute_created_at = compute_snapshot.get("created_at")
     render_provider_status_banner(ohlcv_result)
     _render_browser_qa_provider_banner()
 else:
@@ -727,6 +733,7 @@ else:
             scored = compute_composite(indicators_df, flow_df, flow_z, phase=regime.phase_hint)
             scored = apply_state_machine(scored)
             _COMPUTE_SNAPSHOT_CREATED_AT = datetime.now().timestamp()
+            dashboard_compute_created_at = _COMPUTE_SNAPSHOT_CREATED_AT
             st.session_state.dashboard_compute_snapshot = {
                 "ohlcv_result": ohlcv_result,
                 "ohlcv": ohlcv,
@@ -1076,7 +1083,7 @@ def render_header():
     now = datetime.now()
     last_update = now.strftime("%H:%M")
     as_of = now.strftime("%a %b %d %Y · %H:%M %Z").upper().strip(" ·").strip()
-    next_refresh = "00:60:00"
+    cache_window = "60M CACHE"
     html = f"""
     <div class="app">
       <header class="header">
@@ -1085,11 +1092,11 @@ def render_header():
           SENTIMENT&nbsp;BOARD
         </div>
         <div class="meta">
-          <span><span class="live-dot"></span>LIVE · {last_update}</span>
+          <span><span class="live-dot"></span>RENDERED · {last_update}</span>
           <span class="sep">·</span>
           <span>{as_of}</span>
           <span class="sep">·</span>
-          <span>next <span class="val">{next_refresh}</span></span>
+          <span><span class="val">{cache_window}</span></span>
         </div>
       </header>
     """
@@ -1289,6 +1296,52 @@ def render_bluf():
         """
         cards.append(card_html)
     _md(head_html + "".join(cards) + "</div></div></section>")
+
+
+def render_data_health():
+    rows = data_health_rows(
+        ohlcv=ohlcv,
+        expected_symbols=DATA_SYMBOLS,
+        ohlcv_result=ohlcv_result,
+        fred_data=_fred_data,
+        compute_created_at=dashboard_compute_created_at,
+        provider_flow_stubbed=bool(STUB_MODE),
+    )
+    summary = dashboard_health_summary(rows)
+    requested_at = st.session_state.get("data_refresh_requested_at")
+    refresh_text = f"Manual refresh requested {requested_at}" if requested_at else "No manual refresh in this session"
+    cards_html = ""
+    for row in rows:
+        status = str(row.get("status", "warning"))
+        cards_html += f"""
+        <div class="data-health-card {status}">
+          <div class="data-health-card-head">
+            <span>{_esc(str(row.get('source', 'Source')))}</span>
+            <b>{_esc(status.upper())}</b>
+          </div>
+          <div class="data-health-main">{_esc(str(row.get('freshness', '-')))}</div>
+          <div class="data-health-sub">latest {_esc(str(row.get('latest', '-')))}</div>
+          <div class="data-health-role">{_esc(str(row.get('role', '')))}</div>
+          <p>{_esc(str(row.get('detail', '')))}</p>
+        </div>
+        """
+    _md(
+        f"""
+        <section class="section data-health-panel">
+          <div class="section-head">
+            <h2>Data and dashboard health <span class="count">{_esc(summary['label'])}</span></h2>
+            <div class="right">{_esc(refresh_text)}</div>
+          </div>
+          <div class="data-health-summary {summary['status']}">
+            <span>{_esc(summary['label'])}</span>
+            <b>{_esc(summary['detail'])}</b>
+          </div>
+          <div class="data-health-grid">{cards_html}</div>
+        </section>
+        """
+    )
+    if st.button("REFRESH DATA NOW", key="data_health_refresh_button", on_click=_refresh_loaded_data, width="stretch"):
+        pass
 
 
 def render_status():
@@ -2931,6 +2984,7 @@ _render_timed("render_view_preferences", render_view_preferences)
 _render_timed("render_explainer", render_explainer)
 _render_timed("render_component_docs", render_component_docs)
 _render_timed("render_bluf", render_bluf)
+_render_timed("render_data_health", render_data_health)
 _render_timed("render_status", render_status)
 _render_timed("render_alerts", render_alerts)
 _render_timed("render_picks", render_picks)
