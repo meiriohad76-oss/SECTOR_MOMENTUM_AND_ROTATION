@@ -191,6 +191,10 @@ def _browser_qa_mode_enabled() -> bool:
     return str(os.environ.get("BROWSER_QA_MODE", "")).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _pytest_mode_enabled() -> bool:
+    return "PYTEST_CURRENT_TEST" in os.environ
+
+
 def _browser_qa_query_value(name: str) -> str:
     return str(st.query_params.get(name, "")).strip()
 
@@ -482,7 +486,7 @@ def _apply_control_bridge_actions() -> None:
 
 
 def _start_ohlcv_cache_prefetch() -> None:
-    if _browser_qa_mode_enabled():
+    if _browser_qa_mode_enabled() or _pytest_mode_enabled():
         return
     future = submit_ohlcv_prefetch(DATA_SYMBOLS, period="3y")
     st.session_state["ohlcv_prefetch_future"] = future

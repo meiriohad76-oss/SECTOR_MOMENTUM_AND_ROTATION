@@ -11,6 +11,13 @@ def test_app_wires_async_ohlcv_prefetch_as_cache_warmer_only():
 
     assert "from src.ohlcv_prefetch import prefetch_status, submit_ohlcv_prefetch" in app_source
     assert "def _start_ohlcv_cache_prefetch() -> None:" in app_source
+    prefetch_section = app_source[
+        app_source.index("def _start_ohlcv_cache_prefetch() -> None:") : app_source.index('if "theme" not in st.session_state:')
+    ]
+    assert "if _browser_qa_mode_enabled() or _pytest_mode_enabled():" in prefetch_section
+    assert prefetch_section.index("if _browser_qa_mode_enabled() or _pytest_mode_enabled():") < prefetch_section.index(
+        'future = submit_ohlcv_prefetch(DATA_SYMBOLS, period="3y")'
+    )
     assert 'future = submit_ohlcv_prefetch(DATA_SYMBOLS, period="3y")' in app_source
     assert 'st.session_state["ohlcv_prefetch_future"] = future' in app_source
     assert 'st.session_state["ohlcv_prefetch_status"] = prefetch_status(future)' in app_source
