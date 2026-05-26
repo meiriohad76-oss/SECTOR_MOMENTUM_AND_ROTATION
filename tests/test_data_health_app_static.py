@@ -69,3 +69,15 @@ def test_data_health_css_supports_status_cards():
     assert ".data-health-role" in css
     assert ".data-health-card.stale" in css
     assert ".data-health-card.warning" in css
+
+
+def test_data_health_card_subline_includes_optional_coverage_context():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    health_section = app_source[
+        app_source.index("def render_data_health():") : app_source.index("def render_status():")
+    ]
+
+    assert "coverage = str(row.get(\"coverage\") or \"\")" in health_section
+    assert "subline = f\"latest {latest_text}\"" in health_section
+    assert "if coverage:" in health_section
+    assert "subline += f\" | {coverage}\"" in health_section

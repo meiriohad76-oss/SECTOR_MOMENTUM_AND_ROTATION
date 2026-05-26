@@ -142,7 +142,8 @@ def _ohlcv_health_row(
         "role": "Critical: price, volume, trend, momentum, and market proxies",
         "status": status,
         "latest": str(latest.date()) if latest is not None else "-",
-        "freshness": format_age_label(oldest, now),
+        "freshness": format_age_label(latest, now),
+        "coverage": f"oldest {oldest.date()} ({oldest_age}d old)" if oldest is not None and oldest_age is not None else "",
         "detail": "; ".join(detail_parts),
     }
 

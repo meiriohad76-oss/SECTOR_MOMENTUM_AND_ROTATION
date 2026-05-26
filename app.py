@@ -1317,6 +1317,11 @@ def render_data_health():
     cards_html = ""
     for row in rows:
         status = str(row.get("status", "warning"))
+        latest_text = _esc(str(row.get("latest", "-")))
+        coverage = str(row.get("coverage") or "")
+        subline = f"latest {latest_text}"
+        if coverage:
+            subline += f" | {coverage}"
         cards_html += f"""
         <div class="data-health-card {status}">
           <div class="data-health-card-head">
@@ -1324,7 +1329,7 @@ def render_data_health():
             <b>{_esc(status.upper())}</b>
           </div>
           <div class="data-health-main">{_esc(str(row.get('freshness', '-')))}</div>
-          <div class="data-health-sub">latest {_esc(str(row.get('latest', '-')))}</div>
+          <div class="data-health-sub">{_esc(subline)}</div>
           <div class="data-health-role">{_esc(str(row.get('role', '')))}</div>
           <p>{_esc(str(row.get('detail', '')))}</p>
         </div>

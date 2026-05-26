@@ -63,6 +63,29 @@ def test_data_health_rows_show_ohlcv_and_fred_staleness():
     assert "neutral/stub" in by_source["Provider-flow feeds"]["detail"]
 
 
+def test_ohlcv_health_headline_uses_latest_bar_age_and_details_oldest_loaded_bar():
+    rows = data_health_rows(
+        ohlcv={
+            "SPY": _ohlcv_frame("2026-05-26"),
+            "XLK": _ohlcv_frame("2026-05-21"),
+        },
+        expected_symbols=("SPY", "XLK"),
+        ohlcv_result=SimpleNamespace(provider="massive", missing=(), stale_cache_hits=(), warnings=()),
+        fred_data={},
+        compute_created_at=1_779_760_000.0,
+        now=pd.Timestamp("2026-05-26T16:00:00Z"),
+        provider_flow_stubbed=True,
+    )
+
+    market_row = next(row for row in rows if row["source"] == "Market OHLCV")
+
+    assert market_row["status"] == "healthy"
+    assert market_row["latest"] == "2026-05-26"
+    assert market_row["freshness"] == "today"
+    assert market_row["coverage"] == "oldest 2026-05-21 (5d old)"
+    assert "oldest loaded bar 2026-05-21 (5d old)" in market_row["detail"]
+
+
 def test_ohlcv_health_uses_oldest_loaded_symbol_not_only_latest_symbol():
     rows = data_health_rows(
         ohlcv={
@@ -83,7 +106,8 @@ def test_ohlcv_health_uses_oldest_loaded_symbol_not_only_latest_symbol():
     market_row = next(row for row in rows if row["source"] == "Market OHLCV")
 
     assert market_row["status"] == "stale"
-    assert market_row["freshness"] == "16d old"
+    assert market_row["freshness"] == "1d old"
+    assert market_row["coverage"] == "oldest 2026-05-10 (16d old)"
     assert "oldest loaded bar 2026-05-10" in market_row["detail"]
 
 
