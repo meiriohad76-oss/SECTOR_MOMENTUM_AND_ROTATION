@@ -97,6 +97,8 @@ def test_palette_css_variables_renders_server_side_tokens():
     assert css.startswith("\n:root {")
     assert "  --bg: #002b36;" in css
     assert "  --muted-2:" in css
+    assert "  --ticker-label:" in css
+    assert "  --ticker-label-shadow:" in css
     assert "data-palette" not in css
 
 

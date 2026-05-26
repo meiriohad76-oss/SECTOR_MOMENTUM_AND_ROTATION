@@ -388,7 +388,7 @@ def rrg_chart_dark(df: pd.DataFrame, title: str = "Rotation") -> go.Figure:
         x=sub["rs_ratio"], y=sub["rs_momentum"],
         mode="markers+text",
         text=sub.index, textposition="top center",
-        textfont=dict(size=10, color="#ddd", family="JetBrains Mono, monospace"),
+        textfont=dict(size=12, color="#f5f8ff", family="JetBrains Mono, monospace"),
         marker=dict(
             size=11,
             color=[color_for_state(s) for s in sub.get("state", pd.Series([""] * len(sub), index=sub.index))],
