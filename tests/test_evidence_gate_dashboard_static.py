@@ -27,9 +27,10 @@ def test_app_surfaces_evidence_gates_without_promoting_rules_or_running_cli():
     assert 'EVIDENCE_GATE_REPORT_PATH = APP_ROOT / "docs" / "evidence_gate_report.md"' in app_source
     assert "def render_evidence_gate_lab():" in app_source
     assert "Evidence gates" in section_source
-    assert "B-158 / B-160" in section_source
+    assert "Macro and provider research" in section_source
     assert "evaluate_promotion_gate(" in section_source
     assert "promotion_gate_decisions_frame(" in section_source
+    assert 'gate_rows = gate_rows.rename(columns={"Ticket": "Gate"})' in section_source
     assert "EVIDENCE_GATE_REPORT_PATH.read_text" in section_source
     assert "live_promotion_allowed" in section_source
     assert "evaluate_evidence_gates.main(" not in app_source

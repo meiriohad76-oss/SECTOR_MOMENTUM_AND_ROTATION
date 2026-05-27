@@ -197,6 +197,10 @@ def _browser_qa_mode_enabled() -> bool:
     return str(os.environ.get("BROWSER_QA_MODE", "")).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _operator_mode_enabled() -> bool:
+    return str(os.environ.get("DASHBOARD_OPERATOR_MODE", "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _pytest_mode_enabled() -> bool:
     return "PYTEST_CURRENT_TEST" in os.environ
 
@@ -405,7 +409,7 @@ state.json (persists across restarts)  -->  BLUF + alerts + cards</pre>
 <p style="margin-top: 18px;"><b>Critical caveat:</b> Past predictive power does not guarantee future predictive power. Each pillar has documented failure modes (momentum crashes per Daniel-Moskowitz 2016, "myth of sector rotation" per Molchanov-Stangl 2018). The system layers seven different pillars precisely because no single signal is reliable on its own. The hard flow-veto and the multi-pillar consensus requirement are designed to reduce the false-positive rate.</p>
 
 <h3>References</h3>
-<p>Full methodology with formulas and academic citations: <code>docs/sector-rotation-methodology.md</code> &middot; PDF version in <code>docs/sector-rotation-methodology.pdf</code> &middot; Backlog: <code>docs/BACKLOG.md</code>.</p>
+<p>Full methodology with formulas and academic citations: <code>docs/sector-rotation-methodology.md</code> &middot; PDF version in <code>docs/sector-rotation-methodology.pdf</code>.</p>
 
 </div>
 """
@@ -1174,7 +1178,9 @@ def render_explainer():
 
 
 def render_component_docs():
-    with st.expander("COMPONENT DOCS", expanded=False):
+    if not _operator_mode_enabled():
+        return
+    with st.expander("Component inventory", expanded=False):
         _md(component_docs_html(DASHBOARD_COMPONENT_DOCS))
 
 
@@ -1567,7 +1573,9 @@ def render_status():
         phase_bar_html = f'<div class="phase-bar">{bars}</div>'
 
     n_warn = bluf["warns_count"] + bluf["exits_count"]
-    delta = '<span class="tile-delta">+2 24H</span>' if n_warn > 0 else ""
+    today = datetime.now(timezone.utc).date().isoformat()
+    transition_count_24h = sum(1 for row in transitions if str(row.get("date", "")) == today)
+    delta = f'<span class="tile-delta">{transition_count_24h} today</span>' if n_warn > 0 else ""
 
     yc_label = (
         "POSITIVE" if regime.yield_curve_positive
@@ -1590,7 +1598,7 @@ def render_status():
     html = f"""
     <section class="section">
       <div class="section-head">
-        <h2>Market state <span class="count">8 indicators</span></h2>
+        <h2>Market state <span class="count">Live indicators</span></h2>
         <div class="right">UPDATED {datetime.now().strftime('%H:%M').upper()}</div>
       </div>
       <div class="status-row">
@@ -1856,7 +1864,7 @@ def render_sector_spaghetti():
         """
         <section class="section" id="sector-spaghetti">
           <div class="section-head">
-            <h2>Sector spaghetti chart <span class="count">B-111 · US sectors</span></h2>
+            <h2>Sector spaghetti chart <span class="count">US sectors</span></h2>
             <div class="right">12M RELATIVE STRENGTH VS SPY</div>
           </div>
         </section>
@@ -1968,7 +1976,7 @@ def render_comparison_view():
         f"""
         <section class="section" id="comparison-view">
           <div class="section-head">
-            <h2>Comparison view <span class="count">B-115 · 2-4 tickers</span></h2>
+            <h2>Comparison view <span class="count">2-4 tickers</span></h2>
             <div class="right">{len(scored)} scored tickers</div>
           </div>
         </section>
@@ -2054,7 +2062,6 @@ def render_full_table():
     with direction_col:
         selected_direction = st.segmented_control("Direction",
             options=sort_directions,
-            default=current_direction,
             format_func=lambda key: FULL_TABLE_SORT_DIRECTIONS[key],
             key="table_sort_direction_choice",
         )
@@ -2260,7 +2267,7 @@ def _render_portfolio_analysis(result):
     pnl = analyze_position_pnl(result.holdings, latest_prices_from_ohlcv(ohlcv))
     if not pnl.rows:
         return
-    with st.expander("P&L tracker (B-131)", expanded=False):
+    with st.expander("P&L tracker", expanded=False):
         if pnl.missing_tickers:
             st.caption("P&L inputs missing for: " + ", ".join(pnl.missing_tickers))
         st.dataframe(pnl_summary_frame(pnl), hide_index=True, width="stretch")
@@ -2277,7 +2284,7 @@ def render_portfolio_analyzer():
         f"""
         <section class="section" id="portfolio-analyzer">
           <div class="section-head">
-            <h2>Portfolio analyzer <span class="count">B-130 · read-only</span></h2>
+            <h2>Portfolio analyzer <span class="count">Positions and tickers</span></h2>
             <div class="right">{len(scored)} scored tickers</div>
           </div>
         </section>
@@ -2418,7 +2425,7 @@ def render_custom_universe_builder():
         f"""
         <section class="section" id="custom-universe-builder">
           <div class="section-head">
-            <h2>Custom universe <span class="count">B-105 · read-only</span></h2>
+            <h2>Custom universe <span class="count">Watchlist builder</span></h2>
             <div class="right">{len(scored)} scored tickers</div>
           </div>
         </section>
@@ -2509,8 +2516,8 @@ def render_calibration_lab():
         """
         <section class="section" id="calibration-lab">
           <div class="section-head">
-            <h2>Calibration lab <span class="count">B-163 · research artifacts</span></h2>
-            <div class="right">READ-ONLY EVIDENCE</div>
+            <h2>Calibration lab <span class="count">Research artifacts</span></h2>
+            <div class="right">RESEARCH EVIDENCE</div>
           </div>
         </section>
         """
@@ -2643,7 +2650,7 @@ def render_calibration_lab():
         _md(
             """
             <div class="chart-help">
-              Full 10-year calibration report pending. Future B-163 slices will generate
+              Full calibration report pending. A manual research run will generate
               <code>docs/calibration_10y_report.md</code> after baseline and calibrated
               out-of-sample runs are complete.
             </div>
@@ -2711,7 +2718,7 @@ def render_calibration_lab():
     _md(
         """
         <div class="chart-help">
-          <b>Expanded calibration:</b> B-164 research-only threshold, filter, and
+          <b>Expanded calibration:</b> Research-only threshold, filter, and
           sector-specific rule evidence. These artifacts do not change live scoring.
         </div>
         """
@@ -2737,7 +2744,7 @@ def render_calibration_lab():
                 """
                 <div class="chart-help">
                   Expanded calibration report or metadata hash is <code>UNVERIFIED</code>.
-                  Run <code>python scripts/run_backtest.py</code> to refresh B-164 evidence.
+                  Run the offline backtest refresh command to update expanded evidence.
                 </div>
                 """
             )
@@ -2758,7 +2765,7 @@ def render_calibration_lab():
             """
             <div class="chart-help">
               Expanded calibration candidate artifact hash is <code>UNVERIFIED</code>.
-              Run <code>python scripts/run_backtest.py</code> to refresh B-164 evidence.
+              Run the offline backtest refresh command to update expanded evidence.
             </div>
             """
         )
@@ -2776,7 +2783,7 @@ def render_calibration_lab():
             """
             <div class="chart-help">
               Sector-specific override artifact hash is <code>UNVERIFIED</code>.
-              Run <code>python scripts/run_backtest.py</code> to refresh B-164 evidence.
+              Run the offline backtest refresh command to update expanded evidence.
             </div>
             """
         )
@@ -2796,7 +2803,7 @@ def render_evidence_gate_lab():
         """
         <section class="section" id="evidence-gate-lab">
           <div class="section-head">
-            <h2>Evidence gates <span class="count">B-158 / B-160</span></h2>
+            <h2>Evidence gates <span class="count">Macro and provider research</span></h2>
             <div class="right">FAIL-CLOSED RESEARCH</div>
           </div>
         </section>
@@ -2804,19 +2811,20 @@ def render_evidence_gate_lab():
     )
 
     fred_decision = evaluate_promotion_gate(
-        ticket="B-158",
+        ticket="Macro evidence gate",
         source="FRED macro",
         summary=_read_validation_summary(FRED_VALIDATION_SUMMARY_PATH),
         validation_report_path="docs/fred_macro_validation_report.md",
     )
     massive_decision = evaluate_promotion_gate(
-        ticket="B-160",
+        ticket="Provider evidence gate",
         source="Massive provider data",
         summary=_read_validation_summary(MASSIVE_VALIDATION_SUMMARY_PATH),
         validation_report_path="docs/massive_provider_validation_report.md",
     )
     decisions = [fred_decision, massive_decision]
     gate_rows = promotion_gate_decisions_frame(decisions)
+    gate_rows = gate_rows.rename(columns={"Ticket": "Gate"})
     live_promotion_allowed = any(decision.live_promotion_allowed for decision in decisions)
 
     _md(
@@ -2850,7 +2858,7 @@ def _render_backtest_lab_content():
         """
         <section class="section" id="backtest-lab">
           <div class="section-head">
-            <h2>Backtest lab <span class="count">B-011 · manual artifacts</span></h2>
+            <h2>Backtest lab <span class="count">Manual artifacts</span></h2>
             <div class="right">OFFLINE REPORT VIEWER</div>
           </div>
         </section>
@@ -2924,7 +2932,7 @@ def _render_backtest_lab_content():
 
 
 def render_backtest_lab():
-    with st.expander("Backtest lab - B-011 manual artifacts", expanded=False):
+    with st.expander("Backtest lab", expanded=False):
         _render_backtest_lab_content()
 
 
@@ -2950,7 +2958,7 @@ def _render_personal_trade_backtest_content():
         """
         <section class="section" id="personal-trade-backtest">
           <div class="section-head">
-            <h2>Personal trade backtest <span class="count">B-132 · trade history</span></h2>
+            <h2>Personal trade backtest <span class="count">Trade history</span></h2>
             <div class="right">OFFLINE ALIGNMENT</div>
           </div>
         </section>
@@ -2997,7 +3005,7 @@ def _render_personal_trade_backtest_content():
 
 
 def render_personal_trade_backtest():
-    with st.expander("Personal trade backtest - B-132 trade history", expanded=False):
+    with st.expander("Personal trade backtest", expanded=False):
         _render_personal_trade_backtest_content()
 
 
@@ -3119,7 +3127,7 @@ def render_debrief_lab():
         """
         <section class="section" id="debrief-lab">
           <div class="section-head">
-            <h2>Debrief lab <span class="count">B-153 · run outcomes</span></h2>
+            <h2>Debrief lab <span class="count">Run outcomes</span></h2>
             <div class="right">LOCAL JOURNAL</div>
           </div>
         </section>
@@ -3222,11 +3230,11 @@ def render_debrief_lab():
 
 
 def render_footer():
-    flow_stub_label = "ON" if provider_flow_feeds_stubbed() else "OFF"
+    flow_status_label = "NEUTRAL" if provider_flow_feeds_stubbed() else "LIVE"
     html = f"""
     <div class="footer">
-      <span>{len(scored)} INSTRUMENTS · 7 PILLARS · FLOW FEEDS STUBBED {flow_stub_label} · CACHE TTL 60min</span>
-      <span>{APP_VERSION} · {st.session_state.theme.upper()} · MEIRI / READ-ONLY</span>
+      <span>{len(scored)} INSTRUMENTS · 7 PILLARS · PROVIDER FLOW {flow_status_label} · DATA CACHE 60min</span>
+      <span>{APP_VERSION} · {st.session_state.theme.upper()}</span>
     </div>
     </div>
     """  # closes <div class="app">

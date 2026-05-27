@@ -22,6 +22,8 @@ def test_app_wires_component_docs_page_without_data_fetches():
 
     docs_source = _function_source(app_source, "render_component_docs")
 
+    assert "_operator_mode_enabled()" in docs_source
+    assert "Component inventory" in docs_source
     assert "component_docs_html(DASHBOARD_COMPONENT_DOCS)" in docs_source
     assert "fetch_ohlcv(" not in docs_source
     assert "_load_data(" not in docs_source

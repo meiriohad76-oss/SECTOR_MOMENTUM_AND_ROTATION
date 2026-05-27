@@ -44,7 +44,6 @@ def test_app_surfaces_calibration_artifacts_without_running_calibration():
     assert "Calibration lab" in app_source
     assert "Expanded calibration" in app_source
     assert "sector-specific" in app_source
-    assert "B-163" in app_source
     assert (
         "from src.calibration_dashboard import ("
         in app_source

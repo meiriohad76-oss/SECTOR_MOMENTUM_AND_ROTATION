@@ -326,6 +326,7 @@ def fetch_ohlcv_result(
     missing = [ticker for ticker in tickers if ticker not in cached]
     fetched: dict[str, pd.DataFrame] = {}
     provider_retry_count = 0
+    yfinance_fallback: dict[str, pd.DataFrame] = {}
     if missing:
         if provider_name == "massive":
             provider_result = _fetch_massive_ohlcv(missing, period=period, interval=interval)
@@ -338,9 +339,26 @@ def fetch_ohlcv_result(
                 write_cached_ohlcv(fetched, provider=provider_name, interval=interval)
             except Exception:
                 pass
+        provider_misses_after_primary = [
+            ticker for ticker in missing if ticker not in fetched and str(ticker).upper() not in fetched
+        ]
+        if provider_name == "massive" and provider_misses_after_primary:
+            fallback_result = _fetch_yfinance_ohlcv(
+                provider_misses_after_primary,
+                period=period,
+                interval=interval,
+            )
+            yfinance_fallback = fallback_result.data
+            if yfinance_fallback:
+                fetched = {**fetched, **yfinance_fallback}
+                if cache_enabled:
+                    try:
+                        write_cached_ohlcv(yfinance_fallback, provider="yfinance", interval=interval)
+                    except Exception:
+                        pass
     stale_cached: dict[str, pd.DataFrame] = {}
     provider_misses = [ticker for ticker in missing if ticker not in fetched and str(ticker).upper() not in fetched]
-    if provider_name == "yfinance" and provider_misses and cache_enabled:
+    if provider_misses and cache_enabled:
         try:
             stale_cached = read_cached_ohlcv(
                 provider_misses,
@@ -365,6 +383,12 @@ def fetch_ohlcv_result(
     warnings: list[str] = []
     if provider_retry_count and fetched:
         warnings.append(_provider_retry_warning(provider_name, provider_retry_count))
+    if yfinance_fallback:
+        count = len(yfinance_fallback)
+        warnings.append(
+            f"Massive unavailable for {count} {_warning_symbol_text(count)}; "
+            "yfinance fallback used for live OHLCV."
+        )
     if stale_cached:
         count = len(stale_cached)
         warnings.append(

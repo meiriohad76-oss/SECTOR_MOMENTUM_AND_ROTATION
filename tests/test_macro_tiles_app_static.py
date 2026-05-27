@@ -32,7 +32,7 @@ def test_app_fetches_macro_context_symbols_for_header_tiles():
     assert "data-tip=\"{_esc(str(row.get('tooltip', '')))}\"" in app_source
     assert "macro-signal {sentiment_class}" in app_source
     assert "macro-gauge\" style=\"--gauge:{gauge_pct}%\"" in app_source
-    assert "Market state <span class=\"count\">8 indicators</span>" in app_source
+    assert "Market state <span class=\"count\">Live indicators</span>" in app_source
     assert "Expanded FRED macro context" in app_source
 
 

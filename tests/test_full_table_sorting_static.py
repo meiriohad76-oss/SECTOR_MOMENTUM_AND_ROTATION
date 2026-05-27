@@ -22,6 +22,16 @@ def test_full_matrix_uses_explicit_sort_controls_and_active_headers():
     assert "sort-active" in app_source
 
 
+def test_sort_direction_control_does_not_duplicate_session_state_default():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    start = app_source.index('selected_direction = st.segmented_control("Direction"')
+    end = app_source.index("selected_field, selected_direction = normalize_full_table_sort", start)
+    control_source = app_source[start:end]
+
+    assert 'key="table_sort_direction_choice"' in control_source
+    assert "default=" not in control_source
+
+
 def test_sort_controls_are_visual_only_and_do_not_force_data_recompute():
     perf_source = (ROOT / "src" / "performance_audit.py").read_text(encoding="utf-8")
 

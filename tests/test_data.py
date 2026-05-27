@@ -319,6 +319,45 @@ def test_fetch_ohlcv_result_reports_provider_gap_when_no_cache(monkeypatch):
     assert result.warnings == ("Missing OHLCV for 1 symbol after yfinance fetch.",)
 
 
+def test_fetch_ohlcv_result_uses_yfinance_fallback_when_massive_misses(monkeypatch):
+    dates = pd.bdate_range("2024-01-01", periods=40)
+    fallback_frame = pd.DataFrame(
+        {
+            "open": range(40),
+            "high": range(1, 41),
+            "low": range(40),
+            "close": range(100, 140),
+            "volume": [1_000_000] * 40,
+            "adj_close": range(100, 140),
+        },
+        index=dates,
+    )
+    calls = []
+
+    def fake_massive(tickers, period, interval):
+        calls.append(("massive", tuple(tickers), period, interval))
+        return data._ProviderFetchResult({})
+
+    def fake_yfinance(tickers, period, interval):
+        calls.append(("yfinance", tuple(tickers), period, interval))
+        return data._ProviderFetchResult({"XLK": fallback_frame})
+
+    monkeypatch.setattr(data, "_fetch_massive_ohlcv", fake_massive)
+    monkeypatch.setattr(data, "_fetch_yfinance_ohlcv", fake_yfinance)
+
+    result = data.fetch_ohlcv_result(["XLK"], period="2mo", provider="massive")
+
+    assert calls == [
+        ("massive", ("XLK",), "2mo", "1d"),
+        ("yfinance", ("XLK",), "2mo", "1d"),
+    ]
+    assert result.provider == "massive"
+    assert list(result.data) == ["XLK"]
+    assert result.fetched == ("XLK",)
+    assert result.missing == ()
+    assert result.warnings == ("Massive unavailable for 1 symbol; yfinance fallback used for live OHLCV.",)
+
+
 def test_fetch_ohlcv_result_can_bypass_fresh_cache_for_validation(tmp_path, monkeypatch):
     from src import ohlcv_store
 

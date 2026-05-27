@@ -5,8 +5,8 @@
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now sector-dashboard
 #
-# Adjust User=, WorkingDirectory=, and ExecStart= paths to match
-# your username and where you cloned the repo.
+# This template targets the AHADPI5 deployment checkout. If you install it on a
+# different host, adjust User=, Group=, WorkingDirectory=, and ExecStart=.
 
 [Unit]
 Description=Sector Rotation Dashboard (Streamlit)
@@ -15,10 +15,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=meiri
-Group=meiri
-WorkingDirectory=/home/meiri/sector-rotation-dashboard
-ExecStart=/home/meiri/sector-rotation-dashboard/.venv/bin/streamlit run app.py \
+User=ahad
+Group=ahad
+WorkingDirectory=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION
+ExecStart=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION/.venv/bin/streamlit run app.py \
     --server.address 127.0.0.1 \
     --server.port 8501 \
     --server.headless true \

@@ -13,9 +13,8 @@ def test_app_wires_pnl_tracker_and_personal_trade_backtest_sections():
     assert "from src.personal_trades import" in app_source
     assert "def render_personal_trade_backtest():" in app_source
     assert "Personal trade backtest" in app_source
-    assert 'with st.expander("Personal trade backtest - B-132 trade history", expanded=False):' in app_source
-    assert "B-131" in app_source
-    assert "B-132" in app_source
+    assert 'with st.expander("Personal trade backtest", expanded=False):' in app_source
+    assert 'with st.expander("P&L tracker", expanded=False):' in app_source
     assert "latest_prices_from_ohlcv(ohlcv)" in app_source
     assert "evaluate_trade_history(" in app_source
 

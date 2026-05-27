@@ -23,7 +23,7 @@ def test_app_surfaces_backtest_artifacts_without_running_backtest():
     assert "Normalized equity" in app_source
     assert "Drawdown" in app_source
     assert "st.line_chart(" in app_source
-    assert 'with st.expander("Backtest lab - B-011 manual artifacts", expanded=False):' in app_source
+    assert 'with st.expander("Backtest lab", expanded=False):' in app_source
     assert "run_backtest.main(" not in app_source
 
 

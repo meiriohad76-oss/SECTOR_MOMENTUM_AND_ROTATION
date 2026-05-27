@@ -56,6 +56,9 @@ data/pwa_push_subscriptions.json
 data/vapid_private_key.pem
 public/feeds/
 
+# Local security-review notes may contain provider/account details.
+docs/IOC_AUDIT_*.md
+
 # --- Streamlit secrets (API keys etc.) ---
 .streamlit/secrets.toml
 .streamlit/secrets.toml.bak.*
