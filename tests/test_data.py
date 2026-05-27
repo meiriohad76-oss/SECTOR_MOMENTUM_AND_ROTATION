@@ -226,6 +226,7 @@ def test_fetch_ohlcv_massive_returns_empty_on_provider_error(monkeypatch):
         SimpleNamespace(get=fail_get, RequestException=RuntimeError),
         raising=False,
     )
+    monkeypatch.setattr(data, "_fetch_yfinance_ohlcv", lambda tickers, period, interval: data._ProviderFetchResult({}))
 
     assert data.fetch_ohlcv(["XLK"], provider="massive") == {}
 
