@@ -219,6 +219,8 @@ def _run_playwright_capture(
     timeout_ms: int,
     settle_ms: int,
     browser_channel: str | None = None,
+    user_data_dir: str | None = None,
+    headed: bool = False,
 ) -> list[BrowserQaResult]:
     try:
         from playwright.sync_api import sync_playwright
@@ -231,14 +233,33 @@ def _run_playwright_capture(
     out_dir.mkdir(parents=True, exist_ok=True)
     results: list[BrowserQaResult] = []
     with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(channel=browser_channel) if browser_channel else playwright.chromium.launch()
+        browser = None
+        context = None
+        if user_data_dir:
+            context = (
+                playwright.chromium.launch_persistent_context(
+                    user_data_dir,
+                    channel=browser_channel,
+                    headless=not headed,
+                )
+                if browser_channel
+                else playwright.chromium.launch_persistent_context(user_data_dir, headless=not headed)
+            )
+        else:
+            browser = (
+                playwright.chromium.launch(channel=browser_channel, headless=not headed)
+                if browser_channel
+                else playwright.chromium.launch(headless=not headed)
+            )
+            context = browser
         try:
             for target in browser_qa_targets():
                 screenshot_path = out_dir / f"{target.target_id}.png"
                 if screenshot_path.exists():
                     screenshot_path.unlink()
                 url = _target_url(base_url, target.path)
-                page = browser.new_page(viewport={"width": target.width, "height": target.height})
+                page = context.new_page()
+                page.set_viewport_size({"width": target.width, "height": target.height})
                 notes: list[str] = []
                 ok = True
                 try:
@@ -309,7 +330,10 @@ def _run_playwright_capture(
                     )
                 )
         finally:
-            browser.close()
+            if browser is not None:
+                browser.close()
+            else:
+                context.close()
     return results
 
 
@@ -357,6 +381,16 @@ def main() -> int:
         default=None,
         help="Optional installed browser channel, for example chrome or msedge, to avoid bundled browser downloads.",
     )
+    parser.add_argument(
+        "--user-data-dir",
+        default=None,
+        help="Optional persistent browser profile directory, useful for an already-authenticated Cloudflare Access session.",
+    )
+    parser.add_argument(
+        "--headed",
+        action="store_true",
+        help="Run a visible browser window so an operator can complete Cloudflare Access authentication.",
+    )
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -367,6 +401,8 @@ def main() -> int:
         args.timeout_ms,
         args.settle_ms,
         browser_channel=args.browser_channel,
+        user_data_dir=args.user_data_dir,
+        headed=args.headed,
     )
     _write_outputs(results, out_dir, generated_at, args.qa_mode)
     failed = [result for result in results if not result.ok]

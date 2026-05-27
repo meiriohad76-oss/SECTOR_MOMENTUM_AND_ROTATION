@@ -28,9 +28,10 @@ def test_pi_deploy_workflow_fast_forwards_tests_and_smokes_service():
     assert "git pull --ff-only origin backlog-stepwise-qa" in text
     assert "./.venv/bin/python -m pip install -r requirements.txt" in text
     assert "./.venv/bin/python -m pytest -q" in text
-    assert "systemctl show \"$PI_SERVICE_NAME\" -p MainPID --value" in text
+    assert "./.venv/bin/python scripts/restart_sector_dashboard.py" in text
+    assert "--service \"$PI_SERVICE_NAME\"" in text
     assert "http://127.0.0.1:8501/?ticker=XLK" in text
-    assert "active=$active http=$code" in text
+    assert "restart_result=healthy" in text
 
 
 def test_github_actions_pi_deploy_docs_reference_required_secrets():

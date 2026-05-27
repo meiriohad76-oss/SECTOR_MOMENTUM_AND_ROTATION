@@ -123,12 +123,18 @@ Use Cloudflare Tunnel to expose `http://127.0.0.1:8500` on the public root while
 ### Useful commands
 
 ```bash
-sudo systemctl restart sector-dashboard   # apply code changes / refresh
+./.venv/bin/python scripts/restart_sector_dashboard.py --service sector-dashboard
 sudo systemctl stop sector-dashboard
 sudo systemctl status sector-dashboard
 journalctl -u sector-dashboard -f         # live logs (Ctrl+C to exit)
 journalctl -u sector-dashboard --since "1 hour ago"
 ```
+
+The restart helper is the preferred non-interactive deploy path over SSH. It reads the
+systemd `MainPID`, sends `SIGTERM` to the running Streamlit process, lets the
+`Restart=always` service policy start a fresh process, and polls
+`http://127.0.0.1:8501/?ticker=XLK` until it returns HTTP 200. It does not call
+`sudo`, so it works with `ssh -o BatchMode=yes`.
 
 ## Updating the dashboard later
 
@@ -137,7 +143,7 @@ cd ~/sector-rotation-dashboard
 git pull
 source .venv/bin/activate
 pip install -r requirements.txt           # if dependencies changed
-sudo systemctl restart sector-dashboard
+./.venv/bin/python scripts/restart_sector_dashboard.py --service sector-dashboard
 ```
 
 ## Optional: schedule a nightly state-refresh

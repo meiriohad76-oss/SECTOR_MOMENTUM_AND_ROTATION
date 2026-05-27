@@ -7,7 +7,7 @@ configuration. Other provider-backed signals stay neutral until wired.
 from __future__ import annotations
 
 import csv
-from datetime import datetime
+from datetime import datetime, timezone
 import io
 import json
 import os
@@ -59,6 +59,221 @@ FINRA_SHORT_INTEREST_URL = "https://api.finra.org/data/group/otcmarket/name/cons
 PRIMARY_FLOW_SOURCE_ENV_PREFIX = "ETF_PRIMARY_FLOW_URL_"
 BLOCK_TRADE_MIN_SHARES = 10_000
 BLOCK_TRADE_MIN_NOTIONAL = 200_000.0
+_PROVIDER_FLOW_RUNTIME_HEALTH: dict[str, dict[str, object]] = {}
+
+
+def reset_provider_flow_runtime_health() -> None:
+    """Clear in-process provider-flow diagnostics, primarily for tests and QA runs."""
+    _PROVIDER_FLOW_RUNTIME_HEALTH.clear()
+
+
+def _provider_runtime_timestamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+
+def _record_provider_flow_runtime_health(
+    row_id: str,
+    *,
+    ticker: str,
+    status: str,
+    mode: str,
+    value: Optional[float] = None,
+    error: BaseException | None = None,
+    note: str = "",
+) -> None:
+    symbol = str(ticker).upper()
+    completed_at = _provider_runtime_timestamp()
+    event_parts = [f"{symbol} {mode}"]
+    if value is not None:
+        event_parts.append(f"value={float(value):.4g}")
+    if error is not None:
+        event_parts.append(f"error={type(error).__name__}")
+    if note:
+        event_parts.append(note)
+    event_detail = "; ".join(event_parts)
+    entry = _PROVIDER_FLOW_RUNTIME_HEALTH.setdefault(
+        row_id,
+        {
+            "last_completed": completed_at,
+            "total_count": 0,
+            "status_counts": {},
+            "mode_counts": {},
+            "samples": [],
+            "events": [],
+        },
+    )
+    entry["last_completed"] = completed_at
+    entry["total_count"] = int(entry.get("total_count", 0)) + 1
+    status_counts = dict(entry.get("status_counts", {}) or {})
+    status_counts[status] = int(status_counts.get(status, 0)) + 1
+    entry["status_counts"] = status_counts
+    mode_counts = dict(entry.get("mode_counts", {}) or {})
+    mode_counts[mode] = int(mode_counts.get(mode, 0)) + 1
+    entry["mode_counts"] = mode_counts
+    samples = list(entry.get("samples", []) or [])
+    if symbol not in samples and len(samples) < 5:
+        samples.append(symbol)
+    entry["samples"] = samples
+    events = list(entry.get("events", []) or [])
+    if len(events) < 5:
+        events.append(event_detail)
+    entry["events"] = events
+
+
+def _merge_provider_runtime_health(row: dict[str, str], *, stubbed: bool) -> dict[str, str]:
+    if stubbed or str(row.get("mode", "")).startswith("missing "):
+        return row
+    runtime = _PROVIDER_FLOW_RUNTIME_HEALTH.get(str(row.get("id", "")))
+    if not runtime:
+        return row
+    total_count = int(runtime.get("total_count", 0))
+    status_counts = dict(runtime.get("status_counts", {}) or {})
+    mode_counts = dict(runtime.get("mode_counts", {}) or {})
+    samples = [str(item) for item in (runtime.get("samples", []) or [])]
+    events = [str(item) for item in (runtime.get("events", []) or [])]
+    last_completed = str(runtime.get("last_completed", ""))
+    if total_count <= 1:
+        status = next(iter(status_counts), str(row.get("status", "info")))
+        mode = next(iter(mode_counts), str(row.get("mode", "unknown")))
+        detail = f"last completed {last_completed}; {events[0]}" if events else str(row.get("detail", ""))
+        return {**row, "status": status, "mode": mode, "detail": detail}
+
+    healthy_count = int(status_counts.get("healthy", 0))
+    warning_count = total_count - healthy_count
+    status = "warning" if warning_count else "healthy"
+    mode = f"{healthy_count} live ok / {warning_count} warning" if warning_count else f"{healthy_count} live ok"
+    detail_parts = [
+        f"last completed {last_completed}",
+        f"{healthy_count} live ok, {warning_count} warning across {total_count} tickers",
+    ]
+    if samples:
+        detail_parts.append(f"sample tickers: {', '.join(samples)}")
+    warning_events = [event for event in events if " live ok" not in event]
+    if warning_events:
+        detail_parts.append(f"warnings: {'; '.join(warning_events)}")
+    return {**row, "status": status, "mode": mode, "detail": "; ".join(detail_parts)}
+
+
+def provider_flow_feeds_stubbed(statuses: Iterable[dict[str, str]] | None = None) -> bool:
+    """Return True only when every optional provider-flow feed is in neutral stub mode."""
+    rows = list(statuses) if statuses is not None else provider_flow_health_statuses()
+    optional_rows = [row for row in rows if row.get("id") != "ohlcv_derived"]
+    return bool(optional_rows) and all(str(row.get("mode", "")).startswith("stubbed") for row in optional_rows)
+
+
+def _provider_health_row(
+    *,
+    row_id: str,
+    label: str,
+    provider: str,
+    signal: str,
+    stubbed: bool,
+    required_secrets: tuple[str, ...] = (),
+    detail: str = "",
+) -> dict[str, str]:
+    if stubbed:
+        return {
+            "id": row_id,
+            "label": label,
+            "provider": provider,
+            "signal": signal,
+            "status": "info",
+            "mode": "stubbed neutral",
+            "detail": detail or f"{signal} is held at its neutral default.",
+        }
+    missing = tuple(secret for secret in required_secrets if not _resolve_secret(secret))
+    if missing:
+        return {
+            "id": row_id,
+            "label": label,
+            "provider": provider,
+            "signal": signal,
+            "status": "warning",
+            "mode": f"missing {', '.join(missing)}",
+            "detail": detail or f"{signal} is enabled but not fully configured.",
+        }
+    return {
+        "id": row_id,
+        "label": label,
+        "provider": provider,
+        "signal": signal,
+        "status": "healthy",
+        "mode": "enabled",
+        "detail": detail or f"{signal} provider path is configured.",
+    }
+
+
+def provider_flow_health_statuses() -> list[dict[str, str]]:
+    """Return secret-safe per-provider flow readiness for dashboard health UI."""
+    return [
+        {
+            "id": "ohlcv_derived",
+            "label": "OHLCV-derived flow",
+            "provider": "Market OHLCV",
+            "signal": "CMF/OBV/MFI/RVOL/distribution",
+            "status": "healthy",
+            "mode": "live from market lane",
+            "detail": "CMF, OBV, MFI, RVOL, and distribution-day signals update from refreshed OHLCV.",
+        },
+        _merge_provider_runtime_health(
+            _provider_health_row(
+                row_id="etf_primary_flow",
+                label="ETF primary flow",
+                provider="Massive browser",
+                signal="etf_flow_5d_pct",
+                stubbed=ETF_PRIMARY_FLOW_STUB_MODE,
+                required_secrets=("MASSIVE_API_KEY",),
+                detail="Uses ticker-specific ETF_PRIMARY_FLOW_URL_* sources through Massive browser when configured.",
+            ),
+            stubbed=ETF_PRIMARY_FLOW_STUB_MODE,
+        ),
+        _merge_provider_runtime_health(
+            _provider_health_row(
+                row_id="massive_block_trades",
+                label="Massive block trades",
+                provider="Massive",
+                signal="block_up_ratio",
+                stubbed=MASSIVE_TRADES_STUB_MODE,
+                required_secrets=("MASSIVE_API_KEY",),
+                detail="Reads recent trade prints to estimate upside/downside block-trade pressure.",
+            ),
+            stubbed=MASSIVE_TRADES_STUB_MODE,
+        ),
+        _merge_provider_runtime_health(
+            _provider_health_row(
+                row_id="finra_ats_dark_pool",
+                label="FINRA ATS dark pool",
+                provider="FINRA",
+                signal="dark_pool_pct",
+                stubbed=FINRA_ATS_STUB_MODE,
+                detail="Uses FINRA ATS weekly summaries; no API key is required.",
+            ),
+            stubbed=FINRA_ATS_STUB_MODE,
+        ),
+        _merge_provider_runtime_health(
+            _provider_health_row(
+                row_id="finra_short_interest",
+                label="FINRA short interest",
+                provider="FINRA",
+                signal="si_delta_15d",
+                stubbed=FINRA_SHORT_INTEREST_STUB_MODE,
+                detail="Uses FINRA consolidated short-interest records; no API key is required.",
+            ),
+            stubbed=FINRA_SHORT_INTEREST_STUB_MODE,
+        ),
+        _merge_provider_runtime_health(
+            _provider_health_row(
+                row_id="sec_13f",
+                label="SEC 13F",
+                provider="SEC",
+                signal="thirteen_f_q",
+                stubbed=SEC_13F_STUB_MODE,
+                required_secrets=("SEC_13F_DATA_URL", "SEC_USER_AGENT"),
+                detail="Uses a configured 13F information-table archive plus SEC-compliant User-Agent.",
+            ),
+            stubbed=SEC_13F_STUB_MODE,
+        ),
+    ]
 
 
 @dataclass(frozen=True)
@@ -310,13 +525,49 @@ def etf_primary_flow_5d_pct(ticker):
         return 0.0
     try:
         payload = _fetch_primary_flow_payload(ticker)
-    except requests.RequestException:
+    except requests.RequestException as exc:
+        _record_provider_flow_runtime_health(
+            "etf_primary_flow",
+            ticker=ticker,
+            status="warning",
+            mode="request error neutral",
+            error=exc,
+        )
         return 0.0
     if not payload:
+        source_key = f"{PRIMARY_FLOW_SOURCE_ENV_PREFIX}{str(ticker).upper().replace('-', '_')}"
+        mode = "no provider payload neutral"
+        note = ""
+        if not _primary_flow_source_url(ticker):
+            mode = "missing ticker source"
+            note = f"missing {source_key}"
+        _record_provider_flow_runtime_health(
+            "etf_primary_flow",
+            ticker=ticker,
+            status="warning",
+            mode=mode,
+            note=note,
+        )
         return 0.0
     snapshots = parse_primary_flow_snapshots(payload)
     value = primary_flow_5d_pct_from_snapshots(snapshots)
-    return float(value) if value is not None else 0.0
+    if value is None:
+        _record_provider_flow_runtime_health(
+            "etf_primary_flow",
+            ticker=ticker,
+            status="warning",
+            mode="no usable records neutral",
+        )
+        return 0.0
+    result = float(value)
+    _record_provider_flow_runtime_health(
+        "etf_primary_flow",
+        ticker=ticker,
+        status="healthy",
+        mode="live ok",
+        value=result,
+    )
+    return result
 
 
 def _neutral_float(value: Optional[float], neutral: float) -> float:
@@ -415,9 +666,33 @@ def block_trade_upside_ratio(ticker):
     if MASSIVE_TRADES_STUB_MODE:
         return 1.0
     try:
-        return _neutral_float(_provider_block_trade_upside_ratio(ticker), 1.0)
-    except requests.RequestException:
+        value = _provider_block_trade_upside_ratio(ticker)
+    except requests.RequestException as exc:
+        _record_provider_flow_runtime_health(
+            "massive_block_trades",
+            ticker=ticker,
+            status="warning",
+            mode="request error neutral",
+            error=exc,
+        )
         return 1.0
+    if value is None:
+        _record_provider_flow_runtime_health(
+            "massive_block_trades",
+            ticker=ticker,
+            status="warning",
+            mode="no provider data neutral",
+        )
+        return 1.0
+    result = _neutral_float(value, 1.0)
+    _record_provider_flow_runtime_health(
+        "massive_block_trades",
+        ticker=ticker,
+        status="healthy" if result == value else "warning",
+        mode="live ok" if result == value else "invalid provider value neutral",
+        value=result,
+    )
+    return result
 
 
 def _provider_dark_pool_pct(ticker) -> Optional[float]:
@@ -483,9 +758,33 @@ def dark_pool_pct(ticker):
     if FINRA_ATS_STUB_MODE:
         return 0.40
     try:
-        return _neutral_float(_provider_dark_pool_pct(ticker), 0.40)
-    except requests.RequestException:
+        value = _provider_dark_pool_pct(ticker)
+    except requests.RequestException as exc:
+        _record_provider_flow_runtime_health(
+            "finra_ats_dark_pool",
+            ticker=ticker,
+            status="warning",
+            mode="request error neutral",
+            error=exc,
+        )
         return 0.40
+    if value is None:
+        _record_provider_flow_runtime_health(
+            "finra_ats_dark_pool",
+            ticker=ticker,
+            status="warning",
+            mode="no provider data neutral",
+        )
+        return 0.40
+    result = _neutral_float(value, 0.40)
+    _record_provider_flow_runtime_health(
+        "finra_ats_dark_pool",
+        ticker=ticker,
+        status="healthy" if result == value else "warning",
+        mode="live ok" if result == value else "invalid provider value neutral",
+        value=result,
+    )
+    return result
 
 
 def _provider_short_interest_delta_15d(ticker) -> Optional[float]:
@@ -563,9 +862,33 @@ def short_interest_delta_15d(ticker):
     if FINRA_SHORT_INTEREST_STUB_MODE:
         return 0.0
     try:
-        return _neutral_float(_provider_short_interest_delta_15d(ticker), 0.0)
-    except requests.RequestException:
+        value = _provider_short_interest_delta_15d(ticker)
+    except requests.RequestException as exc:
+        _record_provider_flow_runtime_health(
+            "finra_short_interest",
+            ticker=ticker,
+            status="warning",
+            mode="request error neutral",
+            error=exc,
+        )
         return 0.0
+    if value is None:
+        _record_provider_flow_runtime_health(
+            "finra_short_interest",
+            ticker=ticker,
+            status="warning",
+            mode="no provider data neutral",
+        )
+        return 0.0
+    result = _neutral_float(value, 0.0)
+    _record_provider_flow_runtime_health(
+        "finra_short_interest",
+        ticker=ticker,
+        status="healthy" if result == value else "warning",
+        mode="live ok" if result == value else "invalid provider value neutral",
+        value=result,
+    )
+    return result
 
 
 def _provider_thirteen_f_net_buys_q(ticker) -> Optional[float]:
@@ -647,12 +970,38 @@ def thirteen_f_net_buys_q(ticker):
     if SEC_13F_STUB_MODE:
         return 0.0
     try:
-        return _neutral_float(_provider_thirteen_f_net_buys_q(ticker), 0.0)
-    except requests.RequestException:
+        value = _provider_thirteen_f_net_buys_q(ticker)
+    except requests.RequestException as exc:
+        _record_provider_flow_runtime_health(
+            "sec_13f",
+            ticker=ticker,
+            status="warning",
+            mode="request error neutral",
+            error=exc,
+        )
         return 0.0
+    if value is None:
+        _record_provider_flow_runtime_health(
+            "sec_13f",
+            ticker=ticker,
+            status="warning",
+            mode="no provider data neutral",
+            note="missing CUSIP mapping or insufficient 13F records",
+        )
+        return 0.0
+    result = _neutral_float(value, 0.0)
+    _record_provider_flow_runtime_health(
+        "sec_13f",
+        ticker=ticker,
+        status="healthy" if result == value else "warning",
+        mode="live ok" if result == value else "invalid provider value neutral",
+        value=result,
+    )
+    return result
 
 
 def compute_flow_signals(ohlcv):
+    reset_provider_flow_runtime_health()
     rows = []
     for t, df in ohlcv.items():
         if str(t).startswith("^"):

@@ -234,6 +234,19 @@ python scripts/capture_browser_qa.py --base-url http://127.0.0.1:18601 --browser
 
 Use `--browser-channel msedge` if Edge is installed and Chrome is not. The `BROWSER_QA_MODE` flag must be set before starting Streamlit; it enables deterministic visual fixtures for palette, transition-pulse, and provider-status screenshots, forces secret-free yfinance/FRED-off behavior, and clearing `MASSIVE_API_KEY` plus `FRED_API_KEY` keeps the run explicit. The script writes `browser_qa_report.md`, `browser_qa_manifest.json`, and nonblank screenshots without requiring API keys or webhook secrets.
 
+For the protected Pi route, authenticate through Cloudflare Access first, then run the
+same capture against the public dashboard URL:
+
+```powershell
+python scripts/capture_browser_qa.py --base-url https://sentimentdashboard.ahaddashboards.uk --browser-channel chrome --user-data-dir .browser-qa-cloudflare --headed --qa-mode cloudflare-access-authenticated
+```
+
+The first headed run can be used to complete Cloudflare Access authentication in the
+persistent `.browser-qa-cloudflare` profile. Later runs can reuse the same
+`--user-data-dir` without `--headed`. Without an authenticated Cloudflare Access
+browser session, the public route will stop at the Access login page and browser QA
+will correctly fail its dashboard text checks.
+
 ### Linux / macOS / Raspberry Pi
 
 ```bash
@@ -326,6 +339,12 @@ The remaining provider seams have independent safety flags. Leave each unset/`tr
 - `dark_pool_pct()` → FINRA ATS weekly summary; enable with `FINRA_ATS_STUB_MODE=false`
 - `short_interest_delta_15d()` → FINRA consolidated short interest; enable with `FINRA_SHORT_INTEREST_STUB_MODE=false`
 - `thirteen_f_net_buys_q()` → configured SEC Form 13F data-set zip plus `SEC_13F_CUSIP_<TICKER>` mapping; enable with `SEC_13F_STUB_MODE=false`
+
+The dashboard data-health panel reports each provider lane separately. When a live
+lane runs, the panel also shows its last in-process outcome: live OK, missing ticker
+source, no provider data, invalid provider value, or request-error neutral fallback.
+These diagnostics are secret-safe and intentionally do not print API keys, webhook
+URLs, or raw provider payloads.
 
 ## State transition alerts
 

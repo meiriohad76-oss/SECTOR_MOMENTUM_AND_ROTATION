@@ -10,12 +10,15 @@ def test_dashboard_renders_data_health_panel_before_market_state():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
     assert "from src.data_health import dashboard_health_summary, data_health_rows" in app_source
+    assert "provider_flow_health_statuses" in app_source
+    assert "provider_flow_feeds_stubbed" in app_source
     assert "def render_data_health():" in app_source
     assert "Data and dashboard health" in app_source
     assert "Refresh all lanes" in app_source
     assert "REFRESH DATA NOW" not in app_source
     assert "data-health-panel" in app_source
     assert "data-health-card" in app_source
+    assert "data-health-provider-list" in app_source
     assert "data-health-role" in app_source
     assert "RENDERED · {last_update}" in app_source
     assert "60M CACHE" in app_source
@@ -26,6 +29,17 @@ def test_dashboard_renders_data_health_panel_before_market_state():
     assert app_source.index('_render_timed("render_data_health", render_data_health)') < app_source.index(
         '_render_timed("render_status", render_status)'
     )
+
+
+def test_data_health_uses_provider_statuses_to_determine_flow_stub_state():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    health_section = app_source[
+        app_source.index("def render_data_health():") : app_source.index("def render_status():")
+    ]
+
+    assert "provider_statuses = provider_flow_health_statuses()" in health_section
+    assert "provider_flow_stubbed=provider_flow_feeds_stubbed(provider_statuses)" in health_section
+    assert "provider_flow_statuses=provider_statuses" in health_section
 
 
 def test_refresh_action_clears_all_dashboard_data_caches_and_compute_snapshot():
@@ -48,6 +62,7 @@ def test_refresh_action_clears_all_dashboard_data_caches_and_compute_snapshot():
     assert "data_refresh_lane" in refresh_section
     assert "data_refresh_completed_at" in app_source
     assert "data_refresh_completed_request_at" in app_source
+    assert "data_refresh_completed_by_lane" in app_source
     assert 'log_event(APP_LOGGER, "data_lane_refresh_completed"' in app_source
     assert 'log_event(APP_LOGGER, "data_lane_refresh_requested"' in refresh_section
 
@@ -81,6 +96,8 @@ def test_data_health_css_supports_status_cards():
     assert ".data-health-role" in css
     assert ".data-health-card.stale" in css
     assert ".data-health-card.warning" in css
+    assert ".data-health-provider-list" in css
+    assert ".data-health-provider-list li.warning" in css
     assert ".data-health-refresh-grid" in css
     assert ".lane-refresh-caption" in css
     assert '.element-container:has(.data-health-refresh-grid) + div[data-testid="stHorizontalBlock"]' in css
@@ -114,5 +131,6 @@ def test_data_health_panel_renders_lane_refresh_buttons_from_rows():
     assert 'args=(str(row.get("lane_id")),)' in health_section
     assert "lane-refresh-caption" in health_section
     assert "severity_symbol" in health_section
+    assert "_lane_completed_text(" in health_section
     assert 'st.button("Refresh all lanes"' in health_section
     assert 'key="data_health_refresh_all_button"' in health_section

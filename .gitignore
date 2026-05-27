@@ -32,6 +32,7 @@ state.json
 data/state.json
 *.log
 .cache/
+.browser-qa-cloudflare/
 
 # --- OS junk ---
 *.tmp

@@ -299,7 +299,11 @@ def _compute_health_row(compute_created_at: float | int | None, *, now: pd.Times
     }
 
 
-def _provider_flow_health_row(provider_flow_stubbed: bool) -> dict[str, object]:
+def _provider_flow_health_row(
+    provider_flow_stubbed: bool,
+    provider_flow_statuses: Iterable[Mapping[str, object]] | None = None,
+) -> dict[str, object]:
+    providers = [dict(row) for row in (provider_flow_statuses or ())]
     if provider_flow_stubbed:
         detail = (
             "Provider-backed institutional-flow feeds are neutral/stub; "
@@ -309,6 +313,16 @@ def _provider_flow_health_row(provider_flow_stubbed: bool) -> dict[str, object]:
     else:
         detail = "Provider-backed flow feeds are enabled; check provider warnings above for data gaps."
         status = "healthy"
+    if providers:
+        provider_statuses = [str(row.get("status", "info")) for row in providers]
+        provider_worst = max(provider_statuses, key=_status_rank)
+        if _status_rank(provider_worst) > _status_rank(status):
+            status = provider_worst
+        provider_summary = "; ".join(
+            f"{row.get('label', 'Provider')}: {row.get('mode', row.get('status', 'unknown'))}"
+            for row in providers
+        )
+        detail = f"{detail} Provider status: {provider_summary}."
     return {
         **_lane_metadata("provider_flow", status),
         "source": "Provider-flow feeds",
@@ -316,6 +330,7 @@ def _provider_flow_health_row(provider_flow_stubbed: bool) -> dict[str, object]:
         "status": status,
         "latest": "-",
         "freshness": "derived from market lane",
+        "providers": providers,
         "detail": detail,
     }
 
@@ -329,13 +344,14 @@ def data_health_rows(
     compute_created_at: float | int | None,
     now: pd.Timestamp | datetime | None = None,
     provider_flow_stubbed: bool = True,
+    provider_flow_statuses: Iterable[Mapping[str, object]] | None = None,
 ) -> list[dict[str, object]]:
     current = _now_timestamp(now)
     return [
         _ohlcv_health_row(ohlcv, expected_symbols, ohlcv_result, now=current),
         _fred_health_row(fred_data, now=current),
         _compute_health_row(compute_created_at, now=current),
-        _provider_flow_health_row(provider_flow_stubbed),
+        _provider_flow_health_row(provider_flow_stubbed, provider_flow_statuses),
     ]
 
 

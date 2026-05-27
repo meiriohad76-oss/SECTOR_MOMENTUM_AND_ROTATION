@@ -22,6 +22,9 @@ def test_browser_qa_script_writes_report_and_manifest():
 
     assert "browser_qa_targets()" in script
     assert "--browser-channel" in script
+    assert "--user-data-dir" in script
+    assert "--headed" in script
+    assert "launch_persistent_context" in script
     assert "channel=browser_channel" in script
     assert "build_browser_qa_report(" in script
     assert "browser_qa_manifest.json" in script

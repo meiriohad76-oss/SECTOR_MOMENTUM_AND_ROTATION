@@ -2250,6 +2250,40 @@ div[class*="block-container"] {
   color: var(--fg-dim);
   font-weight: 800;
 }
+.data-health-provider-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.data-health-provider-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 4px 8px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--muted-2);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+}
+.data-health-provider-list li.healthy { border-left-color: var(--green); }
+.data-health-provider-list li.info { border-left-color: var(--blue); }
+.data-health-provider-list li.warning { border-left-color: var(--amber); }
+.data-health-provider-list li.stale { border-left-color: var(--red); }
+.data-health-provider-list b,
+.data-health-provider-list span,
+.data-health-provider-list small {
+  color: var(--ticker-label);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.data-health-provider-list small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+}
 .data-health-card p {
   margin: 10px 0 0;
 }

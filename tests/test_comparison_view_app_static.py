@@ -23,6 +23,12 @@ def test_comparison_view_app_wiring():
     assert app_source.index('<div class="comparison-selector-slot"></div>') < app_source.index(
         'st.multiselect("COMPARE TICKERS"'
     )
+    comparison_widget_section = app_source[
+        app_source.index('st.multiselect("COMPARE TICKERS"') : app_source.index(
+            "selected_compare = list(st.session_state.comparison_tickers)[:4]"
+        )
+    ]
+    assert "default=" not in comparison_widget_section
     assert "selected_compare = list(st.session_state.comparison_tickers)[:4]" in app_source
     assert "comparison_card_rows(scored, selected_compare)" in app_source
     render_order = [

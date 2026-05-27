@@ -46,6 +46,24 @@ def test_data_health_rows_show_ohlcv_and_fred_staleness():
         compute_created_at=1_779_760_000.0,
         now=pd.Timestamp("2026-05-26T08:00:00Z"),
         provider_flow_stubbed=True,
+        provider_flow_statuses=[
+            {
+                "id": "massive_block_trades",
+                "label": "Massive block trades",
+                "provider": "Massive",
+                "status": "info",
+                "mode": "stubbed neutral",
+                "detail": "block_up_ratio neutral",
+            },
+            {
+                "id": "finra_ats_dark_pool",
+                "label": "FINRA ATS dark pool",
+                "provider": "FINRA",
+                "status": "healthy",
+                "mode": "enabled",
+                "detail": "dark_pool_pct live",
+            },
+        ],
     )
 
     by_source = {row["source"]: row for row in rows}
@@ -78,6 +96,9 @@ def test_data_health_rows_show_ohlcv_and_fred_staleness():
     assert by_source["Provider-flow feeds"]["status"] == "info"
     assert by_source["Provider-flow feeds"]["sla"] == "recomputes from current OHLCV"
     assert by_source["Provider-flow feeds"]["freshness"] == "derived from market lane"
+    assert by_source["Provider-flow feeds"]["providers"][0]["label"] == "Massive block trades"
+    assert "Massive block trades: stubbed neutral" in by_source["Provider-flow feeds"]["detail"]
+    assert "FINRA ATS dark pool: enabled" in by_source["Provider-flow feeds"]["detail"]
     assert "neutral/stub" in by_source["Provider-flow feeds"]["detail"]
 
 

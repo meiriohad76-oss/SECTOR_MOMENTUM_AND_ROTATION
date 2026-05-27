@@ -57,21 +57,9 @@ jobs:
           ./.venv/bin/python -m pip install -r requirements.txt
           ./.venv/bin/python -m pytest -q
 
-          old_pid=$(systemctl show "$PI_SERVICE_NAME" -p MainPID --value || true)
-          if [ -n "$old_pid" ] && [ "$old_pid" != "0" ]; then
-            kill -TERM "$old_pid" 2>/dev/null || true
-          fi
-
-          for i in 1 2 3 4 5 6 7 8 9 10; do
-            active=$(systemctl is-active "$PI_SERVICE_NAME" || true)
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://127.0.0.1:8501/?ticker=XLK" || true)
-            echo "poll_$i active=$active http=$code"
-            if [ "$active" = "active" ] && [ "$code" = "200" ]; then
-              exit 0
-            fi
-            sleep 2
-          done
-
-          systemctl status "$PI_SERVICE_NAME" --no-pager
-          exit 1
+          # Helper prints restart_result=healthy after the fresh process serves HTTP 200.
+          ./.venv/bin/python scripts/restart_sector_dashboard.py \
+            --service "$PI_SERVICE_NAME" \
+            --url "http://127.0.0.1:8501/?ticker=XLK" \
+            --timeout-seconds 60
           REMOTE

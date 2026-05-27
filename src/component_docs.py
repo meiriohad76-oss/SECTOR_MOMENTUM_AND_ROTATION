@@ -69,7 +69,7 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         name="Data health",
         section="Decision surface",
         render_function="render_data_health",
-        data_inputs=("OHLCV metadata", "FRED macro snapshot", "compute timestamp", "provider-flow config"),
+        data_inputs=("OHLCV metadata", "FRED macro snapshot", "compute timestamp", "provider-flow runtime status"),
         states=("healthy", "warning", "stale", "manual refresh"),
         qa=("data health tests", "dashboard static tests"),
     ),

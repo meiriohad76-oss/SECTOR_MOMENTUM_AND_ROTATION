@@ -14,6 +14,7 @@ _REAL_FETCH_PRIMARY_FLOW_PAYLOAD = flow._fetch_primary_flow_payload
 
 @pytest.fixture(autouse=True)
 def neutral_primary_flow_provider(monkeypatch):
+    flow.reset_provider_flow_runtime_health()
     # Keep this suite hermetic even when the host environment enables live flow.
     monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", True)
 
@@ -69,6 +70,138 @@ def test_compute_flow_signals_excludes_index_tickers_and_uses_stub_values(
     assert out.loc["XLK", "dark_pool_pct"] == 0.40
     assert out.loc["XLK", "si_delta_15d"] == 0.0
     assert out.loc["XLK", "thirteen_f_q"] == 0.0
+
+
+def test_provider_flow_health_statuses_report_each_provider_without_secret_values(monkeypatch):
+    monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", False)
+    monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", False)
+    monkeypatch.setattr(flow, "FINRA_ATS_STUB_MODE", False)
+    monkeypatch.setattr(flow, "FINRA_SHORT_INTEREST_STUB_MODE", False)
+    monkeypatch.setattr(flow, "SEC_13F_STUB_MODE", False)
+    monkeypatch.setattr(
+        flow,
+        "_resolve_secret",
+        lambda name: {
+            "MASSIVE_API_KEY": "secret-massive-key",
+            "SEC_13F_DATA_URL": "https://example.test/sec.zip",
+        }.get(name),
+    )
+
+    statuses = flow.provider_flow_health_statuses()
+    by_id = {row["id"]: row for row in statuses}
+
+    assert list(by_id) == [
+        "ohlcv_derived",
+        "etf_primary_flow",
+        "massive_block_trades",
+        "finra_ats_dark_pool",
+        "finra_short_interest",
+        "sec_13f",
+    ]
+    assert by_id["ohlcv_derived"]["status"] == "healthy"
+    assert by_id["massive_block_trades"]["status"] == "healthy"
+    assert by_id["finra_ats_dark_pool"]["provider"] == "FINRA"
+    assert by_id["finra_short_interest"]["status"] == "healthy"
+    assert by_id["sec_13f"]["status"] == "warning"
+    assert by_id["sec_13f"]["mode"] == "missing SEC_USER_AGENT"
+    assert "secret-massive-key" not in str(statuses)
+
+
+def test_provider_flow_health_statuses_mark_stubbed_feeds_informational(monkeypatch):
+    monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", True)
+    monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", True)
+    monkeypatch.setattr(flow, "FINRA_ATS_STUB_MODE", True)
+    monkeypatch.setattr(flow, "FINRA_SHORT_INTEREST_STUB_MODE", True)
+    monkeypatch.setattr(flow, "SEC_13F_STUB_MODE", True)
+    monkeypatch.setattr(flow, "_resolve_secret", lambda name: None)
+
+    statuses = flow.provider_flow_health_statuses()
+
+    assert {row["status"] for row in statuses} == {"healthy", "info"}
+    assert sum(1 for row in statuses if row["status"] == "info") == 5
+    assert all("stub" in row["mode"] or row["id"] == "ohlcv_derived" for row in statuses)
+
+
+def test_provider_flow_feeds_stubbed_is_false_when_any_provider_lane_is_live(monkeypatch):
+    monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", True)
+    monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", False, raising=False)
+    monkeypatch.setattr(flow, "FINRA_ATS_STUB_MODE", True, raising=False)
+    monkeypatch.setattr(flow, "FINRA_SHORT_INTEREST_STUB_MODE", True, raising=False)
+    monkeypatch.setattr(flow, "SEC_13F_STUB_MODE", True, raising=False)
+
+    assert flow.provider_flow_feeds_stubbed() is False
+
+
+def test_provider_flow_health_statuses_include_last_live_provider_success(monkeypatch):
+    flow.reset_provider_flow_runtime_health()
+    monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", False, raising=False)
+    monkeypatch.setattr(flow, "_resolve_secret", lambda name: "secret" if name == "MASSIVE_API_KEY" else None)
+    monkeypatch.setattr(flow, "_provider_block_trade_upside_ratio", lambda ticker: 1.75)
+
+    assert flow.block_trade_upside_ratio("XLK") == pytest.approx(1.75)
+    by_id = {row["id"]: row for row in flow.provider_flow_health_statuses()}
+
+    assert by_id["massive_block_trades"]["status"] == "healthy"
+    assert by_id["massive_block_trades"]["mode"] == "live ok"
+    assert "last completed" in by_id["massive_block_trades"]["detail"]
+    assert "XLK" in by_id["massive_block_trades"]["detail"]
+    assert "secret" not in str(by_id["massive_block_trades"])
+
+
+def test_provider_flow_health_statuses_aggregate_mixed_provider_outcomes(monkeypatch):
+    flow.reset_provider_flow_runtime_health()
+    monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", False, raising=False)
+    monkeypatch.setattr(flow, "_resolve_secret", lambda name: "secret" if name == "MASSIVE_API_KEY" else None)
+
+    def fake_block_ratio(ticker):
+        if ticker == "XLK":
+            return 1.75
+        return None
+
+    monkeypatch.setattr(flow, "_provider_block_trade_upside_ratio", fake_block_ratio)
+
+    assert flow.block_trade_upside_ratio("XLK") == pytest.approx(1.75)
+    assert flow.block_trade_upside_ratio("XLF") == pytest.approx(1.0)
+    by_id = {row["id"]: row for row in flow.provider_flow_health_statuses()}
+
+    assert by_id["massive_block_trades"]["status"] == "warning"
+    assert by_id["massive_block_trades"]["mode"] == "1 live ok / 1 warning"
+    assert "across 2 tickers" in by_id["massive_block_trades"]["detail"]
+    assert "XLK" in by_id["massive_block_trades"]["detail"]
+    assert "XLF no provider data neutral" in by_id["massive_block_trades"]["detail"]
+
+
+def test_provider_flow_health_statuses_warn_on_last_live_provider_fallback(monkeypatch):
+    flow.reset_provider_flow_runtime_health()
+    monkeypatch.setattr(flow, "FINRA_ATS_STUB_MODE", False, raising=False)
+
+    def fail_fetch(ticker):
+        raise flow.requests.Timeout("provider timed out")
+
+    monkeypatch.setattr(flow, "_provider_dark_pool_pct", fail_fetch)
+
+    assert flow.dark_pool_pct("XLF") == pytest.approx(0.40)
+    by_id = {row["id"]: row for row in flow.provider_flow_health_statuses()}
+
+    assert by_id["finra_ats_dark_pool"]["status"] == "warning"
+    assert by_id["finra_ats_dark_pool"]["mode"] == "request error neutral"
+    assert "Timeout" in by_id["finra_ats_dark_pool"]["detail"]
+    assert "provider timed out" not in by_id["finra_ats_dark_pool"]["detail"]
+
+
+def test_provider_flow_health_statuses_warn_on_missing_ticker_source(monkeypatch):
+    flow.reset_provider_flow_runtime_health()
+    monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", False)
+    monkeypatch.setattr(flow, "_resolve_secret", lambda name: "secret" if name == "MASSIVE_API_KEY" else None)
+    monkeypatch.setattr(flow, "_primary_flow_source_url", lambda ticker: None)
+    monkeypatch.setattr(flow, "_fetch_primary_flow_payload", _REAL_FETCH_PRIMARY_FLOW_PAYLOAD)
+
+    assert flow.etf_primary_flow_5d_pct("XLV") == 0.0
+    by_id = {row["id"]: row for row in flow.provider_flow_health_statuses()}
+
+    assert by_id["etf_primary_flow"]["status"] == "warning"
+    assert by_id["etf_primary_flow"]["mode"] == "missing ticker source"
+    assert "XLV" in by_id["etf_primary_flow"]["detail"]
 
 
 def test_compute_flow_signals_blocks_unexpected_primary_flow_fetch(

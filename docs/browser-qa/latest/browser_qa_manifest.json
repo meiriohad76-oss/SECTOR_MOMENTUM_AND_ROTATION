@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-26T20:27:19Z",
+  "generated_at": "2026-05-27T03:20:35Z",
   "qa_mode": "browser-qa-secret-free",
   "results": [
     {
@@ -69,7 +69,7 @@
       "actions": [],
       "ok": true,
       "notes": [
-        "focused text: US SECTOR RELATIVE STRENGTH visible=true top=429 height=17 scrollTop=6486",
+        "focused text: US SECTOR RELATIVE STRENGTH visible=true top=429 height=17 scrollTop=6956",
         "nonblank screenshot"
       ]
     },
@@ -88,7 +88,7 @@
       "actions": [],
       "ok": true,
       "notes": [
-        "focused text: COMPARE TICKERS visible=true top=418 height=22 scrollTop=9104",
+        "focused text: COMPARE TICKERS visible=true top=418 height=22 scrollTop=9574",
         "nonblank screenshot"
       ]
     },
@@ -111,7 +111,7 @@
       ],
       "ok": true,
       "notes": [
-        "focused text: Recent transitions visible=true top=418 height=22 scrollTop=3811",
+        "focused text: Recent transitions visible=true top=418 height=22 scrollTop=4281",
         "visible selector: .alert-row.pulse-transition",
         "nonblank screenshot"
       ]
@@ -187,7 +187,7 @@
       ],
       "ok": true,
       "notes": [
-        "focused text: FULL 7 visible=true top=418 height=26 scrollTop=13037",
+        "focused text: FULL 7 visible=true top=418 height=26 scrollTop=13503",
         "hovered first full-table row",
         "visible selector: .full-table tbody tr:first-child .row-preview",
         "nonblank screenshot"
@@ -212,7 +212,7 @@
       "actions": [],
       "ok": true,
       "notes": [
-        "focused text: Risk regime visible=true top=669 height=45 scrollTop=0",
+        "focused text: Risk regime visible=true top=418 height=22 scrollTop=2070",
         "nonblank screenshot"
       ]
     },

@@ -44,7 +44,7 @@ from src.custom_universe import (
 from src.data_health import dashboard_health_summary, data_health_rows
 from src.data import fetch_ohlcv_result, _select_ohlcv_provider
 from src.evidence_gates import evaluate_promotion_gate, promotion_gate_decisions_frame
-from src.flow import compute_flow_signals, flow_composite_z, STUB_MODE
+from src.flow import compute_flow_signals, flow_composite_z, provider_flow_feeds_stubbed, provider_flow_health_statuses
 from src.indicators import compute_all_indicators
 from src.macro import assess_regime
 from src.macro_tiles import MACRO_CONTEXT_SYMBOLS, fred_macro_snapshot, fred_macro_tile_groups, macro_tile_rows, session_range_tile
@@ -537,10 +537,16 @@ def _mark_data_refresh_completed(ohlcv_result_obj) -> None:
     if not requested_at or st.session_state.get("data_refresh_completed_request_at") == requested_at:
         return
     completed_at = datetime.now(timezone.utc).isoformat()
+    lane_id = str(st.session_state.get("data_refresh_lane") or "all")
     st.session_state.data_refresh_completed_request_at = requested_at
     st.session_state.data_refresh_completed_at = completed_at
+    completed_by_lane = dict(st.session_state.get("data_refresh_completed_by_lane", {}) or {})
+    lane_ids = ("market_ohlcv", "fred_macro", "dashboard_compute", "provider_flow") if lane_id == "all" else (lane_id,)
+    for completed_lane in lane_ids:
+        completed_by_lane[str(completed_lane)] = completed_at
+    st.session_state.data_refresh_completed_by_lane = completed_by_lane
     log_event(APP_LOGGER, "data_lane_refresh_completed",
-        lane_id=st.session_state.get("data_refresh_lane"),
+        lane_id=lane_id,
         requested_at=requested_at,
         completed_at=completed_at,
         provider=getattr(ohlcv_result_obj, "provider", "unknown"),
@@ -551,6 +557,21 @@ def _mark_data_refresh_completed(ohlcv_result_obj) -> None:
         provider_warning_count=len(getattr(ohlcv_result_obj, "warnings", ()) or ()),
         cache_refresh_forced=bool(getattr(ohlcv_result_obj, "cache_refresh_forced", False)),
     )
+
+
+def _lane_completed_text(lane_id: str) -> str:
+    completed_by_lane = st.session_state.get("data_refresh_completed_by_lane", {}) or {}
+    completed_at = completed_by_lane.get(lane_id)
+    if not completed_at:
+        return "not refreshed yet"
+    try:
+        parsed = pd.Timestamp(completed_at)
+        if parsed.tzinfo is None:
+            parsed = parsed.tz_localize("UTC")
+        parsed = parsed.tz_convert("UTC")
+        return f"completed {parsed.strftime('%Y-%m-%d %H:%M UTC')}"
+    except Exception:
+        return f"completed {completed_at}"
 
 
 def _apply_control_bridge_actions() -> None:
@@ -1421,14 +1442,36 @@ def render_bluf():
     _md(head_html + "".join(cards) + "</div></div></section>")
 
 
+def _provider_status_list_html(providers) -> str:
+    rows = []
+    for provider in providers or []:
+        if not isinstance(provider, dict):
+            continue
+        status = _esc(str(provider.get("status", "info")))
+        label = _esc(str(provider.get("label", "Provider")))
+        mode = _esc(str(provider.get("mode", provider.get("status", "unknown"))))
+        source = _esc(str(provider.get("provider", "")))
+        signal = _esc(str(provider.get("signal", "")))
+        meta = " · ".join(part for part in (source, signal) if part)
+        rows.append(
+            f'<li class="{status}"><b>{label}</b><span>{mode}</span>'
+            f'<small>{meta}</small></li>'
+        )
+    if not rows:
+        return ""
+    return '<ul class="data-health-provider-list">' + "".join(rows) + "</ul>"
+
+
 def render_data_health():
+    provider_statuses = provider_flow_health_statuses()
     rows = data_health_rows(
         ohlcv=ohlcv,
         expected_symbols=DATA_SYMBOLS,
         ohlcv_result=ohlcv_result,
         fred_data=_fred_data,
         compute_created_at=dashboard_compute_created_at,
-        provider_flow_stubbed=bool(STUB_MODE),
+        provider_flow_stubbed=provider_flow_feeds_stubbed(provider_statuses),
+        provider_flow_statuses=provider_statuses,
     )
     summary = dashboard_health_summary(rows)
     requested_at = st.session_state.get("data_refresh_requested_at")
@@ -1454,6 +1497,7 @@ def render_data_health():
           <div class="data-health-main">{_esc(str(row.get('freshness', '-')))}</div>
           <div class="data-health-sub">{_esc(subline)}</div>
           <div class="data-health-role">{_esc(str(row.get('role', '')))}</div>
+          {_provider_status_list_html(row.get('providers', []))}
           <p>{_esc(str(row.get('detail', '')))}</p>
         </div>
         """
@@ -1478,10 +1522,12 @@ def render_data_health():
         with refresh_cols[idx]:
             refresh_label = str(row.get("refresh_label", "Refresh lane"))
             refresh_key = str(row.get("refresh_key", f"data_health_refresh_{idx}"))
+            lane_id = str(row.get("lane_id"))
             st.button(refresh_label, key=refresh_key, on_click=_refresh_data_lane, args=(str(row.get("lane_id")),), width="stretch")
             _md(
                 f'<div class="lane-refresh-caption">{_esc(str(row.get("severity_symbol", "")))} · '
-                f'{_esc(str(row.get("freshness", "-")))} · {_esc(str(row.get("sla", "")))}</div>'
+                f'{_esc(str(row.get("freshness", "-")))} · {_esc(str(row.get("sla", "")))} · '
+                f'{_esc(_lane_completed_text(lane_id))}</div>'
             )
     _md("</div>")
     if st.button("Refresh all lanes", key="data_health_refresh_all_button", on_click=_refresh_loaded_data, width="stretch"):
@@ -1931,7 +1977,6 @@ def render_comparison_view():
     _md('<div class="comparison-selector-slot"></div>')
     st.multiselect("COMPARE TICKERS",
         options,
-        default=[ticker for ticker in st.session_state.comparison_tickers if ticker in options][:4],
         max_selections=4,
         key="comparison_tickers",
     )
@@ -3177,9 +3222,10 @@ def render_debrief_lab():
 
 
 def render_footer():
+    flow_stub_label = "ON" if provider_flow_feeds_stubbed() else "OFF"
     html = f"""
     <div class="footer">
-      <span>{len(scored)} INSTRUMENTS · 7 PILLARS · STUB MODE {'ON' if STUB_MODE else 'OFF'} · CACHE TTL 60min</span>
+      <span>{len(scored)} INSTRUMENTS · 7 PILLARS · FLOW FEEDS STUBBED {flow_stub_label} · CACHE TTL 60min</span>
       <span>{APP_VERSION} · {st.session_state.theme.upper()} · MEIRI / READ-ONLY</span>
     </div>
     </div>
