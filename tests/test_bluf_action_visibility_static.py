@@ -25,7 +25,8 @@ def test_bluf_full_mode_exposes_complete_action_lists_with_selectors():
     assert "action-count" in render_bluf
     assert 'display_items = a["tickers"][:3]' in render_bluf
     assert "more_count =" in render_bluf
-    assert "more items available in selector" in render_bluf
+    assert "remaining_tickers =" in render_bluf
+    assert "more_tickers_text" in render_bluf
     assert "_render_drill_selector(" in render_bluf
     assert 'f"bluf_{a[\'kind\']}_drill"' in render_bluf
     assert 'f"DRILL-DOWN FROM {a[\'label\']}"' in render_bluf
