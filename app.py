@@ -1533,6 +1533,156 @@ def render_bluf():
             )
 
 
+def _gate_class(passed: bool | None) -> str:
+    if passed is True:
+        return "trigger-pass"
+    if passed is False:
+        return "trigger-fail"
+    return "trigger-neutral"
+
+
+def _gate_label(passed: bool | None) -> str:
+    if passed is True:
+        return "PASS"
+    if passed is False:
+        return "FAIL"
+    return "N/A"
+
+
+def _gate_row(label: str, actual: str, rule: str, passed: bool | None, meaning: str) -> str:
+    tone = _gate_class(passed)
+    return (
+        f"<tr class=\"{tone}\">"
+        f"<td><b>{_esc(label)}</b><span>{_esc(meaning)}</span></td>"
+        f"<td>{_esc(actual)}</td>"
+        f"<td>{_esc(rule)}</td>"
+        f"<td><span class=\"trigger-badge\">{_gate_label(passed)}</span></td>"
+        "</tr>"
+    )
+
+
+def _forecast_horizon_for_state(state: str) -> str:
+    return {
+        "STAGE_2_BULLISH": "4-26 weeks: trend/Stage 2 call, with flow confirmation over 1-3 weeks.",
+        "HOLD": "4-13 weeks: trend still acceptable, but not a full fresh-buy setup.",
+        "WARNING": "2-6 weeks: rising pullback or breakdown risk.",
+        "EXIT": "4-13 weeks: elevated underperformance or drawdown risk.",
+        "BEARISH_STAGE_4": "10-22 weeks: decline/underperformance can persist until a new base forms.",
+        "STAGE_1_BASING": "4-13 weeks: setup watch window; wait for Stage 2 confirmation.",
+    }.get(state, "No calibrated horizon available for this state.")
+
+
+def _ticker_report_html(ticker: str, row) -> str:
+    state = str(row.get("state") or "UNKNOWN")
+    state_label = state.replace("_", " ")
+    class_name = str(row.get("class") or "UNKNOWN")
+    forecast = _forecast_horizon_for_state(state)
+    verdict = _state_tip_for_row(ticker, row)
+
+    s_score = _display_value(row.get("S_score"), signed=True, decimals=2)
+    f_score = _display_value(row.get("F_score"), signed=True, decimals=2)
+    mom = _display_value(row.get("mom_12_1"), signed=True, pct=True, decimals=1)
+    stage = _display_value(row.get("stage"), decimals=0)
+    faber = _display_value(row.get("faber"), decimals=0)
+    antonacci = _display_value(row.get("antonacci"), decimals=0)
+    rrg = str(row.get("rrg_quadrant") or "n/a")
+    rs_ratio = _display_value(row.get("rs_ratio"), decimals=1)
+    rs_momentum = _display_value(row.get("rs_momentum"), decimals=1)
+    breadth = _display_value(row.get("breadth_50d"), pct=True, decimals=0)
+    cmf = _display_value(row.get("cmf21"), signed=True, decimals=2)
+    etf_flow = _display_value(row.get("etf_flow_5d_pct"), signed=True, pct=True, decimals=2)
+    block_ratio = _display_value(row.get("block_up_ratio"), decimals=2)
+    cycle_tilt_value = _display_value(row.get("cycle_tilt"), signed=True, decimals=2)
+    mansfield = _display_value(row.get("mansfield_rs"), signed=True, decimals=2)
+    rank = row.get("rank_in_class")
+    rank_text = "n/a" if rank is None or pd.isna(rank) else str(int(rank))
+    selected_text = "selected" if bool(row.get("selected")) else "not selected"
+    veto_text = "flow veto active" if bool(row.get("veto")) else "no flow veto"
+
+    stage_value = row.get("stage")
+    rrg_value = str(row.get("rrg_quadrant") or "")
+    breadth_value = row.get("breadth_50d")
+    cmf_value = row.get("cmf21")
+    flow_value = row.get("F_score")
+    etf_flow_value = row.get("etf_flow_5d_pct")
+    mansfield_value = row.get("mansfield_rs")
+    above_30wma_value = row.get("above_30wma")
+    slope_value = row.get("ma_slope_pos")
+    antonacci_value = row.get("antonacci")
+    block_value = row.get("block_up_ratio")
+
+    buy_rows = [
+        _gate_row("Weinstein trend", f"Stage={stage}; above 30wMA={_display_value(above_30wma_value)}; slope up={_display_value(slope_value)}", "Stage = 2, price above 30wMA, MA slope up", stage_value == 2 and above_30wma_value is not False and slope_value is not False, "The main trend should be advancing."),
+        _gate_row("Relative strength", f"Mansfield RS={mansfield}", "Mansfield RS > 0", None if mansfield_value is None or pd.isna(mansfield_value) else mansfield_value > 0, "The ticker should beat its benchmark."),
+        _gate_row("RRG rotation", f"RRG={rrg}; RS Ratio={rs_ratio}; RS Momentum={rs_momentum}", "RRG quadrant = Leading", rrg_value == "Leading", "Leadership should be visible in relative rotation."),
+        _gate_row("Breadth confirmation", f"Breadth={breadth}", "Breadth >= 60%", None if breadth_value is None or pd.isna(breadth_value) else breadth_value >= 0.60, "More constituents should participate in the move."),
+        _gate_row("Money flow", f"CMF={cmf}; Flow={f_score}; ETF 5d flow={etf_flow}", "CMF > +0.05 and ETF flow >= 0", None if cmf_value is None or pd.isna(cmf_value) else cmf_value > 0.05 and (etf_flow_value is None or pd.isna(etf_flow_value) or etf_flow_value >= 0), "Accumulation should support the price trend."),
+        _gate_row("Hard veto", veto_text, "F-score must stay above -0.5 sigma", not bool(row.get("veto")), "A flow veto blocks an otherwise strong setup."),
+    ]
+
+    risk_rows = [
+        _gate_row("Trend break", f"above 30wMA={_display_value(above_30wma_value)}", "Healthy while price remains above 30wMA", None if above_30wma_value is None or pd.isna(above_30wma_value) else above_30wma_value is not False, "A weekly trend break weakens the Stage 2 thesis."),
+        _gate_row("Relative strength break", f"Mansfield RS={mansfield}", "Healthy while Mansfield RS >= 0", None if mansfield_value is None or pd.isna(mansfield_value) else mansfield_value >= 0, "Underperformance can precede price damage."),
+        _gate_row("Rotation breakdown", f"RRG={rrg}", "Healthy while RRG is not Lagging", None if not rrg_value else rrg_value != "Lagging", "Lagging rotation means relative momentum has broken."),
+        _gate_row("Distribution", f"CMF={cmf}; block up ratio={block_ratio}", "Healthy while CMF >= -0.10 and block ratio >= 0.70", not ((cmf_value is not None and not pd.isna(cmf_value) and cmf_value < -0.10) or (block_value is not None and not pd.isna(block_value) and block_value < 0.70)), "Negative volume pressure can invalidate the setup."),
+        _gate_row("Absolute momentum", f"Antonacci={antonacci}", "Healthy while Antonacci != 0", None if antonacci_value is None or pd.isna(antonacci_value) else antonacci_value != 0, "The ticker should beat cash/T-bills on the lookback."),
+    ]
+
+    pillar_rows = [
+        _gate_row("1. Momentum", f"MOM 12-1={mom}; S={s_score}", "Positive and preferably top-ranked", (row.get("mom_12_1") or 0) > 0, "Classic winners tend to keep leading over 3-12 months."),
+        _gate_row("2. Trend filters", f"Faber={faber}; Stage={stage}; Antonacci={antonacci}", "Faber=1, Stage=2, Antonacci=1", row.get("faber") == 1 and stage_value == 2 and antonacci_value == 1, "Trend filters keep the system aligned with major uptrends."),
+        _gate_row("3. Weinstein Stage", f"Stage={stage}; Mansfield={mansfield}", "Stage 2 with RS > 0", stage_value == 2 and (mansfield_value is not None and not pd.isna(mansfield_value) and mansfield_value > 0), "Stage 2 is the advance phase."),
+        _gate_row("4. Dual momentum", f"MOM={mom}; Antonacci={antonacci}", "Relative and absolute momentum both positive", (row.get("mom_12_1") or 0) > 0 and antonacci_value == 1, "The ticker should beat peers and cash."),
+        _gate_row("5. RRG rotation", f"RRG={rrg}; ratio={rs_ratio}; momentum={rs_momentum}", "Leading or Improving preferred", rrg_value in {"Leading", "Improving"}, "Rotation shows where leadership is moving."),
+        _gate_row("6. Business cycle", f"Cycle tilt={cycle_tilt_value}", "Positive is supportive", (row.get("cycle_tilt") or 0) > 0, "Macro phase can add or subtract sector tailwind."),
+        _gate_row("7. Institutional flow", f"F={f_score}; CMF={cmf}; ETF flow={etf_flow}; block ratio={block_ratio}", "F > 0 and no veto preferred", (flow_value is not None and not pd.isna(flow_value) and flow_value > 0) and not bool(row.get("veto")), "Flow confirms whether real money supports the signal."),
+    ]
+
+    state_color = _state_color_var(state)
+    return f"""
+    <section class="section ticker-report" id="ticker-report">
+      <div class="section-head">
+        <h2>Complete ticker report <span class="count">{_esc(ticker)} · {_esc(class_name)}</span></h2>
+        <div class="right">Forecast horizon · {_esc(forecast)}</div>
+      </div>
+      <div class="ticker-report-grid">
+        <div class="ticker-report-verdict">
+          <div class="report-kicker">Plain-English verdict</div>
+          <h3 style="color:{state_color};">{_esc(state_label)}</h3>
+          <p>{_esc(verdict)}</p>
+          <div class="report-facts">
+            <span>S {s_score}</span>
+            <span>F {f_score}</span>
+            <span>Rank {rank_text}</span>
+            <span>{_esc(selected_text)}</span>
+          </div>
+        </div>
+        <div class="ticker-report-watch">
+          <div class="report-kicker">What would change the call</div>
+          <p><b>For bullish calls:</b> watch for a weekly close below the 30-week average, Mansfield RS falling below zero, RRG slipping into Lagging, CMF moving below -0.10, or a flow veto.</p>
+          <p><b>For warnings/exits:</b> the call improves when price reclaims the 30-week average, breadth recovers, RRG rotates back toward Improving/Leading, and flow turns positive.</p>
+        </div>
+      </div>
+      <div class="ticker-report-grid report-tables">
+        <div>
+          <h3>Trigger checklist</h3>
+          <div class="report-kicker">Stage 2 buy gates</div>
+          <table class="ticker-report-table"><tbody>{"".join(buy_rows)}</tbody></table>
+        </div>
+        <div>
+          <h3>Risk / exit triggers</h3>
+          <div class="report-kicker">Invalidation watch</div>
+          <table class="ticker-report-table"><tbody>{"".join(risk_rows)}</tbody></table>
+        </div>
+      </div>
+      <div class="ticker-report-matrix">
+        <h3>7-pillar methodology matrix</h3>
+        <table class="ticker-report-table"><tbody>{"".join(pillar_rows)}</tbody></table>
+      </div>
+    </section>
+    """
+
+
 def _provider_status_list_html(providers) -> str:
     rows = []
     for provider in providers or []:
@@ -2035,6 +2185,7 @@ def render_drill():
     </section>
     """
     _md(head_html)
+    _md(_ticker_report_html(sel, row))
 
     # Charts
     c1, c2 = st.columns(2)
