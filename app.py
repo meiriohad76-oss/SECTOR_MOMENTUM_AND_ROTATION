@@ -1025,7 +1025,12 @@ DRILL_SELECTOR_PLACEHOLDER = "__choose_drill_ticker__"
 
 
 def _go_to_drill(ticker: str) -> None:
-    if select_drill_ticker(st.session_state, st.query_params, ticker, AVAILABLE_TICKERS):
+    changed = select_drill_ticker(st.session_state, st.query_params, ticker, AVAILABLE_TICKERS)
+    selected_ticker = str(st.session_state.get("drill_ticker", "")).upper()
+    if selected_ticker:
+        st.session_state["drill_focus_ticker"] = selected_ticker
+        st.query_params["focus"] = "drill"
+    if changed:
         st.rerun()
 
 
@@ -1076,6 +1081,16 @@ def _render_drill_selector(prefix: str, tickers: list[str], label: str) -> None:
         on_change=_go_to_selected_drill,
         args=(key,),
     )
+    focus_ticker = str(st.session_state.get("drill_focus_ticker", "")).upper()
+    if focus_ticker in drill_tickers:
+        _md(
+            f"""
+            <div class="drill-selection-confirm">
+              Selected <b>{_esc(focus_ticker)}</b>.
+              <a href="#drill">Open complete report</a>
+            </div>
+            """
+        )
 
 
 def _macro_tile_html(row: dict[str, object], extra_class: str = "") -> str:

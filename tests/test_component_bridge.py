@@ -21,6 +21,7 @@ def test_drill_click_bridge_preserves_query_params_and_sets_ticker():
     assert "data-drill-ticker" in html
     assert "new URL(parentWindow.location.href)" in html
     assert "url.searchParams.set('ticker', ticker)" in html
+    assert "url.hash = 'drill'" in html
     assert "parentWindow.location.assign(url.toString())" in html
     assert "keydown" in html
     assert "Enter" in html

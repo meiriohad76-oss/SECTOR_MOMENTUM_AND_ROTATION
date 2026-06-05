@@ -80,6 +80,7 @@ def drill_click_bridge_html() -> str:
     }
     const url = new URL(parentWindow.location.href);
     url.searchParams.set('ticker', ticker);
+    url.hash = 'drill';
     parentWindow.location.assign(url.toString());
   }
 

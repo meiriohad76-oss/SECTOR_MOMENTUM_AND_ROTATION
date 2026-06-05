@@ -1541,6 +1541,23 @@ html.density-compact .pick-spark {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+.drill-selection-confirm {
+  margin: -10px 0 16px;
+  font-family: var(--font-prose);
+  font-size: 0.86rem;
+  color: var(--fg-dim);
+}
+.drill-selection-confirm b {
+  color: var(--fg);
+}
+.drill-selection-confirm a {
+  color: var(--green);
+  font-weight: 700;
+  text-decoration: none;
+}
+.drill-selection-confirm a:hover {
+  text-decoration: underline;
+}
 div[data-testid="stButton"] > button {
   min-height: 40px;
   color: var(--fg);

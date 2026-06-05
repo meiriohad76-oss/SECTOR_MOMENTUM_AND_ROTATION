@@ -31,6 +31,22 @@ def test_dashboard_review_replaces_repeated_drill_buttons_with_selectors():
     assert "if selected and selected != st.session_state.drill_ticker:" not in selector_block
 
 
+def test_drill_selectors_confirm_selection_and_offer_report_jump():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    selector_block = app_source[
+        app_source.index("def _render_drill_selector(") : app_source.index("def _macro_tile_html(")
+    ]
+    go_to_block = app_source[
+        app_source.index("def _go_to_drill(") : app_source.index("def _go_to_selected_drill(")
+    ]
+
+    assert 'st.session_state["drill_focus_ticker"] = selected_ticker' in go_to_block
+    assert 'st.query_params["focus"] = "drill"' in go_to_block
+    assert "drill-selection-confirm" in selector_block
+    assert 'href="#drill"' in selector_block
+    assert "Open complete report" in selector_block
+
+
 def test_dashboard_review_transitions_have_directional_badges():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
