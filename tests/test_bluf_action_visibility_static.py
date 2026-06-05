@@ -33,4 +33,16 @@ def test_bluf_action_list_scrolls_instead_of_hiding_extra_tickers():
 
     assert ".action-count" in css
     assert "max-height: 260px;" in css
-    assert "overflow-y: auto;" in css
+    assert "overflow-y: auto !important;" in css
+
+
+def test_tooltip_overflow_reset_does_not_disable_bluf_action_scroll():
+    css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
+    overflow_reset = css[
+        css.index("/* ---------- Tooltip clipping fix ---------- */") : css.index(
+            "/* Streamlit container resets"
+        )
+    ]
+
+    assert ".action-list," not in overflow_reset
+    assert ".action-list {" in css
