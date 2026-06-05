@@ -543,6 +543,13 @@ div[data-testid="stTextArea"] label span {
 .action-card.warn .action-label { color: var(--st-warn); }
 .action-card.buy  .action-label { color: var(--st-stage2); }
 
+.action-count {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--fg);
+}
+
 .action-eta {
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -558,6 +565,9 @@ div[data-testid="stTextArea"] label span {
   margin: 0;
   padding: 0;
   list-style: none;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 .action-list li {
   display: grid;

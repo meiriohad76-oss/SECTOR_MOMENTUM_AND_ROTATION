@@ -900,7 +900,7 @@ def _build_bluf(scored_df: pd.DataFrame):
     def _pack(sub_df, note_fn, kind, label, eta, state):
         items = []
         sub_sorted = sub_df.sort_values("S_score", ascending=(kind == "exit"))
-        for tkr, r in sub_sorted.head(4).iterrows():
+        for tkr, r in sub_sorted.iterrows():
             items.append({"t": tkr, "note": note_fn(r)})
         return {
             "kind": kind, "label": label, "eta": eta, "state": state, "tickers": items
@@ -1430,6 +1430,7 @@ def render_bluf():
     cards = []
     for a in bluf["actions"]:
         first_ticker = next((it["t"] for it in a["tickers"] if it.get("t")), "")
+        action_count = len(a["tickers"])
         items_html = "".join(
             f'<li {drill_bridge_attrs(it["t"], label=it["note"])}><span class="t">{it["t"]}</span><span class="n">{it["note"]}</span></li>'
             for it in a["tickers"]
@@ -1441,11 +1442,20 @@ def render_bluf():
             <div class="action-eta">{a['eta']}</div>
           </div>
           <span class="pill {a['state']}" data-tip="{_esc(STATE_TIPS.get(a['state'], ""))}">{a['state'].replace('_', ' ')}</span>
+          <div class="action-count">{action_count} ticker{'s' if action_count != 1 else ''} in this list</div>
           <ul class="action-list">{items_html}</ul>
         </div>
         """
         cards.append(card_html)
     _md(head_html + "".join(cards) + "</div></div></section>")
+    selector_cols = st.columns(3)
+    for col, a in zip(selector_cols, bluf["actions"]):
+        with col:
+            _render_drill_selector(
+                f"bluf_{a['kind']}_drill",
+                [it["t"] for it in a["tickers"]],
+                f"DRILL-DOWN FROM {a['label']}",
+            )
 
 
 def _provider_status_list_html(providers) -> str:
