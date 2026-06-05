@@ -1552,18 +1552,26 @@ def render_bluf():
             )
 
 
+def _normalize_gate_passed(passed: bool | None) -> bool | None:
+    if passed is None or pd.isna(passed):
+        return None
+    return bool(passed)
+
+
 def _gate_class(passed: bool | None) -> str:
-    if passed is True:
+    normalized = _normalize_gate_passed(passed)
+    if normalized is True:
         return "trigger-pass"
-    if passed is False:
+    if normalized is False:
         return "trigger-fail"
     return "trigger-neutral"
 
 
 def _gate_label(passed: bool | None) -> str:
-    if passed is True:
+    normalized = _normalize_gate_passed(passed)
+    if normalized is True:
         return "PASS"
-    if passed is False:
+    if normalized is False:
         return "FAIL"
     return "N/A"
 

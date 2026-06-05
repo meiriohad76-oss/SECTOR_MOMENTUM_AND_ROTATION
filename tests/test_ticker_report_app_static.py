@@ -33,6 +33,19 @@ def test_ticker_report_contains_verdict_triggers_pillars_and_invalidation():
     assert "Risk / exit triggers" in report_helper
 
 
+def test_ticker_report_gate_helpers_normalize_pandas_boolean_results():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    helper_block = app_source[
+        app_source.index("def _normalize_gate_passed(") : app_source.index("def _ticker_report_html(")
+    ]
+
+    assert "def _normalize_gate_passed(" in helper_block
+    assert "return bool(passed)" in helper_block
+    assert "_normalize_gate_passed(passed)" in helper_block
+    assert "passed is True" not in helper_block
+    assert "passed is False" not in helper_block
+
+
 def test_ticker_report_uses_actual_indicator_values():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
     report_helper = app_source[
