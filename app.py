@@ -1521,16 +1521,10 @@ def render_bluf():
     for a in bluf["actions"]:
         first_ticker = next((it["t"] for it in a["tickers"] if it.get("t")), "")
         action_count = len(a["tickers"])
-        display_items = a["tickers"][:3]
-        more_count = max(0, action_count - len(display_items))
-        remaining_tickers = [it["t"] for it in a["tickers"][len(display_items):] if it.get("t")]
-        more_tickers_text = ", ".join(remaining_tickers)
         items_html = "".join(
             f'<li {drill_bridge_attrs(it["t"], label=it["note"])}><span class="t">{it["t"]}</span><span class="n">{it["note"]}</span></li>'
-            for it in display_items
+            for it in a["tickers"]
         ) or '<li><span class="t">—</span><span class="n">none</span></li>'
-        if more_count:
-            items_html += f'<li class="action-more"><span class="t">+{more_count}</span><span class="n">{_esc(more_tickers_text)} · choose below for full report</span></li>'
         card_html = f"""
         <div class="action-card {a['kind']}" {drill_bridge_attrs(first_ticker, label=a['label'])}>
           <div class="action-head">
