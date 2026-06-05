@@ -565,7 +565,7 @@ div[data-testid="stTextArea"] label span {
   margin: 0;
   padding: 0;
   list-style: none;
-  max-height: 260px;
+  max-height: 148px;
   overflow-y: auto !important;
   overflow-x: hidden !important;
   padding-right: 4px;
@@ -591,6 +591,10 @@ div[data-testid="stTextArea"] label span {
   font-size: 0.74rem;
   color: var(--muted);
   line-height: 1.4;
+}
+.action-list .action-more .t,
+.action-list .action-more .n {
+  color: var(--fg-dim);
 }
 
 /* ---------- Status row ---------- */

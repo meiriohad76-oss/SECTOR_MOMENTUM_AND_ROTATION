@@ -23,6 +23,9 @@ def test_bluf_full_mode_exposes_complete_action_lists_with_selectors():
     ]
 
     assert "action-count" in render_bluf
+    assert 'display_items = a["tickers"][:3]' in render_bluf
+    assert "more_count =" in render_bluf
+    assert "more items available in selector" in render_bluf
     assert "_render_drill_selector(" in render_bluf
     assert 'f"bluf_{a[\'kind\']}_drill"' in render_bluf
     assert 'f"DRILL-DOWN FROM {a[\'label\']}"' in render_bluf
@@ -32,7 +35,7 @@ def test_bluf_action_list_scrolls_instead_of_hiding_extra_tickers():
     css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
 
     assert ".action-count" in css
-    assert "max-height: 260px;" in css
+    assert "max-height: 148px;" in css
     assert "overflow-y: auto !important;" in css
 
 
