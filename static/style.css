@@ -1882,10 +1882,10 @@ div[class*="st-key-comparison_tickers"] [data-testid="stWidgetLabel"] p {
   padding: 10px 12px;
   border-radius: 6px;
   font-family: var(--font-prose);
-  font-size: 0.78rem;
+  font-size: 0.88rem;
   line-height: 1.5;
   width: max-content;
-  max-width: 320px;
+  max-width: 460px;
   white-space: normal;
   pointer-events: none;
   opacity: 0;

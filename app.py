@@ -300,6 +300,81 @@ def _esc(s: str) -> str:
     return (s.replace('&', '&amp;').replace('"', '&quot;')
              .replace('<', '&lt;').replace('>', '&gt;'))
 
+
+def _display_value(value, *, signed: bool = False, pct: bool = False, decimals: int = 2) -> str:
+    if value is None or pd.isna(value):
+        return "n/a"
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, (int, float)):
+        number = float(value)
+        if pct:
+            number *= 100
+            return f"{number:+.{decimals}f}%" if signed else f"{number:.{decimals}f}%"
+        return f"{number:+.{decimals}f}" if signed else f"{number:.{decimals}f}"
+    return str(value)
+
+
+def _state_tip_for_row(ticker: str, row) -> str:
+    state = str(row.get("state") or "UNKNOWN")
+    stage = _display_value(row.get("stage"), decimals=0)
+    rrg = str(row.get("rrg_quadrant") or "n/a")
+    breadth = _display_value(row.get("breadth_50d"), pct=True, decimals=0)
+    cmf = _display_value(row.get("cmf21"), signed=True, decimals=2)
+    flow = _display_value(row.get("F_score"), signed=True, decimals=2)
+    etf_flow = _display_value(row.get("etf_flow_5d_pct"), pct=True, signed=True, decimals=2)
+    momentum = _display_value(row.get("mom_12_1"), pct=True, signed=True, decimals=1)
+    composite = _display_value(row.get("S_score"), signed=True, decimals=2)
+    above_30wma = _display_value(row.get("above_30wma"))
+    slope_up = _display_value(row.get("ma_slope_pos"))
+    mansfield = _display_value(row.get("mansfield_rs"), signed=True, decimals=2)
+
+    readings = (
+        f"Actual readings: Stage={stage}; S={composite}; Flow={flow}; MOM={momentum}; "
+        f"RRG={rrg}; Breadth={breadth}; CMF={cmf}; ETF 5d flow={etf_flow}; "
+        f"price above 30wMA={above_30wma}; MA slope up={slope_up}; Mansfield RS={mansfield}."
+    )
+
+    if state == "STAGE_2_BULLISH":
+        return (
+            f"Why bullish Stage 2 now: {ticker} is in an advancing trend and the confirmation gates agree. "
+            "In simple terms, price trend, relative strength, sector rotation, market breadth, and money flow are all pointing the same way. "
+            f"{readings} "
+            "What it means: the dashboard expects relative outperformance over roughly 4-26 weeks. "
+            "It is a decision-support buy/accumulate signal, not a guarantee and not necessarily an immediate next-day move."
+        )
+
+    if state == "HOLD":
+        return (
+            f"Why hold: {ticker} still has an acceptable trend, but one or more strict buy gates are not strong enough for a fresh buy. "
+            f"{readings} "
+            "What it means: existing exposure can be monitored, but the dashboard is not calling this a top new entry."
+        )
+
+    if state == "WARNING":
+        return (
+            f"Why warning: {ticker} is showing early deterioration. "
+            "Common drivers are weakening rotation, softer breadth, negative CMF, or distribution pressure. "
+            f"{readings} "
+            "What it means: tighten risk controls and avoid adding until the weak signals improve."
+        )
+
+    if state in {"EXIT", "BEARISH_STAGE_4"}:
+        return (
+            f"Why exit/bearish: {ticker} has broken important trend or flow gates. "
+            f"{readings} "
+            "What it means: downside or underperformance risk is elevated, so the dashboard prefers reducing or avoiding exposure."
+        )
+
+    if state == "STAGE_1_BASING":
+        return (
+            f"Why Stage 1 basing: {ticker} may be stabilizing, but the full Stage 2 advance is not confirmed yet. "
+            f"{readings} "
+            "What it means: watchlist candidate; wait for trend slope, relative strength, rotation, and flow to confirm."
+        )
+
+    return f"{STATE_TIPS.get(state, 'State explanation unavailable.')} {readings}"
+
 # =============================== system explainer ================================
 
 def _grade_letter(s: float | None) -> str:
@@ -1712,6 +1787,7 @@ def render_picks():
             available = bool(row["available"])
             pill_class = state if available and state in STATE_TIPS else "HOLD"
             pill_label = state.replace("_", " ") if available else "DATA PENDING"
+            state_tip = _state_tip_for_row(ticker, row) if available else "Awaiting defensive data."
             unavailable_class = "" if available else " unavailable"
             s_score = row["s_score"]
             f_score = row["f_score"]
@@ -1726,7 +1802,7 @@ def render_picks():
                   <div class="pick-ticker">{ticker}</div>
                   <div class="pick-class">{_esc(str(row["role"]))}</div>
                 </div>
-                <span class="pill {pill_class}" data-tip="{_esc(STATE_TIPS.get(state, "Awaiting defensive data."))}">{pill_label}</span>
+                <span class="pill {pill_class}" data-tip="{_esc(state_tip)}">{pill_label}</span>
               </div>
               <div class="defensive-note">{_esc(str(row["note"]))}</div>
               <div class="pick-metrics">
@@ -1778,6 +1854,7 @@ def render_picks():
         s_class = "pos" if s >= 0 else "neg"
         f_class = "pos" if f >= 0 else "neg"
         pulse_class = transition_pulse_class(tkr, transitions)
+        state_tip = _state_tip_for_row(tkr, p)
 
         cards_html += f"""
         <div class="pick {state} {pulse_class}" {drill_bridge_attrs(tkr, label=klass_lbl)}>
@@ -1786,7 +1863,7 @@ def render_picks():
               <div class="pick-ticker"><span class="pick-rank">#{pick_rank}</span>{tkr}</div>
               <div class="pick-class">{klass_lbl}</div>
             </div>
-            <span class="pill {state}" data-tip="{_esc(STATE_TIPS.get(state, ""))}">{state.replace('_', ' ')}</span>
+            <span class="pill {state}" data-tip="{_esc(state_tip)}">{state.replace('_', ' ')}</span>
           </div>
           {spark}
           <div class="pick-metrics">
