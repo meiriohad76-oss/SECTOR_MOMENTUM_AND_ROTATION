@@ -90,6 +90,14 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         qa=("macro tile tests", "session range tests", "run-journal static tests"),
     ),
     ComponentDoc(
+        name="Momentum v2 screens",
+        section="Decision surface",
+        render_function="render_momentum_v2_screens",
+        data_inputs=("scored snapshot", "regime phase", "ticker identities", "seven-pillar weights"),
+        states=("Display A Terminal", "Display B Editorial", "Display C Pillar Stack", "persisted display choice"),
+        qa=("momentum v2 tests", "static app wiring", "component docs tests"),
+    ),
+    ComponentDoc(
         name="Alerts",
         section="Decision surface",
         render_function="render_alerts",

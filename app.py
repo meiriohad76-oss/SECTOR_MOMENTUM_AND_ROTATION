@@ -50,6 +50,12 @@ from src.fred_data import fred_available
 from src.indicators import compute_all_indicators
 from src.macro import assess_regime
 from src.macro_tiles import MACRO_CONTEXT_SYMBOLS, fred_macro_snapshot, fred_macro_tile_groups, macro_tile_rows, session_range_tile
+from src.momentum_v2 import (
+    DISPLAY_LABELS as MOMENTUM_V2_DISPLAY_LABELS,
+    build_view_rows as build_momentum_v2_rows,
+    css as momentum_v2_css,
+    render_display as render_momentum_v2_display,
+)
 from src.navigation import initialize_drill_ticker, select_drill_ticker
 from src.ohlcv_prefetch import prefetch_status, submit_ohlcv_prefetch
 from src.personal_trades import (
@@ -512,7 +518,7 @@ st.set_page_config(
 
 APP_ROOT = Path(__file__).resolve().parent
 _STATIC = APP_ROOT / "static"
-_CSS = (_STATIC / "style.css").read_text(encoding="utf-8")
+_CSS = (_STATIC / "style.css").read_text(encoding="utf-8") + momentum_v2_css()
 BACKTEST_REPORT_PATH = APP_ROOT / "docs" / "backtest_report.md"
 BACKTEST_EQUITY_PATH = APP_ROOT / "docs" / "backtest_equity.csv"
 BACKTEST_STATES_PATH = APP_ROOT / "docs" / "backtest_states.csv"
@@ -720,6 +726,10 @@ if "transition_history_limit" not in st.session_state:
     st.session_state.transition_history_limit = 25
 if "table_open" not in st.session_state:
     st.session_state.table_open = True
+if "momentum_v2_display" not in st.session_state:
+    st.session_state.momentum_v2_display = "C"
+elif st.session_state.momentum_v2_display not in MOMENTUM_V2_DISPLAY_LABELS:
+    st.session_state.momentum_v2_display = "C"
 if "table_sort" not in st.session_state:
     st.session_state.table_sort = "S_score:desc"
 _legacy_table_sort = str(st.session_state.table_sort or "S_score:desc").split(":", 1)
@@ -2027,6 +2037,24 @@ def render_status():
     </section>
     """
     _md(html)
+
+
+def render_momentum_v2_screens():
+    display_keys = list(MOMENTUM_V2_DISPLAY_LABELS.keys())
+    selected_display = st.segmented_control(
+        "Momentum v2 display",
+        options=display_keys,
+        format_func=lambda key: MOMENTUM_V2_DISPLAY_LABELS[key],
+        key="momentum_v2_display",
+    )
+    selected_display = selected_display if selected_display in MOMENTUM_V2_DISPLAY_LABELS else "C"
+    try:
+        created = pd.Timestamp.fromtimestamp(float(dashboard_compute_created_at))
+        as_of = created.strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        as_of = datetime.now().strftime("%Y-%m-%d %H:%M")
+    rows = build_momentum_v2_rows(scored, phase=regime.phase_hint)
+    _md(render_momentum_v2_display(selected_display, rows, as_of))
 
 
 def render_alerts():
@@ -3692,6 +3720,7 @@ _render_timed("render_component_docs", render_component_docs)
 _render_timed("render_bluf", render_bluf)
 _render_timed("render_data_health", render_data_health)
 _render_timed("render_status", render_status)
+_render_timed("render_momentum_v2_screens", render_momentum_v2_screens)
 _render_timed("render_alerts", render_alerts)
 _render_timed("render_picks", render_picks)
 _render_timed("render_rrg", render_rrg)
