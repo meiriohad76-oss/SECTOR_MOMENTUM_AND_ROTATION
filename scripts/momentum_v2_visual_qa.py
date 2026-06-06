@@ -189,7 +189,7 @@ def _fixture_rows():
 def _static_html(display: str, screen: str) -> str:
     from src.momentum_v2 import css, render_display
 
-    body = render_display(display, _fixture_rows(), "FRI MAY 22 2026 | 16:00 ET", screen=screen, focus_ticker="XLK")
+    body = render_display(display, _fixture_rows(), "FRI MAY 22 2026 | 16:00 ET", screen=screen)
     return (
         "<!doctype html><html><head><meta charset='utf-8'>"
         "<style>:root{--font-mono:'Consolas','Courier New',monospace;--font-prose:Inter,Arial,sans-serif}"

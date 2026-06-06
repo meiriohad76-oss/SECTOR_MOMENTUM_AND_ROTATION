@@ -103,6 +103,27 @@ def test_render_display_supports_all_three_screens_for_each_display():
             assert f"momentum-v2-{display.lower()}-{screen}" in html or screen == "overview"
 
 
+def test_deepdive_defaults_to_whole_universe_not_xlk():
+    rows = build_view_rows(_sample_scored(), phase="MID")
+
+    html = render_display("C", rows, "2026-06-06 16:00 ET", screen="deepdive")
+
+    assert "Universe deep dive" in html
+    assert "Not a single-ticker report" in html
+    assert "XLK | Technology sector" in html
+    assert "XLF | Financials sector" in html
+    assert "XLE | Energy sector" in html
+
+
+def test_deepdive_uses_ticker_report_only_when_focus_is_explicit():
+    rows = build_view_rows(_sample_scored(), phase="MID")
+
+    html = render_display("B", rows, "2026-06-06 16:00 ET", screen="deepdive", focus_ticker="XLF")
+
+    assert "Universe deep dive" not in html
+    assert "XLF: price says fine" in html
+
+
 def test_css_contains_readability_and_bar_rules():
     stylesheet = css()
 

@@ -327,6 +327,11 @@ def css() -> str:
 .mv2-gate-mark { width:18px; height:18px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; color:#fff; font:900 12px/1 var(--font-mono); }
 .mv2-gate b { color:var(--mv2-ink); font-size:13px; }
 .mv2-gate span { color:var(--mv2-muted); font:700 12px/1 var(--font-mono); text-align:right; }
+.mv2-state-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin:10px 0 16px; }
+.mv2-state-card { border:1px solid var(--mv2-border); background:var(--mv2-sunken); border-radius:8px; padding:11px; }
+.mv2-state-card span { display:block; color:var(--mv2-muted); font:800 10px/1 var(--font-mono); text-transform:uppercase; }
+.mv2-state-card b { display:block; margin-top:5px; color:var(--mv2-ink); font:900 22px/1 var(--font-mono); }
+.mv2-universe-columns { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
 .mv2-metric-deck { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin:10px 0 16px; }
 .mv2-metric { background:var(--mv2-panel); border:1px solid var(--mv2-border); border-radius:8px; padding:10px; }
 .mv2-metric span { display:block; color:var(--mv2-muted); font:800 10px/1 var(--font-mono); text-transform:uppercase; }
@@ -413,7 +418,7 @@ def css() -> str:
   .mv2-head { flex-direction:column; }
   .mv2-weather, .mv2-b-hero { grid-template-columns:1fr; }
   .mv2-row { grid-template-columns: 120px minmax(160px,1fr) 76px 58px 62px; }
-  .mv2-metric-deck, .mv2-macro-grid { grid-template-columns:1fr 1fr; }
+  .mv2-metric-deck, .mv2-macro-grid, .mv2-state-grid, .mv2-universe-columns { grid-template-columns:1fr 1fr; }
   .mv2-chart-grid, .mv2-chart-grid.tight, .mv2-article-block, .mv2-pillar-grid, .mv2-a-hero-grid, .mv2-a-pillars, .mv2-b-article-grid { grid-template-columns:1fr; }
 }
 """
@@ -691,6 +696,16 @@ def _focus_row(rows: list[MomentumV2Row], focus_ticker: str | None = None) -> Mo
     return sorted(rows, key=lambda item: item.s_score, reverse=True)[0]
 
 
+def _find_focus_row(rows: list[MomentumV2Row], focus_ticker: str | None = None) -> MomentumV2Row | None:
+    normalized = str(focus_ticker or "").strip().upper()
+    if not normalized:
+        return None
+    for row in rows:
+        if row.ticker.upper() == normalized:
+            return row
+    return None
+
+
 def _metric_card(label: str, value: str, tone_class: str = "") -> str:
     return f'<div class="mv2-metric"><span>{_esc(label)}</span><b class="{tone_class}">{_esc(value)}</b></div>'
 
@@ -701,6 +716,34 @@ def _gate_html(ok: bool, label: str, detail: str) -> str:
     return (
         f'<div class="mv2-gate"><i class="mv2-gate-mark" style="background:{color}">{mark}</i>'
         f'<b>{_esc(label)}</b><span>{_esc(detail)}</span></div>'
+    )
+
+
+def _state_count_cards(rows: list[MomentumV2Row]) -> str:
+    counts = {state: 0 for state in STATE_LABELS}
+    for row in rows:
+        counts[row.state] = counts.get(row.state, 0) + 1
+    cards = []
+    for state in ("STAGE_2_BULLISH", "HOLD", "WARNING", "EXIT", "BEARISH_STAGE_4"):
+        cards.append(
+            f"""
+            <div class="mv2-state-card">
+              <span>{_esc(STATE_LABELS.get(state, state))}</span>
+              <b>{counts.get(state, 0)}</b>
+            </div>
+            """
+        )
+    return '<div class="mv2-state-grid">' + "".join(cards) + "</div>"
+
+
+def _state_summary(rows: list[MomentumV2Row]) -> str:
+    bullish = sum(1 for row in rows if row.state == "STAGE_2_BULLISH")
+    warnings = sum(1 for row in rows if row.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"})
+    avg_s = sum(row.s_score for row in rows) / max(len(rows), 1)
+    avg_f = sum(row.f_score for row in rows) / max(len(rows), 1)
+    return (
+        f"{len(rows)} instruments scanned. {bullish} bullish candidates, {warnings} risk names, "
+        f"average S {_fmt(avg_s)}, average F {_fmt(avg_f)}."
     )
 
 
@@ -1001,6 +1044,84 @@ def _deepdive_body(row: MomentumV2Row, display_name: str) -> str:
     """
 
 
+def _universe_deepdive_body(rows: list[MomentumV2Row], display_name: str, as_of: str) -> str:
+    ordered = sorted(rows, key=lambda item: item.s_score, reverse=True)
+    leaders = ordered[:10]
+    risks = [row for row in ordered if row.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"}]
+    weakest_flow = sorted(rows, key=lambda item: item.f_score)[:8]
+    grouped = rows_by_class(rows)
+    class_rows = []
+    for asset_class, items in grouped.items():
+        avg_s = sum(item.s_score for item in items) / max(len(items), 1)
+        bullish = sum(1 for item in items if item.state == "STAGE_2_BULLISH")
+        risk = sum(1 for item in items if item.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"})
+        class_rows.append(
+            f"""
+            <div class="mv2-rail-item">
+              <b>{_esc(asset_class)} | {_fmt(avg_s)} avg S</b>
+              <span>{len(items)} instruments | {bullish} bullish | {risk} warning/exit/bearish</span>
+            </div>
+            """
+        )
+    matrix = []
+    for asset_class, items in grouped.items():
+        matrix.append(f'<div class="mv2-class">{_esc(asset_class)} | {len(items)} instruments</div>')
+        matrix.extend(_row_html(item) for item in items)
+    return f"""
+      <div class="mv2-head">
+        <div>
+          <div class="mv2-kicker">{_esc(display_name)} | Deep dive | whole universe | {_esc(as_of)}</div>
+          <h2 class="mv2-title">Universe deep dive</h2>
+          <p class="mv2-subtitle"><b>Not a single-ticker report.</b> {_esc(_state_summary(rows))} Use this view to understand the whole board before drilling into an individual ticker.</p>
+        </div>
+        <div class="mv2-screen-note">Universe mode<br>{len(rows)} instruments | {len(grouped)} groups</div>
+      </div>
+      {_tabs_html("deepdive")}
+      {_state_count_cards(rows)}
+      <div class="mv2-grid">
+        <div class="mv2-panel">
+          <h3>Full seven-pillar matrix</h3>
+          <p>Every row is part of the current universe. The bar shows signed pillar contributions; the state and scores show current decision pressure.</p>
+          {_legend_html()}
+          <div class="mv2-row mv2-muted"><b>Ticker</b><b>Weighted pillar composition</b><b>State</b><b class="mv2-num">S</b><b class="mv2-num">Mom</b></div>
+          {"".join(matrix)}
+        </div>
+        <aside class="mv2-rail-stack">
+          <div class="mv2-panel">
+            <h3>Top leaders</h3>
+            <div class="mv2-rail-list">
+              {"".join(f'<div class="mv2-rail-item"><b>{_esc(item.display_label)} {_fmt(item.s_score)}</b><span>{_esc(item.state.replace("_", " "))} | {item.quadrant} | F {_fmt(item.f_score)}</span></div>' for item in leaders)}
+            </div>
+          </div>
+          <div class="mv2-panel">
+            <h3>Risk queue</h3>
+            <p>Warning, exit, and bearish names across the full universe.</p>
+            <div class="mv2-rail-list">
+              {"".join(f'<div class="mv2-rail-item"><b>{_esc(item.display_label)}</b><span>{_esc(" ".join(item.reasons))}</span></div>' for item in risks[:10])}
+            </div>
+          </div>
+          <div class="mv2-panel">
+            <h3>Weakest flow</h3>
+            <div class="mv2-rail-list">
+              {"".join(f'<div class="mv2-rail-item"><b>{_esc(item.display_label)} F {_fmt(item.f_score)}</b><span>CMF {_fmt(item.cmf21)} | flow pillar {_fmt(item.pillars["FLOW"], digits=3)}</span></div>' for item in weakest_flow)}
+            </div>
+          </div>
+        </aside>
+      </div>
+      <div class="mv2-universe-columns">
+        <div class="mv2-panel">
+          <h3>Group breakdown</h3>
+          <div class="mv2-rail-list">{"".join(class_rows)}</div>
+        </div>
+        <div class="mv2-panel">
+          <h3>How to use this universe deep dive</h3>
+          <p>Start with state distribution, then scan leaders and risks. Only after that should you select a specific ticker for a ticker-level article or chart review.</p>
+          <p>This fixes the previous XLK-centered behavior: the default deep dive now explains the complete dashboard universe.</p>
+        </div>
+      </div>
+    """
+
+
 def _rrg_position(row: MomentumV2Row) -> tuple[float, float]:
     x = min(94.0, max(6.0, 50.0 + (row.rs_ratio - 100.0) * 1.65))
     y = min(94.0, max(6.0, 50.0 - (row.rs_momentum - 100.0) * 1.65))
@@ -1269,8 +1390,10 @@ def _shell(display: str, screen: str, body: str) -> str:
 
 
 def render_deepdive(display: str, rows: list[MomentumV2Row], as_of: str, focus_ticker: str | None = None) -> str:
-    row = _focus_row(rows, focus_ticker)
     display_name = DISPLAY_LABELS.get(display, "Display C")
+    row = _find_focus_row(rows, focus_ticker)
+    if row is None:
+        return _shell(display, "deepdive", _universe_deepdive_body(rows, display_name, as_of))
     if display == "B":
         return _shell(display, "deepdive", _deepdive_article_body(row, as_of))
     if display == "A":

@@ -2074,7 +2074,7 @@ def render_momentum_v2_screens():
         rows,
         as_of,
         screen=selected_screen,
-        focus_ticker=st.session_state.drill_ticker,
+        focus_ticker=None,
     ))
 
 
