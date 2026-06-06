@@ -702,18 +702,53 @@ div[data-testid="stTextArea"] label span {
   font-weight: 600;
 }
 .macro-gauge {
+  position: relative;
   height: 8px;
-  margin-top: 10px;
+  margin-top: 4px;
   border-radius: 999px;
   background: var(--border);
   overflow: hidden;
 }
-.macro-gauge span {
+.macro-gauge-label {
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.macro-gauge .macro-gauge-fill {
   display: block;
   width: var(--gauge);
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--green), var(--amber), var(--red));
+  background: linear-gradient(90deg, var(--red), var(--amber), var(--green));
+  opacity: 0.55;
+}
+.macro-gauge.negative .macro-gauge-fill {
+  background: linear-gradient(90deg, var(--red), var(--amber));
+}
+.macro-gauge.positive .macro-gauge-fill {
+  background: linear-gradient(90deg, var(--green), color-mix(in srgb, var(--green) 55%, var(--amber)));
+}
+.macro-gauge .macro-gauge-mid,
+.macro-gauge .macro-gauge-marker {
+  position: absolute;
+  top: 0;
+  height: 100%;
+}
+.macro-gauge .macro-gauge-mid {
+  left: 50%;
+  width: 1px;
+  background: rgba(255,255,255,0.55);
+}
+.macro-gauge .macro-gauge-marker {
+  left: clamp(4px, var(--gauge), calc(100% - 4px));
+  width: 8px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--fg);
+  box-shadow: 0 0 0 2px var(--panel), 0 0 10px rgba(255,255,255,0.18);
 }
 
 .fred-macro-context {
@@ -810,6 +845,20 @@ div[data-testid="stTextArea"] label span {
   width: 9px; height: 9px; border-radius: 50%;
 }
 .alert-row .t { font-weight: 700; letter-spacing: 0.04em; }
+.alert-row .t small,
+.action-list .t small,
+.table-ticker small,
+.ticker-name {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-prose);
+  font-size: 0.72rem;
+  line-height: 1.25;
+  letter-spacing: 0;
+  color: var(--fg-dim);
+  text-transform: none;
+  white-space: normal;
+}
 .transition-badge {
   display: inline-flex;
   align-items: center;
@@ -927,6 +976,8 @@ div[data-testid="stTextArea"] label span {
   font-size: 1.18rem;
   font-weight: 700;
   letter-spacing: 0.04em;
+  color: var(--ticker-label);
+  text-shadow: var(--ticker-label-shadow);
 }
 .pick-rank {
   color: var(--accent);
@@ -2025,6 +2076,8 @@ div[class*="st-key-comparison_tickers"] [data-testid="stWidgetLabel"] p {
   width: max-content;
   max-width: min(520px, calc(100vw - 40px));
   white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
@@ -2246,6 +2299,9 @@ div[class*="block-container"] {
   border-radius: 3px;
 }
 .chart-help b { color: var(--fg-dim); font-weight: 600; }
+.spaghetti-help {
+  margin-top: -4px;
+}
 
 /* ---------- Component docs ---------- */
 .component-doc-grid {

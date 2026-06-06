@@ -117,6 +117,7 @@ from src.table_sort import (
     sort_full_table_frame,
 )
 from src.table_preview import table_row_rrg_preview_html
+from src.ticker_identity import TICKER_DISPLAY_NAMES, ticker_display_label, ticker_display_name
 from src.transition_pulse import transition_pulse_class, transition_row_pulse_class
 from src.ui_states import (
     defensive_basket_rows,
@@ -153,40 +154,6 @@ APP_VERSION = "v2.4.11"
 APP_LOGGER = configure_structured_logging()
 DRILL_RANGE_OPTIONS = ("3M", "6M", "1Y", "3Y", "MAX")
 DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + ["^TNX", "^IRX"]))
-TICKER_DISPLAY_NAMES = {
-    **dict(zip(US_SECTORS, [
-        "Technology sector", "Financials sector", "Energy sector", "Health care sector",
-        "Industrials sector", "Consumer discretionary sector", "Consumer staples sector",
-        "Utilities sector", "Materials sector", "Real estate sector", "Communication services sector",
-    ])),
-    **dict(zip(US_INDUSTRIES, [
-        "Semiconductors", "Semiconductors", "Software", "Medical devices", "Healthcare providers",
-        "Regional banks", "Insurance", "Home construction", "Homebuilders", "Retail",
-        "Oil and gas exploration", "Oil services", "Gold miners", "China internet", "Internet",
-        "Aerospace and defense", "Airlines", "Biotech", "Biotech",
-    ])),
-    **dict(zip(COUNTRIES, [
-        "All-world ex-US", "Emerging markets", "Developed ex-US", "Emerging markets",
-        "Japan", "Germany", "United Kingdom", "India", "China", "China large-cap",
-        "Brazil", "Australia", "Canada", "Mexico", "South Africa", "South Korea",
-        "Taiwan", "Singapore", "Indonesia", "Saudi Arabia",
-    ])),
-    **dict(zip(FACTORS, [
-        "Momentum factor", "Quality factor", "Minimum volatility factor", "Value factor",
-        "Small-size factor", "Large-cap growth factor", "Large-cap value factor",
-        "Small-cap factor", "Mid-cap factor", "Large-cap core factor",
-    ])),
-    **dict(zip(THEMES, [
-        "Innovation theme", "Cybersecurity theme", "Agribusiness theme", "Uranium theme",
-        "Lithium and batteries theme", "Solar theme", "Clean energy theme", "Robotics and AI theme",
-    ])),
-    **dict(zip(CRYPTO, ["Bitcoin futures", "Spot bitcoin", "Ethereum exposure"])),
-    **dict(zip(MEGA_CAP_STOCKS, [
-        "NVIDIA", "Apple", "Microsoft", "Amazon", "Alphabet", "Meta Platforms", "Tesla",
-    ])),
-}
-
-
 def _md(html: str):
     """Streamlit markdown wrapper that strips leading whitespace so HTML isn't
     treated as a code block. Indented HTML inside f-strings (>=4 spaces) gets
@@ -315,6 +282,45 @@ def _display_value(value, *, signed: bool = False, pct: bool = False, decimals: 
             return f"{number:+.{decimals}f}%" if signed else f"{number:.{decimals}f}%"
         return f"{number:+.{decimals}f}" if signed else f"{number:.{decimals}f}"
     return str(value)
+
+
+def _ticker_identity_subtext(ticker: str) -> str:
+    name = _ticker_display_name(ticker)
+    normalized = str(ticker or "").strip().upper()
+    return "" if not name or name == normalized else name
+
+
+def _metric_tip_for_row(ticker: str, row, metric: str) -> str:
+    label = ticker_display_label(ticker)
+    state = str(row.get("state") or "UNKNOWN").replace("_", " ")
+    if metric == "S":
+        score = _display_value(row.get("S_score"), signed=True, decimals=2)
+        grade = _grade_letter(row.get("S_score"))
+        rank = row.get("rank_in_class")
+        rank_text = "n/a" if rank is None or pd.isna(rank) else str(int(rank))
+        veto_text = "A flow veto is active, so ranking strength is capped." if bool(row.get("veto")) else "No hard flow veto is active."
+        return f"{label}: composite S-score is {score} ({grade}), rank {rank_text}. This is the cross-sectional ranking score, not the state label. {veto_text} Current state is {state}."
+    if metric == "F":
+        flow = _display_value(row.get("F_score"), signed=True, decimals=2)
+        cmf = _display_value(row.get("cmf21"), signed=True, decimals=2)
+        etf_flow = _display_value(row.get("etf_flow_5d_pct"), signed=True, pct=True, decimals=2)
+        veto_text = "below the veto line" if bool(row.get("veto")) else "above the veto line"
+        return f"{label}: flow F-score is {flow}, CMF is {cmf}, ETF 5-day flow is {etf_flow}. Flow is {veto_text}; F < -0.5 sigma blocks strong-looking price setups."
+    if metric == "MOM":
+        mom = _display_value(row.get("mom_12_1"), signed=True, pct=True, decimals=1)
+        mansfield = _display_value(row.get("mansfield_rs"), signed=True, decimals=2)
+        return f"{label}: 12-1 momentum is {mom} and Mansfield relative strength is {mansfield}. Positive values mean the instrument has been outperforming on the methodology lookback."
+    if metric == "STAGE":
+        stage = _display_value(row.get("stage"), decimals=0)
+        above = _display_value(row.get("above_30wma"))
+        slope = _display_value(row.get("ma_slope_pos"))
+        return f"{label}: Weinstein Stage is {stage}; above 30-week average={above}; 30-week average slope up={slope}. Stage 2 is supportive only when price and slope also confirm."
+    if metric == "RRG":
+        rrg = str(row.get("rrg_quadrant") or "n/a")
+        ratio = _display_value(row.get("rs_ratio"), decimals=1)
+        momentum = _display_value(row.get("rs_momentum"), decimals=1)
+        return f"{label}: RRG quadrant is {rrg}, RS-Ratio {ratio}, RS-Momentum {momentum}. Leading/Improving is constructive; Weakening/Lagging means leadership is fading."
+    return f"{label}: value-specific methodology tooltip unavailable."
 
 
 def _state_tip_for_row(ticker: str, row) -> str:
@@ -710,6 +716,8 @@ if "custom_universe_text" not in st.session_state:
     st.session_state.custom_universe_text = ""
 if "custom_universe_submitted_text" not in st.session_state:
     st.session_state.custom_universe_submitted_text = ""
+if "transition_history_limit" not in st.session_state:
+    st.session_state.transition_history_limit = 25
 if "table_open" not in st.session_state:
     st.session_state.table_open = True
 if "table_sort" not in st.session_state:
@@ -1023,7 +1031,8 @@ def _browser_qa_transitions(scored_df: pd.DataFrame) -> list[dict]:
 
 
 bluf = _build_bluf(scored)
-transitions = recent_transitions(n=14)
+transition_history_limit = int(st.session_state.get("transition_history_limit", 25) or 25)
+transitions = recent_transitions(n=transition_history_limit)
 transitions = _browser_qa_transitions(scored) + transitions
 if not _REUSED_COMPUTE_SNAPSHOT:
     _record_dashboard_run(scored, bluf, regime, transitions, ohlcv, ohlcv_result, fred_macro_snapshot(_fred_data))
@@ -1058,19 +1067,20 @@ def _go_to_selected_drill(widget_key: str) -> None:
 
 
 def _ticker_display_name(ticker: str) -> str:
-    return TICKER_DISPLAY_NAMES.get(ticker, ticker)
+    return ticker_display_name(ticker)
 
 
 def _drill_option_label(ticker: str) -> str:
     if ticker == DRILL_SELECTOR_PLACEHOLDER:
         return "Choose ticker..."
+    label = ticker_display_label(ticker)
     if ticker not in scored.index:
-        return f"{ticker} | {_ticker_display_name(ticker)}"
+        return label
     row = scored.loc[ticker]
     state = str(row.get("state") or "UNKNOWN").replace("_", " ")
     score = row.get("S_score")
     score_text = "n/a" if score is None or pd.isna(score) else f"{float(score):+.2f}"
-    return f"{ticker} | {_ticker_display_name(ticker)} | {state} | S {score_text}"
+    return f"{label} | {state} | S {score_text}"
 
 
 def _render_drill_selector(prefix: str, tickers: list[str], label: str) -> None:
@@ -1115,6 +1125,10 @@ def _macro_tile_html(row: dict[str, object], extra_class: str = "") -> str:
     trend_label = str(row.get("trend_label", "data pending"))
     trend_symbol = str(row.get("trend_symbol", "?"))
     gauge_pct = max(0, min(100, int(row.get("gauge_pct") or 50)))
+    trend_tip = (
+        f"Trend marker: {trend_label}. Left side means negative/worsening pressure; "
+        "center means neutral; right side means positive/improving pressure for this dashboard's momentum model."
+    )
     return f"""
     <div class="tile macro-tile {extra_class} {tone}" data-tip="{_esc(str(row.get('tooltip', '')))}" data-tip-pos="below">
       <div class="tile-label">{_esc(str(row.get('label', '')))}<span class="tile-delta">{_esc(str(row.get('symbol', row.get('series_id', ''))))}</span></div>
@@ -1124,7 +1138,12 @@ def _macro_tile_html(row: dict[str, object], extra_class: str = "") -> str:
         <span>{_esc(sentiment_label)}</span>
         <span class="trend">{_esc(trend_label)}</span>
       </div>
-      <div class="macro-gauge" style="--gauge:{gauge_pct}%"><span></span></div>
+      <div class="macro-gauge-label">trend pressure</div>
+      <div class="macro-gauge {sentiment_class}" style="--gauge:{gauge_pct}%" data-tip="{_esc(trend_tip)}">
+        <span class="macro-gauge-fill"></span>
+        <span class="macro-gauge-mid"></span>
+        <span class="macro-gauge-marker"></span>
+      </div>
       <div class="tile-sub">{_esc(str(row.get('change', '-')))} / {_esc(str(row.get('subtitle', '')))}</div>
     </div>
     """
@@ -1220,6 +1239,7 @@ def render_ticker_analyzer():
         return
 
     ticker = result.holdings[0].ticker
+    ticker_label = ticker_display_label(ticker)
     try:
         analysis_scored, analysis, ad_hoc_result = _analysis_scored_frame_for_result(result)
     except ValueError as exc:
@@ -1267,7 +1287,7 @@ def render_ticker_analyzer():
           <div class="tile">
             <div class="tile-label">Selection</div>
             <div class="tile-value {'up' if selected == 'YES' else 'flat'}">{selected}</div>
-            <div class="tile-sub">{_esc(ticker)} / {_esc(asset_class)}</div>
+            <div class="tile-sub">{_esc(ticker_label)} / {_esc(asset_class)}</div>
           </div>
         </div>
         """
@@ -1540,7 +1560,7 @@ def render_bluf():
         first_ticker = next((it["t"] for it in a["tickers"] if it.get("t")), "")
         action_count = len(a["tickers"])
         items_html = "".join(
-            f'<li {drill_bridge_attrs(it["t"], label=it["note"])}><span class="t">{it["t"]}</span><span class="n">{it["note"]}</span></li>'
+            f'<li {drill_bridge_attrs(it["t"], label=it["note"])}><span class="t">{it["t"]}<small>{_esc(_ticker_identity_subtext(it["t"]))}</small></span><span class="n">{it["note"]}</span></li>'
             for it in a["tickers"]
         ) or '<li><span class="t">-</span><span class="n">none</span></li>'
         card_html = f"""
@@ -1617,6 +1637,7 @@ def _ticker_report_html(ticker: str, row) -> str:
     state = str(row.get("state") or "UNKNOWN")
     state_label = state.replace("_", " ")
     class_name = str(row.get("class") or "UNKNOWN")
+    ticker_label = ticker_display_label(ticker)
     forecast = _forecast_horizon_for_state(state)
     verdict = _state_tip_for_row(ticker, row)
 
@@ -1639,6 +1660,11 @@ def _ticker_report_html(ticker: str, row) -> str:
     rank_text = "n/a" if rank is None or pd.isna(rank) else str(int(rank))
     selected_text = "selected" if bool(row.get("selected")) else "not selected"
     veto_text = "flow veto active" if bool(row.get("veto")) else "no flow veto"
+    grade = _grade_letter(row.get("S_score"))
+    contradiction_note = (
+        f"{ticker_label} can show composite grade {grade} while the state is {state_label} because these are different layers. "
+        "The composite S-score ranks cross-sectional evidence against peers. The state machine is a gatekeeper: a failed trend, rotation, breadth, or flow rule can keep the state cautious even when the rank score is strong."
+    )
 
     stage_value = row.get("stage")
     rrg_value = str(row.get("rrg_quadrant") or "")
@@ -1683,7 +1709,7 @@ def _ticker_report_html(ticker: str, row) -> str:
     return f"""
     <section class="section ticker-report" id="ticker-report">
       <div class="section-head">
-        <h2>Complete ticker report <span class="count">{_esc(ticker)} | {_esc(class_name)}</span></h2>
+        <h2>Complete ticker report <span class="count">{_esc(ticker_label)} | {_esc(class_name)}</span></h2>
         <div class="right">Evidence window | {_esc(forecast)}</div>
       </div>
       <div class="ticker-report-grid">
@@ -1693,12 +1719,15 @@ def _ticker_report_html(ticker: str, row) -> str:
           <p>{_esc(verdict)}</p>
           <div class="report-facts">
             <span>S {s_score}</span>
+            <span>Grade {grade}</span>
             <span>F {f_score}</span>
             <span>Rank {rank_text}</span>
             <span>{_esc(selected_text)}</span>
           </div>
         </div>
         <div class="ticker-report-watch">
+          <div class="report-kicker">Score and state relationship</div>
+          <p>{_esc(contradiction_note)}</p>
           <div class="report-kicker">What would change the call</div>
           <p><b>For bullish calls:</b> watch for a weekly close below the 30-week average, Mansfield RS falling below zero, RRG slipping into Lagging, CMF moving below -0.10, or a flow veto.</p>
           <p><b>For warnings/exits:</b> the call improves when price reclaims the 30-week average, breadth recovers, RRG rotates back toward Improving/Leading, and flow turns positive.</p>
@@ -1722,6 +1751,57 @@ def _ticker_report_html(ticker: str, row) -> str:
       </div>
     </section>
     """
+
+
+def _price_chart_narrative(ticker: str, row, frame: pd.DataFrame) -> str:
+    label = ticker_display_label(ticker)
+    try:
+        weekly = frame.resample("W-FRI").agg({"close": "last"})
+        sma30 = weekly["close"].rolling(30).mean()
+        latest_close = float(weekly["close"].dropna().iloc[-1])
+        latest_sma = float(sma30.dropna().iloc[-1])
+        distance = (latest_close / latest_sma - 1.0) * 100 if latest_sma else None
+        distance_text = "n/a" if distance is None else f"{distance:+.1f}%"
+    except Exception:
+        latest_close = latest_sma = None
+        distance_text = "n/a"
+    above = _display_value(row.get("above_30wma"))
+    slope = _display_value(row.get("ma_slope_pos"))
+    stage = _display_value(row.get("stage"), decimals=0)
+    close_text = "n/a" if latest_close is None else f"{latest_close:.2f}"
+    sma_text = "n/a" if latest_sma is None else f"{latest_sma:.2f}"
+    return (
+        f"{label}: latest weekly close is {close_text}, 30-week average is {sma_text}, distance {distance_text}. "
+        f"Dashboard readings: Stage={stage}, price above 30wMA={above}, average slope up={slope}. "
+        "A bullish trend needs price above the average and a rising average; a weekly close back below the average weakens the trend call."
+    )
+
+
+def _cmf_chart_narrative(ticker: str, row) -> str:
+    label = ticker_display_label(ticker)
+    cmf = _display_value(row.get("cmf21"), signed=True, decimals=2)
+    flow = _display_value(row.get("F_score"), signed=True, decimals=2)
+    if row.get("cmf21") is None or pd.isna(row.get("cmf21")):
+        reading = "CMF is not available, so flow confirmation is weaker."
+    elif float(row.get("cmf21")) > 0.05:
+        reading = "CMF is supportive accumulation evidence."
+    elif float(row.get("cmf21")) < -0.10:
+        reading = "CMF is distribution evidence and can trigger risk controls."
+    else:
+        reading = "CMF is neutral or only mildly supportive."
+    return f"{label}: CMF(21) is {cmf} and flow F-score is {flow}. {reading} The model prefers CMF above +0.05 for fresh bullish Stage 2 entries."
+
+
+def _obv_chart_narrative(ticker: str, row) -> str:
+    label = ticker_display_label(ticker)
+    divergence = bool(row.get("obv_divergence"))
+    obv_slope = _display_value(row.get("obv_slope"), signed=True, decimals=2)
+    message = (
+        "OBV divergence is flagged, meaning volume confirmation is not keeping up with price."
+        if divergence
+        else "No OBV divergence is flagged in the current snapshot."
+    )
+    return f"{label}: OBV slope reading is {obv_slope}. {message} This chart checks whether volume is confirming the price trend or warning that buyers are fading."
 
 
 def _provider_status_list_html(providers) -> str:
@@ -1950,6 +2030,12 @@ def render_status():
 
 
 def render_alerts():
+    st.segmented_control(
+        "Transition history",
+        options=[25, 100, 500],
+        format_func=lambda value: f"Latest {value}",
+        key="transition_history_limit",
+    )
     rows = ""
     for r in transitions[:8]:
         new_state = r.get("to", "")
@@ -1957,12 +2043,13 @@ def render_alerts():
         dot_color = color_for_state(new_state)
         when = r.get("date", "")
         ticker = str(r.get("ticker", "")).upper()
+        ticker_name = _ticker_identity_subtext(ticker)
         pulse_class = transition_row_pulse_class(r)
         sentiment_class, sentiment_label, sentiment_symbol = _transition_sentiment(r)
         rows += f"""
         <div class="alert-row {new_state} {pulse_class}" {drill_bridge_attrs(ticker, label=new_state)}>
           <span class="dot" style="background:{dot_color}"></span>
-          <span class="t">{_esc(ticker)}</span>
+          <span class="t">{_esc(ticker)}<small>{_esc(ticker_name)}</small></span>
           <span class="transition-badge {sentiment_class}"><span>{sentiment_symbol}</span>{sentiment_label}</span>
           <span class="change">
             <span class="from">{from_state.replace('_', ' ')}</span>
@@ -1974,12 +2061,22 @@ def render_alerts():
         </div>
         """
     if not rows:
-        rows = '<div class="alert-row"><span class="dot" style="background:var(--muted-2)"></span><span class="t">&mdash;</span><span class="transition-badge transition-neutral"><span>=</span>neutral</span><span class="change">no state changes yet &mdash; state machine starts logging on first run</span><span class="when"></span><span class="chev"></span></div>'
+        storage = state_storage_health()
+        state_count = storage.get("by_ticker_count", 0)
+        journal_path = storage.get("transition_journal", "data/state_transitions.jsonl")
+        rows = (
+            '<div class="alert-row empty-transition-history">'
+            '<span class="dot" style="background:var(--muted-2)"></span>'
+            '<span class="t">NONE<small>state memory active</small></span>'
+            '<span class="transition-badge transition-neutral"><span>=</span>neutral</span>'
+            f'<span class="change">No persisted transition records yet. The Pi has {state_count} current ticker states and is ready to append future changes to {_esc(str(journal_path))}.</span>'
+            '<span class="when"></span><span class="chev"></span></div>'
+        )
 
     html = f"""
     <section class="section">
       <div class="section-head">
-        <h2>Recent transitions <span class="count">{len(transitions)} latest records</span></h2>
+        <h2>Recent transitions <span class="count">{len(transitions)} of latest {transition_history_limit}</span></h2>
         <div class="right">{datetime.now().strftime('%H:%M').upper()}</div>
       </div>
       <div class="alerts">{rows}</div>
@@ -2000,6 +2097,7 @@ def render_picks():
         cards_html = ""
         for row in basket_rows:
             ticker = str(row["ticker"])
+            ticker_name = _ticker_identity_subtext(ticker)
             state = str(row["state"])
             available = bool(row["available"])
             pill_class = state if available and state in STATE_TIPS else "HOLD"
@@ -2012,19 +2110,21 @@ def render_picks():
             f_text = "--" if f_score is None else f"{float(f_score):+.2f}"
             s_class = "" if s_score is None else ("pos" if float(s_score) >= 0 else "neg")
             f_class = "" if f_score is None else ("pos" if float(f_score) >= 0 else "neg")
+            s_tip = _metric_tip_for_row(ticker, row, "S") if available else "S-score unavailable until this defensive ticker is scored."
+            f_tip = _metric_tip_for_row(ticker, row, "F") if available else "F-score unavailable until this defensive ticker is scored."
             cards_html += f"""
             <div class="pick defensive-card {pill_class}{unavailable_class}" {drill_bridge_attrs(ticker, label=str(row["role"])) if available else ""}>
               <div class="pick-top">
                 <div>
-                  <div class="pick-ticker">{ticker}</div>
+                  <div class="pick-ticker">{ticker}<span class="ticker-name">{_esc(ticker_name)}</span></div>
                   <div class="pick-class">{_esc(str(row["role"]))}</div>
                 </div>
                 <span class="pill {pill_class}" data-tip="{_esc(state_tip)}">{pill_label}</span>
               </div>
               <div class="defensive-note">{_esc(str(row["note"]))}</div>
               <div class="pick-metrics">
-                <div class="m"><span class="k">S</span><span class="v {s_class}">{s_text}</span></div>
-                <div class="m"><span class="k">F</span><span class="v {f_class}">{f_text}</span></div>
+                <div class="m"><span class="k tip-cue" data-tip="{_esc(s_tip)}">S</span><span class="v {s_class}">{s_text}</span></div>
+                <div class="m"><span class="k tip-cue" data-tip="{_esc(f_tip)}">F</span><span class="v {f_class}">{f_text}</span></div>
               </div>
               <div class="pick-foot">
                 <span>ROTATION</span>
@@ -2072,25 +2172,31 @@ def render_picks():
         f_class = "pos" if f >= 0 else "neg"
         pulse_class = transition_pulse_class(tkr, transitions)
         state_tip = _state_tip_for_row(tkr, p)
+        ticker_name = _ticker_identity_subtext(tkr)
+        s_tip = _metric_tip_for_row(tkr, p, "S")
+        f_tip = _metric_tip_for_row(tkr, p, "F")
+        mom_tip = _metric_tip_for_row(tkr, p, "MOM")
+        stage_tip = _metric_tip_for_row(tkr, p, "STAGE")
+        rrg_tip = _metric_tip_for_row(tkr, p, "RRG")
 
         cards_html += f"""
         <div class="pick {state} {pulse_class}" {drill_bridge_attrs(tkr, label=klass_lbl)}>
           <div class="pick-top">
             <div>
-              <div class="pick-ticker"><span class="pick-rank">#{pick_rank}</span>{tkr}</div>
+              <div class="pick-ticker"><span class="pick-rank">#{pick_rank}</span>{tkr}<span class="ticker-name">{_esc(ticker_name)}</span></div>
               <div class="pick-class">{klass_lbl}</div>
             </div>
             <span class="pill {state}" data-tip="{_esc(state_tip)}">{state.replace('_', ' ')}</span>
           </div>
           {spark}
           <div class="pick-metrics">
-            <div class="m"><span class="k tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_S'])}">S</span><span class="v {s_class}">{s:+.2f}<span class="grade {grade}">{grade}</span></span></div>
-            <div class="m"><span class="k tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_F'])}">F</span><span class="v {f_class}">{f:+.2f}</span></div>
-            <div class="m"><span class="k tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_MOM'])}">MOM</span><span class="v {mom_class}">{mom:+.1f}%</span></div>
-            <div class="m"><span class="k tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_STAGE'])}">STAGE</span><span class="v">{stage}</span></div>
+            <div class="m"><span class="k tip-cue" data-tip="{_esc(s_tip)}">S</span><span class="v {s_class}">{s:+.2f}<span class="grade {grade}">{grade}</span></span></div>
+            <div class="m"><span class="k tip-cue" data-tip="{_esc(f_tip)}">F</span><span class="v {f_class}">{f:+.2f}</span></div>
+            <div class="m"><span class="k tip-cue" data-tip="{_esc(mom_tip)}">MOM</span><span class="v {mom_class}">{mom:+.1f}%</span></div>
+            <div class="m"><span class="k tip-cue" data-tip="{_esc(stage_tip)}">STAGE</span><span class="v">{stage}</span></div>
           </div>
           <div class="pick-foot">
-            <span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_RRG'])}">RRG</span>
+            <span class="tip-cue" data-tip="{_esc(rrg_tip)}">RRG</span>
             <span class="quad">{quad}</span>
           </div>
         </div>
@@ -2178,6 +2284,27 @@ def render_sector_spaghetti():
         st.info("Sector relative-strength chart is unavailable until sector and SPY price data are loaded.")
         return
     st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+    ranked = []
+    for trace in fig.data:
+        trace_y = [] if trace.y is None else list(trace.y)
+        y_values = [value for value in trace_y if value is not None and not pd.isna(value)]
+        if not y_values:
+            continue
+        ranked.append((str(trace.name), float(y_values[-1])))
+    ranked.sort(key=lambda item: item[1], reverse=True)
+    if ranked:
+        leaders = ", ".join(f"{name} ({value:.1f})" for name, value in ranked[:3])
+        laggards = ", ".join(f"{name} ({value:.1f})" for name, value in ranked[-3:])
+        _md(
+            f"""
+            <div class="chart-help spaghetti-help">
+              <b>How to read it.</b> Each line starts at 100 and tracks relative strength versus SPY over roughly 12 months.
+              Above 100 means that sector ETF outperformed SPY since the start of the window; below 100 means it lagged.
+              Current leaders: {_esc(leaders)}. Current laggards: {_esc(laggards)}.
+              Hover a line to see the ETF identity, date, and relative-strength value.
+            </div>
+            """
+        )
 
 
 def render_drill():
@@ -2213,7 +2340,7 @@ def render_drill():
     head_html = f"""
     <section class="section" id="drill">
       <div class="section-head">
-        <h2>Per-ticker drill-down <span class="count">{sel} | {row['class']}</span></h2>
+        <h2>Per-ticker drill-down <span class="count">{_esc(ticker_display_label(sel))} | {row['class']}</span></h2>
         <div class="right">{state.replace('_', ' ')}</div>
       </div>
       <div class="drill">
@@ -2259,14 +2386,14 @@ def render_drill():
     with c1:
         st.plotly_chart(price_chart_with_30wma(ohlcv[sel], sel, visible_since=visible_since),
                         width="stretch", config={"displayModeBar": False})
-        _md('<div class="chart-help"><b>Weinstein Stage 2 visual check.</b> Want price (solid line) above the dashed <b>30-week SMA</b>, with the MA sloping <b>upward</b>. Stage 2 confirmed when both hold AND Mansfield RS &gt; 0. Price crossing below the MA on a weekly close is the canonical EXIT trigger.</div>')
+        _md(f'<div class="chart-help"><b>Weekly price vs 30-week average.</b> {_esc(_price_chart_narrative(sel, row, ohlcv[sel]))}</div>')
     with c2:
         st.plotly_chart(cmf_chart(ohlcv[sel], sel, visible_since=visible_since),
                         width="stretch", config={"displayModeBar": False})
-        _md('<div class="chart-help"><b>Chaikin Money Flow (21d) - volume-weighted accumulation/distribution.</b> Above <span style="color:var(--green)">+0.10</span> = strong accumulation (institutional buying). Below <span style="color:var(--red)">-0.10</span> = strong distribution. Sustained negative CMF during a Stage-2 advance is an early Stage-3 topping warning.</div>')
+        _md(f'<div class="chart-help"><b>Chaikin Money Flow.</b> {_esc(_cmf_chart_narrative(sel, row))}</div>')
     st.plotly_chart(obv_chart(ohlcv[sel], sel, visible_since=visible_since),
                     width="stretch", config={"displayModeBar": False})
-    _md('<div class="chart-help"><b>Price vs OBV - bearish divergence detector.</b> When price (left axis) makes a new high but OBV (right axis) does <b>not</b>, institutional money isn\'t following the rally. One of the cleanest pre-breakdown signals. Bullish divergence (OBV new high, price not) often marks Stage-1 accumulation bottoms.</div>')
+    _md(f'<div class="chart-help"><b>Price vs OBV.</b> {_esc(_obv_chart_narrative(sel, row))}</div>')
 
 
 def render_comparison_view():
@@ -2302,11 +2429,12 @@ def render_comparison_view():
     cards = ""
     for row in rows:
         state = row["state"]
+        ticker_name = _ticker_identity_subtext(row["ticker"])
         cards += f"""
         <div class="comparison-card {state}">
           <div class="comparison-head">
             <div>
-              <div class="comparison-ticker">{_esc(row['ticker'])}</div>
+              <div class="comparison-ticker">{_esc(row['ticker'])}<span class="ticker-name">{_esc(ticker_name)}</span></div>
               <div class="comparison-class">{_esc(row['class'])}</div>
             </div>
             <span class="state">{_esc(state.replace('_', ' '))}</span>
@@ -2411,6 +2539,8 @@ def render_full_table():
         mom = (r.get("mom_12_1") or 0) * 100
         state = r["state"]
         preview_html = table_row_rrg_preview_html(tkr, r)
+        ticker_name = _ticker_identity_subtext(tkr)
+        state_tip = _state_tip_for_row(tkr, r)
 
         p_tds = "".join(
             f'<td class="num"><span class="dot {"ok" if ok else "bad"}">{"Y" if ok else "N"}</span></td>'
@@ -2419,9 +2549,9 @@ def render_full_table():
 
         rows_html += f"""
         <tr>
-          <td class="t table-ticker">{_esc(tkr)}{preview_html}</td>
+          <td class="t table-ticker">{_esc(tkr)}<small>{_esc(ticker_name)}</small>{preview_html}</td>
           <td style="color:var(--muted)">{r['class']}</td>
-          <td><span class="pill {state}" data-tip="{_esc(STATE_TIPS.get(state, ""))}">{state.replace('_', ' ')}</span></td>
+          <td><span class="pill {state}" data-tip="{_esc(state_tip)}">{state.replace('_', ' ')}</span></td>
           {p_tds}
           <td class="num {'pos' if s >= 0 else 'neg'}">{s:+.2f}</td>
           <td class="num {'pos' if f >= 0 else 'neg'}">{f:+.2f}</td>

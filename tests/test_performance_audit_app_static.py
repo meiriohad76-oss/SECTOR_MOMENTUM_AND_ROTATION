@@ -116,7 +116,7 @@ def test_visual_only_reuse_skips_stateful_recording():
 def test_visual_only_reuse_refreshes_read_only_transition_rows():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
-    assert app_source.index("transitions = recent_transitions(n=14)") < app_source.index(
+    assert app_source.index("transitions = recent_transitions(n=transition_history_limit)") < app_source.index(
         "if not _REUSED_COMPUTE_SNAPSHOT:"
     )
 

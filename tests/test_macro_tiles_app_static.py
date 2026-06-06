@@ -31,7 +31,12 @@ def test_app_fetches_macro_context_symbols_for_header_tiles():
     assert '_macro_tile_html(row, extra_class="fred-macro-tile")' in app_source
     assert "data-tip=\"{_esc(str(row.get('tooltip', '')))}\"" in app_source
     assert "macro-signal {sentiment_class}" in app_source
-    assert "macro-gauge\" style=\"--gauge:{gauge_pct}%\"" in app_source
+    assert "Trend marker: {trend_label}" in app_source
+    assert "macro-gauge {sentiment_class}\" style=\"--gauge:{gauge_pct}%\"" in app_source
+    assert "macro-gauge-fill" in app_source
+    assert "macro-gauge-mid" in app_source
+    assert "macro-gauge-marker" in app_source
+    assert "trend pressure" in app_source
     assert "Market state <span class=\"count\">Live indicators</span>" in app_source
     assert "Expanded FRED macro context" in app_source
 
@@ -43,6 +48,8 @@ def test_status_row_css_supports_macro_tile_layout():
     assert ".macro-tile .tile-value" in css
     assert ".macro-signal" in css
     assert ".macro-gauge" in css
+    assert ".macro-gauge .macro-gauge-marker" in css
+    assert ".macro-gauge .macro-gauge-mid" in css
     assert ".fred-macro-context" in css
     assert ".fred-macro-grid" in css
     assert ".fred-macro-tile .tile-label" in css

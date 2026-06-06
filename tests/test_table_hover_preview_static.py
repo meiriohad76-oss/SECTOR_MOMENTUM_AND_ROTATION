@@ -11,7 +11,8 @@ def test_full_table_wires_row_hover_preview_markup():
 
     assert "from src.table_preview import table_row_rrg_preview_html" in app_source
     assert "preview_html = table_row_rrg_preview_html(tkr, r)" in app_source
-    assert '<td class="t table-ticker">{_esc(tkr)}{preview_html}</td>' in app_source
+    assert "ticker_name = _ticker_identity_subtext(tkr)" in app_source
+    assert '<td class="t table-ticker">{_esc(tkr)}<small>{_esc(ticker_name)}</small>{preview_html}</td>' in app_source
 
 
 def test_full_table_hover_preview_css_is_present_and_mobile_safe():

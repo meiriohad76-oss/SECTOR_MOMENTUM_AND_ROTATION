@@ -6,6 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from .data import close_price
+from .ticker_identity import ticker_display_label
 
 
 # ---- color helpers ---------------------------------------------------------------
@@ -305,14 +306,16 @@ def sector_spaghetti_chart(
     )
     fig = go.Figure()
     for ticker in frame.columns:
+        display_label = ticker_display_label(ticker)
         fig.add_trace(
             go.Scatter(
                 x=frame.index,
                 y=frame[ticker],
                 mode="lines",
-                name=ticker,
+                name=display_label,
+                customdata=[[ticker, display_label] for _ in frame.index],
                 line=dict(width=1.8),
-                hovertemplate=f"<b>{ticker}</b><br>%{{x|%Y-%m-%d}}<br>RS %{{y:.1f}}<extra></extra>",
+                hovertemplate="<b>%{customdata[1]}</b><br>%{x|%Y-%m-%d}<br>Relative strength %{y:.1f}<extra></extra>",
             )
         )
     fig.add_hline(y=100, line=dict(color="#444", width=1, dash="dot"))

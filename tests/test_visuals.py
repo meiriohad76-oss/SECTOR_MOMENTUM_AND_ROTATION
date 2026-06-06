@@ -159,7 +159,7 @@ def test_sector_spaghetti_chart_adds_one_trace_per_available_sector():
 
     fig = sector_spaghetti_chart(ohlcv, ["XLK", "XLF"], bench_ticker="SPY", lookback_days=4)
 
-    assert [trace.name for trace in fig.data] == ["XLK", "XLF"]
+    assert [trace.name for trace in fig.data] == ["XLK | Technology sector", "XLF | Financials sector"]
     assert fig.layout.yaxis.title.text == "Relative strength vs SPY, start = 100"
 
 

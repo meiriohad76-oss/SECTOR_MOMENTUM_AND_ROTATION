@@ -143,5 +143,21 @@ def test_data_health_panel_renders_lane_refresh_buttons_from_rows():
 def test_recent_transitions_label_is_record_based_not_day_based():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
-    assert "{len(transitions)} latest records" in app_source
+    assert "transition_history_limit" in app_source
+    assert 'st.segmented_control(\n        "Transition history"' in app_source
+    assert "Latest {value}" in app_source
+    assert "{len(transitions)} of latest {transition_history_limit}" in app_source
     assert "{len(transitions)} in last 14d" not in app_source
+
+
+def test_recent_transitions_empty_state_reports_persistence_root_cause():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    alerts_section = app_source[
+        app_source.index("def render_alerts():") : app_source.index("def render_picks():")
+    ]
+
+    assert "storage = state_storage_health()" in alerts_section
+    assert "by_ticker_count" in alerts_section
+    assert "transition_journal" in alerts_section
+    assert "No persisted transition records yet" in alerts_section
+    assert "state memory active" in alerts_section

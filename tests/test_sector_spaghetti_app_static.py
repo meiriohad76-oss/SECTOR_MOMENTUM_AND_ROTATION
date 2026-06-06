@@ -27,3 +27,20 @@ def test_sector_spaghetti_renders_between_rrg_and_drill():
     positions = [app_source.index(call) for call in render_order]
 
     assert positions == sorted(positions)
+
+
+def test_sector_spaghetti_adds_plain_english_explanation_and_ranked_context():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    visuals_source = (ROOT / "src" / "visuals.py").read_text(encoding="utf-8")
+
+    section = app_source[
+        app_source.index("def render_sector_spaghetti():") : app_source.index("def render_drill():")
+    ]
+
+    assert "spaghetti-help" in section
+    assert "How to read it." in section
+    assert "Current leaders:" in section
+    assert "Current laggards:" in section
+    assert "Hover a line to see the ETF identity" in section
+    assert "ticker_display_label(ticker)" in visuals_source
+    assert "Relative strength %{y:.1f}" in visuals_source
