@@ -335,6 +335,29 @@ def css() -> str:
 .mv2-a-transition span, .mv2-a-holding span { color:#7c7c7c; font:800 10px/1.2 var(--font-mono); }
 .mv2-a-callout { margin-top:10px; border:1px solid #5d4213; background:#1d1606; color:#f1cf86; padding:10px 12px; font:12px/1.4 var(--font-prose); }
 .mv2-a-footer { display:flex; justify-content:space-between; gap:16px; padding:10px 4px 0; border-top:1px solid #1f1f1f; color:#5a5a5a; font:900 10px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; }
+.mv2-a2-header { display:flex; align-items:center; gap:16px; height:52px; padding:0 4px 14px; border-bottom:1px solid #1f1f1f; }
+.mv2-a2-back { border:1px solid #2a2a2a; background:#111; color:#b8b8b8; border-radius:3px; padding:5px 10px; font:900 11px/1 var(--font-mono); text-transform:uppercase; }
+.mv2-a2-lead { padding:24px 4px 18px; border-bottom:1px solid #1f1f1f; }
+.mv2-a2-lead-grid { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:32px; align-items:start; }
+.mv2-a2-score { display:flex; align-items:baseline; gap:14px; margin-top:4px; }
+.mv2-a2-score b { font:900 48px/1 var(--font-mono); letter-spacing:0; }
+.mv2-a2-score span { color:#7c7c7c; font:800 14px/1 var(--font-mono); text-transform:uppercase; }
+.mv2-a2-copy { max-width:760px; margin:12px 0 0; color:#d4d4d4; font:15px/1.5 var(--font-prose); }
+.mv2-a2-pillars { margin-top:18px; display:grid; grid-template-columns:1fr 1fr; gap:12px 28px; }
+.mv2-a2-pillar { display:grid; grid-template-columns:3px minmax(0,1fr) auto; gap:10px; align-items:start; border-top:1px solid #1f1f1f; padding-top:9px; }
+.mv2-a2-pillar i { width:3px; min-height:36px; display:block; }
+.mv2-a2-pillar b { display:block; color:#e8e8e8; font:900 11px/1.2 var(--font-mono); }
+.mv2-a2-pillar p { margin:3px 0 0; color:#b8b8b8; font:12px/1.35 var(--font-prose); }
+.mv2-a2-pillar span { font:900 12px/1 var(--font-mono); text-align:right; }
+.mv2-a2-gate-panel { background:#0e0e0e; border:1px solid #1f1f1f; padding:14px 16px; }
+.mv2-a2-gate-panel h3 { margin:0 0 8px; padding-bottom:8px; border-bottom:1px solid #1f1f1f; color:#7c7c7c; font:900 10px/1 var(--font-mono); letter-spacing:.12em; text-transform:uppercase; }
+.mv2-a2-gate-panel p { margin:0 0 10px; color:#7c7c7c; font:12px/1.45 var(--font-prose); }
+.mv2-a2-callout { margin-top:12px; padding:10px 12px; background:#1a1100; border:1px solid #5d4213; color:#d8b260; font:12px/1.5 var(--font-prose); }
+.mv2-a2-charts { padding:16px 4px; display:grid; grid-template-columns:1.6fr 1fr; gap:16px; }
+.mv2-a2-peer-row { display:grid; grid-template-columns:30px 52px 1fr 58px 62px; gap:8px; align-items:center; border-top:1px solid #1f1f1f; padding:7px 0; color:#b8b8b8; font:800 11px/1.2 var(--font-mono); }
+.mv2-a2-peer-row.focus { background:#1d1606; box-shadow:inset 3px 0 0 #e6b450; padding-left:8px; }
+.mv2-a2-peer-row .rank { color:#7c7c7c; font-size:10px; }
+.mv2-a2-peer-row .name { color:#7c7c7c; font:11px/1.2 var(--font-prose); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .mv2-editorial { background:#faf6ef; border-radius:0; }
 .mv2-editorial .mv2-title { font-family: Georgia, 'Times New Roman', serif; font-size:28px; }
 .mv2-editorial .mv2-head { border-bottom:1px solid #c9bfae; padding-bottom:12px; }
@@ -464,7 +487,7 @@ def css() -> str:
   .mv2-a-row { grid-template-columns:52px minmax(150px,1fr) 76px 76px 52px 52px; }
   .mv2-a-row .hide-sm { display:none; }
   .mv2-metric-deck, .mv2-macro-grid, .mv2-state-grid, .mv2-universe-columns { grid-template-columns:1fr 1fr; }
-  .mv2-chart-grid, .mv2-chart-grid.tight, .mv2-article-block, .mv2-pillar-grid, .mv2-a-hero-grid, .mv2-a-pillars, .mv2-b-article-grid { grid-template-columns:1fr; }
+  .mv2-chart-grid, .mv2-chart-grid.tight, .mv2-article-block, .mv2-pillar-grid, .mv2-a-hero-grid, .mv2-a-pillars, .mv2-a2-lead-grid, .mv2-a2-pillars, .mv2-a2-charts, .mv2-b-article-grid { grid-template-columns:1fr; }
 }
 """
 
@@ -1096,6 +1119,100 @@ def _pillar_detail_grid(row: MomentumV2Row) -> str:
     return '<div class="mv2-a-pillars">' + "".join(cells) + "</div>"
 
 
+def _pillar_reason(row: MomentumV2Row, pillar: str) -> str:
+    value = row.pillars[pillar]
+    sign = "supports" if value >= 0 else "drags on"
+    if pillar == "MOM":
+        return f"12-1 momentum is {_fmt(row.momentum_pct, '%', 1)}, so trend speed {sign} the score."
+    if pillar == "MANS":
+        return f"Mansfield RS is {_fmt(row.mansfield_rs)}, showing whether {row.ticker} leads its peer group."
+    if pillar == "RS-R":
+        return f"RRG ratio is {_fmt(row.rs_ratio - 100.0)}, measuring relative strength versus the benchmark."
+    if pillar == "RS-M":
+        return f"RRG momentum is {_fmt(row.rs_momentum - 100.0)}, the rotation signal that often moves first."
+    if pillar == "FILT":
+        gates = [
+            "above 30wMA" if row.above_30wma else "below 30wMA",
+            "rising slope" if row.ma_slope_pos else "falling slope",
+            f"stage {row.stage}",
+        ]
+        return "Trend filters read " + ", ".join(gates) + "."
+    if pillar == "CYC":
+        return f"Business-cycle tilt adjusts the score for {row.asset_class or 'this group'}."
+    if pillar == "FLOW":
+        return f"Flow is {_fmt(row.f_score)} and CMF is {_fmt(row.cmf21)}, so institutional demand {sign} the score."
+    return "Signed weighted contribution from the methodology."
+
+
+def _terminal_pillar_detail_grid(row: MomentumV2Row) -> str:
+    cells = []
+    for pillar in PILLAR_ORDER:
+        value = row.pillars[pillar]
+        tone = _tone_class(value)
+        cells.append(
+            f"""
+            <div class="mv2-a2-pillar">
+              <i style="background:{PILLAR_HUES[pillar]}"></i>
+              <div>
+                <b>{_esc(PILLAR_FULL[pillar])} | w {PILLAR_WEIGHTS[pillar]:.0%}</b>
+                <p>{_esc(_pillar_reason(row, pillar))}</p>
+              </div>
+              <span class="{tone}">{_fmt(value, digits=3)}</span>
+            </div>
+            """
+        )
+    return '<div class="mv2-a2-pillars">' + "".join(cells) + "</div>"
+
+
+def _gate_rows_for(row: MomentumV2Row) -> list[tuple[bool, str, str]]:
+    return [
+        (row.quadrant not in {"Weakening", "Lagging"}, "RRG not weakening", row.quadrant),
+        (row.breadth_50d >= 0.5, "Breadth >= 50%", f"{row.breadth_50d:.0%}"),
+        (row.cmf21 > 0, "CMF stayed > 0", _fmt(row.cmf21)),
+        (row.f_score >= -0.5, "Flow veto avoided", _fmt(row.f_score)),
+        (row.above_30wma, "Close above 30wMA", "above" if row.above_30wma else "below"),
+        (row.mansfield_rs >= 0, "Mansfield RS >= 0", _fmt(row.mansfield_rs)),
+    ]
+
+
+def _next_escalation_text(row: MomentumV2Row) -> str:
+    tripped = []
+    if not row.above_30wma:
+        tripped.append("close < 30wMA")
+    if row.mansfield_rs < 0:
+        tripped.append("Mansfield RS < 0")
+    if row.cmf21 < -0.10:
+        tripped.append("CMF < -0.10")
+    if row.quadrant == "Lagging":
+        tripped.append("RRG Lagging")
+    if tripped:
+        return f"Next state escalation: EXIT pressure is active because {', '.join(tripped)}."
+    return "Next state escalation: EXIT if close < 30wMA, Mansfield RS < 0, RRG enters Lagging, or CMF < -0.10 holds for one week. Currently no escalation gate is tripped."
+
+
+def _peer_rank_html(rows: list[MomentumV2Row], focus: MomentumV2Row) -> tuple[str, int, int]:
+    peers = [row for row in rows if row.asset_class == focus.asset_class] or rows
+    peers = sorted(peers, key=lambda item: item.s_score, reverse=True)
+    rank = next((idx + 1 for idx, row in enumerate(peers) if row.ticker == focus.ticker), 1)
+    rendered = []
+    for idx, row in enumerate(peers[:14], start=1):
+        state = STATE_LABELS.get(row.state, row.state)
+        focus_class = " focus" if row.ticker == focus.ticker else ""
+        rendered.append(
+            f"""
+            <div class="mv2-a2-peer-row mv2-a-click{focus_class}" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}">
+              <span class="rank">{idx:02d}</span>
+              <b>{_esc(row.ticker)}</b>
+              <span class="name">{_esc(row.identity)}</span>
+              <span class="{_tone_class(row.s_score)}">{_fmt(row.s_score)}</span>
+              {_state_pill(row.state)}
+              <span style="display:none">{_esc(state)}</span>
+            </div>
+            """
+        )
+    return "".join(rendered), rank, len(peers)
+
+
 def _svg_polyline(points: list[tuple[float, float]]) -> str:
     return " ".join(f"{x:.1f},{y:.1f}" for x, y in points)
 
@@ -1168,77 +1285,75 @@ def _cmf_svg(row: MomentumV2Row, width: int = 420, height: int = 170) -> str:
     """
 
 
-def _deepdive_terminal_body(row: MomentumV2Row, as_of: str) -> str:
+def _deepdive_terminal_body(row: MomentumV2Row, rows: list[MomentumV2Row], as_of: str) -> str:
     s_class = "mv2-pos" if row.s_score >= 0 else "mv2-neg"
     f_class = "mv2-pos" if row.f_score >= 0 else "mv2-neg"
     mom_class = "mv2-pos" if row.momentum_pct >= 0 else "mv2-neg"
-    gates = [
-        (row.quadrant not in {"Weakening", "Lagging"}, "RRG leadership intact", row.quadrant),
-        (row.breadth_50d >= 0.5, "Breadth above 50% gate", f"{row.breadth_50d:.0%}"),
-        (row.cmf21 >= 0, "CMF stayed above zero", _fmt(row.cmf21)),
-        (row.f_score >= -0.5, "Flow veto avoided", _fmt(row.f_score)),
-        (row.above_30wma, "Weekly close above 30wMA", "above" if row.above_30wma else "below"),
-        (row.mansfield_rs >= 0, "Mansfield RS positive", _fmt(row.mansfield_rs)),
-    ]
+    gate_rows = _gate_rows_for(row)
+    failed_gates = [gate for gate in gate_rows if not gate[0]]
+    peer_rows, rank, peer_count = _peer_rank_html(rows, row)
+    state_text = row.state.replace("_", " ")
+    flow_phrase = "institutional money is supporting the move" if row.f_score >= 0 else "institutional money is exiting before price fully confirms it"
+    narrative = (
+        f"{row.ticker} is in {state_text}. Price-based evidence shows momentum at {_fmt(row.momentum_pct, '%', 1)} "
+        f"and the 30-week SMA is {'intact' if row.above_30wma else 'broken'}, while flow contributes "
+        f"{_fmt(row.pillars['FLOW'], digits=3)} with CMF {_fmt(row.cmf21)}. RRG is {row.quadrant}. "
+        f"The system is telling you {flow_phrase}."
+    )
     return f"""
-      <div class="mv2-head" style="border-bottom:1px solid var(--mv2-border);padding-bottom:12px">
-        <div>
-          <div class="mv2-kicker">A | Terminal | Deep dive | {_esc(as_of)}</div>
-          <h2 class="mv2-title">{_esc(row.ticker)} | {_esc(row.identity)}</h2>
-          <p class="mv2-subtitle">{_esc(row.asset_class)} | last model state {_esc(row.state.replace("_", " "))} | RRG {_esc(row.quadrant)}</p>
-        </div>
-        <div class="mv2-screen-note">{_state_pill(row.state)}<br>S {_fmt(row.s_score)} | F {_fmt(row.f_score)}</div>
+      <div class="mv2-a2-header">
+        <span class="mv2-a2-back">BACK TO OVERVIEW</span>
+        <span style="color:#5a5a5a;font:900 11px/1 var(--font-mono)">/</span>
+        <span style="color:#7c7c7c;font:900 12px/1 var(--font-mono);letter-spacing:.08em">DEEP DIVE</span>
+        <span style="color:#5a5a5a;font:900 11px/1 var(--font-mono)">/</span>
+        <b style="color:#e8e8e8;font:900 14px/1 var(--font-mono)">{_esc(row.ticker)}</b>
+        <span style="color:#7c7c7c;font:800 11px/1 var(--font-mono)">{_esc(row.asset_class)} | {_esc(row.identity.upper())}</span>
+        <span style="flex:1"></span>
+        {_state_pill(row.state)}
+        <span style="color:#7c7c7c;font:800 11px/1 var(--font-mono)">model close proxy | mom {_fmt(row.momentum_pct, '%', 1)}</span>
       </div>
       {_tabs_html("deepdive")}
-      <div class="mv2-a-hero">
-        <div class="mv2-a-hero-grid">
+      <div class="mv2-a2-lead">
+        <div class="mv2-a2-lead-grid">
           <div>
             <div class="mv2-kicker">COMPOSITE FORWARD OUTLOOK</div>
-            <div class="mv2-a-score"><b class="{s_class}">{_fmt(row.s_score)}</b><span>S-score | {_esc(row.asset_class)}</span></div>
-            <p class="mv2-a-prose">
-              <strong>{_esc(row.ticker)}</strong> is being classified by seven signed evidence pillars.
-              Momentum is {_fmt(row.momentum_pct, "%", 1)}, flow is {_fmt(row.f_score)}, Mansfield RS is {_fmt(row.mansfield_rs)}, and CMF is {_fmt(row.cmf21)}.
-              The handoff view makes the disagreement visible first: price/trend gates can still be constructive while flow or rotation starts to deteriorate.
-            </p>
+            <div class="mv2-a2-score"><b class="{s_class}">{_fmt(row.s_score)}</b><span>S-score | rank {rank} of {peer_count} {_esc(row.asset_class)}</span></div>
+            <p class="mv2-a2-copy"><strong style="color:#e6b450">{_esc(row.ticker)} is currently {_esc(state_text)}.</strong> {_esc(narrative)}</p>
             {_composite_bar_html(row)}
-            {_pillar_detail_grid(row)}
+            {_terminal_pillar_detail_grid(row)}
           </div>
-          <aside class="mv2-panel">
-            <h3>{_esc(row.state.replace("_", " "))} state gates</h3>
-            <p>State changes are driven by concrete gates. Failed or warning gates are marked with an exclamation point.</p>
-            <div class="mv2-gates">{"".join(_gate_html(*gate) for gate in gates)}</div>
-            <p style="margin-top:12px"><b>Nearest escalation:</b> watch CMF below -0.10, RRG Lagging, or a weekly close below the 30-week average.</p>
+          <aside class="mv2-a2-gate-panel">
+            <h3>{_esc(STATE_LABELS.get(row.state, row.state))} | STATE GATES</h3>
+            <p>State fires when any one deterioration gate is active. Currently triggered by <span style="color:#e6b450">{len(failed_gates)}</span> gates.</p>
+            <div class="mv2-gates">{"".join(_gate_html(*gate) for gate in gate_rows)}</div>
+            <div class="mv2-a2-callout"><strong style="color:#e6b450">Next state escalation:</strong> {_esc(_next_escalation_text(row))}</div>
           </aside>
         </div>
       </div>
-      <div class="mv2-chart-grid tight" style="padding-top:16px">
+      <div class="mv2-a2-charts">
         <div class="mv2-panel">
-          <h3>Weekly price vs 30-week SMA | Weinstein</h3>
+          <h3>WEEKLY PRICE vs 30-WEEK SMA | WEINSTEIN</h3>
           {_price_svg(row, width=820, height=245)}
-          <p>{_esc(row.ticker)} is {'above' if row.above_30wma else 'below'} the 30-week average and the average slope is {'positive' if row.ma_slope_pos else 'negative'}. This is the primary Stage 2 versus exit line.</p>
+          <p>{_esc(row.ticker)} is {'above' if row.above_30wma else 'below'} the 30-week average and the average slope is {'positive' if row.ma_slope_pos else 'negative'}. A weekly close below the dashed line is the canonical EXIT trigger.</p>
         </div>
         <div class="mv2-panel">
-          <h3>OBV divergence</h3>
+          <h3>OBV DIVERGENCE</h3>
           {_obv_svg(row, width=420, height=190)}
-          <p>OBV shows whether volume confirms price. A higher price high with weaker OBV is an early sponsorship warning.</p>
+          <p>OBV shows whether volume confirms price. A higher price high with weaker OBV is an early sponsorship warning for {_esc(row.ticker)}.</p>
         </div>
         <div class="mv2-panel">
-          <h3>Chaikin Money Flow | 21D</h3>
+          <h3>CHAIKIN MONEY FLOW (21D)</h3>
           {_cmf_svg(row, width=820, height=205)}
           <p>CMF is {_fmt(row.cmf21)}. Values below zero show distribution; values below -0.10 are treated as a more serious exit gate.</p>
         </div>
         <div class="mv2-panel">
-          <h3>Peer rank | S-score context</h3>
-          <div class="mv2-metric-deck" style="grid-template-columns:1fr 1fr;margin-top:0">
-            {_metric_card("S-score", _fmt(row.s_score), s_class)}
-            {_metric_card("F-score", _fmt(row.f_score), f_class)}
-            {_metric_card("Momentum", _fmt(row.momentum_pct, "%", 1), mom_class)}
-            {_metric_card("RRG", row.quadrant)}
-          </div>
-          <p>The peer panel summarizes where the ticker sits before the user switches back to the full matrix.</p>
+          <h3>PEERS | {_esc(row.asset_class.upper())} RANK</h3>
+          <p>{peer_count} peers sorted by S. {_esc(row.ticker)} is #{rank}. Click a peer row to open its drill-down.</p>
+          <div class="mv2-a2-peer-row" style="border-top:0;color:#7c7c7c;text-transform:uppercase"><span>RK</span><span>TKR</span><span>NAME</span><span>S</span><span>STATE</span></div>
+          {peer_rows}
         </div>
       </div>
-      <div class="mv2-footer"><span>{_esc(row.ticker)} | {_esc(row.identity)} | 7 pillars</span><span>Momentum v2 | Terminal deep dive</span></div>
+      <div class="mv2-a-footer"><span>{_esc(row.ticker)} | {_esc(row.identity.upper())} | {len(rows)} ETFS | 7 PILLARS | LIVE FLOW</span><span>v2 | TERMINAL | DEEP DIVE | MEIRI</span></div>
     """
 
 
@@ -1670,7 +1785,7 @@ def render_deepdive(display: str, rows: list[MomentumV2Row], as_of: str, focus_t
     if display == "B":
         return _shell(display, "deepdive", _deepdive_article_body(row, as_of))
     if display == "A":
-        return _shell(display, "deepdive", _deepdive_terminal_body(row, as_of))
+        return _shell(display, "deepdive", _deepdive_terminal_body(row, rows, as_of))
     body = _deepdive_body(row, display_name)
     return _shell(display, "deepdive", body)
 

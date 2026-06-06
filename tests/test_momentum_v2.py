@@ -108,6 +108,36 @@ def test_display_a_overview_matches_terminal_handoff_structure():
     assert "Energy sector" in html
 
 
+def test_display_a_deepdive_matches_terminal_handoff_structure_for_focus_ticker():
+    rows = build_view_rows(_sample_scored(), phase="MID")
+
+    html = render_display(
+        "A",
+        rows,
+        "2026-06-06 16:00 ET",
+        screen="deepdive",
+        focus_ticker="XLF",
+    )
+
+    for marker in (
+        "BACK TO OVERVIEW",
+        "DEEP DIVE",
+        "COMPOSITE FORWARD OUTLOOK",
+        "STATE GATES",
+        "Next state escalation",
+        "WEEKLY PRICE vs 30-WEEK SMA",
+        "OBV DIVERGENCE",
+        "CHAIKIN MONEY FLOW",
+        "PEERS | US SECTORS RANK",
+        "v2 | TERMINAL | DEEP DIVE | MEIRI",
+    ):
+        assert marker in html
+    assert "XLF is currently" in html
+    assert "rank" in html
+    assert "data-drill-ticker=\"XLF\"" in html
+    assert "Financials sector" in html
+
+
 def test_render_display_supports_all_three_screens_for_each_display():
     rows = build_view_rows(_sample_scored(), phase="MID")
 
@@ -159,6 +189,7 @@ def test_css_contains_readability_and_bar_rules():
     assert ".mv2-bar:before" in stylesheet
     assert ".mv2-a-body" in stylesheet
     assert ".mv2-a-header-row" in stylesheet
+    assert ".mv2-a2-lead-grid" in stylesheet
     assert ".mv2-waterfall" in stylesheet
     assert ".mv2-rrg" in stylesheet
     assert "color:var(--mv2-muted)" in stylesheet
