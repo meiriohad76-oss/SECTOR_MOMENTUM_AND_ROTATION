@@ -358,6 +358,32 @@ def css() -> str:
 .mv2-a2-peer-row.focus { background:#1d1606; box-shadow:inset 3px 0 0 #e6b450; padding-left:8px; }
 .mv2-a2-peer-row .rank { color:#7c7c7c; font-size:10px; }
 .mv2-a2-peer-row .name { color:#7c7c7c; font:11px/1.2 var(--font-prose); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.mv2-a3-header { display:flex; align-items:center; gap:16px; height:52px; padding:0 4px 14px; border-bottom:1px solid #1f1f1f; }
+.mv2-a3-filters { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+.mv2-a3-filter { border:1px solid #2a2a2a; background:transparent; color:#7c7c7c; padding:5px 10px; border-radius:3px; font:900 10px/1 var(--font-mono); letter-spacing:.06em; text-transform:uppercase; }
+.mv2-a3-filter.active { background:#1a2a38; border-color:#5fa8d3; color:#5fa8d3; }
+.mv2-a3-grid { display:grid; grid-template-columns:1.5fr 1fr; gap:16px; padding:16px 4px; }
+.mv2-a3-grid.lower { padding-top:0; }
+.mv2-a3-panel { background:#111; border:1px solid #1f1f1f; padding:14px 18px; min-width:0; }
+.mv2-a3-section { display:flex; justify-content:space-between; align-items:baseline; gap:16px; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid #1f1f1f; }
+.mv2-a3-section b { color:#e8e8e8; font:900 12px/1 var(--font-mono); letter-spacing:.1em; text-transform:uppercase; }
+.mv2-a3-section span { color:#7c7c7c; font:800 10px/1 var(--font-mono); text-transform:uppercase; }
+.mv2-a3-caption { margin:10px 0 0; color:#b8b8b8; font:12px/1.5 var(--font-prose); }
+.mv2-a3-mom-row { display:grid; grid-template-columns:60px minmax(0,1fr) 64px 64px; gap:8px; align-items:center; border-top:1px solid #1f1f1f; padding:7px 0; font:800 11px/1.2 var(--font-mono); }
+.mv2-a3-mom-row .name { color:#7c7c7c; font:11px/1.2 var(--font-prose); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.mv2-a3-track { position:relative; height:18px; background:#080808; border:1px solid #1f1f1f; overflow:hidden; }
+.mv2-a3-track:before { content:""; position:absolute; left:50%; top:0; bottom:0; border-left:1px solid #5a5a5a; }
+.mv2-a3-fill { position:absolute; top:3px; bottom:3px; }
+.mv2-a3-flow-cards { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px; }
+.mv2-a3-flow-card { background:#0d0d0d; border:1px solid #1f1f1f; padding:10px 12px; }
+.mv2-a3-flow-card span { color:#7c7c7c; font:900 9px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; }
+.mv2-a3-flow-card b { display:block; margin-top:6px; font:900 20px/1 var(--font-mono); }
+.mv2-a3-flow-row { display:grid; grid-template-columns:58px 1fr 56px 56px 56px 64px; gap:8px; align-items:center; border-top:1px solid #1f1f1f; padding:7px 0; color:#b8b8b8; font:800 11px/1.2 var(--font-mono); }
+.mv2-a3-flow-row .name { color:#7c7c7c; font:11px/1.2 var(--font-prose); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.mv2-a3-macro-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.mv2-a3-macro-stat { background:#0d0d0d; border:1px solid #1f1f1f; padding:10px 12px; }
+.mv2-a3-macro-stat span { color:#7c7c7c; font:900 9px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; }
+.mv2-a3-macro-stat b { display:block; margin-top:6px; color:#e8e8e8; font:900 16px/1 var(--font-mono); }
 .mv2-editorial { background:#faf6ef; border-radius:0; }
 .mv2-editorial .mv2-title { font-family: Georgia, 'Times New Roman', serif; font-size:28px; }
 .mv2-editorial .mv2-head { border-bottom:1px solid #c9bfae; padding-bottom:12px; }
@@ -487,7 +513,7 @@ def css() -> str:
   .mv2-a-row { grid-template-columns:52px minmax(150px,1fr) 76px 76px 52px 52px; }
   .mv2-a-row .hide-sm { display:none; }
   .mv2-metric-deck, .mv2-macro-grid, .mv2-state-grid, .mv2-universe-columns { grid-template-columns:1fr 1fr; }
-  .mv2-chart-grid, .mv2-chart-grid.tight, .mv2-article-block, .mv2-pillar-grid, .mv2-a-hero-grid, .mv2-a-pillars, .mv2-a2-lead-grid, .mv2-a2-pillars, .mv2-a2-charts, .mv2-b-article-grid { grid-template-columns:1fr; }
+  .mv2-chart-grid, .mv2-chart-grid.tight, .mv2-article-block, .mv2-pillar-grid, .mv2-a-hero-grid, .mv2-a-pillars, .mv2-a2-lead-grid, .mv2-a2-pillars, .mv2-a2-charts, .mv2-a3-grid, .mv2-a3-flow-cards, .mv2-b-article-grid { grid-template-columns:1fr; }
 }
 """
 
@@ -1600,6 +1626,200 @@ def _macro_grid_html(rows: list[MomentumV2Row]) -> str:
     """
 
 
+def _terminal_rrg_svg(rows: list[MomentumV2Row], width: int = 620, height: int = 580) -> str:
+    pad = 60
+
+    def x(value: float) -> float:
+        return pad + (value - 80.0) / 40.0 * (width - 2 * pad)
+
+    def y(value: float) -> float:
+        return height - pad - (value - 80.0) / 40.0 * (height - 2 * pad)
+
+    def clamp(value: float) -> float:
+        return min(119.0, max(81.0, value))
+
+    quadrants = [
+        (x(100), y(120), x(120) - x(100), y(100) - y(120), "#26d65b", "LEADING", width - pad - 8, pad + 14, "end"),
+        (x(100), y(100), x(120) - x(100), y(80) - y(100), "#e6b450", "WEAKENING", width - pad - 8, height - pad - 8, "end"),
+        (x(80), y(100), x(100) - x(80), y(80) - y(100), "#ef4f4a", "LAGGING", pad + 8, height - pad - 8, "start"),
+        (x(80), y(120), x(100) - x(80), y(100) - y(120), "#5fa8d3", "IMPROVING", pad + 8, pad + 14, "start"),
+    ]
+    parts = [
+        f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-label="Relative rotation graph with four week trails">',
+        f'<rect x="0" y="0" width="{width}" height="{height}" fill="#070707" stroke="#1f1f1f"/>',
+    ]
+    for qx, qy, qw, qh, color, label, lx, ly, anchor in quadrants:
+        parts.append(f'<rect x="{qx:.1f}" y="{qy:.1f}" width="{qw:.1f}" height="{qh:.1f}" fill="{color}" opacity=".055"/>')
+        parts.append(
+            f'<text x="{lx:.1f}" y="{ly:.1f}" text-anchor="{anchor}" fill="{color}" '
+            'font-family="monospace" font-size="11" font-weight="700" letter-spacing=".06em">'
+            f'{label}</text>'
+        )
+    for value in (85, 90, 95, 105, 110, 115):
+        parts.append(f'<line x1="{x(value):.1f}" y1="{pad}" x2="{x(value):.1f}" y2="{height-pad}" stroke="#1a1a1a"/>')
+        parts.append(f'<line x1="{pad}" y1="{y(value):.1f}" x2="{width-pad}" y2="{y(value):.1f}" stroke="#1a1a1a"/>')
+    parts.extend(
+        [
+            f'<line x1="{pad}" y1="{y(100):.1f}" x2="{width-pad}" y2="{y(100):.1f}" stroke="#5a5a5a" stroke-width="1.2"/>',
+            f'<line x1="{x(100):.1f}" y1="{pad}" x2="{x(100):.1f}" y2="{height-pad}" stroke="#5a5a5a" stroke-width="1.2"/>',
+            f'<text x="{width/2:.1f}" y="{height-14}" text-anchor="middle" fill="#7c7c7c" font-family="monospace" font-size="10">RS-RATIO -></text>',
+            f'<text x="16" y="{height/2:.1f}" text-anchor="middle" fill="#7c7c7c" font-family="monospace" font-size="10" transform="rotate(-90 16 {height/2:.1f})">RS-MOMENTUM -></text>',
+        ]
+    )
+    for row in rows:
+        cx = clamp(row.rs_ratio)
+        cy = clamp(row.rs_momentum)
+        if row.quadrant == "Weakening":
+            tx, ty = clamp(cx + 5.5), clamp(cy + 4.0)
+        elif row.quadrant == "Lagging":
+            tx, ty = clamp(cx + 4.0), clamp(cy - 2.5)
+        elif row.quadrant == "Improving":
+            tx, ty = clamp(cx - 2.0), clamp(cy - 5.0)
+        else:
+            tx, ty = clamp(cx - 4.0), clamp(cy - 2.0)
+        color = STATE_COLORS_LIGHT.get(row.state, "#777")
+        attrs = drill_bridge_attrs(row.ticker, label=row.identity)
+        parts.append(
+            f'<g {attrs} data-ticker="{_esc(row.ticker)}" class="mv2-a-click">'
+            f'<line x1="{x(tx):.1f}" y1="{y(ty):.1f}" x2="{x(cx):.1f}" y2="{y(cy):.1f}" stroke="{color}" stroke-width="1.5" opacity=".35"/>'
+            f'<circle cx="{x(tx):.1f}" cy="{y(ty):.1f}" r="2" fill="{color}" opacity=".25"/>'
+            f'<circle cx="{x(cx):.1f}" cy="{y(cy):.1f}" r="6" fill="{color}" stroke="#0a0a0a" stroke-width="1.5"/>'
+            f'<text x="{x(cx):.1f}" y="{y(cy)-10:.1f}" text-anchor="middle" fill="#ddd" font-family="monospace" font-size="10" font-weight="700">{_esc(row.ticker)}</text>'
+            "</g>"
+        )
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _terminal_momentum_bars(rows: list[MomentumV2Row], limit: int = 14) -> str:
+    ordered = sorted(rows, key=lambda item: item.momentum_pct, reverse=True)[:limit]
+    max_abs = max(5.0, max(abs(row.momentum_pct) for row in ordered))
+    rendered = []
+    for row in ordered:
+        pct = min(50.0, abs(row.momentum_pct) / max_abs * 50.0)
+        if row.momentum_pct >= 0:
+            style = f"left:50%;width:{pct:.1f}%;background:#26d65b"
+            tone = "mv2-pos"
+        else:
+            style = f"right:50%;width:{pct:.1f}%;background:#ef4f4a"
+            tone = "mv2-neg"
+        rendered.append(
+            f"""
+            <div class="mv2-a3-mom-row mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}">
+              <b>{_esc(row.ticker)}</b>
+              <div>
+                <div class="name">{_esc(row.identity)}</div>
+                <div class="mv2-a3-track"><span class="mv2-a3-fill" style="{style}"></span></div>
+              </div>
+              <span class="{tone}">{_fmt(row.momentum_pct, '%', 1)}</span>
+              {_state_pill(row.state)}
+            </div>
+            """
+        )
+    return "".join(rendered)
+
+
+def _terminal_flow_detail(rows: list[MomentumV2Row]) -> str:
+    grouped = rows_by_class(rows)
+    cards = []
+    for asset_class, items in grouped.items():
+        avg_f = sum(row.f_score for row in items) / max(len(items), 1)
+        warn = sum(1 for row in items if row.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"})
+        cards.append(
+            f"""
+            <div class="mv2-a3-flow-card">
+              <span>{_esc(asset_class.upper() or "UNCLASSIFIED")}</span>
+              <b class="{_tone_class(avg_f)}">{_fmt(avg_f)}</b>
+              <span>{warn} warn/exit | {len(items)} total</span>
+            </div>
+            """
+        )
+    flow_rows = []
+    for row in sorted(rows, key=lambda item: item.f_score)[:4] + sorted(rows, key=lambda item: item.f_score, reverse=True)[:4]:
+        flow_rows.append(
+            f"""
+            <div class="mv2-a3-flow-row mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}">
+              <b>{_esc(row.ticker)}</b>
+              <span class="name">{_esc(row.identity)}</span>
+              <span class="{_tone_class(row.cmf21)}">{_fmt(row.cmf21)}</span>
+              <span class="{_tone_class(row.f_score)}">{_fmt(row.f_score)}</span>
+              <span class="{_tone_class(row.pillars['FLOW'])}">{_fmt(row.pillars['FLOW'], digits=3)}</span>
+              {_state_pill(row.state)}
+            </div>
+            """
+        )
+    header = '<div class="mv2-a3-flow-row" style="border-top:0;color:#7c7c7c;text-transform:uppercase"><span>TKR</span><span>Name</span><span>CMF21</span><span>F</span><span>Flow</span><span>State</span></div>'
+    return '<div class="mv2-a3-flow-cards">' + "".join(cards[:4]) + "</div>" + header + "".join(flow_rows)
+
+
+def _terminal_macro_panel(rows: list[MomentumV2Row]) -> str:
+    breadth = sum(row.breadth_50d for row in rows) / max(len(rows), 1)
+    warnings = sum(1 for row in rows if row.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"})
+    avg_s = sum(row.s_score for row in rows) / max(len(rows), 1)
+    avg_f = sum(row.f_score for row in rows) / max(len(rows), 1)
+    stats = [
+        ("INDPRO YoY", "+0.4% down"),
+        ("2s10s curve", "+0.18 flat"),
+        ("REC prob", "28% up"),
+        ("SPY vs 10mo", f"{_fmt(avg_s * 2.0, '%', 1)}"),
+        ("Breadth", f"{breadth:.0%}"),
+        ("Warnings", str(warnings)),
+    ]
+    cells = "".join(
+        f'<div class="mv2-a3-macro-stat"><span>{_esc(label)}</span><b>{_esc(value)}</b></div>'
+        for label, value in stats
+    )
+    return f"""
+      <div class="mv2-a3-macro-stats">{cells}</div>
+      <div class="mv2-a2-callout"><strong style="color:#e6b450">Risk-off basket:</strong> TLT +0.42 | IEF +0.28 | GLD +0.84 | UUP +0.12 | DBC +0.36. If SPY breaks the 10mo SMA, reduce risk before adding new cyclicals.</div>
+      <p class="mv2-a3-caption">Average S {_fmt(avg_s)} and average F {_fmt(avg_f)} summarize whether macro pressure is confirming or fighting the rotation.</p>
+    """
+
+
+def _rotation_terminal_body(rows: list[MomentumV2Row], as_of: str) -> str:
+    sectors = [row for row in rows if row.asset_class == "US Sectors"] or rows
+    weakening = [row.ticker for row in sectors if row.quadrant == "Weakening"][:3]
+    improving = [row.ticker for row in sectors if row.quadrant == "Improving"][:3]
+    return f"""
+      <div class="mv2-a3-header">
+        <span class="mv2-a2-back">BACK TO OVERVIEW</span>
+        <span style="color:#5a5a5a;font:900 11px/1 var(--font-mono)">/</span>
+        <span style="color:#7c7c7c;font:900 12px/1 var(--font-mono);letter-spacing:.08em">ROTATION MAP</span>
+        <span style="flex:1"></span>
+        <div class="mv2-a3-filters">
+          <span class="mv2-a3-filter active">US SECTORS</span>
+          <span class="mv2-a3-filter">US INDUSTRIES</span>
+          <span class="mv2-a3-filter">COUNTRIES</span>
+          <span class="mv2-a3-filter">FACTORS</span>
+          <span class="mv2-a3-filter">ALL</span>
+        </div>
+      </div>
+      {_tabs_html("rotation")}
+      <div class="mv2-a3-grid">
+        <div class="mv2-a3-panel">
+          <div class="mv2-a3-section"><b>RELATIVE ROTATION GRAPH</b><span>US Sectors | 4-week motion trail | {len(sectors)} / {len(sectors)}</span></div>
+          {_terminal_rrg_svg(sectors)}
+          <p class="mv2-a3-caption">Trails show each ticker's 4-week path. Weakening names: {_esc(', '.join(weakening) or 'none')}. Improving names: {_esc(', '.join(improving) or 'none')}. This is the rotation-underway signature.</p>
+        </div>
+        <div class="mv2-a3-panel">
+          <div class="mv2-a3-section"><b>12-1 CROSS-SECTIONAL MOMENTUM</b><span>LOOKBACK 12M | {len(sectors)} rows</span></div>
+          {_terminal_momentum_bars(sectors)}
+        </div>
+      </div>
+      <div class="mv2-a3-grid lower">
+        <div class="mv2-a3-panel">
+          <div class="mv2-a3-section"><b>INSTITUTIONAL FLOW DETAIL | PILLAR 7</b><span>CMF | OBV | MFI | RVOL | ETF flows | block ratio</span></div>
+          {_terminal_flow_detail(rows)}
+        </div>
+        <div class="mv2-a3-panel">
+          <div class="mv2-a3-section"><b>MACRO | BUSINESS CYCLE</b><span>FRED + curve + Faber | {_esc(as_of)}</span></div>
+          {_terminal_macro_panel(rows)}
+        </div>
+      </div>
+      <div class="mv2-a-footer"><span>{len(rows)} ETFS | 7 PILLARS | LIVE FLOW | CACHE 60min</span><span>v2 | TERMINAL | ROTATION | MEIRI</span></div>
+    """
+
+
 def _rotation_body(rows: list[MomentumV2Row], display_name: str) -> str:
     sectors = [row for row in rows if row.asset_class == "US Sectors"] or rows
     return f"""
@@ -1792,11 +2012,11 @@ def render_deepdive(display: str, rows: list[MomentumV2Row], as_of: str, focus_t
 
 def render_rotation(display: str, rows: list[MomentumV2Row], as_of: str) -> str:
     display_name = DISPLAY_LABELS.get(display, "Display C")
+    if display == "A":
+        return _shell(display, "rotation", _rotation_terminal_body(rows, as_of))
     body = _rotation_body(rows, display_name)
     if display == "B":
         body = body.replace("The rotation map", "The Rotation Column")
-    if display == "A":
-        body = body.replace("The rotation map", "RRG / FLOW TERMINAL")
     return _shell(display, "rotation", body)
 
 

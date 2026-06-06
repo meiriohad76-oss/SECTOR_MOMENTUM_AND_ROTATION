@@ -138,16 +138,41 @@ def test_display_a_deepdive_matches_terminal_handoff_structure_for_focus_ticker(
     assert "Financials sector" in html
 
 
+def test_display_a_rotation_matches_terminal_handoff_structure():
+    rows = build_view_rows(_sample_scored(), phase="MID")
+
+    html = render_display("A", rows, "2026-06-06 16:00 ET", screen="rotation")
+
+    for marker in (
+        "ROTATION MAP",
+        "US SECTORS",
+        "US INDUSTRIES",
+        "COUNTRIES",
+        "FACTORS",
+        "RELATIVE ROTATION GRAPH",
+        "4-week motion trail",
+        "12-1 CROSS-SECTIONAL MOMENTUM",
+        "INSTITUTIONAL FLOW DETAIL | PILLAR 7",
+        "MACRO | BUSINESS CYCLE",
+        "v2 | TERMINAL | ROTATION | MEIRI",
+    ):
+        assert marker in html
+    assert "RS-RATIO" in html
+    assert "RS-MOMENTUM" in html
+    assert "data-drill-ticker=\"XLK\"" in html
+    assert "Technology sector" in html
+
+
 def test_render_display_supports_all_three_screens_for_each_display():
     rows = build_view_rows(_sample_scored(), phase="MID")
 
     expected = {
         "overview": "Overview",
-        "rotation": "Flow river",
     }
     for display in DISPLAY_LABELS:
         for screen, marker in {
             **expected,
+            "rotation": {"A": "ROTATION MAP", "B": "Flow river", "C": "Flow river"}[display],
             "deepdive": {"A": "COMPOSITE FORWARD OUTLOOK", "B": "article", "C": "waterfall"}[display],
         }.items():
             html = render_display(
@@ -190,6 +215,7 @@ def test_css_contains_readability_and_bar_rules():
     assert ".mv2-a-body" in stylesheet
     assert ".mv2-a-header-row" in stylesheet
     assert ".mv2-a2-lead-grid" in stylesheet
+    assert ".mv2-a3-grid" in stylesheet
     assert ".mv2-waterfall" in stylesheet
     assert ".mv2-rrg" in stylesheet
     assert "color:var(--mv2-muted)" in stylesheet
