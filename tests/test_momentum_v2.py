@@ -159,6 +159,9 @@ def test_display_a_rotation_matches_terminal_handoff_structure():
         assert marker in html
     assert "RS-RATIO" in html
     assert "RS-MOMENTUM" in html
+    assert "Rotation universe inventory" in html
+    assert "small dot = four-week trail start" in html
+    assert "CMF | F score | flow pillar | breadth | provider data when configured" in html
     assert "data-drill-ticker=\"XLK\"" in html
     assert "Technology sector" in html
 
@@ -203,6 +206,10 @@ def test_display_c_overview_deepdive_rotation_inventory_is_present():
     ):
         assert marker in rotation
     assert "Flow river from outflows to inflows" in rotation
+    assert "NET OUTFLOWS" in rotation
+    assert "NET INFLOWS" in rotation
+    assert "Technology sector pressure into" in rotation or "Energy sector pressure into" in rotation
+    assert "small dot = four-week trail start" in rotation
 
 
 def test_display_b_overview_deepdive_rotation_inventory_is_present():
@@ -242,10 +249,31 @@ def test_display_b_overview_deepdive_rotation_inventory_is_present():
         "FIGURE 1 | RELATIVE ROTATION",
         "Cross-sectional leaderboard",
         "The phase",
+        "Where the flow went",
         "Current support basket",
+        "If the regime weakens",
         "THE SENTIMENT BRIEF | THE MAP",
     ):
         assert marker in rotation
+    assert "current rotation" in rotation
+    assert "The current rotation story." in rotation
+
+
+def test_rotation_screens_use_current_rows_for_flow_and_editorial_copy():
+    rows = build_view_rows(_sample_scored(), phase="MID")
+
+    html = "\n".join(
+        render_display(display, rows, "2026-06-06 16:00 ET", screen="rotation")
+        for display in ("A", "B", "C")
+    )
+
+    assert "XLK | Technology sector" in html
+    assert "XLF | Financials sector" in html
+    assert "XLE | Energy sector" in html
+    assert "Strongest F scores" in html
+    assert "Weakest F scores" in html
+    assert "NET OUTFLOWS" in html and "NET INFLOWS" in html
+    assert "provider feeds when configured" in html
 
 
 def test_render_display_supports_all_three_screens_for_each_display():

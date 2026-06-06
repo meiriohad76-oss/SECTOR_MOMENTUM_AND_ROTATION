@@ -362,6 +362,11 @@ def css() -> str:
 .mv2-a3-filters { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
 .mv2-a3-filter { border:1px solid #2a2a2a; background:transparent; color:#7c7c7c; padding:5px 10px; border-radius:3px; font:900 10px/1 var(--font-mono); letter-spacing:.06em; text-transform:uppercase; }
 .mv2-a3-filter.active { background:#1a2a38; border-color:#5fa8d3; color:#5fa8d3; }
+.mv2-a3-scope { display:flex; flex-wrap:wrap; gap:8px; padding:0 4px 4px; color:#7c7c7c; font:900 10px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; }
+.mv2-a3-scope span { border:1px solid #242424; background:#0d0d0d; padding:7px 9px; }
+.mv2-a3-rrg-legend { display:flex; flex-wrap:wrap; gap:12px; margin-top:10px; color:#b8b8b8; font:800 10px/1 var(--font-mono); text-transform:uppercase; }
+.mv2-a3-rrg-legend span { display:inline-flex; align-items:center; gap:6px; }
+.mv2-a3-rrg-legend i { width:9px; height:9px; border-radius:50%; display:inline-block; }
 .mv2-a3-grid { display:grid; grid-template-columns:1.5fr 1fr; gap:16px; padding:16px 4px; }
 .mv2-a3-grid.lower { padding-top:0; }
 .mv2-a3-panel { background:#111; border:1px solid #1f1f1f; padding:14px 18px; min-width:0; }
@@ -405,6 +410,13 @@ def css() -> str:
 .mv2-rail-item { border-top:1px solid #eee7dd; padding-top:10px; }
 .mv2-rail-item b { display:block; font:800 13px/1.2 var(--font-mono); color:var(--mv2-ink); }
 .mv2-rail-item span { display:block; color:var(--mv2-muted); font-size:12px; line-height:1.35; margin-top:3px; }
+.mv2-b-phase-row { display:flex; gap:6px; margin:10px 0 12px; }
+.mv2-b-phase-row span { flex:1; padding:9px 4px; text-align:center; border:1px solid #c9bfae; color:#8b7e70; font:800 10px/1 var(--font-mono); letter-spacing:.08em; }
+.mv2-b-phase-row span.active { background:#1c1815; color:#faf6ef; border-color:#1c1815; }
+.mv2-b-risk-basket { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-top:12px; }
+.mv2-b-risk-basket div { padding:8px 6px; text-align:center; border:1px solid #c9bfae; }
+.mv2-b-risk-basket b { display:block; color:#1c1815; font:900 12px/1 var(--font-mono); }
+.mv2-b-risk-basket span { display:block; color:#6e6258; font:italic 11px/1.2 Georgia, 'Times New Roman', serif; margin-top:3px; }
 .mv2-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 16px; }
 .mv2-tab { border:1px solid var(--mv2-border); border-radius:999px; padding:6px 10px; font:800 12px/1 var(--font-mono); color:var(--mv2-muted); background:rgba(255,255,255,.55); }
 .mv2-tab.active { color:var(--mv2-ink); border-color:var(--mv2-blue); box-shadow:inset 0 -2px 0 var(--mv2-blue); }
@@ -492,6 +504,7 @@ def css() -> str:
 .mv2-c-rotation-head { padding:28px 12px 8px; }
 .mv2-c-rotation-head h1 { margin:0; color:#1a1714; font:700 30px/1.1 var(--font-prose); }
 .mv2-c-rotation-grid { display:grid; grid-template-columns:1.5fr 1fr; gap:20px; padding:18px 12px 16px; }
+.mv2-c-flow-river { background:linear-gradient(90deg,#fff7f2,#f7fff9); border:1px solid #e6e1d8; border-radius:8px; overflow:hidden; }
 .mv2-c-flow-river svg { width:100%; height:auto; display:block; }
 .mv2-c-flow-row { display:grid; grid-template-columns:60px 1fr 56px 56px 64px 70px; gap:8px; align-items:center; border-top:1px solid #e6e1d8; padding:8px 0; color:#3d362f; font:800 11px/1.2 var(--font-mono); }
 .mv2-c-flow-row .name { color:#7a7066; font:12px/1.2 var(--font-prose); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -1997,8 +2010,134 @@ def _macro_grid_html(rows: list[MomentumV2Row]) -> str:
     """
 
 
-def _terminal_rrg_svg(rows: list[MomentumV2Row], width: int = 620, height: int = 580) -> str:
+def _short_identity(row: MomentumV2Row, max_chars: int = 24) -> str:
+    label = row.identity if row.identity != row.ticker else row.display_label
+    return label if len(label) <= max_chars else label[: max_chars - 1].rstrip() + "."
+
+
+def _rotation_class_counts(rows: list[MomentumV2Row]) -> list[tuple[str, int]]:
+    grouped = rows_by_class(rows)
+    ordered = ["US Sectors", "US Industries", "Countries", "Factors"]
+    counts = [(label, len(grouped.get(label, []))) for label in ordered]
+    other = sum(len(items) for label, items in grouped.items() if label not in ordered)
+    if other:
+        counts.append(("Other", other))
+    counts.append(("All", len(rows)))
+    return counts
+
+
+def _rotation_scope_chips(rows: list[MomentumV2Row]) -> str:
+    chips = []
+    for label, count in _rotation_class_counts(rows):
+        active = " active" if label == "US Sectors" else ""
+        chips.append(f'<span class="mv2-a3-filter{active}" data-rotation-scope="{_esc(label)}">{_esc(label.upper())} {count}</span>')
+    return '<div class="mv2-a3-filters">' + "".join(chips) + "</div>"
+
+
+def _rotation_scope_summary(rows: list[MomentumV2Row]) -> str:
+    chips = "".join(f"<span>{_esc(label.upper())}: {count}</span>" for label, count in _rotation_class_counts(rows))
+    return f'<div class="mv2-a3-scope" aria-label="Rotation universe inventory">{chips}</div>'
+
+
+def _rotation_state_legend() -> str:
+    labels = (
+        ("STAGE_2_BULLISH", "Bullish"),
+        ("HOLD", "Hold"),
+        ("WARNING", "Warning"),
+        ("EXIT", "Exit"),
+        ("BEARISH_STAGE_4", "Bear stage 4"),
+    )
+    return (
+        '<div class="mv2-a3-rrg-legend">'
+        + "".join(
+            f'<span><i style="background:{STATE_COLORS_LIGHT[state]}"></i>{_esc(label)}</span>'
+            for state, label in labels
+        )
+        + '<span style="margin-left:auto">small dot = four-week trail start | large dot = current</span></div>'
+    )
+
+
+def _quadrant_groups(rows: list[MomentumV2Row]) -> dict[str, list[MomentumV2Row]]:
+    groups = {name: [] for name in ("Leading", "Weakening", "Lagging", "Improving")}
+    for row in rows:
+        groups.setdefault(row.quadrant, []).append(row)
+    for items in groups.values():
+        items.sort(key=lambda item: item.s_score, reverse=True)
+    return groups
+
+
+def _rotation_story_parts(rows: list[MomentumV2Row]) -> dict[str, str]:
+    sectors = [row for row in rows if row.asset_class == "US Sectors"] or rows
+    groups = _quadrant_groups(sectors)
+    strongest = max(sectors, key=lambda item: item.f_score, default=None)
+    weakest = min(sectors, key=lambda item: item.f_score, default=None)
+    leaders = sorted(sectors, key=lambda item: item.momentum_pct, reverse=True)[:3]
+    laggards = sorted(sectors, key=lambda item: item.momentum_pct)[:3]
+    lead_names = ", ".join(row.ticker for row in leaders) or "none"
+    lag_names = ", ".join(row.ticker for row in laggards) or "none"
+    weakening = ", ".join(row.ticker for row in groups.get("Weakening", [])[:4]) or "none"
+    improving = ", ".join(row.ticker for row in groups.get("Improving", [])[:4]) or "none"
+    leading = ", ".join(row.ticker for row in groups.get("Leading", [])[:4]) or "none"
+    lagging = ", ".join(row.ticker for row in groups.get("Lagging", [])[:4]) or "none"
+    count_sentence = (
+        f"{len(groups.get('Leading', []))} leading, {len(groups.get('Weakening', []))} weakening, "
+        f"{len(groups.get('Lagging', []))} lagging, and {len(groups.get('Improving', []))} improving."
+    )
+    return {
+        "count_sentence": count_sentence,
+        "caption": (
+            f"Read clockwise using current RRG coordinates. Weakening: {weakening}. "
+            f"Improving: {improving}. Leading: {leading}. Lagging: {lagging}."
+        ),
+        "terminal_caption": (
+            f"Trails show each ticker's four-week path. Current sector map: {count_sentence} "
+            f"Strongest flow is {_row_name(strongest)}; weakest flow is {_row_name(weakest)}."
+        ),
+        "editorial_1": (
+            f"The current sector map contains {count_sentence} The weakening group is {weakening}; "
+            f"the improving group is {improving}. That is the live rotation read generated from the scored universe."
+        ),
+        "editorial_2": (
+            f"Momentum leadership is concentrated in {lead_names}, while the bottom of the 12-1 ranking is {lag_names}. "
+            f"Use this with the RRG: the best setup is a positive momentum row moving into Improving or Leading."
+        ),
+        "editorial_3": (
+            f"Flow confirmation is led by {_row_name(strongest)} with F {_fmt(strongest.f_score) if strongest else '+0.00'}; "
+            f"flow pressure is concentrated in {_row_name(weakest)} with F {_fmt(weakest.f_score) if weakest else '+0.00'}."
+        ),
+    }
+
+
+def _flow_node_rows(rows: list[MomentumV2Row], limit: int = 5) -> tuple[list[MomentumV2Row], list[MomentumV2Row]]:
+    ranked = sorted(rows, key=lambda item: item.f_score)
+    if not ranked:
+        return [], []
+    outflow_rows = ranked[:limit]
+    inflow_rows = list(reversed(ranked[-limit:]))
+    return outflow_rows, inflow_rows
+
+
+def _flow_magnitude(row: MomentumV2Row) -> float:
+    return max(0.05, abs(row.f_score))
+
+
+def _terminal_rrg_svg(
+    rows: list[MomentumV2Row],
+    width: int = 620,
+    height: int = 580,
+    *,
+    theme: str = "dark",
+    annotate: bool = False,
+) -> str:
     pad = 60
+    light = theme in {"light", "editorial"}
+    bg = "#fffbf3" if theme == "editorial" else "#ffffff" if light else "#070707"
+    border = "#e1d8c9" if theme == "editorial" else "#e6e1d8" if light else "#1f1f1f"
+    grid = "#e1d8c9" if theme == "editorial" else "#e6e1d8" if light else "#1a1a1a"
+    axis = "#3d362f" if light else "#5a5a5a"
+    muted = "#6e6258" if theme == "editorial" else "#7a7066" if light else "#7c7c7c"
+    label_fill = "#1c1815" if light else "#ddd"
+    dot_stroke = bg if light else "#0a0a0a"
 
     def x(value: float) -> float:
         return pad + (value - 80.0) / 40.0 * (width - 2 * pad)
@@ -2017,7 +2156,7 @@ def _terminal_rrg_svg(rows: list[MomentumV2Row], width: int = 620, height: int =
     ]
     parts = [
         f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-label="Relative rotation graph with four week trails">',
-        f'<rect x="0" y="0" width="{width}" height="{height}" fill="#070707" stroke="#1f1f1f"/>',
+        f'<rect x="0" y="0" width="{width}" height="{height}" fill="{bg}" stroke="{border}"/>',
     ]
     for qx, qy, qw, qh, color, label, lx, ly, anchor in quadrants:
         parts.append(f'<rect x="{qx:.1f}" y="{qy:.1f}" width="{qw:.1f}" height="{qh:.1f}" fill="{color}" opacity=".055"/>')
@@ -2027,16 +2166,28 @@ def _terminal_rrg_svg(rows: list[MomentumV2Row], width: int = 620, height: int =
             f'{label}</text>'
         )
     for value in (85, 90, 95, 105, 110, 115):
-        parts.append(f'<line x1="{x(value):.1f}" y1="{pad}" x2="{x(value):.1f}" y2="{height-pad}" stroke="#1a1a1a"/>')
-        parts.append(f'<line x1="{pad}" y1="{y(value):.1f}" x2="{width-pad}" y2="{y(value):.1f}" stroke="#1a1a1a"/>')
+        parts.append(f'<line x1="{x(value):.1f}" y1="{pad}" x2="{x(value):.1f}" y2="{height-pad}" stroke="{grid}"/>')
+        parts.append(f'<line x1="{pad}" y1="{y(value):.1f}" x2="{width-pad}" y2="{y(value):.1f}" stroke="{grid}"/>')
     parts.extend(
         [
-            f'<line x1="{pad}" y1="{y(100):.1f}" x2="{width-pad}" y2="{y(100):.1f}" stroke="#5a5a5a" stroke-width="1.2"/>',
-            f'<line x1="{x(100):.1f}" y1="{pad}" x2="{x(100):.1f}" y2="{height-pad}" stroke="#5a5a5a" stroke-width="1.2"/>',
-            f'<text x="{width/2:.1f}" y="{height-14}" text-anchor="middle" fill="#7c7c7c" font-family="monospace" font-size="10">RS-RATIO -></text>',
-            f'<text x="16" y="{height/2:.1f}" text-anchor="middle" fill="#7c7c7c" font-family="monospace" font-size="10" transform="rotate(-90 16 {height/2:.1f})">RS-MOMENTUM -></text>',
+            f'<line x1="{pad}" y1="{y(100):.1f}" x2="{width-pad}" y2="{y(100):.1f}" stroke="{axis}" stroke-width="1.2"/>',
+            f'<line x1="{x(100):.1f}" y1="{pad}" x2="{x(100):.1f}" y2="{height-pad}" stroke="{axis}" stroke-width="1.2"/>',
+            f'<text x="{width/2:.1f}" y="{height-14}" text-anchor="middle" fill="{muted}" font-family="monospace" font-size="10">RS-RATIO -></text>',
+            f'<text x="16" y="{height/2:.1f}" text-anchor="middle" fill="{muted}" font-family="monospace" font-size="10" transform="rotate(-90 16 {height/2:.1f})">RS-MOMENTUM -></text>',
         ]
     )
+    for value in (85, 95, 105, 115):
+        parts.append(f'<text x="{x(value):.1f}" y="{height-pad+16}" text-anchor="middle" fill="{muted}" font-family="monospace" font-size="9">{value}</text>')
+        parts.append(f'<text x="{pad-8}" y="{y(value)+3:.1f}" text-anchor="end" fill="{muted}" font-family="monospace" font-size="9">{value}</text>')
+    if annotate:
+        parts.append(
+            f'<path d="M {x(108):.1f} {y(108):.1f} Q {x(111):.1f} {y(97):.1f} {x(105):.1f} {y(94):.1f}" '
+            'fill="none" stroke="#a8721a" stroke-width="1.6" stroke-dasharray="3 3" opacity=".68"/>'
+        )
+        parts.append(
+            f'<text x="{x(112):.1f}" y="{y(102):.1f}" fill="#a8721a" font-family="Georgia" font-size="12" font-style="italic">'
+            "current rotation</text>"
+        )
     for row in rows:
         cx = clamp(row.rs_ratio)
         cy = clamp(row.rs_momentum)
@@ -2052,10 +2203,11 @@ def _terminal_rrg_svg(rows: list[MomentumV2Row], width: int = 620, height: int =
         attrs = drill_bridge_attrs(row.ticker, label=row.identity)
         parts.append(
             f'<g {attrs} data-ticker="{_esc(row.ticker)}" class="mv2-a-click">'
+            f'<title>{_esc(row.display_label)} | {row.quadrant} | RS-Ratio {row.rs_ratio:.1f} | RS-Momentum {row.rs_momentum:.1f} | S {_fmt(row.s_score)} | F {_fmt(row.f_score)}</title>'
             f'<line x1="{x(tx):.1f}" y1="{y(ty):.1f}" x2="{x(cx):.1f}" y2="{y(cy):.1f}" stroke="{color}" stroke-width="1.5" opacity=".35"/>'
             f'<circle cx="{x(tx):.1f}" cy="{y(ty):.1f}" r="2" fill="{color}" opacity=".25"/>'
-            f'<circle cx="{x(cx):.1f}" cy="{y(cy):.1f}" r="6" fill="{color}" stroke="#0a0a0a" stroke-width="1.5"/>'
-            f'<text x="{x(cx):.1f}" y="{y(cy)-10:.1f}" text-anchor="middle" fill="#ddd" font-family="monospace" font-size="10" font-weight="700">{_esc(row.ticker)}</text>'
+            f'<circle cx="{x(cx):.1f}" cy="{y(cy):.1f}" r="6" fill="{color}" stroke="{dot_stroke}" stroke-width="1.5"/>'
+            f'<text x="{x(cx):.1f}" y="{y(cy)-10:.1f}" text-anchor="middle" fill="{label_fill}" font-family="monospace" font-size="10" font-weight="700">{_esc(row.ticker)}</text>'
             "</g>"
         )
     parts.append("</svg>")
@@ -2090,6 +2242,29 @@ def _terminal_momentum_bars(rows: list[MomentumV2Row], limit: int = 14) -> str:
     return "".join(rendered)
 
 
+def _c_momentum_bars(rows: list[MomentumV2Row], limit: int = 12) -> str:
+    ordered = sorted(rows, key=lambda item: item.momentum_pct, reverse=True)[:limit]
+    max_abs = max(5.0, max(abs(row.momentum_pct) for row in ordered))
+    rendered = []
+    for row in ordered:
+        pct = min(50.0, abs(row.momentum_pct) / max_abs * 50.0)
+        side = "left:50%" if row.momentum_pct >= 0 else "right:50%"
+        color = STATE_COLORS_LIGHT.get(row.state, "#777")
+        rendered.append(
+            f"""
+            <div class="mv2-c-flow-row mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}" style="grid-template-columns:54px 1fr 66px">
+              <b>{_esc(row.ticker)}</b>
+              <div>
+                <div class="name">{_esc(row.identity)}</div>
+                <div class="mv2-a3-track" style="background:#f4f1ec;border-color:#e6e1d8"><span class="mv2-a3-fill" style="{side};width:{pct:.1f}%;background:{color}"></span></div>
+              </div>
+              <span class="{_tone_class(row.momentum_pct)}" style="text-align:right">{_fmt(row.momentum_pct, '%', 1)}</span>
+            </div>
+            """
+        )
+    return "".join(rendered)
+
+
 def _terminal_flow_detail(rows: list[MomentumV2Row]) -> str:
     grouped = rows_by_class(rows)
     cards = []
@@ -2114,12 +2289,12 @@ def _terminal_flow_detail(rows: list[MomentumV2Row]) -> str:
               <span class="name">{_esc(row.identity)}</span>
               <span class="{_tone_class(row.cmf21)}">{_fmt(row.cmf21)}</span>
               <span class="{_tone_class(row.f_score)}">{_fmt(row.f_score)}</span>
-              <span class="{_tone_class(row.pillars['FLOW'])}">{_fmt(row.pillars['FLOW'], digits=3)}</span>
+              <span class="{_tone_class(row.breadth_50d - 0.5)}">{row.breadth_50d:.0%}</span>
               {_state_pill(row.state)}
             </div>
             """
         )
-    header = '<div class="mv2-a3-flow-row" style="border-top:0;color:#7c7c7c;text-transform:uppercase"><span>TKR</span><span>Name</span><span>CMF21</span><span>F</span><span>Flow</span><span>State</span></div>'
+    header = '<div class="mv2-a3-flow-row" style="border-top:0;color:#7c7c7c;text-transform:uppercase"><span>TKR</span><span>Name</span><span>CMF21</span><span>F</span><span>Breadth</span><span>State</span></div>'
     return '<div class="mv2-a3-flow-cards">' + "".join(cards[:4]) + "</div>" + header + "".join(flow_rows)
 
 
@@ -2139,30 +2314,50 @@ def _terminal_macro_panel(rows: list[MomentumV2Row]) -> str:
     """
 
 
+def _c_macro_panel(rows: list[MomentumV2Row]) -> str:
+    phase = _board_phase(rows)
+    support = sorted(rows, key=lambda item: (item.f_score, item.s_score), reverse=True)[:5]
+    phase_cells = "".join(
+        f'<span class="{"active" if label == phase else ""}" style="flex:1;padding:10px 6px;text-align:center;border-radius:4px;background:{"#1a1714" if label == phase else "#f4f1ec"};color:{"#fff" if label == phase else "#7a7066"};font:800 10px/1 var(--font-mono);letter-spacing:.06em">{_esc(label)}</span>'
+        for label in ("RISK-ON", "NARROWING", "RISK-OFF", "NO DATA")
+    )
+    cells = "".join(
+        f'<div class="mv2-macro"><span>{_esc(label)}</span><b class="{_tone_class(_num(value.replace("%", "")) if value not in {"RISK-ON", "NARROWING", "RISK-OFF", "NO DATA"} else 0)}">{_esc(value)}</b></div>'
+        for label, value in _macro_proxy_stats(rows)
+    )
+    support_text = " | ".join(f"{row.ticker} {_fmt(row.f_score)}" for row in support) or "No support rows"
+    return f"""
+      <div style="margin-bottom:16px">
+        <div style="color:#7a7066;font:900 10px/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px">Cycle / board phase</div>
+        <div style="display:flex;gap:4px">{phase_cells}</div>
+        <p style="margin:9px 0 0;color:#3d362f;font:12.5px/1.5 var(--font-prose)">Phase is derived from current scored-universe breadth, average S/F, and warning or exit concentration.</p>
+      </div>
+      <div class="mv2-macro-grid">{cells}</div>
+      <div style="margin-top:14px;padding:12px 14px;background:#fdf4ea;border:1px solid #e7c98f;border-radius:6px;color:#3d362f;font:12px/1.5 var(--font-prose)">
+        <strong style="color:#a8721a">If the board deteriorates:</strong> review support basket {support_text} before adding new cyclicals.
+      </div>
+    """
+
+
 def _rotation_terminal_body(rows: list[MomentumV2Row], as_of: str) -> str:
     sectors = [row for row in rows if row.asset_class == "US Sectors"] or rows
-    weakening = [row.ticker for row in sectors if row.quadrant == "Weakening"][:3]
-    improving = [row.ticker for row in sectors if row.quadrant == "Improving"][:3]
+    story = _rotation_story_parts(rows)
     return f"""
       <div class="mv2-a3-header">
         <span class="mv2-a2-back">BACK TO OVERVIEW</span>
         <span style="color:#5a5a5a;font:900 11px/1 var(--font-mono)">/</span>
         <span style="color:#7c7c7c;font:900 12px/1 var(--font-mono);letter-spacing:.08em">ROTATION MAP</span>
         <span style="flex:1"></span>
-        <div class="mv2-a3-filters">
-          <span class="mv2-a3-filter active">US SECTORS</span>
-          <span class="mv2-a3-filter">US INDUSTRIES</span>
-          <span class="mv2-a3-filter">COUNTRIES</span>
-          <span class="mv2-a3-filter">FACTORS</span>
-          <span class="mv2-a3-filter">ALL</span>
-        </div>
+        {_rotation_scope_chips(rows)}
       </div>
       {_tabs_html("rotation")}
+      {_rotation_scope_summary(rows)}
       <div class="mv2-a3-grid">
         <div class="mv2-a3-panel">
           <div class="mv2-a3-section"><b>RELATIVE ROTATION GRAPH</b><span>US Sectors | 4-week motion trail | {len(sectors)} / {len(sectors)}</span></div>
           {_terminal_rrg_svg(sectors)}
-          <p class="mv2-a3-caption">Trails show each ticker's 4-week path. Weakening names: {_esc(', '.join(weakening) or 'none')}. Improving names: {_esc(', '.join(improving) or 'none')}. This is the rotation-underway signature.</p>
+          {_rotation_state_legend()}
+          <p class="mv2-a3-caption">{_esc(story["terminal_caption"])}</p>
         </div>
         <div class="mv2-a3-panel">
           <div class="mv2-a3-section"><b>12-1 CROSS-SECTIONAL MOMENTUM</b><span>LOOKBACK 12M | {len(sectors)} rows</span></div>
@@ -2171,7 +2366,7 @@ def _rotation_terminal_body(rows: list[MomentumV2Row], as_of: str) -> str:
       </div>
       <div class="mv2-a3-grid lower">
         <div class="mv2-a3-panel">
-          <div class="mv2-a3-section"><b>INSTITUTIONAL FLOW DETAIL | PILLAR 7</b><span>CMF | OBV | MFI | RVOL | ETF flows | block ratio</span></div>
+          <div class="mv2-a3-section"><b>INSTITUTIONAL FLOW DETAIL | PILLAR 7</b><span>CMF | F score | flow pillar | breadth | provider data when configured</span></div>
           {_terminal_flow_detail(rows)}
         </div>
         <div class="mv2-a3-panel">
@@ -2184,58 +2379,82 @@ def _rotation_terminal_body(rows: list[MomentumV2Row], as_of: str) -> str:
 
 
 def _c_rrg_svg(rows: list[MomentumV2Row]) -> str:
-    return _terminal_rrg_svg(rows, width=620, height=530).replace('fill="#070707" stroke="#1f1f1f"', 'fill="#ffffff" stroke="#e6e1d8"').replace('#1a1a1a', '#e6e1d8').replace('#5a5a5a', '#3d362f')
+    return _terminal_rrg_svg(rows, width=620, height=530, theme="light")
 
 
 def _c_flow_river_svg(rows: list[MomentumV2Row]) -> str:
-    ranked = sorted(rows, key=lambda item: item.f_score)
-    outflow_rows = ranked[:4]
-    inflow_rows = list(reversed(ranked[-4:]))
-    outflows = [
-        (row.display_label, max(0.05, abs(row.f_score)), "#b13a1f")
-        for row in outflow_rows
+    outflow_rows, inflow_rows = _flow_node_rows(rows, limit=5)
+    width, height = 1260, 260
+    if not outflow_rows or not inflow_rows:
+        return f'<div class="mv2-c-flow-river"><svg viewBox="0 0 {width} {height}" role="img" aria-label="Flow river from outflows to inflows"><text x="630" y="130" text-anchor="middle" fill="#7a7066" font-size="14">No flow rows available</text></svg></div>'
+
+    pad_t, gap = 28.0, 7.0
+    usable = height - 2 * pad_t - gap * (len(outflow_rows) - 1)
+    left_total = max(0.1, sum(_flow_magnitude(row) for row in outflow_rows))
+    right_total = max(0.1, sum(_flow_magnitude(row) for row in inflow_rows))
+
+    def nodes(source: list[MomentumV2Row], total: float, colors: list[str]) -> list[dict[str, object]]:
+        cursor = pad_t
+        rendered = []
+        for idx, row in enumerate(source):
+            value = _flow_magnitude(row)
+            h = max(18.0, value / total * usable)
+            rendered.append({"row": row, "value": value, "color": colors[idx % len(colors)], "y": cursor, "h": h})
+            cursor += h + gap
+        return rendered
+
+    left_nodes = nodes(outflow_rows, left_total, ["#b13a1f", "#c66b3a", "#a85a3a", "#a85a45", "#9d6638"])
+    right_nodes = nodes(inflow_rows, right_total, ["#1f7a4a", "#1d6a3f", "#2c8358", "#3a8a64", "#4a9070"])
+    left_x, right_x = 190.0, 1086.0
+    left_end, right_start = left_x + 16.0, right_x - 16.0
+    right_stack = [0.0 for _ in right_nodes]
+    ribbons: list[str] = []
+    for left in left_nodes:
+        left_cursor = float(left["y"])
+        for idx, right in enumerate(right_nodes):
+            portion = float(right["value"]) / right_total
+            ribbon_h = max(1.2, portion * float(left["h"]))
+            right_y = float(right["y"]) + right_stack[idx]
+            right_stack[idx] += ribbon_h
+            mx1 = left_end + (right_start - left_end) * 0.38
+            mx2 = left_end + (right_start - left_end) * 0.62
+            path = (
+                f"M {left_end:.1f} {left_cursor:.1f} "
+                f"C {mx1:.1f} {left_cursor:.1f}, {mx2:.1f} {right_y:.1f}, {right_start:.1f} {right_y:.1f} "
+                f"L {right_start:.1f} {right_y + ribbon_h:.1f} "
+                f"C {mx2:.1f} {right_y + ribbon_h:.1f}, {mx1:.1f} {left_cursor + ribbon_h:.1f}, {left_end:.1f} {left_cursor + ribbon_h:.1f} Z"
+            )
+            left_row = left["row"]
+            right_row = right["row"]
+            ribbons.append(
+                f'<path d="{path}" fill="{left["color"]}" opacity=".20">'
+                f'<title>{_esc(left_row.display_label)} pressure into {_esc(right_row.display_label)} support | F magnitude {float(left["value"]):.2f}</title>'
+                "</path>"
+            )
+            left_cursor += ribbon_h
+
+    node_html: list[str] = [
+        f'<text x="{left_x:.1f}" y="18" fill="#7a7066" font-size="10" font-family="monospace" font-weight="800" letter-spacing=".10em">NET OUTFLOWS</text>',
+        f'<text x="{right_x+14:.1f}" y="18" text-anchor="end" fill="#7a7066" font-size="10" font-family="monospace" font-weight="800" letter-spacing=".10em">NET INFLOWS</text>',
     ]
-    inflows = [
-        (row.display_label, max(0.05, abs(row.f_score)), "#1f7a4a")
-        for row in inflow_rows
-    ]
-    width, height = 1260, 250
-    total = max(0.1, sum(v for _, v, _ in outflows))
-    left_y = 28
-    right_y = 28
-    left_nodes = []
-    right_nodes = []
-    for label, value, color in outflows:
-        h = max(18, value / total * 160)
-        left_nodes.append((label, value, color, left_y, h))
-        left_y += h + 12
-    for label, value, color in inflows:
-        h = max(18, value / total * 160)
-        right_nodes.append((label, value, color, right_y, h))
-        right_y += h + 12
-    ribbons = []
-    for idx, (ol, ov, oc, oy, oh) in enumerate(left_nodes):
-        il, iv, ic, iy, ih = right_nodes[idx % len(right_nodes)]
-        sw = max(5, ov / total * 34)
-        ribbons.append(
-            f'<path d="M 250 {oy+oh/2:.1f} C 470 {oy+oh/2:.1f}, 760 {iy+ih/2:.1f}, 1010 {iy+ih/2:.1f}" '
-            f'fill="none" stroke="{ic}" stroke-width="{sw:.1f}" opacity=".34"><title>{_esc(ol)} to {_esc(il)} | flow magnitude {ov:.2f}</title></path>'
-        )
-    node_html = []
-    for label, value, color, y, h in left_nodes:
-        node_html.append(f'<rect x="40" y="{y:.1f}" width="190" height="{h:.1f}" rx="7" fill="{color}" opacity=".14" stroke="{color}"/>')
-        node_html.append(f'<text x="54" y="{y+18:.1f}" fill="#1a1714" font-size="12" font-family="Arial" font-weight="700">{_esc(label)}</text>')
-        node_html.append(f'<text x="54" y="{y+34:.1f}" fill="#7a7066" font-size="11" font-family="monospace">F -{value:.2f}</text>')
-    for label, value, color, y, h in right_nodes:
-        node_html.append(f'<rect x="1030" y="{y:.1f}" width="190" height="{h:.1f}" rx="7" fill="{color}" opacity=".14" stroke="{color}"/>')
-        node_html.append(f'<text x="1044" y="{y+18:.1f}" fill="#1a1714" font-size="12" font-family="Arial" font-weight="700">{_esc(label)}</text>')
-        node_html.append(f'<text x="1044" y="{y+34:.1f}" fill="#7a7066" font-size="11" font-family="monospace">F +{value:.2f}</text>')
+    for node in left_nodes:
+        row = node["row"]
+        y, h, color = float(node["y"]), float(node["h"]), str(node["color"])
+        node_html.append(f'<rect x="{left_x:.1f}" y="{y:.1f}" width="16" height="{h:.1f}" fill="{color}"/>')
+        node_html.append(f'<text x="{left_x-10:.1f}" y="{y+h/2-3:.1f}" text-anchor="end" fill="#1a1714" font-size="12" font-family="Arial" font-weight="700">{_esc(row.ticker)} | {_esc(_short_identity(row, 18))}</text>')
+        node_html.append(f'<text x="{left_x-10:.1f}" y="{y+h/2+12:.1f}" text-anchor="end" fill="#b13a1f" font-size="10" font-family="monospace">F {_fmt(row.f_score)}</text>')
+    for node in right_nodes:
+        row = node["row"]
+        y, h, color = float(node["y"]), float(node["h"]), str(node["color"])
+        node_html.append(f'<rect x="{right_start:.1f}" y="{y:.1f}" width="16" height="{h:.1f}" fill="{color}"/>')
+        node_html.append(f'<text x="{right_x+10:.1f}" y="{y+h/2-3:.1f}" fill="#1a1714" font-size="12" font-family="Arial" font-weight="700">{_esc(row.ticker)} | {_esc(_short_identity(row, 18))}</text>')
+        node_html.append(f'<text x="{right_x+10:.1f}" y="{y+h/2+12:.1f}" fill="#1f7a4a" font-size="10" font-family="monospace">F {_fmt(row.f_score)}</text>')
     return f'<div class="mv2-c-flow-river"><svg viewBox="0 0 {width} {height}" role="img" aria-label="Flow river from outflows to inflows">{"".join(ribbons + node_html)}</svg></div>'
 
 
 def _rotation_c_body(rows: list[MomentumV2Row], as_of: str) -> str:
     sectors = [row for row in rows if row.asset_class == "US Sectors"] or rows
-    rotation_sentence, _ = _rotation_summary(rows)
+    story = _rotation_story_parts(rows)
     flow_low = sorted(rows, key=lambda item: item.f_score)[:4]
     flow_high = sorted(rows, key=lambda item: item.f_score, reverse=True)[:4]
     flow_note = (
@@ -2261,21 +2480,21 @@ def _rotation_c_body(rows: list[MomentumV2Row], as_of: str) -> str:
         <p>Where the money was, where it is, where it's heading. The map shows current quadrant positions; the trails show the four-week path; the flow river shows which sectors are giving up share and which are taking it.</p>
       </div>
       <div class="mv2-c-rotation-grid">
-        <div class="mv2-c-card"><div class="mv2-c-head"><b>Relative rotation | US Sectors</b><span>4-week trail | {len(sectors)} sectors</span></div>{_c_rrg_svg(sectors)}</div>
-        <div class="mv2-c-card"><div class="mv2-c-head"><b>12-1 momentum</b><span>cross-sectional | z-scored</span></div>{_terminal_momentum_bars(sectors, limit=12)}</div>
+        <div class="mv2-c-card"><div class="mv2-c-head"><b>Relative rotation | US Sectors</b><span>4-week trail | {len(sectors)} sectors</span></div>{_c_rrg_svg(sectors)}{_rotation_state_legend()}</div>
+        <div class="mv2-c-card"><div class="mv2-c-head"><b>12-1 momentum</b><span>cross-sectional | sorted</span></div>{_c_momentum_bars(sectors, limit=12)}</div>
       </div>
       <div style="padding:0 12px 16px">
         <div class="mv2-c-card">
-          <div class="mv2-c-head"><b>The flow river</b><span>net institutional money | ETF SHO + block trades</span></div>
+          <div class="mv2-c-head"><b>The flow river</b><span>net flow-score pressure | provider feeds when configured</span></div>
           {_c_flow_river_svg(rows)}
-          <p>Width of each strand encodes the current flow-score magnitude from the scored universe. {_esc(flow_note)}</p>
+          <p>Width of each strand encodes the current F-score magnitude from the scored universe. The left side shows current flow pressure; the right side shows current flow support. {_esc(flow_note)}</p>
         </div>
       </div>
       <div class="mv2-c-rotation-grid" style="padding-top:0">
-        <div class="mv2-c-card"><div class="mv2-c-head"><b>Macro / business cycle</b><span>board proxies | {_esc(_board_phase(rows))}</span></div>{_terminal_macro_panel(rows)}</div>
+        <div class="mv2-c-card"><div class="mv2-c-head"><b>Macro / business cycle</b><span>board proxies | {_esc(_board_phase(rows))}</span></div>{_c_macro_panel(rows)}</div>
         <div class="mv2-c-card"><div class="mv2-c-head"><b>Flow detail</b><span>per-ticker | pillar 7 | leads price 1-3 wk</span></div><div class="mv2-c-flow-row" style="border-top:0;color:#7a7066;text-transform:uppercase"><span>TKR</span><span>Name</span><span>CMF</span><span>F</span><span>Flow</span><span>State</span></div>{flow_table}</div>
       </div>
-      <p class="mv2-a3-caption" style="padding:0 12px 16px">{_esc(rotation_sentence)}</p>
+      <p class="mv2-a3-caption" style="padding:0 12px 16px">{_esc(story["caption"])} {_esc(story["count_sentence"])}</p>
       <div class="mv2-a-footer"><span>{len(rows)} ETFS | ROTATION | FLOW RIVER | MACRO</span><span>v2 | PILLAR STACK | ROTATION | MEIRI</span></div>
     """
 
@@ -2284,9 +2503,14 @@ def _rotation_b_body(rows: list[MomentumV2Row], as_of: str) -> str:
     sectors = [row for row in rows if row.asset_class == "US Sectors"] or rows
     leaders = sorted(rows, key=lambda item: item.momentum_pct, reverse=True)[:12]
     laggards = sorted(rows, key=lambda item: item.momentum_pct)[:12]
-    rotation_sentence, rotation_caption = _rotation_summary(rows)
+    story = _rotation_story_parts(rows)
     flow_leaders = sorted(rows, key=lambda item: item.f_score, reverse=True)[:5]
     flow_laggards = sorted(rows, key=lambda item: item.f_score)[:5]
+    phase = _board_phase(rows)
+    phase_html = "".join(
+        f'<span class="{"active" if label == phase else ""}">{_esc(label)}</span>'
+        for label in ("RISK-ON", "NARROWING", "RISK-OFF", "NO DATA")
+    )
 
     def leaderboard(title: str, items: list[MomentumV2Row]) -> str:
         max_abs = max(5.0, max(abs(row.momentum_pct) for row in items))
@@ -2300,6 +2524,7 @@ def _rotation_b_body(rows: list[MomentumV2Row], as_of: str) -> str:
                   <span style="color:#8b7e70">{idx:02d}</span><b style="color:#1c1815">{_esc(row.ticker)}</b>
                   <div class="mv2-a3-track" style="background:#eee5d4;border-color:#e1d8c9"><span class="mv2-a3-fill" style="left:0;width:{width:.1f}%;background:{color}"></span></div>
                   <span class="{_tone_class(row.momentum_pct)}">{_fmt(row.momentum_pct, '%', 1)}</span>
+                  <span style="display:none">{_esc(row.identity)}</span>
                 </div>
                 """
             )
@@ -2324,30 +2549,43 @@ def _rotation_b_body(rows: list[MomentumV2Row], as_of: str) -> str:
         f'<div class="mv2-macro"><span>{_esc(row.ticker)}</span><b class="{_tone_class(row.f_score)}">{_fmt(row.f_score)}</b></div>'
         for row in flow_leaders[:4]
     )
+    risk_basket = "".join(
+        f'<div class="mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}"><b>{_esc(row.ticker)}</b><span>{_esc(_short_identity(row, 18))}</span></div>'
+        for row in sorted(rows, key=lambda item: (item.f_score, item.s_score), reverse=True)[:5]
+    )
     return f"""
       <div class="mv2-b-mast"><b>The Sentiment Brief</b><span>|</span><span>THE ROTATION MAP</span><span style="flex:1"></span><span>BACK TO BRIEF</span><span>{_esc(as_of)}</span></div>
       <div class="mv2-article-hero" style="padding:46px 56px 28px;max-width:1240px;margin:0 auto">
         <div class="mv2-kicker">The map | weekly | US sectors</div>
         <h2>Where the money is going,<br><em style="color:#a23a1f">and where it has been.</em></h2>
-        <p style="max-width:900px;font:italic 20px/1.45 Georgia,'Times New Roman',serif;color:#3d342e">The relative-rotation graph is a four-quadrant map of every sector's strength and the rate of change of that strength. Read clockwise: leaders weaken, weakeners lag, laggards improve, improvers lead.</p>
+        <p style="max-width:900px;font:italic 20px/1.45 Georgia,'Times New Roman',serif;color:#3d342e">The relative-rotation graph is a four-quadrant map of every sector's strength and the rate of change of that strength. Read clockwise: leaders weaken, weakeners lag, laggards improve, improvers lead. This version is generated from the current scored universe.</p>
       </div>
       <div class="mv2-b-article-grid">
         <main class="mv2-b-main">
           <h3>FIGURE 1 | RELATIVE ROTATION</h3>
-          <div class="mv2-panel" style="background:#fffbf3;border-color:#e1d8c9">{_c_rrg_svg(sectors)}</div>
-          <p>{_esc(rotation_caption)} {_esc(rotation_sentence)}</p>
+          <div class="mv2-panel" style="background:#fffbf3;border-color:#e1d8c9">{_terminal_rrg_svg(sectors, width=700, height=580, theme="editorial", annotate=True)}</div>
+          <div style="margin-top:16px;font:15.5px/1.6 Georgia,'Times New Roman',serif;color:#3d342e;max-width:700px">
+            <p><strong style="font-family:var(--font-prose)">The current rotation story.</strong> {_esc(story["editorial_1"])}</p>
+            <p>{_esc(story["editorial_2"])}</p>
+            <p>{_esc(story["editorial_3"])}</p>
+          </div>
           <h3>Cross-sectional leaderboard</h3>
           <p>12-1 momentum ranking, all ETFs: leaders show where price still works; laggards show where sponsorship already broke.</p>
           <div class="mv2-pillar-grid">{leaderboard("LEADERS", leaders)}{leaderboard("LAGGARDS", laggards)}</div>
         </main>
         <aside class="mv2-b-sidebar">
           <h3>The phase</h3>
-          <p><strong>{_esc(_board_phase(rows))}</strong> | Derived from current S, F, breadth, and warning/exit counts in the scored universe.</p>
+          <div class="mv2-b-phase-row">{phase_html}</div>
+          <p><strong>{_esc(phase)}</strong> | Derived from current S, F, breadth, and warning/exit counts in the scored universe.</p>
+          <h3>Where the flow went</h3>
           <div class="mv2-rail-list">{flow_items}</div>
           <h3>Current support basket</h3>
           <div class="mv2-macro-grid" style="grid-template-columns:1fr 1fr">
             {support_cells}
           </div>
+          <h3>If the regime weakens</h3>
+          <p>The standby basket is selected from current rows with the strongest combination of F and S, rather than a fixed handoff fixture.</p>
+          <div class="mv2-b-risk-basket">{risk_basket}</div>
         </aside>
       </div>
       <div class="mv2-footer"><span>THE SENTIMENT BRIEF | THE MAP</span><span>v2 | EDITORIAL | MEIRI</span></div>
