@@ -163,17 +163,55 @@ def test_display_a_rotation_matches_terminal_handoff_structure():
     assert "Technology sector" in html
 
 
+def test_display_c_overview_deepdive_rotation_inventory_is_present():
+    rows = build_view_rows(_sample_scored(), phase="MID")
+
+    overview = render_display("C", rows, "2026-06-06 16:00 ET")
+    deepdive = render_display("C", rows, "2026-06-06 16:00 ET", screen="deepdive", focus_ticker="XLK")
+    rotation = render_display("C", rows, "2026-06-06 16:00 ET", screen="rotation")
+
+    for marker in (
+        "Momentum",
+        "Heatmap",
+        "Defensives rotating in. Semis lost leadership.",
+        "The composite, dissected",
+        "State changes",
+        "Your positions",
+        "Bullish cohort",
+    ):
+        assert marker in overview
+    assert "data-drill-ticker=\"XLK\"" in overview
+
+    for marker in (
+        "The composite, built pillar by pillar",
+        "The seven pillars",
+        "Price + 30wMA",
+        "State machine",
+        "WATERFALL",
+    ):
+        assert marker in deepdive
+    assert "Technology sector" in deepdive
+
+    for marker in (
+        "The rotation map",
+        "Relative rotation | US Sectors",
+        "The flow river",
+        "Macro / business cycle",
+        "Flow detail",
+        "PILLAR STACK | ROTATION",
+    ):
+        assert marker in rotation
+    assert "Flow river from outflows to inflows" in rotation
+
+
 def test_render_display_supports_all_three_screens_for_each_display():
     rows = build_view_rows(_sample_scored(), phase="MID")
 
-    expected = {
-        "overview": "Overview",
-    }
     for display in DISPLAY_LABELS:
         for screen, marker in {
-            **expected,
+            "overview": {"A": "Overview", "B": "Overview", "C": "Heatmap"}[display],
             "rotation": {"A": "ROTATION MAP", "B": "Flow river", "C": "Flow river"}[display],
-            "deepdive": {"A": "COMPOSITE FORWARD OUTLOOK", "B": "article", "C": "waterfall"}[display],
+            "deepdive": {"A": "COMPOSITE FORWARD OUTLOOK", "B": "article", "C": "The composite, built pillar by pillar"}[display],
         }.items():
             html = render_display(
                 display,
@@ -216,6 +254,8 @@ def test_css_contains_readability_and_bar_rules():
     assert ".mv2-a-header-row" in stylesheet
     assert ".mv2-a2-lead-grid" in stylesheet
     assert ".mv2-a3-grid" in stylesheet
+    assert ".mv2-c-top" in stylesheet
+    assert ".mv2-c-flow-river" in stylesheet
     assert ".mv2-waterfall" in stylesheet
     assert ".mv2-rrg" in stylesheet
     assert "color:var(--mv2-muted)" in stylesheet

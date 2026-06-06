@@ -447,6 +447,54 @@ def css() -> str:
 .mv2-macro { border:1px solid var(--mv2-border); background:var(--mv2-sunken); border-radius:8px; padding:11px; }
 .mv2-macro span { color:var(--mv2-muted); font:800 10px/1 var(--font-mono); text-transform:uppercase; }
 .mv2-macro b { display:block; margin-top:6px; color:var(--mv2-ink); font:900 16px/1 var(--font-mono); }
+.mv2-c-top { display:flex; align-items:center; gap:18px; min-height:60px; padding:0 12px 16px; border-bottom:1px solid #e6e1d8; }
+.mv2-c-logo { width:22px; height:22px; display:inline-grid; grid-template-columns:repeat(4,1fr); gap:2px; align-items:end; }
+.mv2-c-logo i { display:block; border-radius:2px 2px 1px 1px; }
+.mv2-c-brand { display:flex; align-items:center; gap:10px; color:#1a1714; font:700 15px/1 var(--font-prose); }
+.mv2-c-brand small { border-left:1px solid #e6e1d8; padding-left:8px; color:#7a7066; font:800 10px/1 var(--font-mono); letter-spacing:.06em; }
+.mv2-c-tabs { display:flex; align-items:center; gap:2px; margin:0 auto; }
+.mv2-c-tab { position:relative; color:#7a7066; padding:8px 12px; font:600 13px/1 var(--font-prose); }
+.mv2-c-tab.active { color:#1a1714; }
+.mv2-c-tab.active:after { content:""; position:absolute; left:12px; right:12px; bottom:-17px; height:2px; background:#1c3d5a; }
+.mv2-c-btn { width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #e6e1d8; background:#f4f1ec; color:#3d362f; border-radius:6px; }
+.mv2-c-weather { margin:24px 12px 20px; background:#fff; border:1px solid #e6e1d8; border-radius:8px; padding:18px 24px; display:grid; grid-template-columns:1.4fr repeat(5,1fr); gap:24px; }
+.mv2-c-weather h3 { margin:4px 0 6px; color:#1a1714; font:700 22px/1.2 var(--font-prose); }
+.mv2-c-weather p { margin:0; color:#7a7066; font:12px/1.4 var(--font-prose); }
+.mv2-c-weather-item span { display:block; color:#7a7066; font:900 10px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; }
+.mv2-c-weather-item b { display:block; margin-top:8px; color:#1a1714; font:900 22px/1 var(--font-mono); }
+.mv2-c-weather-item small { display:block; margin-top:5px; color:#7a7066; font:12px/1.25 var(--font-prose); }
+.mv2-c-main { display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:20px; padding:0 12px 32px; }
+.mv2-c-card { background:#fff; border:1px solid #e6e1d8; border-radius:8px; padding:22px 28px; min-width:0; box-shadow:0 1px 2px rgba(0,0,0,.035); }
+.mv2-c-card h2, .mv2-c-card h3 { margin:0; color:#1a1714; font:700 18px/1.25 var(--font-prose); letter-spacing:0; }
+.mv2-c-card p { color:#7a7066; font:13px/1.55 var(--font-prose); }
+.mv2-c-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid #e6e1d8; }
+.mv2-c-head b { color:#1a1714; font:700 14px/1 var(--font-prose); }
+.mv2-c-head span { color:#7a7066; font:800 10px/1 var(--font-mono); text-transform:uppercase; }
+.mv2-c-legend { display:flex; gap:14px; flex-wrap:wrap; align-items:center; padding:0 0 14px; margin-bottom:8px; border-bottom:1px solid #e6e1d8; }
+.mv2-c-legend span { display:inline-flex; align-items:center; gap:6px; color:#3d362f; font:800 10.5px/1 var(--font-mono); }
+.mv2-c-row { display:grid; grid-template-columns:52px minmax(260px,1fr) 78px 60px 64px; gap:10px; align-items:center; border-top:1px solid #e6e1d8; padding:7px 0; }
+.mv2-c-row b { color:#1a1714; font:900 12px/1 var(--font-mono); }
+.mv2-c-stack { position:relative; height:22px; background:#f4f1ec; border:1px solid #e6e1d8; border-radius:6px; overflow:hidden; }
+.mv2-c-stack:before { content:""; position:absolute; left:50%; top:0; bottom:0; border-left:1px solid #d4cec1; z-index:2; }
+.mv2-c-seg { position:absolute; top:2px; height:18px; min-width:2px; }
+.mv2-c-rail { display:flex; flex-direction:column; gap:20px; }
+.mv2-c-rail-row { display:grid; grid-template-columns:8px 48px 1fr auto; gap:10px; align-items:center; border-top:1px solid #e6e1d8; padding:9px 0; color:#3d362f; font:12px/1.25 var(--font-prose); }
+.mv2-c-rail-row i { width:8px; height:8px; border-radius:50%; display:block; }
+.mv2-c-statdeck { background:#fff; border:1px solid #e6e1d8; border-radius:8px; padding:14px 18px; display:flex; gap:18px; flex-wrap:wrap; }
+.mv2-c-stat span { display:block; color:#7a7066; font:900 9.5px/1 var(--font-mono); text-transform:uppercase; }
+.mv2-c-stat b { display:block; margin-top:6px; color:#1a1714; font:900 18px/1 var(--font-mono); }
+.mv2-c-waterfall { width:100%; height:auto; display:block; }
+.mv2-c-pillar-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px 32px; }
+.mv2-c-pillar-card { display:grid; grid-template-columns:8px minmax(0,1fr) auto; gap:12px; align-items:start; background:#fbfaf8; border:1px solid #e6e1d8; border-radius:8px; padding:12px; }
+.mv2-c-pillar-card i { width:8px; min-height:56px; border-radius:2px; display:block; }
+.mv2-c-pillar-card b { color:#1a1714; font:700 14px/1.2 var(--font-prose); }
+.mv2-c-pillar-card p { margin:5px 0 0; color:#3d362f; font:12.5px/1.4 var(--font-prose); }
+.mv2-c-rotation-head { padding:28px 12px 8px; }
+.mv2-c-rotation-head h1 { margin:0; color:#1a1714; font:700 30px/1.1 var(--font-prose); }
+.mv2-c-rotation-grid { display:grid; grid-template-columns:1.5fr 1fr; gap:20px; padding:18px 12px 16px; }
+.mv2-c-flow-river svg { width:100%; height:auto; display:block; }
+.mv2-c-flow-row { display:grid; grid-template-columns:60px 1fr 56px 56px 64px 70px; gap:8px; align-items:center; border-top:1px solid #e6e1d8; padding:8px 0; color:#3d362f; font:800 11px/1.2 var(--font-mono); }
+.mv2-c-flow-row .name { color:#7a7066; font:12px/1.2 var(--font-prose); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .mv2-chart-grid { display:grid; grid-template-columns:1.4fr 1fr; gap:16px; margin-top:16px; }
 .mv2-chart-grid.tight { grid-template-columns:1.6fr 1fr; margin-top:0; }
 .mv2-a-hero { padding:20px 0 16px; border-bottom:1px solid var(--mv2-border); }
@@ -507,13 +555,13 @@ def css() -> str:
 @media (max-width: 1050px) {
   .mv2-grid { grid-template-columns: 1fr; }
   .mv2-head { flex-direction:column; }
-  .mv2-weather, .mv2-b-hero { grid-template-columns:1fr; }
+  .mv2-weather, .mv2-b-hero, .mv2-c-weather, .mv2-c-main, .mv2-c-rotation-grid { grid-template-columns:1fr; }
   .mv2-a-status, .mv2-a-body { grid-template-columns:1fr; }
   .mv2-row { grid-template-columns: 120px minmax(160px,1fr) 76px 58px 62px; }
   .mv2-a-row { grid-template-columns:52px minmax(150px,1fr) 76px 76px 52px 52px; }
   .mv2-a-row .hide-sm { display:none; }
   .mv2-metric-deck, .mv2-macro-grid, .mv2-state-grid, .mv2-universe-columns { grid-template-columns:1fr 1fr; }
-  .mv2-chart-grid, .mv2-chart-grid.tight, .mv2-article-block, .mv2-pillar-grid, .mv2-a-hero-grid, .mv2-a-pillars, .mv2-a2-lead-grid, .mv2-a2-pillars, .mv2-a2-charts, .mv2-a3-grid, .mv2-a3-flow-cards, .mv2-b-article-grid { grid-template-columns:1fr; }
+  .mv2-chart-grid, .mv2-chart-grid.tight, .mv2-article-block, .mv2-pillar-grid, .mv2-a-hero-grid, .mv2-a-pillars, .mv2-a2-lead-grid, .mv2-a2-pillars, .mv2-a2-charts, .mv2-a3-grid, .mv2-a3-flow-cards, .mv2-c-pillar-grid, .mv2-b-article-grid { grid-template-columns:1fr; }
 }
 """
 
@@ -682,70 +730,127 @@ def _largest_pillars(row: MomentumV2Row) -> tuple[str, float, str, float]:
     return positive, row.pillars[positive], negative, row.pillars[negative]
 
 
+def _c_topbar(active: str, as_of: str, context: str | None = None) -> str:
+    tabs = {"overview": "Heatmap", "rotation": "Rotation", "deepdive": "Deep dive", "macro": "Macro", "positions": "Positions"}
+    tab_html = "".join(
+        f'<span class="mv2-c-tab {"active" if key == active else ""}">{_esc(label)}</span>'
+        for key, label in tabs.items()
+    )
+    context_html = f'<span style="color:#d4cec1">/</span><span class="mv2-c-tab active">{_esc(context)}</span>' if context else ""
+    return f"""
+    <div class="mv2-c-top">
+      <div class="mv2-c-brand">
+        <span class="mv2-c-logo"><i style="height:9px;background:{PILLAR_HUES['MOM']}"></i><i style="height:12px;background:{PILLAR_HUES['RS-R']}"></i><i style="height:16px;background:{PILLAR_HUES['FILT']}"></i><i style="height:7px;background:{PILLAR_HUES['FLOW']}"></i></span>
+        <span>Momentum</span><small>v2</small>
+      </div>
+      {context_html}
+      <div class="mv2-c-tabs">{tab_html}</div>
+      <span style="color:#7a7066;font:800 11px/1 var(--font-mono)"><i style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#1f7a4a;margin-right:6px"></i>{_esc(as_of)}</span>
+      <span class="mv2-c-btn">R</span><span class="mv2-c-btn">M</span>
+    </div>
+    """
+
+
+def _c_stack_bar(row: MomentumV2Row, width: int = 460) -> str:
+    scale = max(1.0, sum(max(value, 0) for value in row.pillars.values()), sum(abs(min(value, 0)) for value in row.pillars.values()))
+    pos_cursor = 50.0
+    neg_cursor = 50.0
+    segments = []
+    for pillar in PILLAR_ORDER:
+        value = row.pillars[pillar]
+        pct = min(49.0, abs(value) / scale * 50.0)
+        if value >= 0:
+            left = pos_cursor
+            pos_cursor += pct
+            opacity = ".92"
+        else:
+            left = neg_cursor - pct
+            neg_cursor -= pct
+            opacity = ".55"
+        segments.append(
+            f'<span class="mv2-c-seg" title="{_esc(PILLAR_FULL[pillar])}: {_fmt(value, digits=3)}" '
+            f'style="left:{left:.2f}%;width:{pct:.2f}%;background:{PILLAR_HUES[pillar]};opacity:{opacity}"></span>'
+        )
+    return '<div class="mv2-c-stack" style="max-width:%dpx">' % width + "".join(segments) + "</div>"
+
+
+def _c_composition_row(row: MomentumV2Row) -> str:
+    return f"""
+    <div class="mv2-c-row mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}">
+      <b>{_esc(row.ticker)}</b>
+      {_c_stack_bar(row)}
+      <div>{_state_pill(row.state)}</div>
+      <span class="mv2-num {_tone_class(row.s_score)}">{_fmt(row.s_score)}</span>
+      <span class="mv2-num {_tone_class(row.momentum_pct)}">{_fmt(row.momentum_pct, '%', 0)}</span>
+    </div>
+    """
+
+
+def _c_weather_item(label: str, value: str, sub: str, tone: str = "") -> str:
+    return f'<div class="mv2-c-weather-item"><span>{_esc(label)}</span><b class="{tone}">{_esc(value)}</b><small>{_esc(sub)}</small></div>'
+
+
 def render_display_c(rows: list[MomentumV2Row], as_of: str) -> str:
     grouped = rows_by_class(rows)
     body = []
     for asset_class, items in grouped.items():
         bullish = sum(1 for item in items if item.state == "STAGE_2_BULLISH")
-        body.append(f'<div class="mv2-class">{_esc(asset_class)} | {len(items)} | {bullish} bullish</div>')
-        body.extend(_row_html(item) for item in items)
+        body.append(f'<div class="mv2-class">{_esc(asset_class.upper() or "UNCLASSIFIED")} <span style="color:#a89e92;margin-left:8px">| {len(items)} | {bullish} bullish</span></div>')
+        body.extend(_c_composition_row(item) for item in items)
     leaders = sorted(rows, key=lambda item: item.s_score, reverse=True)[:8]
-    warnings = [row for row in rows if row.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"}][:8]
+    warnings = [row for row in rows if row.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"}]
     bullish = [row for row in rows if row.state == "STAGE_2_BULLISH"]
     exits = [row for row in rows if row.state in {"EXIT", "BEARISH_STAGE_4"}]
     breadth = sum(row.breadth_50d for row in rows) / max(len(rows), 1)
     avg_s = sum(row.s_score for row in rows) / max(len(rows), 1)
+    legend = "".join(
+        f'<span><i style="width:12px;height:12px;border-radius:2px;background:{PILLAR_HUES[pillar]};display:inline-block"></i>{pillar} <em style="color:#a89e92;font-style:normal">{PILLAR_WEIGHTS[pillar]:.0%}</em></span>'
+        for pillar in PILLAR_ORDER
+    )
+    rail_changes = "".join(
+        f'<div class="mv2-c-rail-row mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}"><i style="background:{STATE_COLORS_LIGHT.get(row.state, "#777")}"></i><b>{_esc(row.ticker)}</b><span>{_esc(row.identity)} | current -> {_esc(STATE_LABELS.get(row.state, row.state))}</span><span>{_fmt(row.s_score)}</span></div>'
+        for row in warnings[:8]
+    )
+    positions = "".join(
+        f'<div class="mv2-c-rail-row"><i style="background:{STATE_COLORS_LIGHT.get(row.state, "#777")}"></i><b>{_esc(row.ticker)}</b><span>{_esc(row.identity)} | S {_fmt(row.s_score)}</span><span class="{_tone_class(row.f_score)}">F {_fmt(row.f_score)}</span></div>'
+        for row in sorted(rows, key=lambda item: abs(item.s_score), reverse=True)[:6]
+    )
     return f"""
     <section class="mv2-shell mv2-pillarstack" id="momentum-v2-c">
-      <div class="mv2-head">
+      {_c_topbar("overview", as_of)}
+      <div class="mv2-c-weather">
         <div>
-          <div class="mv2-kicker">Display C | Pillar Stack | live data</div>
-          <h2 class="mv2-title">The composite, dissected</h2>
-          <p class="mv2-subtitle">Each row shows the seven weighted forces behind the score. Segments to the right of the midline are bullish; segments to the left are bearish. The label always includes the ETF sector, country, factor, theme, or company identity.</p>
+          <div class="mv2-kicker">Today | Late cycle topping</div>
+          <h3>Defensives rotating in. Semis lost leadership.</h3>
+          <p>{len(exits)} EXITs and {len(bullish)} bullish candidates across the current universe.</p>
         </div>
-        <div class="mv2-screen-note">As of {_esc(as_of)}<br>Best default view for novice explanation and score transparency.</div>
+        {_c_weather_item("Regime", "RISK-ON" if avg_s >= 0 else "RISK-OFF", f"average S {_fmt(avg_s)}", "mv2-pos" if avg_s >= 0 else "mv2-neg")}
+        {_c_weather_item("Cycle", "LATE", "macro/flow proxy")}
+        {_c_weather_item("Warnings", str(len(warnings)), f"{len(exits)} exit", "mv2-neg" if warnings else "mv2-pos")}
+        {_c_weather_item("Breadth", f"{breadth:.0%}", "below 50% gate" if breadth < .5 else "above 50% gate", "mv2-pos" if breadth >= .5 else "mv2-neg")}
+        {_c_weather_item("Universe", str(len(rows)), f"{len(bullish)} bullish | {len(warnings)} warn")}
       </div>
-      <div class="mv2-weather">
-        <div>
-          <div class="mv2-kicker">Today | dashboard weather</div>
-          <h3>{len(bullish)} bullish leaders. {len(warnings)} risk names.</h3>
-          <p>The top strip summarizes the whole board before the user scans individual ETF rows.</p>
-        </div>
-        {_weather_item("Regime", "RISK-ON" if avg_s >= 0 else "RISK-OFF", f"average S {_fmt(avg_s)}", "mv2-pos" if avg_s >= 0 else "mv2-neg")}
-        {_weather_item("Warnings", str(len(warnings)), f"{len(exits)} exit/bearish", "mv2-neg" if warnings else "mv2-pos")}
-        {_weather_item("Breadth", f"{breadth:.0%}", "above 50d moving average", "mv2-pos" if breadth >= 0.5 else "mv2-neg")}
-        {_weather_item("Universe", str(len(rows)), f"{len(grouped)} groups tracked")}
-        {_weather_item("Leaders", str(len(bullish)), "Stage 2 bullish", "mv2-pos")}
-      </div>
-      <div class="mv2-grid">
-        <div class="mv2-panel">
-          <h3>Seven-pillar heatmap</h3>
-          <p>Sorted by S score inside each class. Hover a row for the current trigger story.</p>
-          {_legend_html()}
-          <div class="mv2-row mv2-muted"><b>Ticker</b><b>Weighted pillar composition</b><b>State</b><b class="mv2-num">S</b><b class="mv2-num">Mom</b></div>
+      <div class="mv2-c-main">
+        <div class="mv2-c-card">
+          <div class="mv2-c-head"><b>The composite, dissected</b><span>{len(rows)} ETFs | sorted by S</span></div>
+          <p>Each row IS the composite. Seven segments to the right of the midline are bullish contributions; segments to the left are bearish. Length encodes magnitude. Read the row to see why the score is what it is.</p>
+          <div class="mv2-c-legend">{legend}<span style="margin-left:auto;color:#7a7066;font:800 10px/1 var(--font-mono)">bearish <- | bullish -></span></div>
+          <div class="mv2-c-row" style="color:#7a7066;font:900 10px/1 var(--font-mono);text-transform:uppercase;border-top:0"><span>TKR</span><span>Composition</span><span>State</span><span style="text-align:right">S</span><span style="text-align:right">MOM</span></div>
           {"".join(body)}
         </div>
-        <aside class="mv2-rail-stack">
-          <div class="mv2-panel">
-            <h3>What changed first</h3>
-            <p>Risk items are shown with concrete reasons instead of bare arrows.</p>
-            <div class="mv2-rail-list">
-              {"".join(f'<div class="mv2-rail-item"><b>{_esc(item.display_label)}</b><span>{_esc(" ".join(item.reasons))}</span></div>' for item in warnings[:6])}
-            </div>
+        <aside class="mv2-c-rail">
+          <div class="mv2-c-card">
+            <div class="mv2-c-head"><b>State changes</b><span>last 14 days | {len(warnings)} events</span></div>
+            {rail_changes}
           </div>
-          <div class="mv2-panel">
-            <h3>Top leaders</h3>
-            <div class="mv2-rail-list">
-              {"".join(f'<div class="mv2-rail-item"><b>{_esc(item.display_label)} {_fmt(item.s_score)}</b><span>{_esc(item.quadrant)} | F {_fmt(item.f_score)} | {_esc(item.state.replace("_", " "))}</span></div>' for item in leaders[:6])}
-            </div>
+          <div class="mv2-c-card">
+            <div class="mv2-c-head"><b>Your positions</b><span>connected | synced</span></div>
+            {positions}
+            <div class="mv2-a2-callout"><strong style="color:#a8721a">Actions queued:</strong> Review warning/exit positions before adding new risk.</div>
           </div>
-          <div class="mv2-panel">
-            <h3>Board summary</h3>
-            <div class="mv2-rail-list">
-              <div class="mv2-rail-item"><b>{len(rows)} instruments</b><span>{len(grouped)} asset groups with full seven-pillar rows.</span></div>
-              <div class="mv2-rail-item"><b>{len(bullish)} passing every bullish gate</b><span>These are the cleanest candidates before position sizing and risk review.</span></div>
-              <div class="mv2-rail-item"><b>{len(exits)} exits or bearish Stage 4</b><span>These should be reviewed before new adds.</span></div>
-            </div>
+          <div class="mv2-c-card">
+            <div class="mv2-c-head"><b>Bullish cohort</b><span>{len(bullish)} passing every gate</span></div>
+            {"".join(f'<div class="mv2-c-rail-row"><i style="background:{STATE_COLORS_LIGHT.get(item.state, "#777")}"></i><b>{_esc(item.ticker)}</b><span>{_esc(item.identity)}</span><span>{_fmt(item.s_score)}</span></div>' for item in leaders[:8])}
           </div>
         </aside>
       </div>
@@ -1458,6 +1563,76 @@ def _deepdive_body(row: MomentumV2Row, display_name: str) -> str:
     """
 
 
+def _deepdive_c_body(row: MomentumV2Row, rows: list[MomentumV2Row], as_of: str) -> str:
+    peer_rows, rank, peer_count = _peer_rank_html(rows, row)
+    gate_rows = _gate_rows_for(row)
+    failed = sum(1 for ok, _, _ in gate_rows if not ok)
+    pillar_cards = "".join(
+        f"""
+        <div class="mv2-c-pillar-card">
+          <i style="background:{PILLAR_HUES[pillar]}"></i>
+          <div>
+            <b>{_esc(PILLAR_FULL[pillar])} <span style="color:#7a7066;font:800 10px/1 var(--font-mono)">w {PILLAR_WEIGHTS[pillar]:.0%}</span></b>
+            <p>{_esc(_pillar_reason(row, pillar))} <em style="color:#7a7066">Evidence tag: {pillar} methodology.</em></p>
+          </div>
+          <span class="{_tone_class(row.pillars[pillar])}" style="font:900 18px/1 var(--font-mono)">{_fmt(row.pillars[pillar], digits=3)}</span>
+        </div>
+        """
+        for pillar in PILLAR_ORDER
+    )
+    return f"""
+      {_c_topbar("deepdive", as_of, row.ticker)}
+      <div style="padding:28px 12px 8px">
+        <div style="display:flex;align-items:flex-end;gap:24px;flex-wrap:wrap">
+          <div style="flex:1;min-width:320px">
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px">
+              <h1 style="font:900 48px/1 var(--font-mono);margin:0;color:#1a1714">{_esc(row.ticker)}</h1>
+              {_state_pill(row.state)}
+              <span style="color:#7a7066;font:14px/1 var(--font-prose)">{_esc(row.asset_class)} | {_esc(row.identity)}</span>
+            </div>
+            <p style="max-width:820px;margin:0;color:#3d362f;font:20px/1.4 var(--font-prose)">
+              <strong style="color:#a8721a">{_esc(row.ticker)} is {_esc(row.state.replace('_', ' '))}.</strong>
+              Start at zero, add each pillar's contribution, and end at S {_fmt(row.s_score)}. Flow is {_fmt(row.f_score)} and RRG is {_esc(row.quadrant)}.
+            </p>
+          </div>
+          <div class="mv2-c-statdeck">
+            <div class="mv2-c-stat"><span>S-score</span><b class="{_tone_class(row.s_score)}">{_fmt(row.s_score)}</b></div>
+            <div class="mv2-c-stat"><span>F-score</span><b class="{_tone_class(row.f_score)}">{_fmt(row.f_score)}</b></div>
+            <div class="mv2-c-stat"><span>Mom</span><b class="{_tone_class(row.momentum_pct)}">{_fmt(row.momentum_pct, '%', 0)}</b></div>
+            <div class="mv2-c-stat"><span>Rank</span><b>{rank} / {peer_count}</b></div>
+            <div class="mv2-c-stat"><span>RRG</span><b style="color:#a8721a">{_esc(row.quadrant.upper())}</b></div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:12px 12px 28px">
+        <div class="mv2-c-card">
+          <div class="mv2-c-head"><b>The composite, built pillar by pillar</b><span>each step is a signed, weighted contribution</span></div>
+          <p>Start at zero. Add each pillar's contribution. End at the composite. The chart below makes the math visible: which pillars did the work, which dragged.</p>
+          {_waterfall_html(row)}
+        </div>
+      </div>
+      <div style="padding:0 12px 28px">
+        <div class="mv2-c-card">
+          <div class="mv2-c-head"><b>The seven pillars</b><span>each one, in plain language | weights sum to 1.00</span></div>
+          <div class="mv2-c-pillar-grid">{pillar_cards}</div>
+        </div>
+      </div>
+      <div class="mv2-c-rotation-grid" style="padding-top:0">
+        <div class="mv2-c-card">
+          <div class="mv2-c-head"><b>Price + 30wMA</b><span>Weinstein Stage | {'STAGE 2 INTACT' if row.above_30wma else 'EXIT WATCH'}</span></div>
+          {_price_svg(row, width=720, height=220)}
+          <p>{_esc(row.ticker)} is {'above' if row.above_30wma else 'below'} the 30-week moving average; Mansfield RS is {_fmt(row.mansfield_rs)}.</p>
+        </div>
+        <div class="mv2-c-card">
+          <div class="mv2-c-head"><b>State machine</b><span>WARNING gates | {failed} tripped</span></div>
+          <div class="mv2-gates">{"".join(_gate_html(*gate) for gate in gate_rows)}</div>
+          <div class="mv2-a2-callout"><strong style="color:#a8721a">Next escalation:</strong> {_esc(_next_escalation_text(row))}</div>
+        </div>
+      </div>
+      <div class="mv2-a-footer"><span>{_esc(row.ticker)} | {_esc(row.identity)} | WATERFALL | 7 PILLARS</span><span>v2 | PILLAR STACK | DEEP DIVE | MEIRI</span></div>
+    """
+
+
 def _universe_deepdive_body(rows: list[MomentumV2Row], display_name: str, as_of: str) -> str:
     ordered = sorted(rows, key=lambda item: item.s_score, reverse=True)
     leaders = ordered[:10]
@@ -1820,6 +1995,86 @@ def _rotation_terminal_body(rows: list[MomentumV2Row], as_of: str) -> str:
     """
 
 
+def _c_rrg_svg(rows: list[MomentumV2Row]) -> str:
+    return _terminal_rrg_svg(rows, width=620, height=530).replace('fill="#070707" stroke="#1f1f1f"', 'fill="#ffffff" stroke="#e6e1d8"').replace('#1a1a1a', '#e6e1d8').replace('#5a5a5a', '#3d362f')
+
+
+def _c_flow_river_svg() -> str:
+    outflows = [("Tech / Semis", 1.4, "#b13a1f"), ("Consumer Disc.", 0.6, "#c66b3a"), ("Financials", 0.7, "#a85a3a"), ("Homebuilders", 0.3, "#9d6638")]
+    inflows = [("Energy / Oil", 1.1, "#1f7a4a"), ("Gold miners", 0.8, "#1d6a3f"), ("Healthcare", 0.6, "#2c8358"), ("Utilities", 0.5, "#3a8a64")]
+    width, height = 1260, 250
+    total = sum(v for _, v, _ in outflows)
+    left_y = 28
+    right_y = 28
+    left_nodes = []
+    right_nodes = []
+    for label, value, color in outflows:
+        h = max(18, value / total * 160)
+        left_nodes.append((label, value, color, left_y, h))
+        left_y += h + 12
+    for label, value, color in inflows:
+        h = max(18, value / total * 160)
+        right_nodes.append((label, value, color, right_y, h))
+        right_y += h + 12
+    ribbons = []
+    for idx, (ol, ov, oc, oy, oh) in enumerate(left_nodes):
+        il, iv, ic, iy, ih = right_nodes[idx % len(right_nodes)]
+        sw = max(5, ov / total * 34)
+        ribbons.append(
+            f'<path d="M 250 {oy+oh/2:.1f} C 470 {oy+oh/2:.1f}, 760 {iy+ih/2:.1f}, 1010 {iy+ih/2:.1f}" '
+            f'fill="none" stroke="{ic}" stroke-width="{sw:.1f}" opacity=".34"><title>{_esc(ol)} to {_esc(il)} ${ov:.1f}B</title></path>'
+        )
+    node_html = []
+    for label, value, color, y, h in left_nodes:
+        node_html.append(f'<rect x="40" y="{y:.1f}" width="190" height="{h:.1f}" rx="7" fill="{color}" opacity=".14" stroke="{color}"/>')
+        node_html.append(f'<text x="54" y="{y+18:.1f}" fill="#1a1714" font-size="12" font-family="Arial" font-weight="700">{_esc(label)}</text>')
+        node_html.append(f'<text x="54" y="{y+34:.1f}" fill="#7a7066" font-size="11" font-family="monospace">-${value:.1f}B</text>')
+    for label, value, color, y, h in right_nodes:
+        node_html.append(f'<rect x="1030" y="{y:.1f}" width="190" height="{h:.1f}" rx="7" fill="{color}" opacity=".14" stroke="{color}"/>')
+        node_html.append(f'<text x="1044" y="{y+18:.1f}" fill="#1a1714" font-size="12" font-family="Arial" font-weight="700">{_esc(label)}</text>')
+        node_html.append(f'<text x="1044" y="{y+34:.1f}" fill="#7a7066" font-size="11" font-family="monospace">+${value:.1f}B</text>')
+    return f'<div class="mv2-c-flow-river"><svg viewBox="0 0 {width} {height}" role="img" aria-label="Flow river from outflows to inflows">{"".join(ribbons + node_html)}</svg></div>'
+
+
+def _rotation_c_body(rows: list[MomentumV2Row], as_of: str) -> str:
+    sectors = [row for row in rows if row.asset_class == "US Sectors"] or rows
+    flow_table = "".join(
+        f"""
+        <div class="mv2-c-flow-row mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}">
+          <b>{_esc(row.ticker)}</b><span class="name">{_esc(row.identity)}</span>
+          <span class="{_tone_class(row.cmf21)}">{_fmt(row.cmf21)}</span>
+          <span class="{_tone_class(row.f_score)}">{_fmt(row.f_score)}</span>
+          <span class="{_tone_class(row.pillars['FLOW'])}">{_fmt(row.pillars['FLOW'], digits=3)}</span>
+          {_state_pill(row.state)}
+        </div>
+        """
+        for row in sorted(rows, key=lambda item: item.f_score)[:10]
+    )
+    return f"""
+      {_c_topbar("rotation", as_of)}
+      <div class="mv2-c-rotation-head">
+        <h1>The rotation map</h1>
+        <p>Where the money was, where it is, where it's heading. The map shows current quadrant positions; the trails show the four-week path; the flow river shows which sectors are giving up share and which are taking it.</p>
+      </div>
+      <div class="mv2-c-rotation-grid">
+        <div class="mv2-c-card"><div class="mv2-c-head"><b>Relative rotation | US Sectors</b><span>4-week trail | {len(sectors)} sectors</span></div>{_c_rrg_svg(sectors)}</div>
+        <div class="mv2-c-card"><div class="mv2-c-head"><b>12-1 momentum</b><span>cross-sectional | z-scored</span></div>{_terminal_momentum_bars(sectors, limit=12)}</div>
+      </div>
+      <div style="padding:0 12px 16px">
+        <div class="mv2-c-card">
+          <div class="mv2-c-head"><b>The flow river</b><span>net institutional money | ETF SHO + block trades</span></div>
+          {_c_flow_river_svg()}
+          <p>Width of each strand encodes estimated net dollar flow over the last five sessions. Tech, semis, financials, and homebuilders are the main outflow buckets; energy, gold miners, healthcare, and utilities are the main inflow buckets.</p>
+        </div>
+      </div>
+      <div class="mv2-c-rotation-grid" style="padding-top:0">
+        <div class="mv2-c-card"><div class="mv2-c-head"><b>Macro / business cycle</b><span>FRED + Faber + curve | LATE</span></div>{_terminal_macro_panel(rows)}</div>
+        <div class="mv2-c-card"><div class="mv2-c-head"><b>Flow detail</b><span>per-ticker | pillar 7 | leads price 1-3 wk</span></div><div class="mv2-c-flow-row" style="border-top:0;color:#7a7066;text-transform:uppercase"><span>TKR</span><span>Name</span><span>CMF</span><span>F</span><span>Flow</span><span>State</span></div>{flow_table}</div>
+      </div>
+      <div class="mv2-a-footer"><span>{len(rows)} ETFS | ROTATION | FLOW RIVER | MACRO</span><span>v2 | PILLAR STACK | ROTATION | MEIRI</span></div>
+    """
+
+
 def _rotation_body(rows: list[MomentumV2Row], display_name: str) -> str:
     sectors = [row for row in rows if row.asset_class == "US Sectors"] or rows
     return f"""
@@ -2006,6 +2261,8 @@ def render_deepdive(display: str, rows: list[MomentumV2Row], as_of: str, focus_t
         return _shell(display, "deepdive", _deepdive_article_body(row, as_of))
     if display == "A":
         return _shell(display, "deepdive", _deepdive_terminal_body(row, rows, as_of))
+    if display == "C":
+        return _shell(display, "deepdive", _deepdive_c_body(row, rows, as_of))
     body = _deepdive_body(row, display_name)
     return _shell(display, "deepdive", body)
 
@@ -2014,6 +2271,8 @@ def render_rotation(display: str, rows: list[MomentumV2Row], as_of: str) -> str:
     display_name = DISPLAY_LABELS.get(display, "Display C")
     if display == "A":
         return _shell(display, "rotation", _rotation_terminal_body(rows, as_of))
+    if display == "C":
+        return _shell(display, "rotation", _rotation_c_body(rows, as_of))
     body = _rotation_body(rows, display_name)
     if display == "B":
         body = body.replace("The rotation map", "The Rotation Column")
