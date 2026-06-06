@@ -52,6 +52,7 @@ from src.macro import assess_regime
 from src.macro_tiles import MACRO_CONTEXT_SYMBOLS, fred_macro_snapshot, fred_macro_tile_groups, macro_tile_rows, session_range_tile
 from src.momentum_v2 import (
     DISPLAY_LABELS as MOMENTUM_V2_DISPLAY_LABELS,
+    SCREEN_LABELS as MOMENTUM_V2_SCREEN_LABELS,
     build_view_rows as build_momentum_v2_rows,
     css as momentum_v2_css,
     render_display as render_momentum_v2_display,
@@ -730,6 +731,10 @@ if "momentum_v2_display" not in st.session_state:
     st.session_state.momentum_v2_display = "C"
 elif st.session_state.momentum_v2_display not in MOMENTUM_V2_DISPLAY_LABELS:
     st.session_state.momentum_v2_display = "C"
+if "momentum_v2_screen" not in st.session_state:
+    st.session_state.momentum_v2_screen = "overview"
+elif st.session_state.momentum_v2_screen not in MOMENTUM_V2_SCREEN_LABELS:
+    st.session_state.momentum_v2_screen = "overview"
 if "table_sort" not in st.session_state:
     st.session_state.table_sort = "S_score:desc"
 _legacy_table_sort = str(st.session_state.table_sort or "S_score:desc").split(":", 1)
@@ -2041,20 +2046,36 @@ def render_status():
 
 def render_momentum_v2_screens():
     display_keys = list(MOMENTUM_V2_DISPLAY_LABELS.keys())
-    selected_display = st.segmented_control(
-        "Momentum v2 display",
-        options=display_keys,
-        format_func=lambda key: MOMENTUM_V2_DISPLAY_LABELS[key],
-        key="momentum_v2_display",
-    )
+    display_col, screen_col = st.columns([1.15, 1])
+    with display_col:
+        selected_display = st.segmented_control(
+            "Momentum v2 display",
+            options=display_keys,
+            format_func=lambda key: MOMENTUM_V2_DISPLAY_LABELS[key],
+            key="momentum_v2_display",
+        )
+    with screen_col:
+        selected_screen = st.segmented_control(
+            "Momentum v2 screen",
+            options=list(MOMENTUM_V2_SCREEN_LABELS.keys()),
+            format_func=lambda key: MOMENTUM_V2_SCREEN_LABELS[key],
+            key="momentum_v2_screen",
+        )
     selected_display = selected_display if selected_display in MOMENTUM_V2_DISPLAY_LABELS else "C"
+    selected_screen = selected_screen if selected_screen in MOMENTUM_V2_SCREEN_LABELS else "overview"
     try:
         created = pd.Timestamp.fromtimestamp(float(dashboard_compute_created_at))
         as_of = created.strftime("%Y-%m-%d %H:%M")
     except Exception:
         as_of = datetime.now().strftime("%Y-%m-%d %H:%M")
     rows = build_momentum_v2_rows(scored, phase=regime.phase_hint)
-    _md(render_momentum_v2_display(selected_display, rows, as_of))
+    _md(render_momentum_v2_display(
+        selected_display,
+        rows,
+        as_of,
+        screen=selected_screen,
+        focus_ticker=st.session_state.drill_ticker,
+    ))
 
 
 def render_alerts():

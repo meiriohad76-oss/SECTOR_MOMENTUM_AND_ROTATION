@@ -8,7 +8,9 @@ def test_app_wires_momentum_v2_display_selector_and_renderer():
     assert "render_momentum_v2_screens" in APP
     assert "st.segmented_control" in APP
     assert "momentum_v2_display" in APP
+    assert "momentum_v2_screen" in APP
     assert "MOMENTUM_V2_DISPLAY_LABELS" in APP
+    assert "MOMENTUM_V2_SCREEN_LABELS" in APP
     assert "render_momentum_v2_display" in APP
 
 

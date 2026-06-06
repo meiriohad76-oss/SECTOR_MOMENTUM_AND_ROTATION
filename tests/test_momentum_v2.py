@@ -5,6 +5,7 @@ import pytest
 from src.momentum_v2 import (
     DISPLAY_LABELS,
     PILLAR_ORDER,
+    SCREEN_LABELS,
     build_view_rows,
     contribution_sum,
     css,
@@ -79,13 +80,40 @@ def test_render_display_modes_emit_distinct_terminal_editorial_and_pillar_stack_
     assert "XLK" in html_c and "Technology sector" in html_c
 
 
+def test_render_display_supports_all_three_screens_for_each_display():
+    rows = build_view_rows(_sample_scored(), phase="MID")
+
+    expected = {
+        "overview": "Overview",
+        "deepdive": "waterfall",
+        "rotation": "Flow river",
+    }
+    for display in DISPLAY_LABELS:
+        for screen, marker in expected.items():
+            html = render_display(
+                display,
+                rows,
+                "2026-06-06 16:00 ET",
+                screen=screen,
+                focus_ticker="XLF",
+            )
+            assert marker in html
+            assert f"momentum-v2-{display.lower()}-{screen}" in html or screen == "overview"
+
+
 def test_css_contains_readability_and_bar_rules():
     stylesheet = css()
 
     assert ".mv2-row .t small" in stylesheet
     assert ".mv2-bar:before" in stylesheet
+    assert ".mv2-waterfall" in stylesheet
+    assert ".mv2-rrg" in stylesheet
     assert "color:var(--mv2-muted)" in stylesheet
 
 
 def test_display_labels_cover_all_three_handoff_directions():
     assert set(DISPLAY_LABELS) == {"A", "B", "C"}
+
+
+def test_screen_labels_cover_handoff_overview_deepdive_rotation():
+    assert set(SCREEN_LABELS) == {"overview", "deepdive", "rotation"}
