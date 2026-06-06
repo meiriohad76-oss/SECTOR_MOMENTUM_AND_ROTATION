@@ -38,7 +38,7 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         section="Shell",
         render_function="render_drill_click_bridge",
         data_inputs=("clickable ticker surfaces",),
-        states=("whole-card click", "keyboard activation", "query ticker handoff"),
+        states=("whole-card click", "keyboard activation", "query ticker selection"),
         qa=("component bridge tests", "browser click QA"),
     ),
     ComponentDoc(
@@ -142,7 +142,7 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         section="Analysis",
         render_function="render_ticker_analyzer",
         data_inputs=("typed ticker", "scored snapshot"),
-        states=("valid ticker", "invalid ticker", "missing scored ticker", "drill-down handoff"),
+        states=("valid ticker", "invalid ticker", "missing scored ticker", "drill-down selection"),
         qa=("ticker analyzer static tests", "performance audit tests"),
     ),
     ComponentDoc(

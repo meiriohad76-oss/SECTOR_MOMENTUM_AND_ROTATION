@@ -1,8 +1,7 @@
 """Momentum v2 view-model and HTML helpers.
 
-The UX handoff is a React prototype; this module adapts its three display
-directions into the existing Streamlit app while keeping live dashboard data as
-the source of truth.
+This module renders three dashboard display directions inside the existing
+Streamlit app while keeping live dashboard data as the source of truth.
 """
 from __future__ import annotations
 
@@ -1757,7 +1756,7 @@ def _deepdive_body(row: MomentumV2Row, display_name: str) -> str:
       <div class="mv2-chart-grid">
         <div class="mv2-panel">
           <h3>Weekly price vs 30-week average</h3>
-          <p>The handoff pairs every ticker story with trend evidence. This panel reserves the same visual weight and explains whether price still confirms the state.</p>
+          <p>Every ticker story is paired with trend evidence. This panel explains whether price still confirms the current state.</p>
           {_price_svg(row)}
           <p>{_esc(row.ticker)} is currently {'above' if row.above_30wma else 'below'} the 30-week moving average; the average slope is {'positive' if row.ma_slope_pos else 'negative'}.</p>
         </div>
@@ -2592,7 +2591,7 @@ def _rotation_b_body(rows: list[MomentumV2Row], as_of: str) -> str:
             {support_cells}
           </div>
           <h3>If the regime weakens</h3>
-          <p>The standby basket is selected from current rows with the strongest combination of F and S, rather than a fixed handoff fixture.</p>
+          <p>The standby basket is selected from current rows with the strongest combination of F and S, using the latest scored universe.</p>
           <div class="mv2-b-risk-basket">{risk_basket}</div>
         </aside>
       </div>
@@ -2729,7 +2728,7 @@ def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
       <div class="mv2-b-article-grid">
         <main class="mv2-b-main">
           <h3>The seven pillars, explained</h3>
-          <p>Each paragraph corresponds to a signed, weighted contribution. The handoff's editorial display is meant to be read as an analyst note.</p>
+          <p>Each paragraph corresponds to a signed, weighted contribution and is meant to be read as an analyst note.</p>
           {pillar_paras}
           <div class="mv2-article-block">
             <div>
@@ -2767,7 +2766,7 @@ def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
           {_gate_html(row.quadrant != "Lagging", "RRG has not entered Lagging", row.quadrant)}
           {_gate_html(row.f_score >= -0.5, "Flow veto has not fired", _fmt(row.f_score))}
         </div>
-        <p style="margin-top:14px">This lower table mirrors the handoff article's role: it turns the narrative into a concrete action checklist.</p>
+        <p style="margin-top:14px">This lower table turns the narrative into a concrete action checklist.</p>
       </div>
     """
 

@@ -81,6 +81,7 @@ def test_browser_qa_readme_documents_qa_dependencies_and_secret_free_mode():
 
     assert "python -m pip install -r requirements-qa.txt" in readme
     assert "BROWSER_QA_MODE" in readme
+    assert "BROWSER_QA_ALLOW_FIXTURES" in readme
     assert "MASSIVE_API_KEY" in readme
     assert "FRED_API_KEY" in readme
     assert "playwright" in requirements

@@ -1,4 +1,4 @@
-"""Sentiment Board - Streamlit implementation of the Claude Design mockup.
+"""Sentiment Board - Streamlit implementation of the live momentum dashboard.
 
 Run with: streamlit run app.py
 """
@@ -17,7 +17,6 @@ import streamlit as st
 
 from src.backtest import drawdown_frame, normalized_equity_frame
 from src.ad_hoc_analysis import score_ad_hoc_tickers
-from src.browser_qa_data import browser_qa_ohlcv_result
 from src.calibration_dashboard import (
     calibration_artifact_status_rows,
     expanded_calibration_artifact_status_rows,
@@ -170,7 +169,20 @@ def _md(html: str):
 
 
 def _browser_qa_mode_enabled() -> bool:
-    return str(os.environ.get("BROWSER_QA_MODE", "")).strip().lower() in {"1", "true", "yes", "on"}
+    mode = str(os.environ.get("BROWSER_QA_MODE", "")).strip().lower() in {"1", "true", "yes", "on"}
+    allow_fixtures = str(os.environ.get("BROWSER_QA_ALLOW_FIXTURES", "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    return mode and allow_fixtures
+
+
+def _browser_qa_ohlcv_result(tickers, period: str):
+    from src.browser_qa_data import browser_qa_ohlcv_result
+
+    return browser_qa_ohlcv_result(tickers, period=period)
 
 
 def _operator_mode_enabled() -> bool:
@@ -567,7 +579,7 @@ section.main > div.block-container { padding-top: 0; padding-bottom: 0; max-widt
 def _load_data(period: str = "3y", refresh_token: str | None = None):
     tickers = DATA_SYMBOLS
     if _browser_qa_mode_enabled():
-        return browser_qa_ohlcv_result(tickers, period=period)
+        return _browser_qa_ohlcv_result(tickers, period=period)
     return fetch_ohlcv_result(tickers, period=period, force_refresh=bool(refresh_token))
 
 
@@ -575,7 +587,7 @@ def _load_data(period: str = "3y", refresh_token: str | None = None):
 def _load_ad_hoc_data(tickers: tuple[str, ...], period: str = "3y", refresh_token: str | None = None):
     symbols = tuple(dict.fromkeys([*tickers, BENCH["US"], BENCH["TBILL"]]))
     if _browser_qa_mode_enabled():
-        return browser_qa_ohlcv_result(symbols, period=period)
+        return _browser_qa_ohlcv_result(symbols, period=period)
     return fetch_ohlcv_result(symbols, period=period, force_refresh=bool(refresh_token))
 
 
@@ -816,7 +828,7 @@ def _render_browser_qa_provider_banner() -> None:
         SimpleNamespace(
             used_stale_cache=False,
             missing=("BROWSER_QA",),
-            warnings=("Browser QA provider fallback fixture - no API keys required.",),
+            warnings=("Browser QA provider-status scenario - no API keys required.",),
         )
     )
 

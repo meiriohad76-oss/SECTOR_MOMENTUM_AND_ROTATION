@@ -42,7 +42,7 @@ Browser QA evidence now covers the remaining visual/responsive screenshot gaps f
 
 ## Design Notes
 
-- `BROWSER_QA_MODE=1` is an explicit QA-only mode. It forces dashboard OHLCV through `provider="yfinance"` and disables FRED fetches so screenshot QA does not depend on Massive/FRED secrets.
+- `BROWSER_QA_MODE=1` plus `BROWSER_QA_ALLOW_FIXTURES=1` is an explicit QA-only mode. It forces deterministic dashboard OHLCV fixtures and disables FRED fetches so screenshot QA does not depend on Massive/FRED secrets. Production should not set `BROWSER_QA_ALLOW_FIXTURES`.
 - QA mode also enables deterministic visual fixtures through query params:
   - `browser_qa_palette=Solarized`
   - `browser_qa_transition=1`

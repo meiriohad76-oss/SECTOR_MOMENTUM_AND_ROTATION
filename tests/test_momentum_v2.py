@@ -365,6 +365,19 @@ def test_momentum_v2_renderer_does_not_emit_handoff_sample_market_data():
         assert sample not in html
 
 
+def test_momentum_v2_renderer_does_not_emit_prototype_or_fixture_language():
+    rows = build_view_rows(_sample_scored(), phase="MID")
+
+    html = "\n".join(
+        render_display(display, rows, "2026-06-06 16:00 ET", screen=screen, focus_ticker="XLK")
+        for display in ("A", "B", "C")
+        for screen in ("overview", "deepdive", "rotation")
+    )
+
+    for forbidden in ("handoff", "mockup", "fixture", "sample market", "fixed handoff"):
+        assert forbidden not in html.lower()
+
+
 def test_momentum_v2_renderer_exposes_data_source_provenance():
     rows = build_view_rows(_sample_scored(), phase="MID")
 

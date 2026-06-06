@@ -226,13 +226,14 @@ The visual/responsive QA evidence for implemented dashboard tickets lives in `do
 ```powershell
 python -m pip install -r requirements-qa.txt
 $env:BROWSER_QA_MODE="1"; $env:MASSIVE_API_KEY=""; $env:FRED_API_KEY=""
+$env:BROWSER_QA_ALLOW_FIXTURES="1"
 python -m streamlit run app.py --server.address=127.0.0.1 --server.port=8503 --server.headless=true
 
 # In a second shell:
 python scripts/capture_browser_qa.py --base-url http://127.0.0.1:8503 --browser-channel chrome --qa-mode browser-qa-secret-free
 ```
 
-Use `--browser-channel msedge` if Edge is installed and Chrome is not. The `BROWSER_QA_MODE` flag must be set before starting Streamlit; it enables deterministic visual fixtures for palette, transition-pulse, and provider-status screenshots, forces secret-free yfinance/FRED-off behavior, and clearing `MASSIVE_API_KEY` plus `FRED_API_KEY` keeps the run explicit. The script writes `browser_qa_report.md`, `browser_qa_manifest.json`, and nonblank screenshots without requiring API keys or webhook secrets.
+Use `--browser-channel msedge` if Edge is installed and Chrome is not. Both `BROWSER_QA_MODE=1` and `BROWSER_QA_ALLOW_FIXTURES=1` must be set before starting Streamlit; this two-key lock enables deterministic visual fixtures for palette, transition-pulse, provider-status screenshots, and secret-free OHLCV/FRED-off screenshot runs. Clearing `MASSIVE_API_KEY` plus `FRED_API_KEY` keeps the run explicit. Production should not set `BROWSER_QA_ALLOW_FIXTURES`. The script writes `browser_qa_report.md`, `browser_qa_manifest.json`, and nonblank screenshots without requiring API keys or webhook secrets.
 
 For the protected Pi route, authenticate through Cloudflare Access first, then run the
 same capture against the public dashboard URL:

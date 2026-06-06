@@ -25,6 +25,32 @@ def test_app_uses_fetch_result_and_renders_provider_status_banner():
     assert "provider-status-banner" in ui_states_source
 
 
+def test_app_live_scoring_path_uses_online_provider_results_not_static_artifacts():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    load_section = app_source[
+        app_source.index("def _load_data(") : app_source.index("def _refresh_loaded_data()")
+    ]
+    compute_section = app_source[
+        app_source.index('with PERF_AUDIT.section("load_data"):') : app_source.index("AVAILABLE_TICKERS =")
+    ]
+
+    assert "return fetch_ohlcv_result(tickers, period=period, force_refresh=bool(refresh_token))" in load_section
+    assert "return _browser_qa_ohlcv_result(tickers, period=period)" in load_section
+    assert "BROWSER_QA_ALLOW_FIXTURES" in app_source
+    assert 'ohlcv_result = _load_data("3y", refresh_token=refresh_token)' in compute_section
+    assert "ohlcv = ohlcv_result.data" in compute_section
+    assert "compute_all_indicators(scoring_ohlcv, bench_ticker, bil_ticker)" in compute_section
+    assert "compute_flow_signals(scoring_ohlcv)" in compute_section
+    assert "_load_fred(refresh_token=fred_refresh_token)" in compute_section
+    assert "assess_regime(" in compute_section
+    assert "compute_composite(indicators_df, flow_df, flow_z, phase=regime.phase_hint)" in compute_section
+    assert "apply_state_machine(scored)" in compute_section
+    assert "pd.read_csv" not in compute_section
+    assert "read_text(" not in compute_section
+    assert "docs/" not in compute_section
+    assert "browser_qa_ohlcv_result" not in compute_section
+
+
 def test_provider_status_banner_css_exists():
     css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
 

@@ -65,3 +65,4 @@ def test_component_docs_html_is_generated_from_catalog():
     assert "Portfolio analyzer" in html
     assert "Backtest lab" in html
     assert "fetch_ohlcv(" not in html
+    assert "handoff" not in html.lower()
