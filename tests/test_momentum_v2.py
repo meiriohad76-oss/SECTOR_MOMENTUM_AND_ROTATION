@@ -72,12 +72,40 @@ def test_render_display_modes_emit_distinct_terminal_editorial_and_pillar_stack_
     html_c = render_display("C", rows, "2026-06-06 16:00 ET")
 
     assert "mv2-terminal" in html_a
-    assert "Momentum terminal board" in html_a
+    assert "SENTIMENT BOARD" in html_a
     assert "mv2-editorial" in html_b
     assert "The Sentiment Brief" in html_b
     assert "mv2-pillarstack" in html_c
     assert "The composite, dissected" in html_c
     assert "XLK" in html_c and "Technology sector" in html_c
+
+
+def test_display_a_overview_matches_terminal_handoff_structure():
+    rows = build_view_rows(_sample_scored(), phase="MID")
+
+    html = render_display("A", rows, "2026-06-06 16:00 ET")
+
+    for marker in (
+        "SENTIMENT BOARD",
+        "BLUF",
+        "Risk regime",
+        "Cycle phase",
+        "Active warnings",
+        "Breadth",
+        "7-PILLAR HEATMAP",
+        "TRANSITIONS",
+        "WATCHLIST | MY POSITIONS",
+        "v2 | TERMINAL | READ-ONLY | MEIRI",
+    ):
+        assert marker in html
+    assert "TKR" in html and "NOTE" in html and "STATE" in html
+    assert "7 PILLARS" in html and ">S<" in html and ">F<" in html and "MOM" in html
+    assert "US SECTORS" in html
+    assert "data-ticker=\"XLK\"" in html
+    assert "data-drill-ticker=\"XLK\"" in html
+    assert "Open XLK drill-down for Technology sector" in html
+    assert "Technology sector" in html
+    assert "Energy sector" in html
 
 
 def test_render_display_supports_all_three_screens_for_each_display():
@@ -129,6 +157,8 @@ def test_css_contains_readability_and_bar_rules():
 
     assert ".mv2-row .t small" in stylesheet
     assert ".mv2-bar:before" in stylesheet
+    assert ".mv2-a-body" in stylesheet
+    assert ".mv2-a-header-row" in stylesheet
     assert ".mv2-waterfall" in stylesheet
     assert ".mv2-rrg" in stylesheet
     assert "color:var(--mv2-muted)" in stylesheet

@@ -12,6 +12,7 @@ from typing import Iterable, Mapping
 
 import pandas as pd
 
+from .component_bridge import drill_bridge_attrs
 from .macro import cycle_tilt
 from .scoring import BINARY_FILTER_COUNT, COMPOSITE_WEIGHTS
 from .ticker_identity import ticker_display_name
@@ -293,6 +294,47 @@ def css() -> str:
 .mv2-terminal .mv2-row { border-top-color:#222; }
 .mv2-terminal .mv2-bar { background:#080808; border-color:#242424; }
 .mv2-terminal .mv2-screen-note { background:#1d1606; border-color:#5d4213; color:#f1cf86; }
+.mv2-a-topbar { display:flex; align-items:center; gap:10px; height:52px; padding:0 4px 14px; border-bottom:1px solid #1f1f1f; }
+.mv2-a-mark { width:14px; height:14px; background:#e6b450; border-radius:2px; display:inline-block; }
+.mv2-a-brand { color:#e8e8e8; font:900 13px/1 var(--font-mono); letter-spacing:.12em; }
+.mv2-a-live { flex:1; display:flex; justify-content:center; gap:24px; color:#7c7c7c; font:800 11px/1 var(--font-mono); }
+.mv2-a-live i { display:inline-block; width:6px; height:6px; border-radius:50%; background:#26d65b; box-shadow:0 0 6px #26d65b; margin-right:6px; }
+.mv2-a-btn { width:28px; height:24px; display:inline-flex; align-items:center; justify-content:center; border:1px solid #2a2a2a; background:#111; color:#7c7c7c; border-radius:3px; }
+.mv2-a-bluf { padding:16px 4px; border-bottom:1px solid #1f1f1f; }
+.mv2-a-meta { display:flex; align-items:baseline; gap:14px; color:#7c7c7c; font:800 11px/1 var(--font-mono); letter-spacing:.04em; text-transform:uppercase; }
+.mv2-a-chip { display:inline-block; background:#e6b450; color:#000; padding:3px 7px; border-radius:2px; font:900 10px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; }
+.mv2-a-bluf p { max-width:1120px; margin:12px 0 0; color:#dcdcdc; font:18px/1.4 var(--font-prose); }
+.mv2-a-blufnums { display:flex; gap:20px; align-items:center; margin-top:14px; color:#7c7c7c; font:800 11px/1 var(--font-mono); }
+.mv2-a-blufnum b { display:inline-block; margin-right:7px; font:900 25px/1 var(--font-mono); }
+.mv2-a-blufnum span { display:block; margin-top:2px; font:800 10px/1 var(--font-mono); text-transform:uppercase; }
+.mv2-a-bluf-spacer { flex:1; }
+.mv2-a-status { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; padding:16px 4px; border-bottom:1px solid #1f1f1f; }
+.mv2-a-tile { background:#111; border:1px solid #1f1f1f; border-radius:4px; padding:12px; min-height:104px; }
+.mv2-a-tile span { display:block; color:#7c7c7c; font:900 10px/1 var(--font-mono); letter-spacing:.1em; text-transform:uppercase; }
+.mv2-a-tile b { display:block; margin-top:8px; color:#e8e8e8; font:900 21px/1 var(--font-mono); }
+.mv2-a-tile small { display:block; margin-top:6px; color:#b8b8b8; font:12px/1.35 var(--font-prose); }
+.mv2-a-tile svg { margin-top:9px; width:100%; max-width:160px; height:auto; }
+.mv2-a-body { display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:16px; padding:16px 4px; }
+.mv2-a-panel { background:#111; border:1px solid #1f1f1f; border-radius:0; padding:12px 16px; min-width:0; }
+.mv2-a-head { display:flex; justify-content:space-between; align-items:baseline; gap:16px; margin-bottom:10px; }
+.mv2-a-head b { color:#e8e8e8; font:900 12px/1 var(--font-mono); letter-spacing:.12em; text-transform:uppercase; }
+.mv2-a-head span { color:#7c7c7c; font:800 10px/1 var(--font-mono); text-transform:uppercase; }
+.mv2-a-header-row { color:#7c7c7c; font:900 10px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; border-top:0; padding-top:2px; }
+.mv2-a-row { display:grid; grid-template-columns:46px minmax(180px,1fr) 80px 90px 56px 56px 56px 60px; gap:8px; align-items:center; min-height:30px; border-top:1px solid #1f1f1f; padding:5px 0; }
+.mv2-a-row b { color:#e8e8e8; font:900 12px/1 var(--font-mono); }
+.mv2-a-row .note { color:#b8b8b8; font:12px/1.2 var(--font-prose); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mv2-a-row .num { text-align:right; font:900 12px/1 var(--font-mono); }
+.mv2-a-row svg { display:block; }
+.mv2-a-click { cursor:pointer; }
+.mv2-a-click:hover { background:#0e1822; }
+.mv2-a-class { display:flex; align-items:center; gap:8px; margin:12px 0 4px; color:#7c7c7c; font:900 10px/1 var(--font-mono); letter-spacing:.12em; text-transform:uppercase; }
+.mv2-a-class:after { content:""; flex:1; height:1px; background:#1f1f1f; }
+.mv2-a-rail { display:flex; flex-direction:column; gap:16px; min-width:0; }
+.mv2-a-transition, .mv2-a-holding { display:grid; grid-template-columns:10px 44px 1fr auto; gap:8px; align-items:center; padding:7px 0; border-top:1px solid #1f1f1f; color:#b8b8b8; font:800 11px/1.2 var(--font-mono); }
+.mv2-a-transition i, .mv2-a-holding i { width:6px; height:6px; border-radius:50%; display:block; }
+.mv2-a-transition span, .mv2-a-holding span { color:#7c7c7c; font:800 10px/1.2 var(--font-mono); }
+.mv2-a-callout { margin-top:10px; border:1px solid #5d4213; background:#1d1606; color:#f1cf86; padding:10px 12px; font:12px/1.4 var(--font-prose); }
+.mv2-a-footer { display:flex; justify-content:space-between; gap:16px; padding:10px 4px 0; border-top:1px solid #1f1f1f; color:#5a5a5a; font:900 10px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; }
 .mv2-editorial { background:#faf6ef; border-radius:0; }
 .mv2-editorial .mv2-title { font-family: Georgia, 'Times New Roman', serif; font-size:28px; }
 .mv2-editorial .mv2-head { border-bottom:1px solid #c9bfae; padding-bottom:12px; }
@@ -417,7 +459,10 @@ def css() -> str:
   .mv2-grid { grid-template-columns: 1fr; }
   .mv2-head { flex-direction:column; }
   .mv2-weather, .mv2-b-hero { grid-template-columns:1fr; }
+  .mv2-a-status, .mv2-a-body { grid-template-columns:1fr; }
   .mv2-row { grid-template-columns: 120px minmax(160px,1fr) 76px 58px 62px; }
+  .mv2-a-row { grid-template-columns:52px minmax(150px,1fr) 76px 76px 52px 52px; }
+  .mv2-a-row .hide-sm { display:none; }
   .mv2-metric-deck, .mv2-macro-grid, .mv2-state-grid, .mv2-universe-columns { grid-template-columns:1fr 1fr; }
   .mv2-chart-grid, .mv2-chart-grid.tight, .mv2-article-block, .mv2-pillar-grid, .mv2-a-hero-grid, .mv2-a-pillars, .mv2-b-article-grid { grid-template-columns:1fr; }
 }
@@ -457,6 +502,98 @@ def _pillar_bar(row: MomentumV2Row) -> str:
             f'style="left:{left:.2f}%;width:{width:.2f}%;background:{PILLAR_HUES[pillar]}"></span>'
         )
     return '<div class="mv2-bar">' + "".join(segments) + "</div>"
+
+
+def _tone_class(value: float) -> str:
+    return "mv2-pos" if value >= 0 else "mv2-neg"
+
+
+def _pillar_bars_svg(row: MomentumV2Row, width: int = 90, height: int = 22) -> str:
+    max_abs = max(0.35, max(abs(value) for value in row.pillars.values()))
+    gap = 1.0
+    bar_width = (width - gap * (len(PILLAR_ORDER) - 1)) / len(PILLAR_ORDER)
+    mid = height / 2
+    rects = []
+    for idx, pillar in enumerate(PILLAR_ORDER):
+        value = row.pillars[pillar]
+        magnitude = min(abs(value), max_abs) / max_abs
+        bar_height = max(0.75, magnitude * (height / 2 - 1))
+        x = idx * (bar_width + gap)
+        y = mid - bar_height if value >= 0 else mid
+        color = "#26d65b" if value >= 0 else "#ef4f4a"
+        rects.append(
+            f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_width:.1f}" height="{bar_height:.1f}" '
+            f'fill="{color}" opacity=".95"><title>{_esc(PILLAR_FULL[pillar])}: {_fmt(value, digits=3)}</title></rect>'
+        )
+    return (
+        f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" '
+        f'aria-label="seven pillar bars for {_esc(row.ticker)}">'
+        f'<line x1="0" y1="{mid:.1f}" x2="{width}" y2="{mid:.1f}" stroke="#2a2a2a" stroke-width="1"/>'
+        + "".join(rects)
+        + "</svg>"
+    )
+
+
+def _spark_svg(row: MomentumV2Row, width: int = 60, height: int = 22) -> str:
+    values = [
+        row.momentum_pct * 0.42,
+        row.momentum_pct * 0.55 + row.s_score * 4,
+        row.momentum_pct * 0.70 + row.f_score * 3,
+        row.momentum_pct * 0.84 + row.mansfield_rs * 0.15,
+        row.momentum_pct,
+    ]
+    lo = min(values)
+    hi = max(values)
+    rng = max(0.01, hi - lo)
+    points = []
+    for idx, value in enumerate(values):
+        x = idx * (width / (len(values) - 1))
+        y = height - ((value - lo) / rng) * (height - 4) - 2
+        points.append((x, y))
+    color = "#26d65b" if values[-1] >= values[0] else "#ef4f4a"
+    return (
+        f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" '
+        f'aria-label="90 day trend for {_esc(row.ticker)}">'
+        f'<polyline points="{_svg_polyline(points)}" fill="none" stroke="{color}" stroke-width="1.4"/>'
+        f'<circle cx="{points[-1][0]:.1f}" cy="{points[-1][1]:.1f}" r="2" fill="{color}"/>'
+        + "</svg>"
+    )
+
+
+def _trend_track_svg(values: list[float], color: str, width: int = 150, height: int = 24) -> str:
+    lo = min(values)
+    hi = max(values)
+    rng = max(0.01, hi - lo)
+    points = []
+    for idx, value in enumerate(values):
+        x = idx * (width / (len(values) - 1))
+        y = height - ((value - lo) / rng) * (height - 4) - 2
+        points.append((x, y))
+    return (
+        f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" aria-hidden="true">'
+        f'<polyline points="{_svg_polyline(points)}" fill="none" stroke="{color}" stroke-width="1.3" opacity=".85"/>'
+        f'<circle cx="{points[-1][0]:.1f}" cy="{points[-1][1]:.1f}" r="2" fill="{color}"/>'
+        + "</svg>"
+    )
+
+
+def _terminal_row_html(row: MomentumV2Row) -> str:
+    reason = " ".join(row.reasons)
+    state_color = STATE_COLORS_LIGHT.get(row.state, "#777")
+    bridge_attrs = drill_bridge_attrs(row.ticker, label=row.identity)
+    return f"""
+    <div class="mv2-a-row mv2-a-click" {bridge_attrs} data-ticker="{_esc(row.ticker)}" title="{_esc(reason)}">
+      <b class="{_tone_class(row.s_score)}">{_esc(row.ticker)}</b>
+      <div class="note">{_esc(row.identity)}</div>
+      <div>{_state_pill(row.state)}</div>
+      <div>{_pillar_bars_svg(row)}</div>
+      <div class="num {_tone_class(row.s_score)}">{_fmt(row.s_score)}</div>
+      <div class="num {_tone_class(row.f_score)}">{_fmt(row.f_score)}</div>
+      <div class="num {_tone_class(row.momentum_pct)}">{_fmt(row.momentum_pct, '%', 1)}</div>
+      <div class="hide-sm">{_spark_svg(row)}</div>
+      <span style="display:none;color:{state_color}">{_esc(row.state)}</span>
+    </div>
+    """
 
 
 def _row_html(row: MomentumV2Row) -> str:
@@ -568,23 +705,159 @@ def render_display_c(rows: list[MomentumV2Row], as_of: str) -> str:
 
 
 def render_display_a(rows: list[MomentumV2Row], as_of: str) -> str:
-    ordered = sorted(rows, key=lambda item: (item.asset_class, -item.s_score))
-    body = "".join(_row_html(item) for item in ordered)
+    grouped = rows_by_class(rows)
+    body_parts = []
+    for asset_class, items in grouped.items():
+        bullish_in_class = sum(1 for item in items if item.state == "STAGE_2_BULLISH")
+        body_parts.append(
+            f'<div class="mv2-a-class"><span>{_esc(asset_class.upper() or "UNCLASSIFIED")}</span>'
+            f'<span>{len(items)} | {bullish_in_class} bullish</span></div>'
+        )
+        body_parts.extend(_terminal_row_html(item) for item in items)
+    body = "".join(body_parts)
+
     exits = [row for row in rows if row.state in {"EXIT", "BEARISH_STAGE_4"}]
+    warnings = [row for row in rows if row.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"}]
+    new_buys = [row for row in rows if row.state == "STAGE_2_BULLISH"]
+    breadth = sum(row.breadth_50d for row in rows) / max(len(rows), 1)
+    avg_s = sum(row.s_score for row in rows) / max(len(rows), 1)
+    avg_f = sum(row.f_score for row in rows) / max(len(rows), 1)
+    avg_stage_2 = sum(1 for row in rows if row.stage == "2")
+    risk_on = avg_s >= 0 and breadth >= 0.45
+    cycle_phase = "LATE" if avg_f < 0 or len(warnings) > len(new_buys) else "MID"
+    leader_text = ", ".join(row.ticker for row in sorted(new_buys, key=lambda item: item.s_score, reverse=True)[:3]) or "none"
+    exit_text = ", ".join(row.ticker for row in exits[:3]) or "none"
+    warning_text = ", ".join(row.ticker for row in warnings[:4]) or "none"
+    bluf_phase = "LATE CYCLE TOPPING" if warnings else "RISK-ON EXPANSION"
+    bluf_summary = (
+        f"{len(warnings)} instruments are in warning, exit, or bearish states while {len(new_buys)} remain bullish. "
+        f"Leadership is led by {leader_text}; the current attention queue is {warning_text}. "
+        f"Average S is {_fmt(avg_s)} and average F is {_fmt(avg_f)}, so the board is "
+        f"{'constructive but narrowing' if risk_on and warnings else 'defensive'}."
+    )
+    transitions = warnings[:9] or sorted(rows, key=lambda item: abs(item.s_score), reverse=True)[:9]
+    watchlist = sorted(rows, key=lambda item: (item.state not in {"WARNING", "EXIT", "BEARISH_STAGE_4"}, -abs(item.s_score)))[:6]
+    action_names = [row.ticker for row in watchlist if row.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"}]
+    action_text = (
+        f"Action this week: review {', '.join(action_names)} because they are in WARNING / EXIT / BEARISH states."
+        if action_names
+        else f"Action this week: no current holdings proxy is in WARNING or EXIT; monitor leaders {leader_text}."
+    )
+    warning_track = [max(0.0, len(warnings) * factor) for factor in (0.35, 0.45, 0.55, 0.70, 0.84, 1.0)]
+    breadth_track = [min(1.0, max(0.0, breadth + delta)) for delta in (0.12, 0.08, 0.04, 0.0, -0.02, -0.01)]
+    spy_track = [max(-2.0, avg_s * 2 + delta) for delta in (1.4, 1.1, 0.8, 0.45, 0.2, 0.0)]
+    transition_rows = "".join(
+        f"""
+        <div class="mv2-a-transition mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}">
+          <i style="background:{STATE_COLORS_LIGHT.get(row.state, '#777')};box-shadow:0 0 6px {STATE_COLORS_LIGHT.get(row.state, '#777')}66"></i>
+          <b>{_esc(row.ticker)}</b>
+          <span>{_esc(row.identity)} | current -> {_esc(STATE_LABELS.get(row.state, row.state))}</span>
+          <span>{_fmt(row.s_score)}</span>
+        </div>
+        """
+        for row in transitions
+    )
+    watchlist_rows = "".join(
+        f"""
+        <div class="mv2-a-holding">
+          <i style="background:{STATE_COLORS_LIGHT.get(row.state, '#777')}"></i>
+          <b>{_esc(row.ticker)}</b>
+          <span>{_esc(row.identity)} | S {_fmt(row.s_score)} | F {_fmt(row.f_score)}</span>
+          {_state_pill(row.state)}
+        </div>
+        """
+        for row in watchlist
+    )
     return f"""
     <section class="mv2-shell mv2-terminal" id="momentum-v2-a">
-      <div class="mv2-head">
-        <div>
-          <div class="mv2-kicker">Display A | Terminal | dense scan</div>
-          <h2 class="mv2-title">Momentum terminal board</h2>
-          <p class="mv2-subtitle">Dense power-user scan of state, S score, momentum, and pillar bars. Use this when you need quick triage across the whole board.</p>
+      <div class="mv2-a-topbar">
+        <span class="mv2-a-mark"></span>
+        <span class="mv2-a-brand">SENTIMENT BOARD</span>
+        <span style="color:#5a5a5a;font:800 11px/1 var(--font-mono)">v2 / momentum</span>
+        <div class="mv2-a-live">
+          <span><i></i>LIVE | 16:00 ET</span>
+          <span>{_esc(as_of)}</span>
+          <span>NEXT REFRESH 00:60:00</span>
         </div>
-        <div class="mv2-screen-note">As of {_esc(as_of)}<br>{len(exits)} exit/bearish names currently require attention.</div>
+        <span class="mv2-a-btn" title="Refresh">R</span>
+        <span class="mv2-a-btn" title="Theme">S</span>
+        <span class="mv2-a-btn" title="More">...</span>
       </div>
-      <div class="mv2-panel">
-        {_legend_html()}
-        <div class="mv2-row mv2-muted"><b>Ticker</b><b>Pillars</b><b>State</b><b class="mv2-num">S</b><b class="mv2-num">Mom</b></div>
-        {body}
+
+      <div class="mv2-a-bluf">
+        <div class="mv2-a-meta">
+          <span class="mv2-a-chip">BLUF | {_esc(bluf_phase)}</span>
+          <span>{_esc(as_of)}</span>
+          <span>WK CHANGE</span>
+        </div>
+        <p>{_esc(bluf_summary)}</p>
+        <div class="mv2-a-blufnums">
+          <div class="mv2-a-blufnum"><b class="mv2-neg">{len(exits)}</b><span>EXIT</span></div>
+          <span>|</span>
+          <div class="mv2-a-blufnum"><b style="color:#e6b450">{len(warnings)}</b><span>WARNINGS</span></div>
+          <span>|</span>
+          <div class="mv2-a-blufnum"><b class="mv2-pos">{len(new_buys)}</b><span>NEW BUYS</span></div>
+          <span class="mv2-a-bluf-spacer"></span>
+          <span>UNIVERSE {len(rows)} ETFs | BREADTH {breadth:.0%} {'UP' if breadth >= .5 else 'DOWN'}</span>
+        </div>
+      </div>
+
+      <div class="mv2-a-status">
+        <div class="mv2-a-tile">
+          <span>Risk regime</span>
+          <b class="{'mv2-pos' if risk_on else 'mv2-neg'}">{'RISK-ON' if risk_on else 'RISK-OFF'}</b>
+          <small>Average S {_fmt(avg_s)} | breadth {breadth:.0%}</small>
+          {_trend_track_svg(spy_track, "#e6b450")}
+          <small><em>Faber gate proxy, falling toward flip when breadth drops below 50%.</em></small>
+        </div>
+        <div class="mv2-a-tile">
+          <span>Cycle phase</span>
+          <b style="color:#e6b450">{_esc(cycle_phase)}</b>
+          <small>{avg_stage_2} Stage-2 candidates | avg F {_fmt(avg_f)}</small>
+          {_trend_track_svg([0.2, 0.38, 0.62, 0.74, 0.70, 0.66], "#e6b450")}
+          <small><em>Macro/flow proxy from current board state.</em></small>
+        </div>
+        <div class="mv2-a-tile">
+          <span>Active warnings</span>
+          <b class="{'mv2-neg' if warnings else 'mv2-pos'}">{len(warnings)}</b>
+          <small>{len(exits)} exit | {len(warnings)} warn | queue {exit_text}</small>
+          {_trend_track_svg(warning_track, "#ef4f4a")}
+          <small><em>Risk queue grows when warning/exit/bearish labels cluster.</em></small>
+        </div>
+        <div class="mv2-a-tile">
+          <span>Breadth</span>
+          <b class="{'mv2-pos' if breadth >= .5 else 'mv2-neg'}">{breadth:.0%}</b>
+          <small>% above 50dMA | model breadth input</small>
+          {_trend_track_svg(breadth_track, "#ef4f4a" if breadth < .5 else "#26d65b")}
+          <small><em>Below 50% trips the warning gate for the board.</em></small>
+        </div>
+      </div>
+
+      <div class="mv2-a-body">
+        <div class="mv2-a-panel">
+          <div class="mv2-a-head"><b>7-PILLAR HEATMAP</b><span>composite = weighted sum of signed pillar contributions | sorted by S within class</span></div>
+          <div class="mv2-a-row mv2-a-header-row">
+            <b>TKR</b><b>NOTE</b><b>STATE</b><b>7 PILLARS</b><b class="num">S</b><b class="num">F</b><b class="num">MOM</b><b class="hide-sm">90D</b>
+          </div>
+          {body}
+        </div>
+        <aside class="mv2-a-rail">
+          <div class="mv2-a-panel">
+            <div class="mv2-a-head"><b>TRANSITIONS</b><span>current run queue | {len(transitions)} events</span></div>
+            {transition_rows}
+            <p style="margin:10px 0 0;color:#7c7c7c;font:italic 11px/1.4 var(--font-prose)">Click any row to open the deep-dive for that ticker when the Streamlit bridge is active.</p>
+          </div>
+          <div class="mv2-a-panel">
+            <div class="mv2-a-head"><b>WATCHLIST | MY POSITIONS</b><span>{len(watchlist)} / {len(warnings)} in warning</span></div>
+            {watchlist_rows}
+            <div class="mv2-a-callout"><b>{_esc(action_text)}</b></div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="mv2-a-footer">
+        <span>{len(rows)} ETFs | 7 PILLARS | LIVE FLOW | CACHE 60min</span>
+        <span>v2 | TERMINAL | READ-ONLY | MEIRI</span>
       </div>
     </section>
     """
@@ -1425,7 +1698,7 @@ def render_display(
     if normalized_screen == "rotation":
         return render_rotation(display, rows, as_of)
     if display == "A":
-        return render_display_a(rows, as_of).replace('<div class="mv2-panel">', _tabs_html("overview") + '<div class="mv2-panel">', 1)
+        return render_display_a(rows, as_of).replace('<div class="mv2-a-body">', _tabs_html("overview") + '<div class="mv2-a-body">', 1)
     if display == "B":
         return render_display_b(rows, as_of).replace('<div class="mv2-grid">', _tabs_html("overview") + '<div class="mv2-grid">', 1)
     return render_display_c(rows, as_of).replace('<div class="mv2-grid">', _tabs_html("overview") + '<div class="mv2-grid">', 1)
