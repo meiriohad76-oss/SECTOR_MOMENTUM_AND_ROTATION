@@ -375,6 +375,18 @@ def css() -> str:
 .mv2-article-block p { font:16px/1.55 Georgia, 'Times New Roman', serif; color:#3d342e; margin:0 0 12px; }
 .mv2-article-side { background:#fffbf3; border:1px solid #e1d8c9; padding:14px; }
 .mv2-article-side b { display:block; font:900 12px/1 var(--font-mono); margin-bottom:8px; color:#1c1815; }
+.mv2-b-mast { display:flex; align-items:center; gap:16px; border-bottom:1px solid #c9bfae; padding:0 0 12px; margin-bottom:18px; color:#6e6258; font:800 11px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; }
+.mv2-b-mast b { color:#1c1815; font:700 18px/1 Georgia, 'Times New Roman', serif; letter-spacing:0; text-transform:none; }
+.mv2-b-article-grid { display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:56px; max-width:1340px; margin:0 auto; align-items:start; }
+.mv2-b-main { min-width:0; }
+.mv2-b-main > h3 { border-bottom:2px solid #1c1815; padding-bottom:8px; margin:0 0 8px; color:#1c1815; font:900 11px/1 var(--font-mono); letter-spacing:.14em; text-transform:uppercase; }
+.mv2-b-main > p { margin:0 0 18px; color:#6e6258; font:italic 14px/1.5 Georgia, 'Times New Roman', serif; }
+.mv2-b-sidebar { position:sticky; top:16px; background:#fffbf3; border:1px solid #c9bfae; border-top:3px solid #1c1815; padding:16px 18px; }
+.mv2-b-sidebar h3 { margin:16px 0 8px; color:#1c1815; font:900 10px/1 var(--font-mono); letter-spacing:.12em; text-transform:uppercase; }
+.mv2-b-sidebar h3:first-child { margin-top:0; }
+.mv2-b-sidebar p { margin:8px 0 0; color:#6e6258; font:italic 12.5px/1.45 Georgia, 'Times New Roman', serif; }
+.mv2-b-gate-table { max-width:1340px; margin:24px auto 0; background:#fffbf3; border:1px solid #e1d8c9; padding:18px 22px; }
+.mv2-b-gate-table h3 { margin:0 0 10px; color:#1c1815; font:900 11px/1 var(--font-mono); letter-spacing:.14em; text-transform:uppercase; }
 .mv2-article-hero { padding:28px 0 18px; border-bottom:1px solid #e1d8c9; }
 .mv2-article-hero h2 { font:700 52px/1 Georgia, 'Times New Roman', serif; color:#1c1815; margin:10px 0 12px; }
 .mv2-pull-strip { background:#1c1815; color:#f6efe2; display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin:18px 0; }
@@ -400,7 +412,7 @@ def css() -> str:
   .mv2-weather, .mv2-b-hero { grid-template-columns:1fr; }
   .mv2-row { grid-template-columns: 120px minmax(160px,1fr) 76px 58px 62px; }
   .mv2-metric-deck, .mv2-macro-grid { grid-template-columns:1fr 1fr; }
-  .mv2-chart-grid, .mv2-chart-grid.tight, .mv2-article-block, .mv2-pillar-grid, .mv2-a-hero-grid, .mv2-a-pillars { grid-template-columns:1fr; }
+  .mv2-chart-grid, .mv2-chart-grid.tight, .mv2-article-block, .mv2-pillar-grid, .mv2-a-hero-grid, .mv2-a-pillars, .mv2-b-article-grid { grid-template-columns:1fr; }
 }
 """
 
@@ -1173,6 +1185,12 @@ def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
         for idx, pillar in enumerate(PILLAR_ORDER)
     )
     return f"""
+      <div class="mv2-b-mast">
+        <b>The Sentiment Brief</b>
+        <span>|</span>
+        <span>Deep-dive | {_esc(row.ticker)}</span>
+        <span style="margin-left:auto">Back to brief | Next leader</span>
+      </div>
       <div class="mv2-article-hero">
         <div class="mv2-kicker">Display B | Editorial deep dive | {_esc(as_of)}</div>
         <h2>{_esc(row.ticker)}: price says fine.<br><em style="color:#a23a1f">Flow says watch carefully.</em></h2>
@@ -1187,13 +1205,24 @@ def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
         <div><span>Momentum</span><b>{_fmt(row.momentum_pct, "%", 1)}</b></div>
         <div><span>RRG</span><b>{_esc(row.quadrant)}</b></div>
       </div>
-      <div class="mv2-grid">
-        <div class="mv2-panel">
+      <div class="mv2-b-article-grid">
+        <main class="mv2-b-main">
           <h3>The seven pillars, explained</h3>
           <p>Each paragraph corresponds to a signed, weighted contribution. The handoff's editorial display is meant to be read as an analyst note.</p>
           {pillar_paras}
-        </div>
-        <aside class="mv2-panel">
+          <div class="mv2-article-block">
+            <div>
+              <p>The practical interpretation is deliberately conservative. A warning state does not say the instrument must immediately fall; it says the evidence stack has stopped agreeing. In this case the largest disagreement is between price trend and sponsorship. Price remains above the long moving average, but flow and relative rotation are no longer confirming the advance.</p>
+              <p>The dashboard therefore treats the position as a hold-with-conditions rather than a fresh buy. The nearest escalation gate is a weekly close below the 30-week moving average, followed by a deeper CMF break below -0.10 or a sustained Mansfield RS failure. If those gates fire, the model moves from warning to exit without waiting for every pillar to turn negative.</p>
+              <p>For a novice reader, the important idea is simple: the score is not one magic number. It is seven forces. The article view is designed to show which forces still help, which forces hurt, and which one changed most recently.</p>
+            </div>
+            <div class="mv2-article-side">
+              <b>NEXT WATCH LIST</b>
+              <p>Weekly close vs 30wMA<br>CMF relative to -0.10<br>Mansfield RS crossing zero<br>RRG Weakening to Lagging<br>Flow contribution below veto line</p>
+            </div>
+          </div>
+        </main>
+        <aside class="mv2-b-sidebar">
           <h3>Charts and gates</h3>
           {_price_svg(row, width=420, height=190)}
           <p>Price is {'above' if row.above_30wma else 'below'} the 30-week average. Mansfield RS is {_fmt(row.mansfield_rs)}.</p>
@@ -1207,18 +1236,7 @@ def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
           </div>
         </aside>
       </div>
-      <div class="mv2-article-block">
-        <div>
-          <p>The practical interpretation is deliberately conservative. A warning state does not say the instrument must immediately fall; it says the evidence stack has stopped agreeing. In this case the largest disagreement is between price trend and sponsorship. Price remains above the long moving average, but flow and relative rotation are no longer confirming the advance.</p>
-          <p>The dashboard therefore treats the position as a hold-with-conditions rather than a fresh buy. The nearest escalation gate is a weekly close below the 30-week moving average, followed by a deeper CMF break below -0.10 or a sustained Mansfield RS failure. If those gates fire, the model moves from warning to exit without waiting for every pillar to turn negative.</p>
-          <p>For a novice reader, the important idea is simple: the score is not one magic number. It is seven forces. The article view is designed to show which forces still help, which forces hurt, and which one changed most recently.</p>
-        </div>
-        <div class="mv2-article-side">
-          <b>NEXT WATCH LIST</b>
-          <p>Weekly close vs 30wMA<br>CMF relative to -0.10<br>Mansfield RS crossing zero<br>RRG Weakening to Lagging<br>Flow contribution below veto line</p>
-        </div>
-      </div>
-      <div class="mv2-panel" style="margin-top:18px">
+      <div class="mv2-b-gate-table">
         <h3>Exit trigger table</h3>
         <div class="mv2-gates">
           {_gate_html(row.above_30wma, "Weekly close remains above 30wMA", "pass" if row.above_30wma else "failed")}
