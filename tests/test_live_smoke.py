@@ -28,6 +28,17 @@ def test_classifies_authenticated_dashboard_as_healthy_route():
     assert result.state == "authenticated_dashboard"
 
 
+def test_classifies_followed_cloudflare_access_page_as_healthy_challenge():
+    result = classify_protected_dashboard_response(
+        status_code=200,
+        headers={},
+        text="<html><title>Sign in - Cloudflare Access</title><body>Cloudflare Access</body></html>",
+    )
+
+    assert result.ok is True
+    assert result.state == "cloudflare_access_challenge"
+
+
 def test_rejects_ambiguous_public_200_without_dashboard_or_access_markers():
     result = classify_protected_dashboard_response(
         status_code=200,

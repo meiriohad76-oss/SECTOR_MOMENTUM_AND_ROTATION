@@ -63,7 +63,7 @@ def classify_protected_dashboard_response(
         or "sign in - cloudflare access" in body
         or "cloudflare access" in body
     )
-    if access_markers and status_code in {302, 401, 403}:
+    if access_markers and status_code in {200, 302, 401, 403}:
         return ProtectedRouteSmoke(True, "cloudflare_access_challenge", f"HTTP {status_code}")
 
     if status_code == 200 and expected and location_host == expected:
