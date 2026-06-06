@@ -109,6 +109,52 @@ def _fixture_rows():
         ("EWJ", "Japan", "Countries", "HOLD", 0.32, 0.12, 14.0, "2", "Improving", 99, 104, 0.04, 0.08, 0.56, True, True, [0.08, 0.02, -0.01, 0.08, 0.08, 0.00, 0.07]),
         ("MTUM", "Momentum factor", "Factors", "WARNING", -0.34, -0.18, 22.0, "2", "Weakening", 102, 96, -0.02, 0.01, 0.49, True, True, [0.16, -0.02, 0.04, -0.14, 0.08, -0.01, -0.45]),
     ]
+    extra_specs = [
+        ("XLU", "Utilities sector", "US Sectors"), ("XLP", "Consumer staples sector", "US Sectors"),
+        ("XLI", "Industrials sector", "US Sectors"), ("XLY", "Consumer discretionary sector", "US Sectors"),
+        ("XLC", "Communication services sector", "US Sectors"), ("XLB", "Materials sector", "US Sectors"),
+        ("XLRE", "Real estate sector", "US Sectors"), ("SOXX", "Semiconductors", "US Industries"),
+        ("IGV", "Software", "US Industries"), ("FDN", "Internet", "US Industries"),
+        ("IHI", "Medical devices", "US Industries"), ("IHF", "Healthcare providers", "US Industries"),
+        ("KRE", "Regional banks", "US Industries"), ("KIE", "Insurance", "US Industries"),
+        ("ITB", "Home construction", "US Industries"), ("XHB", "Homebuilders", "US Industries"),
+        ("XRT", "Retail", "US Industries"), ("XOP", "Oil and gas exploration", "US Industries"),
+        ("OIH", "Oil services", "US Industries"), ("TAN", "Solar", "US Industries"),
+        ("ICLN", "Clean energy", "US Industries"), ("KWEB", "China internet", "US Industries"),
+        ("ITA", "Aerospace and defense", "US Industries"), ("JETS", "Airlines", "US Industries"),
+        ("IBB", "Biotech", "US Industries"), ("XBI", "Biotech", "US Industries"),
+        ("VEU", "All-world ex-US", "Countries"), ("EEM", "Emerging markets", "Countries"),
+        ("EFA", "Developed ex-US", "Countries"), ("VWO", "Emerging markets", "Countries"),
+        ("EWG", "Germany", "Countries"), ("EWU", "United Kingdom", "Countries"),
+        ("INDA", "India", "Countries"), ("MCHI", "China", "Countries"),
+        ("FXI", "China large-cap", "Countries"), ("EWZ", "Brazil", "Countries"),
+        ("EWA", "Australia", "Countries"), ("EWC", "Canada", "Countries"),
+        ("EWW", "Mexico", "Countries"), ("EZA", "South Africa", "Countries"),
+        ("EWY", "South Korea", "Countries"), ("EWT", "Taiwan", "Countries"),
+        ("EWS", "Singapore", "Countries"), ("EIDO", "Indonesia", "Countries"),
+        ("KSA", "Saudi Arabia", "Countries"), ("QUAL", "Quality factor", "Factors"),
+        ("USMV", "Minimum volatility factor", "Factors"), ("VLUE", "Value factor", "Factors"),
+        ("SIZE", "Small-size factor", "Factors"), ("IWF", "Large-cap growth factor", "Factors"),
+        ("IWD", "Large-cap value factor", "Factors"), ("IJR", "Small-cap factor", "Factors"),
+        ("IJH", "Mid-cap factor", "Factors"), ("IWB", "Large-cap core factor", "Factors"),
+    ]
+    states = ["STAGE_2_BULLISH", "HOLD", "WARNING", "EXIT", "BEARISH_STAGE_4", "HOLD", "WARNING"]
+    quads = ["Leading", "Improving", "Weakening", "Lagging"]
+    for idx, (ticker, identity, asset_class) in enumerate(extra_specs):
+        sign = 1 if idx % 5 in {0, 1} else -1 if idx % 5 in {3, 4} else 0.25
+        s = round(sign * (0.18 + (idx % 9) * 0.13), 2)
+        f = round(sign * (0.08 + (idx % 7) * 0.07), 2)
+        mom = round(sign * (6 + (idx % 13) * 2.1), 1)
+        state = states[idx % len(states)]
+        quad = quads[idx % len(quads)]
+        data.append((
+            ticker, identity, asset_class, state, s, f, mom,
+            "2" if state not in {"EXIT", "BEARISH_STAGE_4"} else "3",
+            quad, 100 + sign * (2 + idx % 8), 100 + sign * (1 + idx % 7),
+            f / 4, s / 6, 0.55 + sign * 0.08,
+            state not in {"EXIT", "BEARISH_STAGE_4"}, state != "BEARISH_STAGE_4",
+            [s * 0.14, s * 0.08, s * 0.10, s * 0.06, 0.08 if s >= 0 else -0.04, s * 0.04, s * 0.25],
+        ))
     rows = []
     for item in data:
         ticker, identity, asset_class, state, s, f, mom, stage, quad, rsr, rsm, cmf, mans, breadth, above, slope, pillars = item
@@ -147,7 +193,7 @@ def _static_html(display: str, screen: str) -> str:
     return (
         "<!doctype html><html><head><meta charset='utf-8'>"
         "<style>:root{--font-mono:'Consolas','Courier New',monospace;--font-prose:Inter,Arial,sans-serif}"
-        "body{margin:0;background:#d8d8d8;padding:24px}"
+        "body{margin:0;background:#d8d8d8;padding:0}"
         + css()
         + "</style></head><body>"
         + body

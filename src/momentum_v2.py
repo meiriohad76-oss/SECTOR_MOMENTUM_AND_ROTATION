@@ -250,7 +250,9 @@ def css() -> str:
   border: 1px solid var(--mv2-border);
   border-radius: 10px;
   padding: 20px;
-  margin: 18px 0;
+  margin: 18px auto;
+  max-width: 1440px;
+  width: 100%;
 }
 .mv2-shell, .mv2-shell * { box-sizing: border-box; letter-spacing: 0; }
 .mv2-head { display:flex; justify-content:space-between; gap:18px; align-items:flex-start; margin-bottom:16px; }
@@ -266,9 +268,9 @@ def css() -> str:
 .mv2-chip { display:inline-flex; align-items:center; gap:6px; color:var(--mv2-muted); font:700 12px/1 var(--font-mono); }
 .mv2-swatch { width:10px; height:10px; border-radius:2px; display:inline-block; }
 .mv2-class { margin:18px 0 8px; color:var(--mv2-muted); font:700 12px/1.2 var(--font-mono); text-transform:uppercase; }
-.mv2-row { display:grid; grid-template-columns: 150px minmax(220px,1fr) 82px 70px 76px; gap:10px; align-items:center; min-height:38px; border-top:1px solid #eee7dd; padding:8px 0; }
+.mv2-row { display:grid; grid-template-columns: 150px minmax(220px,1fr) 82px 70px 76px; gap:10px; align-items:center; min-height:31px; border-top:1px solid #eee7dd; padding:5px 0; }
 .mv2-row .t { color:var(--mv2-ink); font:800 14px/1.1 var(--font-mono); }
-.mv2-row .t small { display:block; margin-top:3px; color:var(--mv2-muted); font:500 12px/1.2 var(--font-prose); white-space:normal; }
+.mv2-row .t small { display:block; margin-top:2px; color:var(--mv2-muted); font:500 11px/1.1 var(--font-prose); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .mv2-bar { position:relative; height:20px; background:var(--mv2-sunken); border:1px solid #ebe4da; border-radius:5px; overflow:hidden; }
 .mv2-bar:before { content:""; position:absolute; left:50%; top:0; bottom:0; border-left:1px solid #c9c0b4; z-index:2; }
 .mv2-seg { position:absolute; top:3px; height:12px; min-width:2px; }
@@ -331,6 +333,14 @@ def css() -> str:
 .mv2-macro { border:1px solid var(--mv2-border); background:var(--mv2-sunken); border-radius:8px; padding:11px; }
 .mv2-macro span { color:var(--mv2-muted); font:800 10px/1 var(--font-mono); text-transform:uppercase; }
 .mv2-macro b { display:block; margin-top:6px; color:var(--mv2-ink); font:900 16px/1 var(--font-mono); }
+.mv2-chart-grid { display:grid; grid-template-columns:1.4fr 1fr; gap:16px; margin-top:16px; }
+.mv2-faux-chart { height:220px; border:1px solid var(--mv2-border); border-radius:8px; background:linear-gradient(180deg, transparent 0 19%, rgba(0,0,0,.05) 20%, transparent 21% 39%, rgba(0,0,0,.05) 40%, transparent 41% 59%, rgba(0,0,0,.05) 60%, transparent 61% 79%, rgba(0,0,0,.05) 80%, transparent 81%), var(--mv2-sunken); position:relative; overflow:hidden; }
+.mv2-faux-line { position:absolute; left:8%; right:8%; height:46%; bottom:22%; border-bottom:3px solid var(--mv2-green); border-radius:50%; transform:skewX(-12deg); opacity:.72; }
+.mv2-faux-line.alt { bottom:30%; border-bottom-color:var(--mv2-amber); border-bottom-style:dashed; opacity:.65; }
+.mv2-article-block { display:grid; grid-template-columns:1fr 280px; gap:22px; border-top:1px solid #e1d8c9; padding-top:18px; margin-top:18px; }
+.mv2-article-block p { font:16px/1.55 Georgia, 'Times New Roman', serif; color:#3d342e; margin:0 0 12px; }
+.mv2-article-side { background:#fffbf3; border:1px solid #e1d8c9; padding:14px; }
+.mv2-article-side b { display:block; font:900 12px/1 var(--font-mono); margin-bottom:8px; color:#1c1815; }
 .mv2-terminal .mv2-tab { background:#111; border-color:#2a2a2a; color:#b8b8b8; }
 .mv2-terminal .mv2-tab.active { color:#f0f0f0; border-color:#5fa8d3; box-shadow:inset 0 -2px 0 #5fa8d3; }
 .mv2-terminal .mv2-waterfall, .mv2-terminal .mv2-gate, .mv2-terminal .mv2-mom-row { border-top-color:#242424; }
@@ -342,6 +352,7 @@ def css() -> str:
   .mv2-head { flex-direction:column; }
   .mv2-row { grid-template-columns: 120px minmax(160px,1fr) 76px 58px 62px; }
   .mv2-metric-deck, .mv2-macro-grid { grid-template-columns:1fr 1fr; }
+  .mv2-chart-grid, .mv2-article-block { grid-template-columns:1fr; }
 }
 """
 
@@ -453,7 +464,7 @@ def render_display_c(rows: list[MomentumV2Row], as_of: str) -> str:
 
 def render_display_a(rows: list[MomentumV2Row], as_of: str) -> str:
     ordered = sorted(rows, key=lambda item: (item.asset_class, -item.s_score))
-    body = "".join(_row_html(item) for item in ordered[:36])
+    body = "".join(_row_html(item) for item in ordered)
     exits = [row for row in rows if row.state in {"EXIT", "BEARISH_STAGE_4"}]
     return f"""
     <section class="mv2-shell mv2-terminal" id="momentum-v2-a">
@@ -475,10 +486,10 @@ def render_display_a(rows: list[MomentumV2Row], as_of: str) -> str:
 
 
 def render_display_b(rows: list[MomentumV2Row], as_of: str) -> str:
-    leaders = sorted(rows, key=lambda item: item.s_score, reverse=True)[:4]
-    risks = [row for row in rows if row.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"}][:6]
+    leaders = sorted(rows, key=lambda item: item.s_score, reverse=True)[:8]
+    risks = [row for row in rows if row.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"}][:10]
     stories = []
-    for item in [*leaders[:2], *risks[:3]]:
+    for item in [*leaders[:3], *risks[:6]]:
         stories.append(
             f"""
             <article class="mv2-story">
@@ -504,6 +515,16 @@ def render_display_b(rows: list[MomentumV2Row], as_of: str) -> str:
         <div class="mv2-panel">
           <h3>Current stories</h3>
           {"".join(stories)}
+          <div class="mv2-article-block">
+            <div>
+              <p>The editorial display is designed for a slower reading workflow: not just which tickers changed, but what forces changed first. Momentum and trend say where price has been; flow and rotation say where sponsorship may be moving next.</p>
+              <p>Read every story as decision support. A bullish state means evidence is aligned today; a warning means one or more forward-looking gates has started to deteriorate.</p>
+            </div>
+            <div class="mv2-article-side">
+              <b>READING ORDER</b>
+              <p>1. State label<br>2. S and F scores<br>3. Largest pillar drag<br>4. Exit trigger proximity</p>
+            </div>
+          </div>
         </div>
         <aside class="mv2-panel">
           <h3>By the numbers</h3>
@@ -638,6 +659,19 @@ def _deepdive_body(row: MomentumV2Row, display_name: str) -> str:
         <h3>The seven pillars</h3>
         <p>Each line shows the signed weighted contribution used by the composite.</p>
         <div class="mv2-rail-list">{pillar_cards}</div>
+      </div>
+      <div class="mv2-chart-grid">
+        <div class="mv2-panel">
+          <h3>Weekly price vs 30-week average</h3>
+          <p>The handoff pairs every ticker story with trend evidence. This panel reserves the same visual weight and explains whether price still confirms the state.</p>
+          <div class="mv2-faux-chart"><span class="mv2-faux-line"></span><span class="mv2-faux-line alt"></span></div>
+          <p>{_esc(row.ticker)} is currently {'above' if row.above_30wma else 'below'} the 30-week moving average; the average slope is {'positive' if row.ma_slope_pos else 'negative'}.</p>
+        </div>
+        <div class="mv2-panel">
+          <h3>Flow and volume confirmation</h3>
+          <p>Flow is the heaviest pillar in the model. The current F score is {_fmt(row.f_score)}, CMF is {_fmt(row.cmf21)}, and the flow contribution is {_fmt(row.pillars['FLOW'], digits=3)}.</p>
+          <div class="mv2-faux-chart"><span class="mv2-faux-line" style="border-bottom-color:var(--mv2-blue)"></span><span class="mv2-faux-line alt" style="border-bottom-color:var(--mv2-red)"></span></div>
+        </div>
       </div>
     """
 
