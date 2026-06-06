@@ -90,7 +90,7 @@ def test_render_display_supports_all_three_screens_for_each_display():
     for display in DISPLAY_LABELS:
         for screen, marker in {
             **expected,
-            "deepdive": "article" if display == "B" else "waterfall",
+            "deepdive": {"A": "COMPOSITE FORWARD OUTLOOK", "B": "article", "C": "waterfall"}[display],
         }.items():
             html = render_display(
                 display,

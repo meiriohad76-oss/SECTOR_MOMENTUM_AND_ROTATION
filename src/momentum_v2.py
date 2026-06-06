@@ -334,9 +334,28 @@ def css() -> str:
 .mv2-macro span { color:var(--mv2-muted); font:800 10px/1 var(--font-mono); text-transform:uppercase; }
 .mv2-macro b { display:block; margin-top:6px; color:var(--mv2-ink); font:900 16px/1 var(--font-mono); }
 .mv2-chart-grid { display:grid; grid-template-columns:1.4fr 1fr; gap:16px; margin-top:16px; }
+.mv2-chart-grid.tight { grid-template-columns:1.6fr 1fr; margin-top:0; }
 .mv2-faux-chart { height:220px; border:1px solid var(--mv2-border); border-radius:8px; background:linear-gradient(180deg, transparent 0 19%, rgba(0,0,0,.05) 20%, transparent 21% 39%, rgba(0,0,0,.05) 40%, transparent 41% 59%, rgba(0,0,0,.05) 60%, transparent 61% 79%, rgba(0,0,0,.05) 80%, transparent 81%), var(--mv2-sunken); position:relative; overflow:hidden; }
 .mv2-faux-line { position:absolute; left:8%; right:8%; height:46%; bottom:22%; border-bottom:3px solid var(--mv2-green); border-radius:50%; transform:skewX(-12deg); opacity:.72; }
 .mv2-faux-line.alt { bottom:30%; border-bottom-color:var(--mv2-amber); border-bottom-style:dashed; opacity:.65; }
+.mv2-a-hero { padding:20px 0 16px; border-bottom:1px solid var(--mv2-border); }
+.mv2-a-hero-grid { display:grid; grid-template-columns:1fr 340px; gap:28px; align-items:start; }
+.mv2-a-score { display:flex; align-items:baseline; gap:14px; margin-top:4px; }
+.mv2-a-score b { font:900 48px/1 var(--font-mono); letter-spacing:-.02em; }
+.mv2-a-score span { color:var(--mv2-muted); font:800 13px/1 var(--font-mono); text-transform:uppercase; }
+.mv2-a-prose { margin-top:12px; max-width:760px; color:var(--mv2-muted); font:15px/1.52 Georgia, 'Times New Roman', serif; }
+.mv2-a-bar-wrap { margin-top:18px; }
+.mv2-a-bar-meta { display:flex; justify-content:space-between; color:var(--mv2-muted); font:800 10px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; margin-bottom:5px; }
+.mv2-a-bar { position:relative; height:56px; border:1px solid var(--mv2-border); background:var(--mv2-sunken); overflow:hidden; }
+.mv2-a-bar:before { content:""; position:absolute; left:50%; top:0; bottom:0; border-left:2px solid #8a8074; z-index:2; }
+.mv2-a-seg { position:absolute; top:5px; bottom:5px; opacity:.94; }
+.mv2-a-seg.neg { opacity:.72; }
+.mv2-a-pillars { display:grid; grid-template-columns:1fr 1fr; gap:8px 28px; margin-top:14px; }
+.mv2-a-pillar { display:grid; grid-template-columns:12px 1fr auto; gap:8px; align-items:baseline; border-top:1px solid var(--mv2-border); padding-top:7px; }
+.mv2-a-pillar i { width:10px; height:10px; border-radius:2px; margin-top:2px; }
+.mv2-a-pillar b { color:var(--mv2-ink); font:900 11px/1 var(--font-mono); }
+.mv2-a-pillar span { color:var(--mv2-muted); font:800 11px/1 var(--font-mono); text-align:right; }
+.mv2-footer { display:flex; justify-content:space-between; gap:16px; margin-top:20px; padding-top:10px; border-top:1px solid var(--mv2-border); color:var(--mv2-muted); font:800 10px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; }
 .mv2-article-block { display:grid; grid-template-columns:1fr 280px; gap:22px; border-top:1px solid #e1d8c9; padding-top:18px; margin-top:18px; }
 .mv2-article-block p { font:16px/1.55 Georgia, 'Times New Roman', serif; color:#3d342e; margin:0 0 12px; }
 .mv2-article-side { background:#fffbf3; border:1px solid #e1d8c9; padding:14px; }
@@ -351,19 +370,21 @@ def css() -> str:
 .mv2-pillar-article .num { font:700 32px/1 Georgia, 'Times New Roman', serif; color:#3d342e; }
 .mv2-pillar-article h4 { margin:0 0 6px; font:700 19px/1.2 Georgia, 'Times New Roman', serif; color:#1c1815; }
 .mv2-pillar-article p { margin:0; font:16px/1.58 Georgia, 'Times New Roman', serif; color:#3d342e; }
+.mv2-pillar-grid { display:grid; grid-template-columns:1fr 1fr; column-gap:22px; row-gap:2px; }
 .mv2-svg-chart { width:100%; height:auto; display:block; border:1px solid var(--mv2-border); border-radius:8px; background:var(--mv2-sunken); }
 .mv2-terminal .mv2-tab { background:#111; border-color:#2a2a2a; color:#b8b8b8; }
 .mv2-terminal .mv2-tab.active { color:#f0f0f0; border-color:#5fa8d3; box-shadow:inset 0 -2px 0 #5fa8d3; }
 .mv2-terminal .mv2-waterfall, .mv2-terminal .mv2-gate, .mv2-terminal .mv2-mom-row { border-top-color:#242424; }
 .mv2-terminal .mv2-metric, .mv2-terminal .mv2-macro { background:#111; border-color:#242424; }
 .mv2-terminal .mv2-metric b, .mv2-terminal .mv2-macro b, .mv2-terminal .mv2-gate b, .mv2-terminal .mv2-dot b { color:#f0f0f0; }
-.mv2-terminal .mv2-rrg, .mv2-terminal .mv2-flow-river { background:#080808; border-color:#242424; }
+.mv2-terminal .mv2-rrg, .mv2-terminal .mv2-flow-river, .mv2-terminal .mv2-svg-chart, .mv2-terminal .mv2-a-bar { background:#080808; border-color:#242424; }
+.mv2-terminal .mv2-a-pillar { border-top-color:#242424; }
 @media (max-width: 1050px) {
   .mv2-grid { grid-template-columns: 1fr; }
   .mv2-head { flex-direction:column; }
   .mv2-row { grid-template-columns: 120px minmax(160px,1fr) 76px 58px 62px; }
   .mv2-metric-deck, .mv2-macro-grid { grid-template-columns:1fr 1fr; }
-  .mv2-chart-grid, .mv2-article-block { grid-template-columns:1fr; }
+  .mv2-chart-grid, .mv2-chart-grid.tight, .mv2-article-block, .mv2-pillar-grid, .mv2-a-hero-grid, .mv2-a-pillars { grid-template-columns:1fr; }
 }
 """
 
@@ -614,6 +635,52 @@ def _waterfall_html(row: MomentumV2Row) -> str:
     return '<div class="mv2-waterfall">' + "".join(steps) + "</div>"
 
 
+def _composite_bar_html(row: MomentumV2Row) -> str:
+    max_abs = max(1.0, sum(max(value, 0) for value in row.pillars.values()), sum(abs(min(value, 0)) for value in row.pillars.values()))
+    pos_cursor = 50.0
+    neg_cursor = 50.0
+    segments: list[str] = []
+    for pillar in sorted(PILLAR_ORDER, key=lambda key: row.pillars[key], reverse=True):
+        value = row.pillars[pillar]
+        width = min(48.0, abs(value) / max_abs * 50.0)
+        if width <= 0.2:
+            continue
+        if value >= 0:
+            left = pos_cursor
+            pos_cursor += width
+            klass = "mv2-a-seg"
+        else:
+            left = neg_cursor - width
+            neg_cursor -= width
+            klass = "mv2-a-seg neg"
+        segments.append(
+            f'<span class="{klass}" title="{_esc(PILLAR_FULL[pillar])}: {_fmt(value, digits=3)}" '
+            f'style="left:{left:.2f}%;width:{width:.2f}%;background:{PILLAR_HUES[pillar]}"></span>'
+        )
+    return (
+        '<div class="mv2-a-bar-wrap">'
+        '<div class="mv2-a-bar-meta"><span>bearish contribution &lt;-</span>'
+        f'<span>S = {_fmt(row.s_score)}</span><span>-&gt; bullish contribution</span></div>'
+        '<div class="mv2-a-bar">' + "".join(segments) + "</div></div>"
+    )
+
+
+def _pillar_detail_grid(row: MomentumV2Row) -> str:
+    cells = []
+    for pillar in PILLAR_ORDER:
+        tone = "mv2-pos" if row.pillars[pillar] >= 0 else "mv2-neg"
+        cells.append(
+            f"""
+            <div class="mv2-a-pillar">
+              <i style="background:{PILLAR_HUES[pillar]}"></i>
+              <b>{_esc(pillar)} | {_esc(PILLAR_FULL[pillar])}</b>
+              <span class="{tone}">{_fmt(row.pillars[pillar], digits=3)}</span>
+            </div>
+            """
+        )
+    return '<div class="mv2-a-pillars">' + "".join(cells) + "</div>"
+
+
 def _svg_polyline(points: list[tuple[float, float]]) -> str:
     return " ".join(f"{x:.1f},{y:.1f}" for x, y in points)
 
@@ -686,6 +753,80 @@ def _cmf_svg(row: MomentumV2Row, width: int = 420, height: int = 170) -> str:
     """
 
 
+def _deepdive_terminal_body(row: MomentumV2Row, as_of: str) -> str:
+    s_class = "mv2-pos" if row.s_score >= 0 else "mv2-neg"
+    f_class = "mv2-pos" if row.f_score >= 0 else "mv2-neg"
+    mom_class = "mv2-pos" if row.momentum_pct >= 0 else "mv2-neg"
+    gates = [
+        (row.quadrant not in {"Weakening", "Lagging"}, "RRG leadership intact", row.quadrant),
+        (row.breadth_50d >= 0.5, "Breadth above 50% gate", f"{row.breadth_50d:.0%}"),
+        (row.cmf21 >= 0, "CMF stayed above zero", _fmt(row.cmf21)),
+        (row.f_score >= -0.5, "Flow veto avoided", _fmt(row.f_score)),
+        (row.above_30wma, "Weekly close above 30wMA", "above" if row.above_30wma else "below"),
+        (row.mansfield_rs >= 0, "Mansfield RS positive", _fmt(row.mansfield_rs)),
+    ]
+    return f"""
+      <div class="mv2-head" style="border-bottom:1px solid var(--mv2-border);padding-bottom:12px">
+        <div>
+          <div class="mv2-kicker">A | Terminal | Deep dive | {_esc(as_of)}</div>
+          <h2 class="mv2-title">{_esc(row.ticker)} | {_esc(row.identity)}</h2>
+          <p class="mv2-subtitle">{_esc(row.asset_class)} | last model state {_esc(row.state.replace("_", " "))} | RRG {_esc(row.quadrant)}</p>
+        </div>
+        <div class="mv2-screen-note">{_state_pill(row.state)}<br>S {_fmt(row.s_score)} | F {_fmt(row.f_score)}</div>
+      </div>
+      {_tabs_html("deepdive")}
+      <div class="mv2-a-hero">
+        <div class="mv2-a-hero-grid">
+          <div>
+            <div class="mv2-kicker">COMPOSITE FORWARD OUTLOOK</div>
+            <div class="mv2-a-score"><b class="{s_class}">{_fmt(row.s_score)}</b><span>S-score | {_esc(row.asset_class)}</span></div>
+            <p class="mv2-a-prose">
+              <strong>{_esc(row.ticker)}</strong> is being classified by seven signed evidence pillars.
+              Momentum is {_fmt(row.momentum_pct, "%", 1)}, flow is {_fmt(row.f_score)}, Mansfield RS is {_fmt(row.mansfield_rs)}, and CMF is {_fmt(row.cmf21)}.
+              The handoff view makes the disagreement visible first: price/trend gates can still be constructive while flow or rotation starts to deteriorate.
+            </p>
+            {_composite_bar_html(row)}
+            {_pillar_detail_grid(row)}
+          </div>
+          <aside class="mv2-panel">
+            <h3>{_esc(row.state.replace("_", " "))} state gates</h3>
+            <p>State changes are driven by concrete gates. Failed or warning gates are marked with an exclamation point.</p>
+            <div class="mv2-gates">{"".join(_gate_html(*gate) for gate in gates)}</div>
+            <p style="margin-top:12px"><b>Nearest escalation:</b> watch CMF below -0.10, RRG Lagging, or a weekly close below the 30-week average.</p>
+          </aside>
+        </div>
+      </div>
+      <div class="mv2-chart-grid tight" style="padding-top:16px">
+        <div class="mv2-panel">
+          <h3>Weekly price vs 30-week SMA | Weinstein</h3>
+          {_price_svg(row, width=820, height=245)}
+          <p>{_esc(row.ticker)} is {'above' if row.above_30wma else 'below'} the 30-week average and the average slope is {'positive' if row.ma_slope_pos else 'negative'}. This is the primary Stage 2 versus exit line.</p>
+        </div>
+        <div class="mv2-panel">
+          <h3>OBV divergence</h3>
+          {_obv_svg(row, width=420, height=190)}
+          <p>OBV shows whether volume confirms price. A higher price high with weaker OBV is an early sponsorship warning.</p>
+        </div>
+        <div class="mv2-panel">
+          <h3>Chaikin Money Flow | 21D</h3>
+          {_cmf_svg(row, width=820, height=205)}
+          <p>CMF is {_fmt(row.cmf21)}. Values below zero show distribution; values below -0.10 are treated as a more serious exit gate.</p>
+        </div>
+        <div class="mv2-panel">
+          <h3>Peer rank | S-score context</h3>
+          <div class="mv2-metric-deck" style="grid-template-columns:1fr 1fr;margin-top:0">
+            {_metric_card("S-score", _fmt(row.s_score), s_class)}
+            {_metric_card("F-score", _fmt(row.f_score), f_class)}
+            {_metric_card("Momentum", _fmt(row.momentum_pct, "%", 1), mom_class)}
+            {_metric_card("RRG", row.quadrant)}
+          </div>
+          <p>The peer panel summarizes where the ticker sits before the user switches back to the full matrix.</p>
+        </div>
+      </div>
+      <div class="mv2-footer"><span>{_esc(row.ticker)} | {_esc(row.identity)} | 7 pillars</span><span>Momentum v2 | Terminal deep dive</span></div>
+    """
+
+
 def _deepdive_body(row: MomentumV2Row, display_name: str) -> str:
     s_class = "mv2-pos" if row.s_score >= 0 else "mv2-neg"
     f_class = "mv2-pos" if row.f_score >= 0 else "mv2-neg"
@@ -741,7 +882,7 @@ def _deepdive_body(row: MomentumV2Row, display_name: str) -> str:
       <div class="mv2-panel" style="margin-top:16px">
         <h3>The seven pillars</h3>
         <p>Each line shows the signed weighted contribution used by the composite.</p>
-        <div class="mv2-rail-list">{pillar_cards}</div>
+        <div class="mv2-pillar-grid">{pillar_cards}</div>
       </div>
       <div class="mv2-chart-grid">
         <div class="mv2-panel">
@@ -887,6 +1028,50 @@ def _rotation_body(rows: list[MomentumV2Row], display_name: str) -> str:
     """
 
 
+def _pillar_article_text(row: MomentumV2Row, pillar: str) -> str:
+    value = row.pillars[pillar]
+    direction = "supports" if value >= 0 else "drags on"
+    base = (
+        f"{pillar} carries a {PILLAR_WEIGHTS[pillar]:.0%} model weight and currently {direction} "
+        f"the composite by {_fmt(value, digits=3)}."
+    )
+    details = {
+        "MOM": (
+            f" For {row.ticker}, trailing momentum is {_fmt(row.momentum_pct, '%', 1)}. "
+            "This is the primary trend-following evidence: strong values say the market has already been rewarding the instrument."
+        ),
+        "MANS": (
+            f" Mansfield relative strength is {_fmt(row.mansfield_rs)}. "
+            "Positive readings mean the instrument is outperforming its benchmark; negative readings warn that leadership is fading before the price chart fully breaks."
+        ),
+        "RS-R": (
+            f" RS-Ratio is {row.rs_ratio:.1f}, placing the instrument in the {row.quadrant} rotation context. "
+            "This tells whether relative strength is still on the right side of the rotation map."
+        ),
+        "RS-M": (
+            f" RS-Momentum is {row.rs_momentum:.1f}. "
+            "It measures acceleration or deceleration in relative strength, so it often changes before the slower trend filters."
+        ),
+        "FILT": (
+            f" The filter stack reads stage {row.stage}, price {'above' if row.above_30wma else 'below'} the 30-week average, "
+            f"and average slope {'rising' if row.ma_slope_pos else 'falling'}. These gates keep the model anchored to observable trend structure."
+        ),
+        "CYC": (
+            f" The business-cycle tilt adjusts the score for the current macro phase and {row.asset_class}. "
+            "It is intentionally smaller than price and flow, but it helps separate sectors that usually lead in different cycle regimes."
+        ),
+        "FLOW": (
+            f" Flow is {_fmt(row.f_score)} and CMF is {_fmt(row.cmf21)}. "
+            "This is the sponsorship test: accumulation supports a trend, while distribution can warn before price-based exits are triggered."
+        ),
+    }
+    conclusion = (
+        f" Read this pillar together with state {row.state.replace('_', ' ')} and RRG {row.quadrant}; "
+        "the article view is designed to show which part of the evidence stack changed, not just the final label."
+    )
+    return base + details[pillar] + conclusion
+
+
 def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
     s_class = "mv2-pos" if row.s_score >= 0 else "mv2-neg"
     f_class = "mv2-pos" if row.f_score >= 0 else "mv2-neg"
@@ -896,7 +1081,7 @@ def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
           <div class="num">{idx + 1}</div>
           <div>
             <h4>{_esc(PILLAR_FULL[pillar])} <span class="{s_class if row.pillars[pillar] >= 0 else 'mv2-neg'}">{_fmt(row.pillars[pillar], digits=3)}</span></h4>
-            <p>{_esc(pillar)} carries a {PILLAR_WEIGHTS[pillar]:.0%} model weight and currently {'supports' if row.pillars[pillar] >= 0 else 'drags'} the composite. For {row.ticker}, this should be read together with state {row.state.replace('_', ' ')}, RRG {row.quadrant}, and flow {_fmt(row.f_score)}.</p>
+            <p>{_esc(_pillar_article_text(row, pillar))}</p>
           </div>
         </div>
         """
@@ -976,9 +1161,9 @@ def render_deepdive(display: str, rows: list[MomentumV2Row], as_of: str, focus_t
     display_name = DISPLAY_LABELS.get(display, "Display C")
     if display == "B":
         return _shell(display, "deepdive", _deepdive_article_body(row, as_of))
-    body = _deepdive_body(row, display_name)
     if display == "A":
-        body = body.replace("Ticker-specific report", f"AS OF {_esc(as_of)}")
+        return _shell(display, "deepdive", _deepdive_terminal_body(row, as_of))
+    body = _deepdive_body(row, display_name)
     return _shell(display, "deepdive", body)
 
 
