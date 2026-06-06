@@ -5,8 +5,13 @@ import argparse
 import os
 import signal
 import subprocess
+import sys
 import time
 import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 
 from src.live_smoke import classify_local_dashboard_response
 
