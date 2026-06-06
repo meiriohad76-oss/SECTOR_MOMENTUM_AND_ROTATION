@@ -85,11 +85,13 @@ def test_render_display_supports_all_three_screens_for_each_display():
 
     expected = {
         "overview": "Overview",
-        "deepdive": "waterfall",
         "rotation": "Flow river",
     }
     for display in DISPLAY_LABELS:
-        for screen, marker in expected.items():
+        for screen, marker in {
+            **expected,
+            "deepdive": "article" if display == "B" else "waterfall",
+        }.items():
             html = render_display(
                 display,
                 rows,
