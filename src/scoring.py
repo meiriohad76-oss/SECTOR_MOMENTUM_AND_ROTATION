@@ -432,6 +432,8 @@ def state_storage_health() -> dict[str, object]:
         payload = _state_payload()
         snapshot_transitions = list(payload.get("transitions", []) or [])
         _seed_transition_journal(snapshot_transitions)
+        if STATE_FILE.exists() or payload.get("by_ticker"):
+            _ensure_transition_journal_file()
         journal_rows = _read_transition_journal()
         latest_transition = journal_rows[-1] if journal_rows else (snapshot_transitions[-1] if snapshot_transitions else {})
         return {

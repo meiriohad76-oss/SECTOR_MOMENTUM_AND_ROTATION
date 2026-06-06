@@ -306,3 +306,25 @@ def test_state_storage_health_reports_paths_and_counts(tmp_path, monkeypatch):
     assert health["by_ticker_count"] == 1
     assert health["journal_transition_count"] == 1
     assert health["latest_transition_date"] == "2026-05-18"
+
+
+def test_state_storage_health_initializes_empty_journal_for_existing_snapshot(tmp_path, monkeypatch):
+    state_file = tmp_path / "state.json"
+    monkeypatch.setattr(scoring, "STATE_FILE", state_file)
+    monkeypatch.setattr(scoring, "STATE_TRANSITION_JOURNAL", None)
+    state_file.write_text(
+        json.dumps(
+            {
+                "updated": "2026-05-18T00:00:00+00:00",
+                "by_ticker": {"XLK": {"state": "HOLD", "date": "2026-05-18"}},
+                "transitions": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    health = scoring.state_storage_health()
+
+    assert health["transition_journal_exists"] is True
+    assert (tmp_path / "state_transitions.jsonl").exists()
+    assert health["journal_transition_count"] == 0
