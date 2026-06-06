@@ -815,6 +815,7 @@ def _build_expanded_calibration_artifacts(
         sector_overrides = pd.DataFrame()
     else:
         sector_overrides = calibration_research.sector_override_candidates(sector_source)
+    sector_override_guardrail = calibration_research.sector_override_guardrail(sector_overrides)
     metadata = {
         "ticket": "B-164",
         "purpose": "research_only_expanded_statistical_calibration",
@@ -826,6 +827,7 @@ def _build_expanded_calibration_artifacts(
         "label_rows": int(len(labels)),
         "candidate_rows": int(len(candidates)),
         "sector_override_rows": int(len(sector_overrides)),
+        "sector_override_guardrail": sector_override_guardrail,
         "safety": {
             "live_scoring_change": "none",
             "candidate_promotion": "separate_ticket_required",
@@ -907,6 +909,13 @@ def _selected_candidate_rows(candidates: pd.DataFrame) -> pd.DataFrame:
     return candidates[candidates["selected_by_calibration"].map(_scalar_bool)].copy()
 
 
+def _with_calibration_guardrail(config: dict) -> dict:
+    return {
+        **config,
+        "guardrail": calibration_research.calibration_candidate_guardrail(config),
+    }
+
+
 def _build_calibration_candidate_config(
     *,
     candidates: pd.DataFrame,
@@ -938,21 +947,21 @@ def _build_calibration_candidate_config(
         },
     }
     if split_status != "ready":
-        return {
+        return _with_calibration_guardrail({
             **base,
             "config_status": "skipped_insufficient_history",
             "gate_reasons": [
                 str((calibration_split_summary or {}).get("reason") or "walk_forward_splits_not_ready")
             ],
-        }
+        })
 
     selected = _selected_candidate_rows(candidates)
     if selected.empty:
-        return {
+        return _with_calibration_guardrail({
             **base,
             "config_status": "blocked_no_selected_candidate",
             "gate_reasons": ["no_candidate_selected_by_calibration"],
-        }
+        })
 
     row = selected.iloc[0].to_dict()
     candidate_id = str(row.get("candidate_id", "unknown"))
@@ -971,7 +980,7 @@ def _build_calibration_candidate_config(
         ),
     }
     config_available = candidate_id != "unknown"
-    return {
+    return _with_calibration_guardrail({
         **base,
         "config_status": gate_status,
         "candidate_config_available": bool(config_available),
@@ -994,7 +1003,7 @@ def _build_calibration_candidate_config(
                 else "not_evaluated"
             ),
         },
-    }
+    })
 
 
 def _build_calibration_baseline_artifacts(

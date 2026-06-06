@@ -1200,11 +1200,13 @@ html.density-compact .pick-spark {
 }
 .quad-card .qtick {
   font-family: var(--font-mono);
-  font-size: 0.74rem;
-  color: var(--muted);
-  letter-spacing: 0.04em;
+  font-size: 0.82rem;
+  color: var(--ticker-label);
+  letter-spacing: 0;
   grid-column: 1 / -1;
-  word-spacing: 4px;
+  line-height: 1.45;
+  text-shadow: var(--ticker-label-shadow);
+  overflow-wrap: anywhere;
 }
 .quad-card.leading { border-left: 3px solid var(--green); }
 .quad-card.weakening { border-left: 3px solid var(--amber); }
@@ -1890,6 +1892,22 @@ div[class*="st-key-comparison_tickers"] [data-testid="stWidgetLabel"] p {
     font-size: 0.66rem;
     line-height: 1.35;
   }
+  .header-controls-slot + div[data-testid="stHorizontalBlock"],
+  .element-container:has(.header-controls-slot) + div[data-testid="stHorizontalBlock"] {
+    position: static;
+    width: 100%;
+    flex-wrap: wrap;
+    margin: -8px 0 16px;
+  }
+  .header-controls-slot + div[data-testid="stHorizontalBlock"] [data-testid="column"],
+  .element-container:has(.header-controls-slot) + div[data-testid="stHorizontalBlock"] [data-testid="column"] {
+    min-width: 112px;
+    flex: 1 1 112px !important;
+  }
+  div[class*="st-key-header_refresh_data_button"] div[data-testid="stButton"],
+  div[class*="st-key-header_theme_toggle"] div[data-testid="stButton"] {
+    margin-top: 0;
+  }
   .section-head {
     flex-direction: column;
     align-items: flex-start;
@@ -2002,10 +2020,10 @@ div[class*="st-key-comparison_tickers"] [data-testid="stWidgetLabel"] p {
   padding: 10px 12px;
   border-radius: 6px;
   font-family: var(--font-prose);
-  font-size: 0.88rem;
-  line-height: 1.5;
+  font-size: 0.92rem;
+  line-height: 1.55;
   width: max-content;
-  max-width: 460px;
+  max-width: min(520px, calc(100vw - 40px));
   white-space: normal;
   pointer-events: none;
   opacity: 0;

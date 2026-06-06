@@ -114,6 +114,24 @@ def browser_qa_targets() -> tuple[BrowserQaTarget, ...]:
             focus_text="US SECTOR RELATIVE STRENGTH",
         ),
         BrowserQaTarget(
+            target_id="desktop-rrg-readability",
+            viewport="desktop",
+            width=1440,
+            height=1100,
+            path="/?ticker=XLK",
+            tickets=("B-112", "B-147"),
+            checks=(
+                "text:Relative Rotation Graph",
+                "text:Leading",
+                "text:DRILL-DOWN FROM RRG",
+            ),
+            focus_text="Relative Rotation Graph",
+            actions=(
+                "expect-visible:.quad-card .qtick",
+                'expect-visible:div[class*="st-key-rrg_drill_leading_select"]',
+            ),
+        ),
+        BrowserQaTarget(
             target_id="desktop-comparison-view",
             viewport="desktop",
             width=1440,
@@ -178,6 +196,23 @@ def browser_qa_targets() -> tuple[BrowserQaTarget, ...]:
                 "expect-scrollable:.action-card.exit .action-list",
                 "expect-scrollable:.action-card.warn .action-list",
                 "expect-no-document-overlap:.bluf-actions|.data-health-panel",
+            ),
+        ),
+        BrowserQaTarget(
+            target_id="desktop-drill-click-bridge",
+            viewport="desktop",
+            width=1440,
+            height=1100,
+            path="/?ticker=XLK",
+            tickets=("B-112",),
+            checks=(
+                "text:BLUF",
+                "text:Per-ticker drill-down",
+            ),
+            focus_text="BUY CANDIDATES",
+            actions=(
+                "expect-visible:.action-card [data-drill-ticker]",
+                "click-drill:.action-card [data-drill-ticker]",
             ),
         ),
         BrowserQaTarget(
@@ -253,6 +288,7 @@ def build_browser_qa_report(
     results: list[BrowserQaResult],
     *,
     generated_at: str | None = None,
+    qa_mode: str = "local-dashboard",
 ) -> str:
     stamp = generated_at or utc_timestamp()
     passed = sum(1 for result in results if result.ok)
@@ -260,6 +296,8 @@ def build_browser_qa_report(
         "# Browser QA Evidence",
         "",
         f"Generated: `{stamp}`",
+        "",
+        f"QA mode: `{qa_mode}`",
         "",
         f"Targets: `{passed}/{len(results)}` passed",
         "",
@@ -288,6 +326,7 @@ def build_browser_qa_report(
             "",
             "Scope:",
             "- Local dashboard browser rendering only.",
+            "- Use `qa_mode=cloudflare-access-authenticated` only after the browser profile is authenticated to the protected route.",
             "- No credentials, account data, notification endpoints, or private config values are required.",
             "- Screenshots are stored as local QA artifacts and should be regenerated after major UI changes.",
         ]

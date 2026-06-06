@@ -140,7 +140,7 @@ def test_ohlcv_health_headline_uses_latest_bar_age_and_details_oldest_loaded_bar
 
     assert market_row["status"] == "healthy"
     assert market_row["latest"] == "2026-05-26"
-    assert market_row["freshness"] == "today"
+    assert market_row["freshness"] == "latest today; oldest 5d old"
     assert market_row["coverage"] == "oldest 2026-05-21 (5d old)"
     assert "oldest loaded bar 2026-05-21 (5d old)" in market_row["detail"]
 
@@ -165,9 +165,54 @@ def test_ohlcv_health_uses_oldest_loaded_symbol_not_only_latest_symbol():
     market_row = next(row for row in rows if row["source"] == "Market OHLCV")
 
     assert market_row["status"] == "stale"
-    assert market_row["freshness"] == "1d old"
+    assert market_row["freshness"] == "latest 1d old; oldest 16d old"
     assert market_row["coverage"] == "oldest 2026-05-10 (16d old)"
     assert "oldest loaded bar 2026-05-10" in market_row["detail"]
+
+
+def test_ohlcv_health_discloses_provider_source_mix():
+    rows = data_health_rows(
+        ohlcv={"SPY": _ohlcv_frame("2026-05-26"), "XLK": _ohlcv_frame("2026-05-26")},
+        expected_symbols=("SPY", "XLK"),
+        ohlcv_result=SimpleNamespace(
+            provider="massive",
+            missing=(),
+            stale_cache_hits=(),
+            warnings=("OHLCV source mix: massive=1, yfinance=1.",),
+            provider_by_ticker={"SPY": "massive", "XLK": "yfinance"},
+            source_by_ticker={"SPY": "massive_live", "XLK": "fresh_cache"},
+        ),
+        fred_data={},
+        fred_configured=False,
+        compute_created_at=1_779_760_000.0,
+        now=pd.Timestamp("2026-05-26T08:00:00Z"),
+        provider_flow_stubbed=True,
+    )
+
+    market_row = next(row for row in rows if row["source"] == "Market OHLCV")
+
+    assert market_row["status"] == "warning"
+    assert "source mix massive:1, yfinance:1" in market_row["detail"]
+    assert "paths fresh_cache:1, massive_live:1" in market_row["detail"]
+
+
+def test_fred_health_treats_unconfigured_fred_as_supported_fallback():
+    rows = data_health_rows(
+        ohlcv={"SPY": _ohlcv_frame("2026-05-26")},
+        expected_symbols=("SPY",),
+        ohlcv_result=SimpleNamespace(provider="massive", missing=(), stale_cache_hits=(), warnings=()),
+        fred_data={},
+        fred_configured=False,
+        compute_created_at=1_779_760_000.0,
+        now=pd.Timestamp("2026-05-26T16:00:00Z"),
+        provider_flow_stubbed=True,
+    )
+
+    fred_row = next(row for row in rows if row["source"] == "FRED macro/regime")
+
+    assert fred_row["status"] == "info"
+    assert fred_row["freshness"] == "unconfigured fallback"
+    assert "supported coarse macro fallback" in fred_row["detail"]
 
 
 def test_fred_health_allows_normal_monthly_observation_date_lag():

@@ -37,5 +37,6 @@ def test_tooltip_style_supports_longer_explanations():
     css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
     tooltip_style = css[css.index("[data-tip]::after") : css.index("[data-tip]::before")]
 
-    assert "font-size: 0.88rem;" in tooltip_style
-    assert "max-width: 460px;" in tooltip_style
+    assert "font-size: 0.92rem;" in tooltip_style
+    assert "line-height: 1.55;" in tooltip_style
+    assert "max-width: min(520px, calc(100vw - 40px));" in tooltip_style

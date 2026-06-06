@@ -65,3 +65,16 @@ def test_header_native_controls_align_and_use_readable_labels():
     assert "background: var(--panel) !important;" in css
     assert "-webkit-text-fill-color: var(--ticker-label) !important;" in css
     assert "color: var(--ticker-label) !important;" in css
+
+
+def test_header_native_controls_wrap_on_mobile_without_fixed_overlap():
+    css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
+    mobile = css[css.index("@media (max-width: 760px)") : css.index("@media (hover: none)")]
+
+    assert '.header-controls-slot + div[data-testid="stHorizontalBlock"]' in mobile
+    assert "position: static;" in mobile
+    assert "width: 100%;" in mobile
+    assert "flex-wrap: wrap;" in mobile
+    assert "min-width: 112px;" in mobile
+    assert "flex: 1 1 112px !important;" in mobile
+    assert "margin-top: 0;" in mobile

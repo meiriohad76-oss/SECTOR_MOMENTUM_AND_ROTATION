@@ -46,5 +46,11 @@ def test_dark_rrg_ticker_text_uses_readable_foreground():
     fig = rrg_chart_dark(frame)
     point_trace = fig.data[0]
 
-    assert point_trace.textfont.color == "#f5f8ff"
-    assert point_trace.textfont.size >= 12
+    assert point_trace.textfont.color == "#ffffff"
+    assert point_trace.textfont.size >= 14
+
+    annotation_text = " ".join(annotation.text for annotation in fig.layout.annotations)
+    assert "LEADING - strong relative trend" in annotation_text
+    assert "WEAKENING - leadership fading" in annotation_text
+    assert "LAGGING - weak relative trend" in annotation_text
+    assert "IMPROVING - early recovery" in annotation_text

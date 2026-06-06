@@ -62,4 +62,9 @@ jobs:
             --service "$PI_SERVICE_NAME" \
             --url "http://127.0.0.1:8501/?ticker=XLK" \
             --timeout-seconds 60
+
+          ./.venv/bin/python scripts/smoke_deploy_gate.py \
+            --local-dashboard-url "http://127.0.0.1:8501/?ticker=XLK" \
+            --public-dashboard-url "https://sentimentdashboard.ahaddashboards.uk/?ticker=XLK" \
+            --expect-cloudflare-access
           REMOTE

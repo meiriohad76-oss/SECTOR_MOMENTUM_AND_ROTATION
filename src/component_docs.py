@@ -34,6 +34,14 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         qa=("controls unit tests", "static app wiring"),
     ),
     ComponentDoc(
+        name="Drill click bridge",
+        section="Shell",
+        render_function="render_drill_click_bridge",
+        data_inputs=("clickable ticker surfaces",),
+        states=("whole-card click", "keyboard activation", "query ticker handoff"),
+        qa=("component bridge tests", "browser click QA"),
+    ),
+    ComponentDoc(
         name="View options",
         section="Shell",
         render_function="render_view_preferences",

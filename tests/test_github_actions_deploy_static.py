@@ -29,8 +29,11 @@ def test_pi_deploy_workflow_fast_forwards_tests_and_smokes_service():
     assert "./.venv/bin/python -m pip install -r requirements.txt" in text
     assert "./.venv/bin/python -m pytest -q" in text
     assert "./.venv/bin/python scripts/restart_sector_dashboard.py" in text
+    assert "./.venv/bin/python scripts/smoke_deploy_gate.py" in text
     assert "--service \"$PI_SERVICE_NAME\"" in text
     assert "http://127.0.0.1:8501/?ticker=XLK" in text
+    assert "https://sentimentdashboard.ahaddashboards.uk/?ticker=XLK" in text
+    assert "--expect-cloudflare-access" in text
     assert "restart_result=healthy" in text
 
 

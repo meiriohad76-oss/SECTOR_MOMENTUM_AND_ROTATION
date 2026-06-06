@@ -303,7 +303,12 @@ def test_fetch_ohlcv_result_uses_stale_cache_when_yfinance_is_unavailable(tmp_pa
     assert result.stale_cache_hits == ("XLK",)
     assert result.fetched == ()
     assert result.missing == ()
-    assert result.warnings == ("Using stale cached OHLCV for 1 symbol because yfinance returned no fresh rows.",)
+    assert result.source_by_ticker == {"XLK": "stale_cache"}
+    assert result.provider_by_ticker == {"XLK": "unit-test"}
+    assert result.warnings == (
+        "Using stale cached OHLCV for 1 symbol because yfinance returned no fresh rows.",
+        "OHLCV source mix: unit-test=1.",
+    )
 
 
 def test_fetch_ohlcv_result_reports_provider_gap_when_no_cache(monkeypatch):
@@ -356,7 +361,12 @@ def test_fetch_ohlcv_result_uses_yfinance_fallback_when_massive_misses(monkeypat
     assert list(result.data) == ["XLK"]
     assert result.fetched == ("XLK",)
     assert result.missing == ()
-    assert result.warnings == ("Massive unavailable for 1 symbol; yfinance fallback used for live OHLCV.",)
+    assert result.source_by_ticker == {"XLK": "yfinance_fallback_live"}
+    assert result.provider_by_ticker == {"XLK": "yfinance"}
+    assert result.warnings == (
+        "Massive unavailable for 1 symbol; yfinance fallback used for live OHLCV.",
+        "OHLCV source mix: yfinance=1.",
+    )
 
 
 def test_fetch_ohlcv_result_can_bypass_fresh_cache_for_validation(tmp_path, monkeypatch):

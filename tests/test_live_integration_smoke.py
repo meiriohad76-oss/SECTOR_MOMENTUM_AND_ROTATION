@@ -15,6 +15,7 @@ from src.alerts import (
     telegram_slack_alert_status,
 )
 from src.data import _fetch_massive_ohlcv, _resolve_secret
+from src.live_smoke import classify_protected_dashboard_response
 
 
 LIVE_FLAG = "RUN_LIVE_INTEGRATION_SMOKE"
@@ -74,8 +75,13 @@ def test_live_cloudflare_route_smoke_reaches_protected_dashboard():
     )
 
     response = requests.get(url, timeout=20, allow_redirects=False)
+    classification = classify_protected_dashboard_response(
+        status_code=response.status_code,
+        headers=response.headers,
+        text=response.text,
+    )
 
-    assert response.status_code in {200, 302, 401, 403}
+    assert classification.ok, classification
 
 
 def test_live_alert_smoke_is_dry_run_unless_explicit_send_enabled():

@@ -16,6 +16,7 @@ def test_pi_restart_script_uses_non_interactive_mainpid_restart():
     assert "os.kill" in script
     assert "signal.SIGTERM" in script
     assert "urllib.request.urlopen" in script
+    assert "classify_local_dashboard_response" in script
     assert "sudo" not in script.lower()
     assert "restart_result=healthy" in script
 
@@ -49,7 +50,11 @@ def test_restart_helper_tolerates_pid_race_when_fresh_pid_becomes_healthy(monkey
     pids = iter([123, 124])
     monkeypatch.setattr(restart_sector_dashboard, "_main_pid", lambda service: next(pids, 124))
     monkeypatch.setattr(restart_sector_dashboard, "_active", lambda service: "active")
-    monkeypatch.setattr(restart_sector_dashboard, "_http_status", lambda url, timeout: 200)
+    monkeypatch.setattr(
+        restart_sector_dashboard,
+        "_http_probe",
+        lambda url, timeout: (200, "SENTIMENT BOARD BLUF Data and dashboard health"),
+    )
 
     def already_exited(pid, sig):
         raise ProcessLookupError(pid)
@@ -67,3 +72,26 @@ def test_restart_helper_tolerates_pid_race_when_fresh_pid_becomes_healthy(monkey
     assert exit_code == 0
     assert "restart_action=mainpid_already_exited" in captured
     assert "restart_result=healthy" in captured
+
+
+def test_restart_helper_rejects_http_200_with_wrong_content(monkeypatch, capsys):
+    pids = iter([123, 124, 124])
+    monkeypatch.setattr(restart_sector_dashboard, "_main_pid", lambda service: next(pids, 124))
+    monkeypatch.setattr(restart_sector_dashboard, "_active", lambda service: "active")
+    monkeypatch.setattr(restart_sector_dashboard.os, "kill", lambda pid, sig: None)
+    monkeypatch.setattr(
+        restart_sector_dashboard,
+        "_http_probe",
+        lambda url, timeout: (200, "Welcome"),
+    )
+
+    exit_code = restart_sector_dashboard.restart_and_wait(
+        "sector-dashboard",
+        "http://127.0.0.1:8501/?ticker=XLK",
+        timeout_seconds=1,
+        poll_seconds=0,
+    )
+
+    captured = capsys.readouterr().out
+    assert exit_code == 1
+    assert "content=wrong_content" in captured

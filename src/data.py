@@ -17,7 +17,7 @@ import pandas as pd
 import requests
 import yfinance as yf
 
-from .ohlcv_store import ohlcv_cache_enabled, read_cached_ohlcv, write_cached_ohlcv
+from .ohlcv_store import ohlcv_cache_enabled, read_cached_ohlcv_metadata, write_cached_ohlcv
 
 
 MASSIVE_AGGS_URL_TEMPLATE = (
@@ -40,6 +40,8 @@ class OhlcvFetchResult:
     used_stale_cache: bool = False
     provider_retry_count: int = 0
     cache_refresh_forced: bool = False
+    source_by_ticker: dict[str, str] | None = None
+    provider_by_ticker: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -317,12 +319,19 @@ def fetch_ohlcv_result(
     tickers = list(dict.fromkeys(tickers))  # de-dup preserving order
     provider_name = _select_ohlcv_provider(provider)
     cached: dict[str, pd.DataFrame] = {}
+    cached_meta: dict[str, dict[str, object]] = {}
     cache_enabled = use_cache and ohlcv_cache_enabled()
     if cache_enabled and not force_refresh:
         try:
-            cached = read_cached_ohlcv(tickers, period=period, interval=interval)
+            cached_meta = read_cached_ohlcv_metadata(tickers, period=period, interval=interval)
+            cached = {
+                ticker: meta["frame"]
+                for ticker, meta in cached_meta.items()
+                if isinstance(meta.get("frame"), pd.DataFrame)
+            }
         except Exception:
             cached = {}
+            cached_meta = {}
     missing = [ticker for ticker in tickers if ticker not in cached]
     fetched: dict[str, pd.DataFrame] = {}
     provider_retry_count = 0
@@ -357,17 +366,24 @@ def fetch_ohlcv_result(
                     except Exception:
                         pass
     stale_cached: dict[str, pd.DataFrame] = {}
+    stale_cached_meta: dict[str, dict[str, object]] = {}
     provider_misses = [ticker for ticker in missing if ticker not in fetched and str(ticker).upper() not in fetched]
     if provider_misses and cache_enabled:
         try:
-            stale_cached = read_cached_ohlcv(
+            stale_cached_meta = read_cached_ohlcv_metadata(
                 provider_misses,
                 period=period,
                 interval=interval,
                 allow_stale=True,
             )
+            stale_cached = {
+                ticker: meta["frame"]
+                for ticker, meta in stale_cached_meta.items()
+                if isinstance(meta.get("frame"), pd.DataFrame)
+            }
         except Exception:
             stale_cached = {}
+            stale_cached_meta = {}
     combined = {**cached, **stale_cached, **fetched}
     ordered = {}
     for ticker in tickers:
@@ -401,6 +417,35 @@ def fetch_ohlcv_result(
             f"Missing OHLCV for {count} {_warning_symbol_text(count)} after {provider_name} fetch."
         )
 
+    source_by_ticker: dict[str, str] = {}
+    provider_by_ticker: dict[str, str] = {}
+    for key in ordered:
+        if key in fetched:
+            if key in yfinance_fallback:
+                source_by_ticker[key] = "yfinance_fallback_live"
+                provider_by_ticker[key] = "yfinance"
+            else:
+                source_by_ticker[key] = f"{provider_name}_live"
+                provider_by_ticker[key] = provider_name
+        elif key in cached:
+            source_by_ticker[key] = "fresh_cache"
+            provider_by_ticker[key] = str(cached_meta.get(key, {}).get("provider") or "unknown")
+        elif key in stale_cached:
+            source_by_ticker[key] = "stale_cache"
+            provider_by_ticker[key] = str(stale_cached_meta.get(key, {}).get("provider") or "unknown")
+
+    if provider_by_ticker:
+        provider_mix = sorted(set(provider_by_ticker.values()))
+        if len(provider_mix) > 1 or provider_name not in provider_mix:
+            warnings.append(
+                "OHLCV source mix: "
+                + ", ".join(
+                    f"{provider}={sum(1 for value in provider_by_ticker.values() if value == provider)}"
+                    for provider in provider_mix
+                )
+                + "."
+            )
+
     return OhlcvFetchResult(
         data=ordered,
         provider=provider_name,
@@ -412,6 +457,8 @@ def fetch_ohlcv_result(
         used_stale_cache=bool(stale_cached),
         provider_retry_count=provider_retry_count,
         cache_refresh_forced=bool(force_refresh),
+        source_by_ticker=source_by_ticker,
+        provider_by_ticker=provider_by_ticker,
     )
 
 

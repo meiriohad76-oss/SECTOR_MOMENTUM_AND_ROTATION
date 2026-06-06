@@ -8,6 +8,8 @@ import subprocess
 import time
 import urllib.request
 
+from src.live_smoke import classify_local_dashboard_response
+
 
 def _run_text(args: list[str]) -> str:
     result = subprocess.run(args, check=False, capture_output=True, text=True, timeout=10)
@@ -26,12 +28,13 @@ def _active(service: str) -> str:
     return _run_text(["systemctl", "is-active", service]) or "unknown"
 
 
-def _http_status(url: str, timeout: float) -> int:
+def _http_probe(url: str, timeout: float) -> tuple[int, str]:
     try:
         with urllib.request.urlopen(url, timeout=timeout) as response:
-            return int(response.status)
+            body = response.read(80_000).decode("utf-8", errors="replace")
+            return int(response.status), body
     except Exception:
-        return 0
+        return 0, ""
 
 
 def restart_and_wait(service: str, url: str, timeout_seconds: int, poll_seconds: float) -> int:
@@ -54,15 +57,18 @@ def restart_and_wait(service: str, url: str, timeout_seconds: int, poll_seconds:
     while time.monotonic() < deadline:
         attempt += 1
         active = _active(service)
-        status = _http_status(url, timeout=min(5.0, poll_seconds))
+        status, body = _http_probe(url, timeout=min(5.0, poll_seconds))
+        smoke = classify_local_dashboard_response(status_code=status, text=body)
         pid = _main_pid(service)
-        print(f"poll_{attempt} active={active} http={status} pid={pid}")
-        if active == "active" and status == 200 and pid > 0 and pid != old_pid:
-            print(f"restart_result=healthy service={service} pid={pid} http={status}")
+        print(f"poll_{attempt} active={active} http={status} content={smoke.state} pid={pid}")
+        if active == "active" and smoke.ok and pid > 0 and pid != old_pid:
+            print(f"restart_result=healthy service={service} pid={pid} http={status} content={smoke.state}")
             return 0
         time.sleep(poll_seconds)
 
-    print(f"restart_result=failed service={service} active={_active(service)} http={_http_status(url, timeout=5)}")
+    status, body = _http_probe(url, timeout=5)
+    smoke = classify_local_dashboard_response(status_code=status, text=body)
+    print(f"restart_result=failed service={service} active={_active(service)} http={status} content={smoke.state}")
     return 1
 
 

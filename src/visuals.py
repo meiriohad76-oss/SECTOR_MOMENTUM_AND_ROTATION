@@ -388,7 +388,7 @@ def rrg_chart_dark(df: pd.DataFrame, title: str = "Rotation") -> go.Figure:
         x=sub["rs_ratio"], y=sub["rs_momentum"],
         mode="markers+text",
         text=sub.index, textposition="top center",
-        textfont=dict(size=12, color="#f5f8ff", family="JetBrains Mono, monospace"),
+        textfont=dict(size=14, color="#ffffff", family="JetBrains Mono, monospace"),
         marker=dict(
             size=11,
             color=[color_for_state(s) for s in sub.get("state", pd.Series([""] * len(sub), index=sub.index))],
@@ -396,14 +396,14 @@ def rrg_chart_dark(df: pd.DataFrame, title: str = "Rotation") -> go.Figure:
         ),
         hovertemplate="<b>%{text}</b><br>RS-Ratio %{x:.1f}<br>RS-Mom %{y:.1f}<extra></extra>",
     ))
-    fig.add_annotation(x=119, y=119, text="LEADING",   showarrow=False, font=dict(size=10, color=TERM_GREEN, family="JetBrains Mono, monospace"))
-    fig.add_annotation(x=119, y=81,  text="WEAKENING", showarrow=False, font=dict(size=10, color=TERM_AMBER, family="JetBrains Mono, monospace"))
-    fig.add_annotation(x=81,  y=81,  text="LAGGING",   showarrow=False, font=dict(size=10, color=TERM_RED,   family="JetBrains Mono, monospace"))
-    fig.add_annotation(x=81,  y=119, text="IMPROVING", showarrow=False, font=dict(size=10, color=TERM_BLUE,  family="JetBrains Mono, monospace"))
+    fig.add_annotation(x=119, y=119, text="LEADING - strong relative trend",   showarrow=False, font=dict(size=11, color=TERM_GREEN, family="JetBrains Mono, monospace"))
+    fig.add_annotation(x=119, y=81,  text="WEAKENING - leadership fading", showarrow=False, font=dict(size=11, color=TERM_AMBER, family="JetBrains Mono, monospace"))
+    fig.add_annotation(x=81,  y=81,  text="LAGGING - weak relative trend",   showarrow=False, font=dict(size=11, color=TERM_RED,   family="JetBrains Mono, monospace"))
+    fig.add_annotation(x=81,  y=119, text="IMPROVING - early recovery", showarrow=False, font=dict(size=11, color=TERM_BLUE,  family="JetBrains Mono, monospace"))
     fig.update_layout(
         title=dict(text=title, font=dict(size=14, color="#ccc", family="JetBrains Mono, monospace")),
-        xaxis=dict(title="RS-RATIO",    range=[80, 120], color="#888", gridcolor="#222", zerolinecolor="#444", showgrid=True, title_font=dict(size=10, family="JetBrains Mono, monospace")),
-        yaxis=dict(title="RS-MOMENTUM", range=[80, 120], color="#888", gridcolor="#222", zerolinecolor="#444", showgrid=True, title_font=dict(size=10, family="JetBrains Mono, monospace")),
+        xaxis=dict(title="RS-RATIO (relative strength)",    range=[80, 120], color="#d7dde7", gridcolor="#2f3640", zerolinecolor="#667085", showgrid=True, title_font=dict(size=11, family="JetBrains Mono, monospace")),
+        yaxis=dict(title="RS-MOMENTUM (rotation speed)", range=[80, 120], color="#d7dde7", gridcolor="#2f3640", zerolinecolor="#667085", showgrid=True, title_font=dict(size=11, family="JetBrains Mono, monospace")),
         height=560,
         margin=dict(l=40, r=40, t=50, b=40),
         plot_bgcolor="#0a0a0a",

@@ -36,6 +36,17 @@ def test_app_renders_native_header_controls():
     assert "drill_click_bridge_html()" not in header_section
 
 
+def test_app_mounts_generic_drill_click_bridge_before_clickable_surfaces():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+
+    assert "drill_click_bridge_html" in app_source
+    assert "def render_drill_click_bridge():" in app_source
+    assert "st.iframe(drill_click_bridge_html(), height=1)" in app_source
+    assert app_source.index('_render_timed("render_drill_click_bridge", render_drill_click_bridge)') < app_source.index(
+        '_render_timed("render_bluf", render_bluf)'
+    )
+
+
 def test_app_adds_whole_card_drill_attributes_to_clickable_surfaces():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 

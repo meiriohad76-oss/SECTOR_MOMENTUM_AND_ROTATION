@@ -88,6 +88,20 @@ def test_duckdb_ohlcv_cache_round_trips_fresh_period(tmp_path):
     assert_frame_equal(cached["XLK"], _expected_window(frame, today), check_freq=False)
 
 
+def test_duckdb_ohlcv_cache_metadata_preserves_provider_provenance(tmp_path):
+    cache_path = tmp_path / "ohlcv.duckdb"
+    today = date.today()
+    frame = _frame(end=today)
+
+    ohlcv_store.write_cached_ohlcv({"XLK": frame}, cache_path=cache_path, provider="yfinance")
+    cached = ohlcv_store.read_cached_ohlcv_metadata(["XLK"], period="2mo", cache_path=cache_path, today=today)
+
+    assert list(cached) == ["XLK"]
+    assert cached["XLK"]["provider"] == "yfinance"
+    assert cached["XLK"]["updated_at"]
+    assert_frame_equal(cached["XLK"]["frame"], _expected_window(frame, today), check_freq=False)
+
+
 def test_fetch_ohlcv_uses_fresh_duckdb_cache_without_provider_call(tmp_path, monkeypatch):
     cache_path = tmp_path / "ohlcv.duckdb"
     today = date.today()

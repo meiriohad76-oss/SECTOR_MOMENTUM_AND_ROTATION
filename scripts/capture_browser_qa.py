@@ -197,6 +197,24 @@ def _run_target_actions(page, actions: tuple[str, ...], timeout_ms: int) -> tupl
             page.locator(selector).first.wait_for(state="visible", timeout=action_timeout)
             notes.append(f"visible selector: {selector}")
             continue
+        if action.startswith("click-drill:"):
+            selector = action.removeprefix("click-drill:")
+            locator = page.locator(selector).first
+            locator.wait_for(state="visible", timeout=action_timeout)
+            ticker = locator.get_attribute("data-drill-ticker")
+            if not ticker:
+                raise AssertionError(f"{selector} has no data-drill-ticker attribute")
+            locator.click(timeout=action_timeout)
+            page.wait_for_url(
+                lambda url: f"ticker={ticker}" in url and "#drill" in url,
+                timeout=timeout_ms,
+            )
+            page.get_by_text("Per-ticker drill-down", exact=False).first.wait_for(
+                state="visible",
+                timeout=action_timeout,
+            )
+            notes.append(f"clicked drill selector: {selector} ticker={ticker}")
+            continue
         if action.startswith("expect-scrollable:"):
             selector = action.removeprefix("expect-scrollable:")
             locator = page.locator(selector).first
@@ -431,7 +449,7 @@ def _write_outputs(results: list[BrowserQaResult], out_dir: Path, generated_at: 
     }
     (out_dir / "browser_qa_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     (out_dir / "browser_qa_report.md").write_text(
-        build_browser_qa_report(results, generated_at=generated_at),
+        build_browser_qa_report(results, generated_at=generated_at, qa_mode=qa_mode),
         encoding="utf-8",
     )
 

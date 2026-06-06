@@ -15,6 +15,108 @@ def _scope_token(scope: str) -> str:
     return scope.lower().replace(" ", "_").replace("-", "_")
 
 
+def calibration_candidate_guardrail(
+    config: dict,
+    *,
+    min_final_holdout_rows: int = 20,
+) -> dict:
+    """Validate that a calibrated candidate config is display-only and fail-closed."""
+
+    reasons: list[str] = []
+    selected = config.get("selected_candidate") if isinstance(config.get("selected_candidate"), dict) else {}
+    safety = config.get("safety") if isinstance(config.get("safety"), dict) else {}
+    promotion_label = str(selected.get("promotion_label") or "").strip().lower()
+    final_holdout_evaluated = _scalar_bool(config.get("final_holdout_evaluated"))
+    try:
+        final_holdout_rows = int(config.get("final_holdout_rows_used") or 0)
+    except (TypeError, ValueError):
+        final_holdout_rows = 0
+
+    if _scalar_bool(config.get("live_promotion_allowed")):
+        reasons.append("config_live_promotion_true")
+    if _scalar_bool(selected.get("live_promotion_allowed")):
+        reasons.append("selected_candidate_live_promotion_true")
+    if not _scalar_bool(config.get("research_only")):
+        reasons.append("config_not_research_only")
+    if safety.get("candidate_promotion") != "separate_ticket_required":
+        reasons.append("missing_separate_ticket_requirement")
+    if promotion_label in {"candidate", "research_candidate"} and not final_holdout_evaluated:
+        reasons.append("candidate_without_final_holdout")
+    if promotion_label in {"candidate", "research_candidate"} and final_holdout_rows < int(min_final_holdout_rows):
+        reasons.append("insufficient_final_holdout_rows_for_candidate")
+    if str(config.get("config_status") or "").startswith("passed_final_holdout") and not final_holdout_evaluated:
+        reasons.append("passed_status_without_final_holdout")
+
+    return {
+        "status": "fail_closed" if reasons else "pass_display_only",
+        "live_promotion_allowed": False,
+        "requires_separate_ticket": True,
+        "min_final_holdout_rows": int(min_final_holdout_rows),
+        "reasons": reasons,
+    }
+
+
+def sector_override_guardrail(
+    sector_overrides: pd.DataFrame,
+    *,
+    max_weight_multiplier: float = 1.25,
+) -> dict:
+    """Validate sector/class calibration overrides before any dashboard surfacing."""
+
+    if sector_overrides is None or sector_overrides.empty:
+        return {
+            "status": "pass_no_overrides",
+            "live_promotion_allowed": False,
+            "requires_separate_ticket": True,
+            "override_count": 0,
+            "reasons": [],
+        }
+    frame = pd.DataFrame(sector_overrides).copy()
+    reasons: list[str] = []
+    required = {
+        "sector",
+        "promotion_label",
+        "live_promotion_allowed",
+        "promotion_requires",
+        "sector_weight_multiplier",
+    }
+    missing = sorted(required.difference(frame.columns))
+    if missing:
+        reasons.append("missing_columns:" + ",".join(missing))
+        return {
+            "status": "fail_closed",
+            "live_promotion_allowed": False,
+            "requires_separate_ticket": True,
+            "override_count": int(len(frame)),
+            "reasons": reasons,
+        }
+
+    sectors = frame["sector"].astype(str).str.upper()
+    multipliers = pd.to_numeric(frame["sector_weight_multiplier"], errors="coerce")
+    if not sectors.isin(set(universe.US_SECTORS)).all():
+        reasons.append("non_us_sector_override")
+    if not (frame["promotion_label"].astype(str) == "sector_candidate").all():
+        reasons.append("unexpected_promotion_label")
+    if _bool_series(frame["live_promotion_allowed"]).any():
+        reasons.append("override_live_promotion_true")
+    if not (
+        frame["promotion_requires"].astype(str)
+        == "separate_reviewed_live_promotion_ticket"
+    ).all():
+        reasons.append("missing_separate_review_requirement")
+    if multipliers.isna().any() or (multipliers < 1.0).any() or (multipliers > float(max_weight_multiplier)).any():
+        reasons.append("weight_multiplier_out_of_bounds")
+
+    return {
+        "status": "fail_closed" if reasons else "pass_display_only",
+        "live_promotion_allowed": False,
+        "requires_separate_ticket": True,
+        "override_count": int(len(frame)),
+        "max_weight_multiplier": float(max_weight_multiplier),
+        "reasons": reasons,
+    }
+
+
 def expanded_candidate_grid() -> list[dict]:
     score_thresholds = [0.8, 1.0, 1.2]
     negative_thresholds = [0.0, -0.5, -1.0]

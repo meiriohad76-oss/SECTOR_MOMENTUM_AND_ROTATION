@@ -77,6 +77,11 @@ def test_dashboard_review_css_uses_readable_contrast_and_type():
     assert ".pick-metrics {\n  display: grid;\n  grid-template-columns: 1fr 1fr;\n  gap: 8px 14px;\n  font-family: var(--font-mono);\n  font-size: 0.92rem;" in css
     assert 'div[data-testid="stButton"] > button' in css
     assert ".drill-selector-slot" in css
+    assert ".quad-card .qtick" in css
+    assert "color: var(--ticker-label);" in css
+    assert "text-shadow: var(--ticker-label-shadow);" in css
+    assert "overflow-wrap: anywhere;" in css
+    assert "max-width: min(520px, calc(100vw - 40px));" in css
 
 
 def test_dashboard_review_source_has_no_mojibake_markers():

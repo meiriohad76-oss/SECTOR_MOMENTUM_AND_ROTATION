@@ -136,15 +136,16 @@ def rrg_plotly_click_bridge_html(fig: Any, *, div_id: str = "rrg-plotly-bridge")
   function cleanTicker(value) {{
     return String(value || '').toUpperCase().replace(/[^A-Z0-9.^_-]/g, '').slice(0, 24);
   }}
-  function setTicker(ticker) {{
-    ticker = cleanTicker(ticker);
-    if (!ticker) {{
-      return;
+    function setTicker(ticker) {{
+      ticker = cleanTicker(ticker);
+      if (!ticker) {{
+        return;
+      }}
+      const url = new URL(parentWindow.location.href);
+      url.searchParams.set('ticker', ticker);
+      url.hash = 'drill';
+      parentWindow.location.assign(url.toString());
     }}
-    const url = new URL(parentWindow.location.href);
-    url.searchParams.set('ticker', ticker);
-    parentWindow.location.assign(url.toString());
-  }}
   function wire() {{
     const plot = document.getElementById('{safe_div_id}');
     if (!plot || typeof plot.on !== 'function') {{

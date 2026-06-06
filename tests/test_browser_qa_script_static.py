@@ -31,6 +31,7 @@ def test_browser_qa_script_writes_report_and_manifest():
     assert "browser_qa_report.md" in script
     assert "--qa-mode" in script
     assert '"qa_mode": qa_mode' in script
+    assert "qa_mode=qa_mode" in script
     assert "screenshot_path.unlink()" in script
     assert "missing_text_checks(" in script
     assert "_wait_for_dashboard_idle(" in script
@@ -47,6 +48,9 @@ def test_browser_qa_script_writes_report_and_manifest():
     assert "locator(\"label\").filter(has_text=value)" in script
     assert "action == \"hover:first-full-table-row\"" in script
     assert "expect-visible:" in script
+    assert "click-drill:" in script
+    assert "data-drill-ticker" in script
+    assert "Per-ticker drill-down" in script
     assert "expect-scrollable:" in script
     assert "expect-no-document-overlap:" in script
     assert "element.scrollHeight > element.clientHeight" in script

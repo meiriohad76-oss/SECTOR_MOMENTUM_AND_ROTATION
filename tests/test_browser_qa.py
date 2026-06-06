@@ -44,6 +44,16 @@ def test_browser_qa_targets_cover_visual_residual_risks():
     assert "expect-scrollable:.action-card.exit .action-list" in by_id["desktop-bluf-scroll-lanes"].actions
     assert "expect-scrollable:.action-card.warn .action-list" in by_id["desktop-bluf-scroll-lanes"].actions
     assert "expect-no-document-overlap:.bluf-actions|.data-health-panel" in by_id["desktop-bluf-scroll-lanes"].actions
+    assert by_id["desktop-drill-click-bridge"].tickets == ("B-112",)
+    assert "click-drill:.action-card [data-drill-ticker]" in by_id["desktop-drill-click-bridge"].actions
+    assert by_id["desktop-rrg-readability"].tickets == ("B-112", "B-147")
+    assert "text:Relative Rotation Graph" in by_id["desktop-rrg-readability"].checks
+    assert "text:DRILL-DOWN FROM RRG" in by_id["desktop-rrg-readability"].checks
+    assert "expect-visible:.quad-card .qtick" in by_id["desktop-rrg-readability"].actions
+    assert (
+        'expect-visible:div[class*="st-key-rrg_drill_leading_select"]'
+        in by_id["desktop-rrg-readability"].actions
+    )
     assert by_id["desktop-data-health-lanes"].tickets == ("B-147",)
     assert "text:Refresh market OHLCV" in by_id["desktop-data-health-lanes"].checks
     assert "text:Refresh FRED macro" in by_id["desktop-data-health-lanes"].checks
@@ -85,10 +95,15 @@ def test_browser_qa_report_is_secret_safe_and_actionable():
         ),
     ]
 
-    report = build_browser_qa_report(results, generated_at="2026-05-23T03:00:00Z")
+    report = build_browser_qa_report(
+        results,
+        generated_at="2026-05-23T03:00:00Z",
+        qa_mode="cloudflare-access-authenticated",
+    )
 
     assert "Browser QA Evidence" in report
     assert "2026-05-23T03:00:00Z" in report
+    assert "QA mode: `cloudflare-access-authenticated`" in report
     assert "B-111, B-115, B-146, B-147" in report
     assert "FAIL" in report
     assert "docs/browser-qa/latest/mobile-dashboard.png" in report

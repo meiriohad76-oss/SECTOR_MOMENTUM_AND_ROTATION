@@ -233,3 +233,68 @@ def read_cached_ohlcv(
     finally:
         conn.close()
     return out
+
+
+def read_cached_ohlcv_metadata(
+    tickers: Iterable[str],
+    period: str = "3y",
+    interval: str = "1d",
+    cache_path: str | Path | None = None,
+    today: date | None = None,
+    stale_after_days: int = FRESHNESS_TOLERANCE_DAYS,
+    allow_stale: bool = False,
+) -> dict[str, dict[str, object]]:
+    """Read usable cached OHLCV with cache provenance for operator health UI."""
+    path = ohlcv_cache_path(cache_path)
+    if duckdb is None or not path.exists():
+        return {}
+    as_of = today or date.today()
+    start = _period_start(period, as_of)
+    out: dict[str, dict[str, object]] = {}
+    conn = _connect(path)
+    if conn is None:
+        return out
+    try:
+        try:
+            _ensure_schema(conn)
+        except Exception:
+            return out
+        for ticker in list(dict.fromkeys(tickers)):
+            try:
+                frame = conn.execute(
+                    """
+                    SELECT date, open, high, low, close, volume, adj_close, provider, updated_at
+                    FROM ohlcv
+                    WHERE ticker = ? AND interval = ? AND date >= ?
+                    ORDER BY date
+                    """,
+                    [str(ticker), interval, start - pd.Timedelta(days=COVERAGE_TOLERANCE_DAYS)],
+                ).fetchdf()
+            except Exception:
+                continue
+            if frame.empty:
+                continue
+            try:
+                frame["date"] = _normalize_index(frame["date"])
+                updated_at = pd.to_datetime(frame.get("updated_at"), errors="coerce").dropna()
+                provider_values = frame.get("provider", pd.Series(dtype=object)).dropna().astype(str)
+                provider = str(provider_values.iloc[-1]) if not provider_values.empty else "unknown"
+                ohlcv_frame = frame.set_index("date").sort_index()
+                ohlcv_frame.index.name = None
+                ohlcv_frame = ohlcv_frame[OHLCV_COLUMNS].apply(pd.to_numeric, errors="coerce")
+                if not _frame_is_usable(ohlcv_frame, start, as_of, stale_after_days, allow_stale=allow_stale):
+                    continue
+                out[str(ticker)] = {
+                    "frame": ohlcv_frame.loc[ohlcv_frame.index >= start, OHLCV_COLUMNS].copy(),
+                    "provider": provider,
+                    "updated_at": (
+                        pd.Timestamp(updated_at.max()).isoformat()
+                        if not updated_at.empty
+                        else ""
+                    ),
+                }
+            except Exception:
+                continue
+    finally:
+        conn.close()
+    return out

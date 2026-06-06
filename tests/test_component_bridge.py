@@ -37,6 +37,7 @@ def test_rrg_plotly_click_bridge_uses_point_text_as_drill_ticker():
     assert "plotly_click" in html
     assert "point.text" in html
     assert "setTicker(ticker)" in html
+    assert "url.hash = 'drill'" in html
 
 
 def test_control_bridge_applies_query_actions_and_clears_consumed_params():

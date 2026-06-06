@@ -20,7 +20,7 @@ def test_dashboard_renders_data_health_panel_before_market_state():
     assert "data-health-card" in app_source
     assert "data-health-provider-list" in app_source
     assert "data-health-role" in app_source
-    assert "RENDERED · {last_update}" in app_source
+    assert "RENDERED | {last_update}" in app_source
     assert "60M CACHE" in app_source
     assert "_render_timed(\"render_data_health\", render_data_health)" in app_source
     assert app_source.index('_render_timed("render_bluf", render_bluf)') < app_source.index(

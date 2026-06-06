@@ -28,7 +28,7 @@ def test_ticker_report_contains_verdict_triggers_pillars_and_invalidation():
     assert "Trigger checklist" in report_helper
     assert "7-pillar methodology matrix" in report_helper
     assert "What would change the call" in report_helper
-    assert "Forecast horizon" in report_helper
+    assert "Evidence window" in report_helper
     assert "Stage 2 buy gates" in report_helper
     assert "Risk / exit triggers" in report_helper
 

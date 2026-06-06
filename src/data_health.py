@@ -147,6 +147,8 @@ def _ohlcv_health_row(
     oldest_age = _age_days(oldest, now)
     stale_cache_hits = tuple(getattr(ohlcv_result, "stale_cache_hits", ()))
     warnings = tuple(getattr(ohlcv_result, "warnings", ()))
+    provider_by_ticker = dict(getattr(ohlcv_result, "provider_by_ticker", {}) or {})
+    source_by_ticker = dict(getattr(ohlcv_result, "source_by_ticker", {}) or {})
 
     status = "healthy"
     if oldest_age is None or not latest_dates:
@@ -160,6 +162,24 @@ def _ohlcv_health_row(
         f"{len(latest_dates)}/{len(expected)} symbols loaded",
         f"provider {getattr(ohlcv_result, 'provider', 'unknown')}",
     ]
+    if provider_by_ticker:
+        providers = sorted(set(str(provider) for provider in provider_by_ticker.values()))
+        detail_parts.append(
+            "source mix "
+            + ", ".join(
+                f"{provider}:{sum(1 for value in provider_by_ticker.values() if str(value) == provider)}"
+                for provider in providers
+            )
+        )
+    if source_by_ticker:
+        sources = sorted(set(str(source) for source in source_by_ticker.values()))
+        detail_parts.append(
+            "paths "
+            + ", ".join(
+                f"{source}:{sum(1 for value in source_by_ticker.values() if str(value) == source)}"
+                for source in sources
+            )
+        )
     if getattr(ohlcv_result, "cache_refresh_forced", False):
         detail_parts.append("manual refresh bypassed persistent cache")
     if oldest is not None and oldest_age is not None:
@@ -177,7 +197,11 @@ def _ohlcv_health_row(
         "role": "Critical: price, volume, trend, momentum, and market proxies",
         "status": status,
         "latest": str(latest.date()) if latest is not None else "-",
-        "freshness": format_age_label(latest, now),
+        "freshness": (
+            f"latest {format_age_label(latest, now)}; oldest {format_age_label(oldest, now)}"
+            if latest is not None and oldest is not None and latest != oldest
+            else format_age_label(latest, now)
+        ),
         "age_days": latest_age,
         "oldest_age_days": oldest_age,
         "coverage": f"oldest {oldest.date()} ({oldest_age}d old)" if oldest is not None and oldest_age is not None else "",
@@ -222,8 +246,26 @@ def _latest_series_date(series: pd.Series | None) -> pd.Timestamp | None:
     return _date_timestamp(latest_index)
 
 
-def _fred_health_row(fred_data: Mapping[str, pd.Series], *, now: pd.Timestamp) -> dict[str, object]:
+def _fred_health_row(
+    fred_data: Mapping[str, pd.Series],
+    *,
+    now: pd.Timestamp,
+    fred_configured: bool = True,
+) -> dict[str, object]:
     items = _fred_items()
+    if not fred_configured and not fred_data:
+        status = "info"
+        return {
+            **_lane_metadata("fred_macro", status),
+            "source": "FRED macro/regime",
+            "role": "Optional: macro classifier is using supported SPY/yield-curve fallback",
+            "status": status,
+            "latest": "-",
+            "freshness": "unconfigured fallback",
+            "age_days": None,
+            "coverage": "FRED not configured",
+            "detail": "FRED is not configured; dashboard uses the supported coarse macro fallback instead of treating this as stale data.",
+        }
     stale: list[str] = []
     missing = 0
     latest_dates: list[pd.Timestamp] = []
@@ -345,11 +387,13 @@ def data_health_rows(
     now: pd.Timestamp | datetime | None = None,
     provider_flow_stubbed: bool = True,
     provider_flow_statuses: Iterable[Mapping[str, object]] | None = None,
+    fred_configured: bool | None = None,
 ) -> list[dict[str, object]]:
     current = _now_timestamp(now)
+    fred_expected = bool(fred_data) if fred_configured is None else bool(fred_configured)
     return [
         _ohlcv_health_row(ohlcv, expected_symbols, ohlcv_result, now=current),
-        _fred_health_row(fred_data, now=current),
+        _fred_health_row(fred_data, now=current, fred_configured=fred_expected),
         _compute_health_row(compute_created_at, now=current),
         _provider_flow_health_row(provider_flow_stubbed, provider_flow_statuses),
     ]

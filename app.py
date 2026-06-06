@@ -26,6 +26,7 @@ from src.calibration_dashboard import (
 from src.component_bridge import (
     apply_control_bridge_query_actions,
     drill_bridge_attrs,
+    drill_click_bridge_html,
     rrg_plotly_click_bridge_html,
 )
 from src.component_docs import DASHBOARD_COMPONENT_DOCS, component_docs_html
@@ -45,6 +46,7 @@ from src.data_health import dashboard_health_summary, data_health_rows
 from src.data import fetch_ohlcv_result, _select_ohlcv_provider
 from src.evidence_gates import evaluate_promotion_gate, promotion_gate_decisions_frame
 from src.flow import compute_flow_signals, flow_composite_z, provider_flow_feeds_stubbed, provider_flow_health_statuses
+from src.fred_data import fred_available
 from src.indicators import compute_all_indicators
 from src.macro import assess_regime
 from src.macro_tiles import MACRO_CONTEXT_SYMBOLS, fred_macro_snapshot, fred_macro_tile_groups, macro_tile_rows, session_range_tile
@@ -245,44 +247,44 @@ def render_loading_state(placeholder, label: str, card_count: int = 4) -> None:
 
 INDICATOR_TIPS = {
     # BLUF
-    "bluf_exit":     "Tickers requiring action this week. Sell on Monday open. Triggered by close below 30wMA, Mansfield RS negative, Antonacci absolute failed, RRG entered Lagging, CMF below -0.10, or sustained ETF redemptions.",
-    "bluf_warning":  "Tickers showing early bearish signals. Tighten stops, no new adds. Triggered by RRG dropping to Weakening, breadth below 50%, distribution-day cluster, or OBV/price bearish divergence.",
-    "bluf_buy":      "Stage 2 candidates passing every strict gate: price above 30-week SMA with positive slope, Mansfield RS positive, RRG in Leading quadrant, sector breadth ≥ 60%, CMF above +0.05, and positive ETF primary flow.",
+    "bluf_exit":     "Tickers with model risk flags this week. Review exposure and risk controls. Triggered by close below 30wMA, Mansfield RS negative, Antonacci absolute failed, RRG entered Lagging, CMF below -0.10, or sustained ETF redemptions.",
+    "bluf_warning":  "Tickers showing early bearish evidence. Review stops and avoid adding until evidence improves. Triggered by RRG dropping to Weakening, breadth below 50%, distribution-day cluster, or OBV/price bearish divergence.",
+    "bluf_buy":      "Stage 2 candidates passing the strict evidence gates: price above 30-week SMA with positive slope, Mansfield RS positive, RRG in Leading quadrant, sector breadth >= 60%, CMF above +0.05, and non-negative ETF primary flow when available.",
     # Status tiles
     "tip_regime":     "Faber 10-month SMA on SPY. Portfolio-level forward circuit breaker. SPY > SMA historically associated with positive forward equity returns; SPY < SMA precedes the worst drawdowns (2000, 2008, 2020). Flip to RISK-OFF triggers defensive rotation to TLT/GLD/BIL.",
     "tip_phase":     "Business-cycle phase per Stovall/Fidelity. Predicts which sector basket will lead the next 3-6 months. EARLY: cyclicals (XLY, XLF, XLRE, XLI, XLK). MID: tech / industrials. LATE: energy + defensives (XLE, XLB, XLP, XLV). RECESSION: pure defensives (XLP, XLU, XLV).",
     "tip_warnings":  "Tickers currently in EXIT or WARNING state. Watch the week-over-week change to gauge market deterioration. Spikes here often precede broader risk-off.",
     # Pick card metrics
     "tip_S":     "Composite forward-outlook score. Weighted z-score across the 7 pillars; the higher this is for a ticker, the stronger the system's forward call. A hard veto fires if F < -0.5sigma. Forward horizon is roughly the worst-case across pillars (1 week to 6 months).",
-    "tip_F":     "Institutional money flow z-score (forward indicator). Combines CMF, OBV slope, ETF creations, block-trade direction, RVOL, short-interest delta. Smart money positioning leads price by ~1-3 weeks (Chordia-Swaminathan 2000). F < -0.5sigma kills the trade regardless of price signals.",
-    "tip_MOM":     "12-1 momentum (Jegadeesh-Titman 1993): 12-month return excluding the most recent month. Predicts forward 3-12 month relative performance. Top-decile winners have historically beaten bottom-decile losers by ~1%/month for the next year. The most-studied predictive anomaly in finance.",
-    "tip_STAGE":     "Weinstein Stage. Predicts next 4-26 weeks of behavior. Stage 1 = basing (setup forming). Stage 2 = ADVANCE (forward outperformance expected). Stage 3 = TOPPING (pullback risk rising). Stage 4 = DECLINE (forward underperformance expected). The MA + slope + RS combination historically continues until the next stage transition.",
-    "tip_RRG":     "Relative Rotation Graph quadrant. Predicts the next rotation phase. Improving -> Leading (entry signal, 4-12 wk fwd outperformance). Leading -> Weakening (rotate out, momentum fading). Weakening -> Lagging (full breakdown expected). Lagging -> Improving (Stage-1 basing in progress).",
+    "tip_F":     "Money flow z-score. Combines OHLCV-derived CMF/OBV/MFI/RVOL signals plus provider-backed flow fields when those feeds are live. F < -0.5sigma is treated as a model veto, but check data health because provider feeds can be neutral or unavailable.",
+    "tip_MOM":     "12-1 momentum (Jegadeesh-Titman 1993): 12-month return excluding the most recent month. Historically associated with 3-12 month relative strength, but live results vary by regime, costs, and sample.",
+    "tip_STAGE":     "Weinstein Stage. Stage 1 = basing, Stage 2 = advance, Stage 3 = topping risk, Stage 4 = decline. The dashboard treats Stage 2/4 as trend evidence, not a certain outcome.",
+    "tip_RRG":     "Relative Rotation Graph quadrant. Improving/Leading can indicate strengthening relative rotation; Weakening/Lagging can indicate fading leadership. Use it as one evidence pillar, not a standalone forecast.",
     # Quadrant cards
     "tip_q_leading":   "Outperforming the benchmark with rising relative momentum. Best buy zone.",
     "tip_q_weakening": "Still outperforming but momentum decaying. Tighten stops; rotation candidate.",
     "tip_q_lagging":   "Underperforming with declining momentum. Avoid or short.",
-    "tip_q_improving": "Underperforming but momentum turning up. Watch — early entry zone.",
+    "tip_q_improving": "Underperforming but momentum turning up. Watch for early entry evidence.",
     # Full table column headers
     "tip_col_FABER":   "Time-series momentum filter. 1 if monthly close > 10-month SMA, else 0. Faber 2007. The binary 'is this asset in its own uptrend' switch.",
     "tip_col_STAGE2":  "1 if Weinstein Stage = 2 (advance), else 0. Requires all three: P > 30wMA, slope > 0, Mansfield RS > 0.",
-    "tip_col_ANT":     "Antonacci absolute momentum. 1 if asset's 12mo return > BIL T-bill return. The catastrophic-loss circuit breaker — kept the system out of 2008.",
-    "tip_col_BREADTH": "Sector breadth proxy. 1 if % of recent 50 sessions above 50dMA ≥ 50%. A clean way to confirm trend internals.",
+    "tip_col_ANT":     "Antonacci absolute momentum. 1 if asset's 12mo return > BIL T-bill return. This is the catastrophic-loss circuit breaker that kept the system out of 2008.",
+    "tip_col_BREADTH": "Sector breadth proxy. 1 if % of recent 50 sessions above 50dMA >= 50%. A clean way to confirm trend internals.",
     "tip_col_FLOW":    "Pillar-7 flow check. 1 if F > 0 (institutional flow positive). The independent confirmation that price movement is backed by real money.",
     # Drill-down tiles
     "tip_drill_composite": "Master S-score for this ticker (this is the ranking metric).",
-    "tip_drill_flow":      "Institutional flow F-score. VETO fires when F < -0.5σ regardless of price-based pillars.",
+    "tip_drill_flow":      "Institutional flow F-score. VETO fires when F < -0.5 sigma regardless of price-based pillars.",
     "tip_drill_state":     "Current state machine output. See state pill tooltips for definition.",
     "tip_drill_momentum":  "12-1 momentum, Mansfield 52-week relative strength shown alongside.",
 }
 
 STATE_TIPS = {
-    "STAGE_2_BULLISH":  "FORWARD CALL: expected to outperform its class over the next 4-26 weeks. All entry gates pass (price > 30wMA + slope > 0 + Mansfield RS > 0 + RRG Leading + breadth >= 60% + CMF > 0.05 + ETF flow positive). Historically the highest-edge state.",
-    "HOLD":             "FORWARD CALL: trend likely intact for next 4-13 weeks but missing one strict gate (e.g., RRG not Leading, or breadth slightly low). Existing positions are safe; no new entries.",
-    "WARNING":          "FORWARD CALL: 5-15% pullback or trend break in the next 2-6 weeks is more likely than continuation. Triggered by RRG -> Weakening 2+ wks, OR breadth < 50%, OR sustained CMF < 0, OR OBV/price bearish divergence, OR 4+ distribution days. Tighten stops.",
-    "EXIT":             "FORWARD CALL: 10-30% drawdown over the next 4-13 weeks is the median outcome if the breakdown holds. Triggered by close < 30wMA, OR Mansfield RS < 0, OR Antonacci failed, OR RRG -> Lagging, OR CMF < -0.10, OR ETF redemptions > 1.5% AUM. Sell on Monday open.",
-    "BEARISH_STAGE_4":  "FORWARD CALL: continued decline expected. Median Stage-4 duration is 10-22 weeks. Gates confirmed: price < 30wMA + MA slope negative + RRG Lagging 3+ wks + CMF confirmed negative. Avoid long; short candidate.",
-    "STAGE_1_BASING":   "FORWARD CALL: possible Stage-2 setup forming over the next 4-13 weeks if remaining gates fill. Recovered from Stage 4: price reclaimed 30wMA but slope still flat AND CMF turned positive. Watchlist.",
+    "STAGE_2_BULLISH":  "MODEL SIGNAL: the strongest bullish evidence state. Entry gates pass (price > 30wMA + slope > 0 + Mansfield RS > 0 + RRG Leading + breadth >= 60% + CMF > 0.05 + ETF flow non-negative when available). Treat as decision support, not a guaranteed outcome.",
+    "HOLD":             "MODEL SIGNAL: trend evidence is acceptable but one or more strict fresh-buy gates are missing. Review position size and risk controls before adding.",
+    "WARNING":          "MODEL SIGNAL: early deterioration evidence is present. Triggered by RRG -> Weakening, breadth < 50%, sustained CMF < 0, OBV/price bearish divergence, or 4+ distribution days.",
+    "EXIT":             "MODEL SIGNAL: one or more major risk gates failed. Triggered by close < 30wMA, Mansfield RS < 0, Antonacci failed, RRG -> Lagging, CMF < -0.10, ETF redemptions > 1.5% AUM, or weak block ratio. Review exit/risk plan.",
+    "BEARISH_STAGE_4":  "MODEL SIGNAL: bearish trend evidence is confirmed by price below 30wMA, negative MA slope, weak relative strength, and negative flow evidence. Avoid treating it as an automatic short without separate risk review.",
+    "STAGE_1_BASING":   "MODEL SIGNAL: possible base-building setup. Price has improved but full Stage 2 confirmation is not present yet. Watchlist evidence, not a buy signal.",
 }
 
 STATE_STRENGTH_RANK = {
@@ -391,7 +393,7 @@ def _grade_letter(s: float | None) -> str:
 SYSTEM_EXPLAINER_HTML = f"""
 <div class="explainer">
 
-<p><b>Forward-looking signal system.</b> The Sentiment Board monitors {len(SCORED_TICKERS)} instruments across US sectors, industries, countries, factors, themes, crypto exposures, and mega-cap stocks, then applies a 7-pillar methodology to <b>predict</b> which sectors will lead and which will break down. Every score, state, and signal you see on this page is a forward call, not a current-state description. The pillars are leading indicators by construction — each one has decades of out-of-sample evidence that <i>past readings predict forward returns</i>.</p>
+<p><b>Evidence-based signal system.</b> The Sentiment Board monitors {len(SCORED_TICKERS)} instruments across US sectors, industries, countries, factors, themes, crypto exposures, and mega-cap stocks, then applies a 7-pillar methodology to rank current evidence. Scores and states are decision-support signals, not guaranteed predictions or financial advice. Each pillar has research support and failure modes; always check data health and risk context.</p>
 
 <h3>Data flow</h3>
 <pre class="flow">yfinance daily OHLCV (3y, {len(DATA_SYMBOLS)} symbols)
@@ -414,10 +416,10 @@ State machine (6 forward-outlook states with strict gates)
         v
 state.json (persists across restarts)  -->  BLUF + alerts + cards</pre>
 
-<h3>The 7 pillars — weights and forward horizons</h3>
-<p>Weights sum to 1.00. "Forward horizon" is the empirically-supported window over which each pillar's signal is predictive.</p>
+<h3>The 7 pillars - weights and forward horizons</h3>
+<p>Weights sum to 1.00. "Evidence window" is the historical horizon the dashboard reviews for that pillar; it is not a promise that a move will occur inside that window.</p>
 <table>
-<thead><tr><th>#</th><th>Pillar</th><th>What it predicts</th><th>Horizon</th><th class="weight">Weight</th></tr></thead>
+<thead><tr><th>#</th><th>Pillar</th><th>What it measures</th><th>Evidence window</th><th class="weight">Weight</th></tr></thead>
 <tbody>
 <tr><td>1</td><td>12-1 Cross-sectional Momentum</td><td>Forward 3-12mo relative performance</td><td>3-12 mo</td><td class="weight">22%</td></tr>
 <tr><td>2</td><td>Mansfield 52-week Relative Strength</td><td>Whether the sector keeps leading the index</td><td>2-6 mo</td><td class="weight">12%</td></tr>
@@ -439,41 +441,41 @@ state.json (persists across restarts)  -->  BLUF + alerts + cards</pre>
   + 0.23 * z(F_score)</pre>
 
 <h3>Hard flow veto</h3>
-<p>A high S-score is overridden if <code>F &lt; -0.5&sigma;</code>. Price moves without real money behind them historically reverse — flow rejection is the system's main protection against pure-momentum traps.</p>
+<p>A high S-score is overridden if <code>F &lt; -0.5&sigma;</code>. Price moves without real money behind them historically reverse; flow rejection is the system's main protection against pure-momentum traps.</p>
 
 <h3>Letter grade (forward outlook ranking)</h3>
 <table>
 <thead><tr><th>Grade</th><th>S-score range</th><th>Forward outlook</th></tr></thead>
 <tbody>
-<tr><td><span class="grade A">A</span></td><td><code>S &ge; +1.0</code></td><td>Top decile <b>predicted outperformance</b> over the relevant horizon (1wk-6mo)</td></tr>
+<tr><td><span class="grade A">A</span></td><td><code>S &ge; +1.0</code></td><td>Strongest evidence bucket; review data health, gates, and risk before acting.</td></tr>
 <tr><td><span class="grade B">B</span></td><td><code>0.0 &le; S &lt; +1.0</code></td><td>Modestly bullish forward call</td></tr>
 <tr><td><span class="grade C">C</span></td><td><code>-1.0 &lt; S &lt; 0.0</code></td><td>No edge in either direction</td></tr>
-<tr><td><span class="grade D">D</span></td><td><code>-1.5 &le; S &le; -1.0</code></td><td>Mild forward <b>underperformance</b> expected</td></tr>
-<tr><td><span class="grade F">F</span></td><td><code>S &lt; -1.5</code></td><td>Bottom decile <b>predicted underperformance</b>; avoid or short</td></tr>
+<tr><td><span class="grade D">D</span></td><td><code>-1.5 &le; S &le; -1.0</code></td><td>Weak evidence bucket; review risk and wait for improvement.</td></tr>
+<tr><td><span class="grade F">F</span></td><td><code>S &lt; -1.5</code></td><td>Weakest evidence bucket; requires caution and separate risk review.</td></tr>
 </tbody>
 </table>
 
-<h3>State machine — forward calls</h3>
+<h3>State machine - forward calls</h3>
 <table>
 <thead><tr><th>State</th><th>Forward outlook</th></tr></thead>
 <tbody>
-<tr><td><span class="pill STAGE_2_BULLISH">STAGE 2 BULLISH</span></td><td><b>Expected outperformance</b> over next 4-26 weeks. All entry gates passed.</td></tr>
-<tr><td><span class="pill HOLD">HOLD</span></td><td>Trend intact for next 4-13 weeks; existing positions safe.</td></tr>
-<tr><td><span class="pill WARNING">WARNING</span></td><td><b>5-15% pullback or trend break</b> in next 2-6 weeks is more likely than continuation.</td></tr>
-<tr><td><span class="pill EXIT">EXIT</span></td><td><b>10-30% drawdown</b> over next 4-13 weeks is the median outcome.</td></tr>
-<tr><td><span class="pill BEARISH_STAGE_4">BEARISH STAGE 4</span></td><td><b>Continued decline expected.</b> Median Stage-4 duration is 10-22 weeks.</td></tr>
+<tr><td><span class="pill STAGE_2_BULLISH">STAGE 2 BULLISH</span></td><td>Strongest bullish evidence state. All strict entry gates passed.</td></tr>
+<tr><td><span class="pill HOLD">HOLD</span></td><td>Trend evidence is acceptable, but a fresh-buy gate is missing.</td></tr>
+<tr><td><span class="pill WARNING">WARNING</span></td><td>Deterioration evidence is present; review risk controls.</td></tr>
+<tr><td><span class="pill EXIT">EXIT</span></td><td>Major risk gate failed; review exit/risk plan and data quality.</td></tr>
+<tr><td><span class="pill BEARISH_STAGE_4">BEARISH STAGE 4</span></td><td>Bearish trend evidence is confirmed by multiple gates.</td></tr>
 <tr><td><span class="pill STAGE_1_BASING">STAGE 1 BASING</span></td><td>Possible <b>Stage-2 setup forming</b> over next 4-13 weeks if remaining gates fill.</td></tr>
 </tbody>
 </table>
 
 <h3>Empirical evidence per pillar</h3>
-<p>Forward-prediction evidence supporting each pillar. Citations in full bibliography at <code>docs/sector-rotation-methodology.md</code> &sect;11.</p>
+<p>Research evidence supporting each pillar. Citations in full bibliography at <code>docs/sector-rotation-methodology.md</code> &sect;11.</p>
 <table>
-<thead><tr><th>Pillar</th><th>Evidence of forward predictive power</th></tr></thead>
+<thead><tr><th>Pillar</th><th>Evidence and caveats</th></tr></thead>
 <tbody>
 <tr><td>12-1 Momentum</td><td>Jegadeesh-Titman 1993; 30+ years of out-of-sample data (Asness et al. 2013, AQR; alphaarchitect.com 2024). Top-minus-bottom decile spread averages <b>~1% per month over the next year</b>. The most-studied anomaly in finance.</td></tr>
 <tr><td>Mansfield RS / Weinstein Stage 2</td><td>Weinstein 1988; 30+ years of practitioner use. Stage-2 breakouts on weekly charts historically continue an average 6-9 months before Stage 3 confirmation.</td></tr>
-<tr><td>Faber 10mo SMA</td><td>Faber 2007 (SSRN 962461); updated 2013 & 2020. SMA10 timing on S&P 500 + 4 other asset classes returned <b>~10.5% vs 9.9% buy-and-hold from 1973-2012</b> with HALF the drawdown — drawdown reduction is the documented edge.</td></tr>
+<tr><td>Faber 10mo SMA</td><td>Faber 2007 (SSRN 962461); updated 2013 & 2020. SMA10 timing on S&P 500 + 4 other asset classes returned <b>~10.5% vs 9.9% buy-and-hold from 1973-2012</b> with HALF the drawdown; drawdown reduction is the documented edge.</td></tr>
 <tr><td>Antonacci Dual Momentum</td><td>Antonacci 2014. Absolute-momentum filter kept the model in T-bills through 2008, capping drawdown at <b>~20% vs S&P 500's -55%</b>. Direct demonstration of forward downside protection.</td></tr>
 <tr><td>RRG (RS-Ratio + RS-Momentum)</td><td>de Kempenaer 2004-present (relativerotationgraphs.com). Improving -> Leading transitions historically precede outperformance phases by 4-12 weeks; visible on Bloomberg terminals since 2011.</td></tr>
 <tr><td>Business-Cycle Tilt</td><td>Stovall 1996; Fidelity Business Cycle Approach (2014, updated annually). Forward sector returns by phase published with cycle-by-cycle data going back to 1962.</td></tr>
@@ -494,7 +496,7 @@ state.json (persists across restarts)  -->  BLUF + alerts + cards</pre>
 
 st.set_page_config(
     page_title="Sentiment Board",
-    page_icon="📊",
+    page_icon="chart_with_upwards_trend",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -648,9 +650,9 @@ def _lane_completed_text(lane_id: str) -> str:
         if parsed.tzinfo is None:
             parsed = parsed.tz_localize("UTC")
         parsed = parsed.tz_convert("UTC")
-        return f"completed {parsed.strftime('%Y-%m-%d %H:%M UTC')}"
+        return f"rendered after request {parsed.strftime('%Y-%m-%d %H:%M UTC')}"
     except Exception:
-        return f"completed {completed_at}"
+        return f"rendered after request {completed_at}"
 
 
 def _apply_control_bridge_actions() -> None:
@@ -923,12 +925,12 @@ if _REUSED_COMPUTE_SNAPSHOT is False:
 
 def _state_color_var(state: str) -> str:
     return {
-        "STAGE_2_BULLISH":  "var(--st-stage2)",
-        "HOLD":             "var(--st-hold)",
-        "WARNING":          "var(--st-warn)",
-        "EXIT":             "var(--st-exit)",
-        "BEARISH_STAGE_4":  "var(--st-bear)",
-        "STAGE_1_BASING":   "var(--st-basing)",
+        "STAGE_2_BULLISH": "var(--st-stage2)",
+        "HOLD": "var(--st-hold)",
+        "WARNING": "var(--st-warn)",
+        "EXIT": "var(--st-exit)",
+        "BEARISH_STAGE_4": "var(--st-bear)",
+        "STAGE_1_BASING": "var(--st-basing)",
     }.get(state, "var(--muted)")
 
 
@@ -950,7 +952,7 @@ def _build_bluf(scored_df: pd.DataFrame):
             bits.append("flow veto")
         if not bits:
             bits = [f"S {row['S_score']:+.2f}"]
-        return " · ".join(bits[:3])
+        return " | ".join(bits[:3])
 
     def _note_warn(row):
         bits = []
@@ -962,7 +964,7 @@ def _build_bluf(scored_df: pd.DataFrame):
             bits.append(f"CMF {row['cmf21']:+.2f}")
         if not bits:
             bits = [f"S {row['S_score']:+.2f}"]
-        return " · ".join(bits[:3])
+        return " | ".join(bits[:3])
 
     def _note_buy(row):
         bits = [f"S {row['S_score']:+.2f}"]
@@ -970,7 +972,7 @@ def _build_bluf(scored_df: pd.DataFrame):
             bits.append(f"F {row['F_score']:+.2f}")
         if (row.get("mom_12_1") or 0) > 0:
             bits.append(f"mom +{row['mom_12_1']*100:.0f}%")
-        return " · ".join(bits[:3])
+        return " | ".join(bits[:3])
 
     def _pack(sub_df, note_fn, kind, label, eta, state):
         items = []
@@ -1263,7 +1265,7 @@ def render_ticker_analyzer():
 
 
 def render_explainer():
-    with st.expander("📖  HOW THIS WORKS — system, data flow, pillars, gates", expanded=False):
+    with st.expander("HOW THIS WORKS - system, data flow, pillars, gates", expanded=False):
         _md(SYSTEM_EXPLAINER_HTML)
 
 
@@ -1277,7 +1279,7 @@ def render_component_docs():
 def render_header():
     now = datetime.now()
     last_update = now.strftime("%H:%M")
-    as_of = now.strftime("%a %b %d %Y · %H:%M %Z").upper().strip(" ·").strip()
+    as_of = now.strftime("%a %b %d %Y | %H:%M %Z").upper().strip(" |").strip()
     cache_window = "60M CACHE"
     html = f"""
     <div class="app">
@@ -1287,10 +1289,10 @@ def render_header():
           SENTIMENT&nbsp;BOARD
         </div>
         <div class="meta">
-          <span><span class="live-dot"></span>RENDERED · {last_update}</span>
-          <span class="sep">·</span>
+          <span><span class="live-dot"></span>RENDERED | {last_update}</span>
+          <span class="sep">|</span>
           <span>{as_of}</span>
-          <span class="sep">·</span>
+          <span class="sep">|</span>
           <span><span class="val">{cache_window}</span></span>
         </div>
       </header>
@@ -1429,6 +1431,10 @@ def _apply_header_preference(widget_key: str, target_key: str, allowed: tuple[st
         st.session_state[target_key] = value
 
 
+def render_drill_click_bridge():
+    st.iframe(drill_click_bridge_html(), height=1)
+
+
 def render_header_controls():
     _md('<div class="header-controls-slot"></div>')
     for widget_key, target_key in (
@@ -1478,15 +1484,14 @@ def render_header_controls():
             args=("header_color_palette", "color_palette", PALETTE_OPTIONS),
         )
 
-
 def render_bluf():
     if not should_render_bluf(st.session_state.bluf_mode):
         return
     compact = is_compact_bluf(st.session_state.bluf_mode)
     sub = (
-        f"Forward calls: {bluf['exits_count']} tickers expected to underperform soon, "
+        f"Model evidence: {bluf['exits_count']} tickers with major risk flags, "
         f"{bluf['warns_count']} showing topping signals, "
-        f"{bluf['buys_count']} predicted to lead the next 4-26 weeks. "
+        f"{bluf['buys_count']} passing strict bullish evidence gates. "
         f"Universe: {len(scored)} instruments. "
         f"Risk regime is {('on' if regime.risk_on else 'off')} ({regime.phase_hint.lower()} cycle)."
     )
@@ -1497,15 +1502,15 @@ def render_bluf():
         <div class="bluf-head">
           <div class="bluf-eyebrow">
             <span class="pill-tiny">BLUF</span>
-            <span>BOTTOM LINE · FORWARD OUTLOOK · {datetime.now().strftime('%H:%M')}</span>
+          <span>BOTTOM LINE | FORWARD OUTLOOK | {datetime.now().strftime('%H:%M')}</span>
             <span class="stamp">{'RISK-ON' if regime.risk_on else 'RISK-OFF'}</span>
           </div>
         </div>
         <div class="bluf-headline">
           <span class="exit-num tip-cue" data-tip="{_esc(INDICATOR_TIPS['bluf_exit'])}">{bluf['exits_count']}</span> <span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['bluf_exit'])}">EXIT</span>
-          <span class="sep">·</span>
+          <span class="sep">|</span>
           <span class="warn-num tip-cue" data-tip="{_esc(INDICATOR_TIPS['bluf_warning'])}">{bluf['warns_count']}</span> <span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['bluf_warning'])}">WARNINGS</span>
-          <span class="sep">·</span>
+          <span class="sep">|</span>
           <span class="buy-num tip-cue" data-tip="{_esc(INDICATOR_TIPS['bluf_buy'])}">{bluf['buys_count']}</span> <span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['bluf_buy'])}">NEW BUYS</span>
         </div>
         <div class="bluf-sub">{sub}</div>
@@ -1524,7 +1529,7 @@ def render_bluf():
         items_html = "".join(
             f'<li {drill_bridge_attrs(it["t"], label=it["note"])}><span class="t">{it["t"]}</span><span class="n">{it["note"]}</span></li>'
             for it in a["tickers"]
-        ) or '<li><span class="t">—</span><span class="n">none</span></li>'
+        ) or '<li><span class="t">-</span><span class="n">none</span></li>'
         card_html = f"""
         <div class="action-card {a['kind']}" {drill_bridge_attrs(first_ticker, label=a['label'])}>
           <div class="action-head">
@@ -1586,12 +1591,12 @@ def _gate_row(label: str, actual: str, rule: str, passed: bool | None, meaning: 
 
 def _forecast_horizon_for_state(state: str) -> str:
     return {
-        "STAGE_2_BULLISH": "4-26 weeks: trend/Stage 2 call, with flow confirmation over 1-3 weeks.",
-        "HOLD": "4-13 weeks: trend still acceptable, but not a full fresh-buy setup.",
-        "WARNING": "2-6 weeks: rising pullback or breakdown risk.",
-        "EXIT": "4-13 weeks: elevated underperformance or drawdown risk.",
-        "BEARISH_STAGE_4": "10-22 weeks: decline/underperformance can persist until a new base forms.",
-        "STAGE_1_BASING": "4-13 weeks: setup watch window; wait for Stage 2 confirmation.",
+        "STAGE_2_BULLISH": "Evidence window: trend and Stage 2 evidence is usually reviewed over 4-26 weeks; flow evidence is shorter-term.",
+        "HOLD": "Evidence window: trend evidence remains acceptable, but this is not a fresh-buy setup.",
+        "WARNING": "Evidence window: review deterioration evidence over the next several sessions to weeks.",
+        "EXIT": "Evidence window: a major risk gate failed; review risk plan and data quality before acting.",
+        "BEARISH_STAGE_4": "Evidence window: bearish trend evidence can persist until a new base forms.",
+        "STAGE_1_BASING": "Evidence window: watch for confirmation before treating it as Stage 2.",
     }.get(state, "No calibrated horizon available for this state.")
 
 
@@ -1665,8 +1670,8 @@ def _ticker_report_html(ticker: str, row) -> str:
     return f"""
     <section class="section ticker-report" id="ticker-report">
       <div class="section-head">
-        <h2>Complete ticker report <span class="count">{_esc(ticker)} · {_esc(class_name)}</span></h2>
-        <div class="right">Forecast horizon · {_esc(forecast)}</div>
+        <h2>Complete ticker report <span class="count">{_esc(ticker)} | {_esc(class_name)}</span></h2>
+        <div class="right">Evidence window | {_esc(forecast)}</div>
       </div>
       <div class="ticker-report-grid">
         <div class="ticker-report-verdict">
@@ -1716,7 +1721,7 @@ def _provider_status_list_html(providers) -> str:
         mode = _esc(str(provider.get("mode", provider.get("status", "unknown"))))
         source = _esc(str(provider.get("provider", "")))
         signal = _esc(str(provider.get("signal", "")))
-        meta = " · ".join(part for part in (source, signal) if part)
+        meta = " | ".join(part for part in (source, signal) if part)
         rows.append(
             f'<li class="{status}"><b>{label}</b><span>{mode}</span>'
             f'<small>{meta}</small></li>'
@@ -1736,6 +1741,7 @@ def render_data_health():
         compute_created_at=dashboard_compute_created_at,
         provider_flow_stubbed=provider_flow_feeds_stubbed(provider_statuses),
         provider_flow_statuses=provider_statuses,
+        fred_configured=fred_available(),
     )
     summary = dashboard_health_summary(rows)
     requested_at = st.session_state.get("data_refresh_requested_at")
@@ -1756,7 +1762,7 @@ def render_data_health():
         <div class="data-health-card {status}">
           <div class="data-health-card-head">
             <span>{_esc(str(row.get('source', 'Source')))}</span>
-            <b>{_esc(severity)} · {_esc(status.upper())}</b>
+            <b>{_esc(severity)} | {_esc(status.upper())}</b>
           </div>
           <div class="data-health-main">{_esc(str(row.get('freshness', '-')))}</div>
           <div class="data-health-sub">{_esc(subline)}</div>
@@ -1789,8 +1795,8 @@ def render_data_health():
             lane_id = str(row.get("lane_id"))
             st.button(refresh_label, key=refresh_key, on_click=_refresh_data_lane, args=(str(row.get("lane_id")),), width="stretch")
             _md(
-                f'<div class="lane-refresh-caption">{_esc(str(row.get("severity_symbol", "")))} · '
-                f'{_esc(str(row.get("freshness", "-")))} · {_esc(str(row.get("sla", "")))} · '
+                f'<div class="lane-refresh-caption">{_esc(str(row.get("severity_symbol", "")))} | '
+                f'{_esc(str(row.get("freshness", "-")))} | {_esc(str(row.get("sla", "")))} | '
                 f'{_esc(_lane_completed_text(lane_id))}</div>'
             )
     _md("</div>")
@@ -1811,7 +1817,7 @@ def render_status():
             bits.append(f"2s10s {regime.curve_2s10s:+.2f}")
         if regime.recession_prob is not None and regime.recession_prob >= 5:
             bits.append(f"rec prob {regime.recession_prob:.0f}%")
-        cycle_sub = " · ".join(bits) if bits else regime.note
+        cycle_sub = " | ".join(bits) if bits else regime.note
     else:
         fred_badge = '<span class="tile-delta" style="opacity:0.6">PROXY</span>'
         cycle_sub = regime.note
@@ -1837,7 +1843,7 @@ def render_status():
 
     yc_label = (
         "POSITIVE" if regime.yield_curve_positive
-        else ("INVERTED" if regime.yield_curve_positive is False else "—")
+        else ("INVERTED" if regime.yield_curve_positive is False else "-")
     )
 
     session_row = session_range_tile(ohlcv.get(BENCH["US"]), BENCH["US"])
@@ -1867,7 +1873,7 @@ def render_status():
             <span class="dot" style="background:{risk_dot}"></span>
             {risk_label}
           </div>
-          <div class="tile-sub">{sub_risk} · curve {yc_label.lower()}</div>
+          <div class="tile-sub">{sub_risk} | curve {yc_label.lower()}</div>
         </div>
 
         <div class="tile">
@@ -1889,7 +1895,7 @@ def render_status():
             <span class="dot" style="background:var(--amber)"></span>
             {n_warn}
           </div>
-          <div class="tile-sub">{bluf['exits_count']} exit · {bluf['warns_count']} warn</div>
+          <div class="tile-sub">{bluf['exits_count']} exit | {bluf['warns_count']} warn</div>
         </div>
 
         {session_tile_html}
@@ -1909,7 +1915,7 @@ def render_alerts():
     rows = ""
     for r in transitions[:8]:
         new_state = r.get("to", "")
-        from_state = r.get("from", "—")
+        from_state = r.get("from", "-")
         dot_color = color_for_state(new_state)
         when = r.get("date", "")
         ticker = str(r.get("ticker", "")).upper()
@@ -1922,11 +1928,11 @@ def render_alerts():
           <span class="transition-badge {sentiment_class}"><span>{sentiment_symbol}</span>{sentiment_label}</span>
           <span class="change">
             <span class="from">{from_state.replace('_', ' ')}</span>
-            <span class="arrow">→</span>
+            <span class="arrow">-></span>
             <span class="to">{new_state.replace('_', ' ')}</span>
           </span>
           <span class="when">{when}</span>
-          <span class="chev">›</span>
+          <span class="chev">></span>
         </div>
         """
     if not rows:
@@ -2014,8 +2020,8 @@ def render_picks():
         f = p["F_score"]
         grade = _grade_letter(s)
         mom = (p["mom_12_1"] or 0) * 100
-        stage = p.get("stage") or "—"
-        quad = (p.get("rrg_quadrant") or "—").upper()
+        stage = p.get("stage") or "-"
+        quad = (p.get("rrg_quadrant") or "-").upper()
         klass_lbl = p["class"]
         spark_color = "#26d65b" if mom >= 0 else "#ef4f4a"
         spark = svg_sparkline(
@@ -2169,7 +2175,7 @@ def render_drill():
     head_html = f"""
     <section class="section" id="drill">
       <div class="section-head">
-        <h2>Per-ticker drill-down <span class="count">{sel} · {row['class']}</span></h2>
+        <h2>Per-ticker drill-down <span class="count">{sel} | {row['class']}</span></h2>
         <div class="right">{state.replace('_', ' ')}</div>
       </div>
       <div class="drill">
@@ -2185,15 +2191,15 @@ def render_drill():
           <div class="tile">
             <div class="tile-label"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_drill_flow'])}">Flow score</span></div>
             <div class="tile-value {'up' if row['F_score'] >= 0 else 'down'}">{row['F_score']:+.3f}</div>
-            <div class="tile-sub">{'VETO' if row.get('veto') else 'OK'} · CMF {row.get('cmf21', 0) or 0:+.2f}</div>
-            <div class="tile-help">Institutional money flow z-score: CMF + OBV slope + ETF creations + block ratio + RVOL + short-interest delta. <b>F &gt; 0 = real money entering</b>; F &lt; -0.5&sigma; kills the trade.</div>
+            <div class="tile-sub">{'VETO' if row.get('veto') else 'OK'} | CMF {row.get('cmf21', 0) or 0:+.2f}</div>
+            <div class="tile-help">Money flow z-score: CMF + OBV slope + ETF creations + block ratio + RVOL + short-interest delta when available. <b>F &gt; 0 = supportive flow evidence</b>; F &lt; -0.5&sigma; triggers a model veto.</div>
           </div>
 
           <div class="tile">
             <div class="tile-label"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_drill_state'])}">State</span></div>
             <div class="tile-value" style="color:{color};font-size:1.1rem;">{state.replace('_', ' ')}</div>
-            <div class="tile-sub">Stage {row.get('stage', '—')} · {(row.get('rrg_quadrant') or '—').upper()}</div>
-            <div class="tile-help">State machine output. <b>STAGE 2 BULLISH</b> = active buy. <b>HOLD</b> = position safe. <b>WARNING</b> = tighten stops. <b>EXIT / BEARISH</b> = sell now or short. Hover the pill for the full gate definition.</div>
+            <div class="tile-sub">Stage {row.get('stage', '-')} | {(row.get('rrg_quadrant') or '-').upper()}</div>
+            <div class="tile-help">State machine output. <b>STAGE 2 BULLISH</b> = strongest bullish evidence. <b>HOLD</b> = acceptable trend evidence. <b>WARNING</b> = deterioration evidence. <b>EXIT / BEARISH</b> = major risk gates failed. Hover the pill for the full gate definition.</div>
           </div>
 
           <div class="tile">
@@ -2219,10 +2225,10 @@ def render_drill():
     with c2:
         st.plotly_chart(cmf_chart(ohlcv[sel], sel, visible_since=visible_since),
                         width="stretch", config={"displayModeBar": False})
-        _md('<div class="chart-help"><b>Chaikin Money Flow (21d) — volume-weighted accumulation/distribution.</b> Above <span style="color:var(--green)">+0.10</span> = strong accumulation (institutional buying). Below <span style="color:var(--red)">-0.10</span> = strong distribution. Sustained negative CMF during a Stage-2 advance is an early Stage-3 topping warning.</div>')
+        _md('<div class="chart-help"><b>Chaikin Money Flow (21d) - volume-weighted accumulation/distribution.</b> Above <span style="color:var(--green)">+0.10</span> = strong accumulation (institutional buying). Below <span style="color:var(--red)">-0.10</span> = strong distribution. Sustained negative CMF during a Stage-2 advance is an early Stage-3 topping warning.</div>')
     st.plotly_chart(obv_chart(ohlcv[sel], sel, visible_since=visible_since),
                     width="stretch", config={"displayModeBar": False})
-    _md('<div class="chart-help"><b>Price vs OBV — bearish divergence detector.</b> When price (left axis) makes a new high but OBV (right axis) does <b>not</b>, institutional money isn\'t following the rally. One of the cleanest pre-breakdown signals. Bullish divergence (OBV new high, price not) often marks Stage-1 accumulation bottoms.</div>')
+    _md('<div class="chart-help"><b>Price vs OBV - bearish divergence detector.</b> When price (left axis) makes a new high but OBV (right axis) does <b>not</b>, institutional money isn\'t following the rally. One of the cleanest pre-breakdown signals. Bullish divergence (OBV new high, price not) often marks Stage-1 accumulation bottoms.</div>')
 
 
 def render_comparison_view():
@@ -2299,7 +2305,7 @@ def _full_table_sort_header(label: str, field: str, active_field: str, active_di
 def render_full_table():
     toggle_col, field_col, direction_col, status_col = st.columns([2, 3, 2, 3])
     with toggle_col:
-        if st.button(("▾ HIDE" if st.session_state.table_open else "▸ SHOW") + "  FULL 7-PILLAR MATRIX",
+        if st.button(("HIDE" if st.session_state.table_open else "SHOW") + " FULL 7-PILLAR MATRIX",
                      key="table_toggle"):
             st.session_state.table_open = not st.session_state.table_open
             st.rerun()
@@ -2349,7 +2355,7 @@ def render_full_table():
     # 3. stage == 2 (Weinstein)
     # 4. antonacci == 1
     # 5. rrg_quadrant in {Leading, Improving}
-    # 6. (cycle tilt — derive from class match, approximate)  → just use breadth > 50%
+    # 6. (cycle tilt - derive from class match, approximate) just use breadth > 50%
     # 7. F_score > 0 (institutional flow)
 
     for tkr, r in scored_sorted.iterrows():
@@ -2369,7 +2375,7 @@ def render_full_table():
         preview_html = table_row_rrg_preview_html(tkr, r)
 
         p_tds = "".join(
-            f'<td class="num"><span class="dot {"ok" if ok else "bad"}">{"●" if ok else "○"}</span></td>'
+            f'<td class="num"><span class="dot {"ok" if ok else "bad"}">{"Y" if ok else "N"}</span></td>'
             for ok in pillars
         )
 
@@ -3494,8 +3500,8 @@ def render_footer():
     flow_status_label = "NEUTRAL" if provider_flow_feeds_stubbed() else "LIVE"
     html = f"""
     <div class="footer">
-      <span>{len(scored)} INSTRUMENTS · 7 PILLARS · PROVIDER FLOW {flow_status_label} · DATA CACHE 60min</span>
-      <span>{APP_VERSION} · {st.session_state.theme.upper()}</span>
+      <span>{len(scored)} INSTRUMENTS | 7 PILLARS | PROVIDER FLOW {flow_status_label} | DATA CACHE 60min</span>
+      <span>{APP_VERSION} | {st.session_state.theme.upper()}</span>
     </div>
     </div>
     """  # closes <div class="app">
@@ -3511,6 +3517,7 @@ def _render_timed(section_name: str, render_fn):
 
 _render_timed("render_header", render_header)
 _render_timed("render_header_controls", render_header_controls)
+_render_timed("render_drill_click_bridge", render_drill_click_bridge)
 _render_timed("render_view_preferences", render_view_preferences)
 _render_timed("render_explainer", render_explainer)
 _render_timed("render_component_docs", render_component_docs)

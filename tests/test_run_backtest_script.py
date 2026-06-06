@@ -218,6 +218,8 @@ def test_build_calibration_baseline_artifacts_summarizes_directional_metrics(mon
     assert candidate_config["selected_candidate_id"] == "positive_score_ge_0_8"
     assert candidate_config["final_holdout_evaluated"] is False
     assert candidate_config["live_promotion_allowed"] is False
+    assert candidate_config["guardrail"]["status"] == "pass_display_only"
+    assert candidate_config["guardrail"]["live_promotion_allowed"] is False
 
 
 def test_build_expanded_calibration_artifacts_uses_fixed_split_and_research_only_metadata(monkeypatch):
@@ -296,6 +298,8 @@ def test_build_expanded_calibration_artifacts_uses_fixed_split_and_research_only
     assert metadata["ticket"] == "B-164"
     assert metadata["research_only"] is True
     assert metadata["live_promotion_allowed"] is False
+    assert metadata["sector_override_guardrail"]["status"] == "pass_no_overrides"
+    assert metadata["sector_override_guardrail"]["live_promotion_allowed"] is False
     assert metadata["candidate_rows"] == 1
     assert metadata["sector_override_rows"] == len(overrides)
 
