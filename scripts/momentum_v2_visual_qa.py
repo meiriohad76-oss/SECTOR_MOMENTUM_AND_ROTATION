@@ -274,6 +274,12 @@ def main() -> int:
     parser.add_argument("--static-fixture", action="store_true", help="Capture deterministic static Momentum v2 HTML instead of a live Streamlit URL")
     parser.add_argument("--display", action="append", choices=["A", "B", "C"], help="Repeatable; defaults to all")
     parser.add_argument("--screen", action="append", choices=["overview", "deepdive", "rotation"], help="Repeatable; defaults to all")
+    parser.add_argument(
+        "--min-similarity",
+        type=float,
+        default=None,
+        help="Optional release gate. Exit non-zero if any compared screen is below this 0..1 similarity.",
+    )
     args = parser.parse_args()
 
     displays = args.display or ["A", "B", "C"]
@@ -288,6 +294,31 @@ def main() -> int:
     report_path = Path(args.output_dir) / "report.json"
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps({"screens": len(report), "report": str(report_path)}, indent=2))
+    if args.min_similarity is not None:
+        failures = [
+            row
+            for row in report
+            if row.get("reference_exists") and row.get("similarity", 0.0) < args.min_similarity
+        ]
+        if failures:
+            print(
+                json.dumps(
+                    {
+                        "min_similarity": args.min_similarity,
+                        "failures": [
+                            {
+                                "display": row["display"],
+                                "screen": row["screen"],
+                                "similarity": row.get("similarity"),
+                            }
+                            for row in failures
+                        ],
+                    },
+                    indent=2,
+                ),
+                file=sys.stderr,
+            )
+            return 1
     return 0
 
 

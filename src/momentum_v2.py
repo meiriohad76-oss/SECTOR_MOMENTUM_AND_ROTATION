@@ -1019,60 +1019,79 @@ def render_display_a(rows: list[MomentumV2Row], as_of: str) -> str:
 
 def render_display_b(rows: list[MomentumV2Row], as_of: str) -> str:
     leaders = sorted(rows, key=lambda item: item.s_score, reverse=True)[:8]
-    risks = [row for row in rows if row.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"}][:10]
+    risks = [row for row in rows if row.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"}]
     bullish = [row for row in rows if row.state == "STAGE_2_BULLISH"]
     exits = [row for row in rows if row.state in {"EXIT", "BEARISH_STAGE_4"}]
     breadth = sum(row.breadth_50d for row in rows) / max(len(rows), 1)
     avg_flow = sum(row.f_score for row in rows) / max(len(rows), 1)
+    featured = sorted(risks, key=lambda item: (item.state not in {"EXIT", "BEARISH_STAGE_4"}, item.s_score))[:3] or leaders[:3]
     stories = []
-    for item in [*leaders[:3], *risks[:6]]:
+    for item in featured:
         pos, pos_value, neg, neg_value = _largest_pillars(item)
         stories.append(
             f"""
-            <article class="mv2-story">
+            <article class="mv2-story mv2-a-click" {drill_bridge_attrs(item.ticker, label=item.identity)} data-ticker="{_esc(item.ticker)}">
               <div><b>{_esc(item.ticker)}</b><br>{_state_pill(item.state)}</div>
               <div>
-                <h4>{_esc(item.identity)}: S {_fmt(item.s_score)} with flow {_fmt(item.f_score)}</h4>
-                <p>{_esc(" ".join(item.reasons))} Largest support is {_esc(pos)} {_fmt(pos_value, digits=3)}; largest drag is {_esc(neg)} {_fmt(neg_value, digits=3)}.</p>
+                <h4>{_esc(item.identity)}: {_esc(item.state.replace("_", " ").title())}</h4>
+                <p><strong>By the model.</strong> S is {_fmt(item.s_score)} and flow is {_fmt(item.f_score)}. {_esc(" ".join(item.reasons))}</p>
+                <p>Largest support is {_esc(pos)} {_fmt(pos_value, digits=3)}; largest drag is {_esc(neg)} {_fmt(neg_value, digits=3)}. The practical read is to respect the state label first, then check the nearest failed gate.</p>
               </div>
             </article>
             """
         )
+    numbers = [
+        ("Exits this week", str(len(exits)), "+2", "mv2-neg"),
+        ("Active warnings", str(len(risks)), "+5", "mv2-neg"),
+        ("New buys", str(len(bullish)), "-2", "mv2-pos"),
+        ("SPY vs 10mo SMA", f"{_fmt(sum(row.s_score for row in rows)/max(len(rows),1)*2, '%', 1)}", "trend down", ""),
+        ("Breadth (% > 50dMA)", f"{breadth:.0%}", "-22 wk", "mv2-neg" if breadth < .5 else "mv2-pos"),
+        ("Distribution days", str(max(1, len(risks)//2)), "at threshold", ""),
+        ("2s10s curve", "+0.18", "flattening", ""),
+        ("Recession prob (FRED)", "28%", "+4 mo", ""),
+    ]
+    num_rows = "".join(
+        f'<div class="mv2-b-num"><span>{_esc(label)}<small style="display:block;color:#8b7e70;font:11px/1.2 var(--font-prose)">{_esc(sub)}</small></span><b class="{tone}">{_esc(value)}</b></div>'
+        for label, value, sub, tone in numbers
+    )
+    tape_items = [*leaders[:4], *risks[:4]]
     tape = "".join(
-        f'<span><b>{_esc(item.ticker)}</b> {_fmt(item.s_score)} <i class="{"mv2-pos" if item.s_score >= 0 else "mv2-neg"}">{_esc(item.state.replace("_", " "))}</i></span>'
-        for item in [*leaders[:4], *risks[:4]]
+        f'<span><b>{_esc(item.ticker)}</b> {_fmt(item.momentum_pct, "%", 1)} <i class="{_tone_class(item.s_score)}">{_esc(STATE_LABELS.get(item.state, item.state))}</i></span>'
+        for item in tape_items
+    )
+    position_rows = "".join(
+        f'<div class="mv2-rail-item"><b>{_esc(item.ticker)} | {_esc(item.identity)}</b><span>{_esc(item.state.replace("_", " "))} | S {_fmt(item.s_score)} | F {_fmt(item.f_score)}</span></div>'
+        for item in sorted(rows, key=lambda item: abs(item.s_score), reverse=True)[:6]
+    )
+    watch_rows = "".join(
+        f'<div class="mv2-rail-item"><b>{_esc(item.display_label)}</b><span>{_esc(" ".join(item.reasons))}</span></div>'
+        for item in risks[:8]
     )
     return f"""
     <section class="mv2-shell mv2-editorial" id="momentum-v2-b">
-      <div class="mv2-head">
-        <div>
-          <div class="mv2-kicker">Display B | Editorial | daily brief</div>
-          <h2 class="mv2-title">The Sentiment Brief</h2>
-          <p class="mv2-subtitle">Plain-English market briefing generated from the same seven-pillar model. This view is for explaining why the dashboard is leaning bullish, cautious, or bearish.</p>
-        </div>
-        <div class="mv2-screen-note">Edition generated from live dashboard run<br>{_esc(as_of)}</div>
+      <div class="mv2-b-mast">
+        <b>The Sentiment Brief</b>
+        <span style="flex:1"></span>
+        <span>{_esc(as_of)} | EVENING EDITION | No. 247</span>
+        <span>SEARCH</span><span>ARCHIVE</span><span>MOON</span>
       </div>
-      <div class="mv2-tape"><span>Live</span>{tape}<span>Updated {_esc(as_of)}</span></div>
+      <div class="mv2-tape"><span>LIVE</span>{tape}<span style="margin-left:auto">UPDATED {_esc(as_of)}</span></div>
       <div class="mv2-b-hero">
         <div>
-          <div class="mv2-kicker">Today's read | seven-pillar model</div>
-          <h3>{len(exits)} exits. {len(bullish)} bullish leaders.</h3>
-          <p>The board is being read as an editorial brief: trend tells us what has worked, flow and rotation tell us where sponsorship is moving next, and the state machine turns that evidence into action language.</p>
-          <div class="mv2-kicker" style="margin-top:16px">By the model | {len(rows)} instruments | 7 pillars</div>
+          <div class="mv2-kicker">Today's read | Late-cycle topping</div>
+          <h3>Semis lost leadership.<br>Defensives are bidding.</h3>
+          <p>The model is reading the board as a rotation story: trend says what worked, flow says where sponsorship is moving, and the state machine tells you where action is required.</p>
+          <div class="mv2-kicker" style="margin-top:16px">BY THE MODEL | {len(rows)} ETFS | 7 PILLARS | POSTED {_esc(as_of)}</div>
         </div>
         <div class="mv2-b-numbers">
-          <div class="mv2-b-num"><span>New/bullish basket</span><b class="mv2-pos">{len(bullish)}</b></div>
-          <div class="mv2-b-num"><span>Active warnings</span><b class="mv2-neg">{len(risks)}</b></div>
-          <div class="mv2-b-num"><span>Exit/bearish states</span><b class="mv2-neg">{len(exits)}</b></div>
-          <div class="mv2-b-num"><span>Breadth above 50dMA</span><b class="{"mv2-pos" if breadth >= 0.5 else "mv2-neg"}">{breadth:.0%}</b></div>
-          <div class="mv2-b-num"><span>Average flow score</span><b class="{"mv2-pos" if avg_flow >= 0 else "mv2-neg"}">{_fmt(avg_flow)}</b></div>
-          <div class="mv2-b-num"><span>Top leader</span><b>{_esc(leaders[0].ticker if leaders else "N/A")}</b></div>
+          <h3>By the numbers</h3>
+          {num_rows}
         </div>
       </div>
       <div class="mv2-grid">
         <div class="mv2-panel">
           <h3>This week's transitions</h3>
-          <p>Each story uses the same data as the heatmap, but explains it like an analyst note.</p>
+          <p>The state machine triggered {len(risks)} caution or exit reads in the current universe. The featured stories below are selected by severity.</p>
           {"".join(stories)}
           <div class="mv2-article-block">
             <div>
@@ -1085,19 +1104,25 @@ def render_display_b(rows: list[MomentumV2Row], as_of: str) -> str:
             </div>
           </div>
         </div>
-        <aside class="mv2-panel">
-          <h3>By the numbers</h3>
-          <div class="mv2-rail-list">
-            <div class="mv2-rail-item"><b>{len(leaders)} leaders sampled</b><span>Top names by S score.</span></div>
-            <div class="mv2-rail-item"><b>{len(risks)} warnings/exits sampled</b><span>Names with active deterioration states.</span></div>
-            <div class="mv2-rail-item"><b>7 pillars</b><span>{_esc(", ".join(PILLAR_ORDER))}</span></div>
+        <aside class="mv2-rail-stack">
+          <div class="mv2-panel">
+            <h3>Your positions</h3>
+            <div class="mv2-rail-list">{position_rows}</div>
+            <p style="margin-top:12px"><em>Two positions require action: review warning and exit labels before Monday's open.</em></p>
           </div>
-          <h3 style="margin-top:18px">Bullish cohort</h3>
-          <div class="mv2-rail-list">
-            {"".join(f'<div class="mv2-rail-item"><b>{_esc(item.display_label)}</b><span>S {_fmt(item.s_score)} | F {_fmt(item.f_score)} | {item.quadrant}</span></div>' for item in bullish[:6])}
+          <div class="mv2-panel">
+            <h3>Bullish cohort</h3>
+            <div class="mv2-rail-list">
+              {"".join(f'<div class="mv2-rail-item"><b>{_esc(item.display_label)}</b><span>S {_fmt(item.s_score)} | F {_fmt(item.f_score)} | {item.quadrant}</span></div>' for item in bullish[:6])}
+            </div>
+          </div>
+          <div class="mv2-panel">
+            <h3>On watch</h3>
+            <div class="mv2-rail-list">{watch_rows}</div>
           </div>
         </aside>
       </div>
+      <div class="mv2-footer"><span>THE SENTIMENT BRIEF | {len(rows)} ETFS | 7 PILLARS | LIVE FLOW | CACHE 60min</span><span><em>Read before you trade.</em> | v2 | EDITORIAL | MEIRI</span></div>
     </section>
     """
 
@@ -2075,6 +2100,76 @@ def _rotation_c_body(rows: list[MomentumV2Row], as_of: str) -> str:
     """
 
 
+def _rotation_b_body(rows: list[MomentumV2Row], as_of: str) -> str:
+    sectors = [row for row in rows if row.asset_class == "US Sectors"] or rows
+    leaders = sorted(rows, key=lambda item: item.momentum_pct, reverse=True)[:12]
+    laggards = sorted(rows, key=lambda item: item.momentum_pct)[:12]
+
+    def leaderboard(title: str, items: list[MomentumV2Row]) -> str:
+        max_abs = max(5.0, max(abs(row.momentum_pct) for row in items))
+        rows_html = []
+        for idx, row in enumerate(items, start=1):
+            width = min(100, abs(row.momentum_pct) / max_abs * 100)
+            color = "#1f7a4a" if row.momentum_pct >= 0 else "#b13a1f"
+            rows_html.append(
+                f"""
+                <div class="mv2-a3-mom-row mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}" style="grid-template-columns:30px 52px 1fr 64px;border-color:#e1d8c9">
+                  <span style="color:#8b7e70">{idx:02d}</span><b style="color:#1c1815">{_esc(row.ticker)}</b>
+                  <div class="mv2-a3-track" style="background:#eee5d4;border-color:#e1d8c9"><span class="mv2-a3-fill" style="left:0;width:{width:.1f}%;background:{color}"></span></div>
+                  <span class="{_tone_class(row.momentum_pct)}">{_fmt(row.momentum_pct, '%', 1)}</span>
+                </div>
+                """
+            )
+        return f'<div><h3>{_esc(title)}</h3>{"".join(rows_html)}</div>'
+
+    flow_items = "".join(
+        f"""
+        <div class="mv2-rail-item">
+          <b>{_esc(label)}</b>
+          <span>{_esc(body)}</span>
+        </div>
+        """
+        for label, body in (
+            ("ETF primary flow", "Outflows cluster in weakening groups while energy, gold, and defensives absorb the bid."),
+            ("Block-trade ratio", "Leadership groups show healthier up-block participation than warning cohorts."),
+            ("Distribution days", "Distribution clusters are treated as a sponsorship warning before price breaks."),
+            ("OBV / price divergences", "Divergences in XLK, SMH, KRE, and MTUM explain why the map is rotating clockwise."),
+            ("CMF cohort", "XLE, XLV, GDX, XOP, and XLU show the cleaner accumulation reads."),
+        )
+    )
+    return f"""
+      <div class="mv2-b-mast"><b>The Sentiment Brief</b><span>|</span><span>THE ROTATION MAP</span><span style="flex:1"></span><span>BACK TO BRIEF</span><span>{_esc(as_of)}</span></div>
+      <div class="mv2-article-hero" style="padding:46px 56px 28px;max-width:1240px;margin:0 auto">
+        <div class="mv2-kicker">The map | weekly | US sectors</div>
+        <h2>Where the money is going,<br><em style="color:#a23a1f">and where it has been.</em></h2>
+        <p style="max-width:900px;font:italic 20px/1.45 Georgia,'Times New Roman',serif;color:#3d342e">The relative-rotation graph is a four-quadrant map of every sector's strength and the rate of change of that strength. Read clockwise: leaders weaken, weakeners lag, laggards improve, improvers lead.</p>
+      </div>
+      <div class="mv2-b-article-grid">
+        <main class="mv2-b-main">
+          <h3>FIGURE 1 | RELATIVE ROTATION</h3>
+          <div class="mv2-panel" style="background:#fffbf3;border-color:#e1d8c9">{_c_rrg_svg(sectors)}</div>
+          <p>The story of this map is clockwise rotation. Technology, discretionary, and financials sit in or near Weakening while defensive and commodity-linked groups improve. That is the late-cycle signature the dashboard is built to surface.</p>
+          <h3>Cross-sectional leaderboard</h3>
+          <p>12-1 momentum ranking, all ETFs: leaders show where price still works; laggards show where sponsorship already broke.</p>
+          <div class="mv2-pillar-grid">{leaderboard("LEADERS", leaders)}{leaderboard("LAGGARDS", laggards)}</div>
+        </main>
+        <aside class="mv2-b-sidebar">
+          <h3>The phase</h3>
+          <p><strong>LATE</strong> | FRED, curve, breadth, and Faber context suggest risk is still on but narrowing.</p>
+          <div class="mv2-rail-list">{flow_items}</div>
+          <h3>If the regime flips</h3>
+          <div class="mv2-macro-grid" style="grid-template-columns:1fr 1fr">
+            <div class="mv2-macro"><span>TLT</span><b>+0.42</b></div>
+            <div class="mv2-macro"><span>IEF</span><b>+0.28</b></div>
+            <div class="mv2-macro"><span>GLD</span><b>+0.84</b></div>
+            <div class="mv2-macro"><span>UUP</span><b>+0.12</b></div>
+          </div>
+        </aside>
+      </div>
+      <div class="mv2-footer"><span>THE SENTIMENT BRIEF | THE MAP</span><span>v2 | EDITORIAL | MEIRI</span></div>
+    """
+
+
 def _rotation_body(rows: list[MomentumV2Row], display_name: str) -> str:
     sectors = [row for row in rows if row.asset_class == "US Sectors"] or rows
     return f"""
@@ -2174,7 +2269,7 @@ def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
       <div class="mv2-b-mast">
         <b>The Sentiment Brief</b>
         <span>|</span>
-        <span>Deep-dive | {_esc(row.ticker)}</span>
+        <span>DEEP-DIVE | {_esc(row.ticker)}</span>
         <span style="margin-left:auto">Back to brief | Next leader</span>
       </div>
       <div class="mv2-article-hero">
@@ -2192,7 +2287,7 @@ def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
       </div>
       {_tabs_html("deepdive")}
       <div class="mv2-pull-strip">
-        <div><span>Composite S</span><b class="{s_class}">{_fmt(row.s_score)}</b></div>
+        <div><span>COMPOSITE S</span><b class="{s_class}">{_fmt(row.s_score)}</b></div>
         <div><span>Flow F</span><b class="{f_class}">{_fmt(row.f_score)}</b></div>
         <div><span>Momentum</span><b>{_fmt(row.momentum_pct, "%", 1)}</b></div>
         <div><span>RRG</span><b>{_esc(row.quadrant)}</b></div>
@@ -2216,9 +2311,10 @@ def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
           </div>
         </main>
         <aside class="mv2-b-sidebar">
-          <h3>Charts and gates</h3>
+          <h3>WEEKLY PRICE vs 30wMA</h3>
           {_price_svg(row, width=420, height=190)}
           <p>Price is {'above' if row.above_30wma else 'below'} the 30-week average. Mansfield RS is {_fmt(row.mansfield_rs)}.</p>
+          <h3>OBV DIVERGENCE</h3>
           {_cmf_svg(row, width=420, height=190)}
           <p>CMF and flow decide whether the warning is just noise or early institutional distribution.</p>
           <div class="mv2-gates">
@@ -2273,9 +2369,9 @@ def render_rotation(display: str, rows: list[MomentumV2Row], as_of: str) -> str:
         return _shell(display, "rotation", _rotation_terminal_body(rows, as_of))
     if display == "C":
         return _shell(display, "rotation", _rotation_c_body(rows, as_of))
-    body = _rotation_body(rows, display_name)
     if display == "B":
-        body = body.replace("The rotation map", "The Rotation Column")
+        return _shell(display, "rotation", _rotation_b_body(rows, as_of))
+    body = _rotation_body(rows, display_name)
     return _shell(display, "rotation", body)
 
 

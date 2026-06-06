@@ -204,13 +204,56 @@ def test_display_c_overview_deepdive_rotation_inventory_is_present():
     assert "Flow river from outflows to inflows" in rotation
 
 
+def test_display_b_overview_deepdive_rotation_inventory_is_present():
+    rows = build_view_rows(_sample_scored(), phase="MID")
+
+    overview = render_display("B", rows, "2026-06-06 16:00 ET")
+    deepdive = render_display("B", rows, "2026-06-06 16:00 ET", screen="deepdive", focus_ticker="XLK")
+    rotation = render_display("B", rows, "2026-06-06 16:00 ET", screen="rotation")
+
+    for marker in (
+        "The Sentiment Brief",
+        "LIVE",
+        "Semis lost leadership.",
+        "Defensives are bidding.",
+        "By the numbers",
+        "This week's transitions",
+        "Your positions",
+        "Bullish cohort",
+        "On watch",
+        "Read before you trade.",
+    ):
+        assert marker in overview
+
+    for marker in (
+        "DEEP-DIVE",
+        "price says fine",
+        "COMPOSITE S",
+        "The seven pillars, explained",
+        "Exit trigger table",
+        "WEEKLY PRICE vs 30wMA",
+    ):
+        assert marker in deepdive
+
+    for marker in (
+        "THE ROTATION MAP",
+        "Where the money is going",
+        "FIGURE 1 | RELATIVE ROTATION",
+        "Cross-sectional leaderboard",
+        "The phase",
+        "If the regime flips",
+        "THE SENTIMENT BRIEF | THE MAP",
+    ):
+        assert marker in rotation
+
+
 def test_render_display_supports_all_three_screens_for_each_display():
     rows = build_view_rows(_sample_scored(), phase="MID")
 
     for display in DISPLAY_LABELS:
         for screen, marker in {
             "overview": {"A": "Overview", "B": "Overview", "C": "Heatmap"}[display],
-            "rotation": {"A": "ROTATION MAP", "B": "Flow river", "C": "Flow river"}[display],
+            "rotation": {"A": "ROTATION MAP", "B": "THE ROTATION MAP", "C": "Flow river"}[display],
             "deepdive": {"A": "COMPOSITE FORWARD OUTLOOK", "B": "article", "C": "The composite, built pillar by pillar"}[display],
         }.items():
             html = render_display(

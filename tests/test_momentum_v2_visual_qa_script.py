@@ -21,3 +21,21 @@ def test_visual_qa_static_html_contains_mv2_shell():
     assert "mv2-shell" in html
     assert "momentum-v2-c-deepdive" in html
     assert "waterfall" in html
+
+
+def test_visual_qa_cli_exposes_similarity_release_gate():
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/momentum_v2_visual_qa.py",
+            "--help",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "--min-similarity" in result.stdout
