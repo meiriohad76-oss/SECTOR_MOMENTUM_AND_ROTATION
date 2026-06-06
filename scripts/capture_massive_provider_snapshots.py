@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import date, timedelta
+import os
 from pathlib import Path
 import sys
 
@@ -11,14 +12,47 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src import flow
+from src.config_resolver import resolve_config_value
 from src.provider_snapshots import DEFAULT_SNAPSHOT_DB_PATH, upsert_provider_snapshot
+from src.universe import ALL_TICKERS, SCORED_TICKERS, US_SECTORS
+
+
+UNIVERSE_CHOICES = ("us-sectors", "scored", "dashboard", "all")
+
+
+def _tickers_for_universe(name: str) -> list[str]:
+    normalized = str(name).strip().lower()
+    if normalized == "us-sectors":
+        return list(US_SECTORS)
+    if normalized in {"scored", "dashboard"}:
+        return list(SCORED_TICKERS)
+    if normalized == "all":
+        return list(ALL_TICKERS)
+    raise ValueError(f"unknown universe: {name}")
+
+
+def _bootstrap_massive_secret() -> bool:
+    token = resolve_config_value("MASSIVE_API_KEY", root=ROOT)
+    if token:
+        os.environ.setdefault("MASSIVE_API_KEY", token)
+    return bool(os.environ.get("MASSIVE_API_KEY"))
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Capture Massive provider snapshots for later historical as-of replay."
     )
-    parser.add_argument("--ticker", action="append", required=True, help="Ticker to capture. Repeat per ticker.")
+    parser.add_argument("--ticker", action="append", default=[], help="Ticker to capture. Repeat per ticker.")
+    parser.add_argument(
+        "--universe",
+        action="append",
+        choices=UNIVERSE_CHOICES,
+        default=[],
+        help=(
+            "Ticker universe to capture. Repeatable. "
+            "Use 'scored' or 'dashboard' for the dashboard matrix, 'all' to include benchmarks."
+        ),
+    )
     parser.add_argument(
         "--as-of",
         default=date.today().isoformat(),
@@ -85,8 +119,14 @@ def _snapshot_payload(
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv or [])
     tickers = [str(ticker).strip().upper() for ticker in args.ticker if str(ticker).strip()]
+    for universe_name in args.universe:
+        tickers.extend(_tickers_for_universe(universe_name))
+    tickers = list(dict.fromkeys(tickers))
     if not tickers:
-        print("No tickers were provided.")
+        print("No tickers were provided. Use --ticker or --universe.")
+        return 2
+    if not _bootstrap_massive_secret():
+        print("Massive provider snapshot capture skipped: MASSIVE_API_KEY is not configured.")
         return 2
     try:
         for ticker in tickers:

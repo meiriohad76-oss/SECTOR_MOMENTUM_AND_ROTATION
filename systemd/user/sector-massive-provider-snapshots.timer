@@ -1,0 +1,12 @@
+# Sector Rotation Massive Provider Snapshots - weekday post-market user timer
+
+[Unit]
+Description=Capture Massive provider snapshots after US market close
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 18:45:00 America/New_York
+Persistent=true
+Unit=sector-massive-provider-snapshots.service
+
+[Install]
+WantedBy=timers.target

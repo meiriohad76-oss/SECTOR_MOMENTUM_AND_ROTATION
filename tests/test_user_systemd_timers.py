@@ -36,11 +36,28 @@ def test_user_transition_feed_timer_publishes_static_feed_copies():
     assert "systemctl --user enable --now sector-transition-feeds.timer" in deploy_docs
 
 
+def test_user_massive_provider_snapshot_timer_runs_without_sudo_after_market_close():
+    service = _read_unit("sector-massive-provider-snapshots.service")
+    timer = _read_unit("sector-massive-provider-snapshots.timer")
+    deploy_docs = (ROOT / "docs" / "DEPLOY_RASPBERRY_PI.md").read_text(encoding="utf-8")
+    backlog = (ROOT / "docs" / "BACKLOG.md").read_text(encoding="utf-8")
+
+    assert "WorkingDirectory=%h/SECTOR_MOMENTUM_AND_ROTATION" in service
+    assert "scripts/capture_massive_provider_snapshots.py --universe scored" in service
+    assert "--limit 5000" in service
+    assert "User=" not in service
+    assert "OnCalendar=Mon..Fri *-*-* 18:45:00 America/New_York" in timer
+    assert "Persistent=true" in timer
+    assert "systemctl --user enable --now sector-massive-provider-snapshots.timer" in deploy_docs
+    assert "systemd/user/sector-massive-provider-snapshots.service" in backlog
+
+
 def test_backlog_references_non_sudo_user_timers():
     backlog = (ROOT / "docs" / "BACKLOG.md").read_text(encoding="utf-8")
 
     assert "systemd/user/sector-email-digest.service" in backlog
     assert "systemd/user/sector-transition-feeds.service" in backlog
+    assert "systemd/user/sector-massive-provider-snapshots.service" in backlog
     assert "non-sudo user timer" in backlog
 
 

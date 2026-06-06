@@ -249,6 +249,48 @@ systemctl --user list-timers sector-transition-feeds.timer
 
 The transition-feed timer exports every 15 minutes into `data/feeds/` and `public/feeds/`. Public validation is complete only when the external route serves RSS XML from `/feeds/transitions.rss` and iCal text from `/feeds/transitions.ics`.
 
+## Optional: schedule Massive provider snapshots
+
+B-161 can persist Massive `/v3/trades` provider snapshots into
+`data/provider_snapshots/provider_snapshots.sqlite` for later as-of replay,
+calibration, and provider-flow backtesting. The script is storage-only: it does
+not change live scoring, vetoes, alerts, or recommendations.
+
+Run a manual capture after `MASSIVE_API_KEY` is configured in
+`.streamlit/secrets.toml`:
+
+```bash
+cd ~/SECTOR_MOMENTUM_AND_ROTATION
+./.venv/bin/python scripts/capture_massive_provider_snapshots.py \
+  --universe scored \
+  --limit 5000 \
+  --timeout 20
+```
+
+The `scored` universe captures the dashboard matrix and defensive instruments.
+Use repeated `--ticker XLK` arguments for a narrow smoke test, or `--universe
+all` if you also want benchmark tickers.
+
+Install the post-market user timer without sudo:
+
+```bash
+cd ~/SECTOR_MOMENTUM_AND_ROTATION
+mkdir -p ~/.config/systemd/user
+cp systemd/user/sector-massive-provider-snapshots.service ~/.config/systemd/user/
+cp systemd/user/sector-massive-provider-snapshots.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now sector-massive-provider-snapshots.timer
+systemctl --user list-timers sector-massive-provider-snapshots.timer
+```
+
+The timer runs Monday-Friday at `18:45 America/New_York`, after the regular US
+market close. Verify storage health with:
+
+```bash
+sqlite3 data/provider_snapshots/provider_snapshots.sqlite \
+  "pragma integrity_check; select count(*) from provider_snapshots;"
+```
+
 ## Resource notes
 
 On a Pi 4 with 4 GB RAM and the full 67-ticker universe:

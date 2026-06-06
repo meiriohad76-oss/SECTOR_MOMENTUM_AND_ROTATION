@@ -1,0 +1,19 @@
+# Sector Rotation Massive Provider Snapshots - user systemd one-shot unit
+#
+# Install without sudo:
+#   mkdir -p ~/.config/systemd/user
+#   cp systemd/user/sector-massive-provider-snapshots.service ~/.config/systemd/user/
+#   cp systemd/user/sector-massive-provider-snapshots.timer ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now sector-massive-provider-snapshots.timer
+
+[Unit]
+Description=Sector Rotation Massive Provider Snapshot Capture
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/SECTOR_MOMENTUM_AND_ROTATION
+Environment=PYTHONUNBUFFERED=1
+ExecStart=%h/SECTOR_MOMENTUM_AND_ROTATION/.venv/bin/python scripts/capture_massive_provider_snapshots.py --universe scored --limit 5000 --timeout 20

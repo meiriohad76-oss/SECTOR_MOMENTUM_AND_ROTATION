@@ -55,6 +55,7 @@ def test_capture_massive_provider_snapshots_stores_trade_payloads(monkeypatch, t
         "_fetch_massive_trades_for_snapshot",
         fake_fetch,
     )
+    monkeypatch.setattr(capture_massive_provider_snapshots, "_bootstrap_massive_secret", lambda: True)
 
     assert (
         capture_massive_provider_snapshots.main(
@@ -131,6 +132,7 @@ def test_capture_massive_provider_snapshots_sanitizes_failure_output(monkeypatch
         "_fetch_massive_trades_for_snapshot",
         fail_fetch,
     )
+    monkeypatch.setattr(capture_massive_provider_snapshots, "_bootstrap_massive_secret", lambda: True)
 
     assert (
         capture_massive_provider_snapshots.main(
@@ -151,3 +153,74 @@ def test_capture_massive_provider_snapshots_sanitizes_failure_output(monkeypatch
     assert "Bearer" not in output
     assert "SECRET" not in output
     assert "MASSIVE_API_KEY" not in output
+
+
+def test_capture_massive_provider_snapshots_supports_scored_universe(monkeypatch, tmp_path):
+    tickers = []
+
+    def fake_fetch(ticker, *, as_of, limit, timeout):
+        tickers.append(ticker)
+        return [{"p": 100.0, "s": 100, "sip_timestamp": 1}]
+
+    monkeypatch.setattr(
+        capture_massive_provider_snapshots,
+        "_fetch_massive_trades_for_snapshot",
+        fake_fetch,
+    )
+    monkeypatch.setattr(capture_massive_provider_snapshots, "_bootstrap_massive_secret", lambda: True)
+
+    assert (
+        capture_massive_provider_snapshots.main(
+            [
+                "--universe",
+                "scored",
+                "--as-of",
+                "2026-05-19",
+                "--db-path",
+                str(tmp_path / "provider_snapshots.sqlite"),
+                "--limit",
+                "25",
+            ]
+        )
+        == 0
+    )
+
+    assert "XLK" in tickers
+    assert "NVDA" in tickers
+    assert "TLT" in tickers
+    assert "SPY" not in tickers
+
+
+def test_capture_massive_provider_snapshots_does_not_write_without_massive_key(monkeypatch, tmp_path, capsys):
+    called = False
+
+    def fake_fetch(*args, **kwargs):
+        nonlocal called
+        called = True
+        return []
+
+    monkeypatch.setattr(
+        capture_massive_provider_snapshots,
+        "_fetch_massive_trades_for_snapshot",
+        fake_fetch,
+    )
+    monkeypatch.setattr(capture_massive_provider_snapshots, "_bootstrap_massive_secret", lambda: False)
+
+    assert (
+        capture_massive_provider_snapshots.main(
+            [
+                "--ticker",
+                "XLK",
+                "--as-of",
+                "2026-05-19",
+                "--db-path",
+                str(tmp_path / "provider_snapshots.sqlite"),
+            ]
+        )
+        == 2
+    )
+
+    output = capsys.readouterr().out
+    assert called is False
+    assert "MASSIVE_API_KEY is not configured" in output
+    assert not (tmp_path / "provider_snapshots.sqlite").exists()

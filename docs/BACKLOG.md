@@ -290,9 +290,9 @@ Status legend:
 **Safety:** no Massive/provider-flow rule can enter live scoring, veto logic, alerts, recommendations, or dashboard decision text until the B-159 evidence gate passes and is reviewed.
 
 ### B-161 · Massive historical as-of provider snapshot store — IMPLEMENTED
-**Status:** B-161 is implemented as an offline SQLite snapshot store and capture helper for later historical replay.
-**Files:** `src/provider_snapshots.py`, `scripts/capture_massive_provider_snapshots.py`, `tests/test_provider_snapshots.py`, `tests/test_capture_massive_provider_snapshots_script.py`, `.gitignore`.
-**Behavior:** provider snapshots are stored under ignored local data paths by default, keyed by provider, dataset, ticker, and as-of date. Replay helpers return only the latest snapshot whose as-of date is less than or equal to the requested rebalance date, so future snapshots cannot leak into historical decisions. A capture CLI can save Massive `/v3/trades` payloads for one or more tickers without printing secrets.
+**Status:** B-161 is implemented as an offline SQLite snapshot store, capture helper, dashboard-universe CLI mode, and non-sudo user timer templates for later historical replay.
+**Files:** `src/provider_snapshots.py`, `scripts/capture_massive_provider_snapshots.py`, `systemd/user/sector-massive-provider-snapshots.service`, `systemd/user/sector-massive-provider-snapshots.timer`, `tests/test_provider_snapshots.py`, `tests/test_capture_massive_provider_snapshots_script.py`, `tests/test_user_systemd_timers.py`, `.gitignore`, `docs/DEPLOY_RASPBERRY_PI.md`.
+**Behavior:** provider snapshots are stored under ignored local data paths by default, keyed by provider, dataset, ticker, and as-of date. Replay helpers return only the latest snapshot whose as-of date is less than or equal to the requested rebalance date, so future snapshots cannot leak into historical decisions. A capture CLI can save Massive `/v3/trades` payloads for one or more tickers or the scored dashboard universe without printing secrets. The AHADPI5-style user timer runs `--universe scored` Monday-Friday at `18:45 America/New_York` after the US market close.
 **Safety:** storage/replay only; no live scoring, state-machine behavior, provider-flow behavior, alerts, vetoes, recommendations, broker behavior, or Pillar 7 weights change.
 
 ### B-162 · Massive provider-flow historical backtest variants — IMPLEMENTED
