@@ -389,10 +389,12 @@ def css() -> str:
 .mv2-b-gate-table h3 { margin:0 0 10px; color:#1c1815; font:900 11px/1 var(--font-mono); letter-spacing:.14em; text-transform:uppercase; }
 .mv2-article-hero { padding:28px 0 18px; border-bottom:1px solid #e1d8c9; }
 .mv2-article-hero h2 { font:700 52px/1 Georgia, 'Times New Roman', serif; color:#1c1815; margin:10px 0 12px; }
-.mv2-pull-strip { background:#1c1815; color:#f6efe2; display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin:18px 0; }
+.mv2-article-meta { display:flex; gap:28px; align-items:baseline; margin-top:18px; color:#6e6258; font:800 11px/1 var(--font-mono); letter-spacing:.06em; text-transform:uppercase; }
+.mv2-pull-strip { background:#1c1815; color:#f6efe2; display:grid; grid-template-columns:1.05fr .85fr .95fr 1fr 1.35fr; gap:1px; margin:18px 0; }
 .mv2-pull-strip div { padding:14px 18px; border-right:1px solid #3d342e; }
 .mv2-pull-strip span { display:block; color:#c4b5a0; font:800 10px/1 var(--font-mono); text-transform:uppercase; }
 .mv2-pull-strip b { display:block; margin-top:5px; font:900 26px/1 var(--font-mono); color:#f6efe2; }
+.mv2-pull-strip em { display:block; color:#d8c9b3; font:italic 13px/1.35 Georgia, 'Times New Roman', serif; text-align:right; }
 .mv2-pillar-article { display:grid; grid-template-columns:46px 1fr; gap:14px; border-top:1px solid #e1d8c9; padding:18px 0; }
 .mv2-pillar-article .num { font:700 32px/1 Georgia, 'Times New Roman', serif; color:#3d342e; }
 .mv2-pillar-article h4 { margin:0 0 6px; font:700 19px/1.2 Georgia, 'Times New Roman', serif; color:#1c1815; }
@@ -1193,10 +1195,16 @@ def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
       </div>
       <div class="mv2-article-hero">
         <div class="mv2-kicker">Display B | Editorial deep dive | {_esc(as_of)}</div>
-        <h2>{_esc(row.ticker)}: price says fine.<br><em style="color:#a23a1f">Flow says watch carefully.</em></h2>
+        <h2>{_esc(row.ticker)}: price says fine.<br><em style="color:#a23a1f">Flow says go.</em></h2>
         <p class="mv2-subtitle" style="font-family:Georgia,'Times New Roman',serif;font-size:20px;max-width:940px">
-          {_esc(row.identity)} is a model article, not a card. It explains how the seven forces combine, why the current state exists, and which exit trigger is nearest.
+          {_esc(row.identity)} has a mixed evidence stack: price and trend are still constructive, while flow and rotation are the parts that changed first. The article explains why the current state exists and which exit trigger is nearest.
         </p>
+        <div class="mv2-article-meta">
+          <span>By the model</span>
+          <span>3 min read</span>
+          <span>Momentum {_fmt(row.momentum_pct, "%", 1)}</span>
+          <span>Flow {_fmt(row.f_score)}</span>
+        </div>
       </div>
       {_tabs_html("deepdive")}
       <div class="mv2-pull-strip">
@@ -1204,6 +1212,7 @@ def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
         <div><span>Flow F</span><b class="{f_class}">{_fmt(row.f_score)}</b></div>
         <div><span>Momentum</span><b>{_fmt(row.momentum_pct, "%", 1)}</b></div>
         <div><span>RRG</span><b>{_esc(row.quadrant)}</b></div>
+        <div><em>Six of seven pillars can still look calm while the flow pillar changes the decision.</em></div>
       </div>
       <div class="mv2-b-article-grid">
         <main class="mv2-b-main">
