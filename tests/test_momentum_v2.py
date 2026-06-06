@@ -326,6 +326,29 @@ def test_momentum_v2_renderer_does_not_emit_handoff_sample_market_data():
         assert sample not in html
 
 
+def test_momentum_v2_renderer_exposes_data_source_provenance():
+    rows = build_view_rows(_sample_scored(), phase="MID")
+
+    html = render_display(
+        "C",
+        rows,
+        "2026-06-06 16:00 ET",
+        data_provenance={
+            "market_ohlcv": "configured massive; providers massive:3; paths massive_live:3",
+            "fred_macro": "FRED classifier live; 20 series; phase MID",
+            "provider_flow": "2 live/configured, 4 neutral-stubbed, 0 warning",
+            "computed": "rows from scored dataframe",
+        },
+    )
+
+    assert "momentum-v2-provenance" in html
+    assert "Market OHLCV" in html
+    assert "configured massive" in html
+    assert "FRED classifier live" in html
+    assert "Provider flow" in html
+    assert "rows from scored dataframe" in html
+
+
 def test_css_contains_readability_and_bar_rules():
     stylesheet = css()
 
@@ -337,6 +360,7 @@ def test_css_contains_readability_and_bar_rules():
     assert ".mv2-a3-grid" in stylesheet
     assert ".mv2-c-top" in stylesheet
     assert ".mv2-c-flow-river" in stylesheet
+    assert ".mv2-provenance" in stylesheet
     assert ".mv2-waterfall" in stylesheet
     assert ".mv2-rrg" in stylesheet
     assert "color:var(--mv2-muted)" in stylesheet

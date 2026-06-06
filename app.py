@@ -2044,6 +2044,59 @@ def render_status():
     _md(html)
 
 
+def _count_values(values) -> str:
+    counts: dict[str, int] = {}
+    for value in values:
+        text = str(value or "unknown")
+        counts[text] = counts.get(text, 0) + 1
+    return ", ".join(f"{key}:{counts[key]}" for key in sorted(counts)) or "unknown"
+
+
+def _momentum_v2_data_provenance(as_of: str) -> dict[str, str]:
+    provider_by_ticker = dict(getattr(ohlcv_result, "provider_by_ticker", {}) or {})
+    source_by_ticker = dict(getattr(ohlcv_result, "source_by_ticker", {}) or {})
+    market_parts = [
+        f"configured {getattr(ohlcv_result, 'provider', 'unknown')}",
+        f"{len(getattr(ohlcv_result, 'data', {}) or {})} loaded",
+    ]
+    if provider_by_ticker:
+        market_parts.append(f"providers {_count_values(provider_by_ticker.values())}")
+    if source_by_ticker:
+        market_parts.append(f"paths {_count_values(source_by_ticker.values())}")
+    if getattr(ohlcv_result, "used_stale_cache", False):
+        market_parts.append("stale cache used")
+    if getattr(ohlcv_result, "missing", ()):
+        market_parts.append(f"{len(getattr(ohlcv_result, 'missing', ()))} missing")
+
+    fred_series_count = len(_fred_data or {})
+    if regime.fred_used:
+        fred_text = f"FRED classifier live; {fred_series_count} series; phase {regime.phase_hint}"
+    elif fred_series_count:
+        fred_text = f"FRED fetched {fred_series_count} series; regime used fallback/proxy; phase {regime.phase_hint}"
+    else:
+        fred_text = f"FRED unavailable; regime uses OHLCV/yield fallback; phase {regime.phase_hint}"
+
+    flow_rows = provider_flow_health_statuses()
+    live_flow = sum(
+        1
+        for row in flow_rows
+        if "live" in str(row.get("mode", "")).lower() or row.get("status") == "healthy"
+    )
+    stubbed_flow = sum(1 for row in flow_rows if str(row.get("mode", "")).startswith("stubbed"))
+    warning_flow = sum(1 for row in flow_rows if row.get("status") in {"warning", "stale"})
+    flow_text = (
+        f"{live_flow} live/configured, {stubbed_flow} neutral-stubbed, {warning_flow} warning; "
+        "F score = OHLCV-derived flow plus configured provider feeds"
+    )
+
+    return {
+        "market_ohlcv": "; ".join(market_parts),
+        "fred_macro": fred_text,
+        "provider_flow": flow_text,
+        "computed": f"{as_of}; rows from scored dataframe; production path only",
+    }
+
+
 def render_momentum_v2_screens():
     display_keys = list(MOMENTUM_V2_DISPLAY_LABELS.keys())
     display_col, screen_col = st.columns([1.15, 1])
@@ -2075,6 +2128,7 @@ def render_momentum_v2_screens():
         as_of,
         screen=selected_screen,
         focus_ticker=None,
+        data_provenance=_momentum_v2_data_provenance(as_of),
     ))
 
 

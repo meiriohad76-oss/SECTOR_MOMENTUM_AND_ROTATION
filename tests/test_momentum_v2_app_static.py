@@ -12,6 +12,21 @@ def test_app_wires_momentum_v2_display_selector_and_renderer():
     assert "MOMENTUM_V2_DISPLAY_LABELS" in APP
     assert "MOMENTUM_V2_SCREEN_LABELS" in APP
     assert "render_momentum_v2_display" in APP
+    assert "_momentum_v2_data_provenance(as_of)" in APP
+    assert "data_provenance=_momentum_v2_data_provenance(as_of)" in APP
+
+
+def test_app_momentum_v2_provenance_uses_live_compute_objects():
+    helper = APP[APP.index("def _momentum_v2_data_provenance") : APP.index("def render_momentum_v2_screens")]
+
+    assert "ohlcv_result" in helper
+    assert "provider_by_ticker" in helper
+    assert "source_by_ticker" in helper
+    assert "_fred_data" in helper
+    assert "regime.fred_used" in helper
+    assert "provider_flow_health_statuses()" in helper
+    assert "rows from scored dataframe" in helper
+    assert "fixture" not in helper.lower()
 
 
 def test_app_renders_momentum_v2_before_legacy_signal_sections():

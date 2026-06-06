@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from html import escape
-from typing import Iterable, Mapping
+from typing import Any, Iterable, Mapping
 
 import pandas as pd
 
@@ -552,6 +552,12 @@ def css() -> str:
 .mv2-terminal .mv2-metric b, .mv2-terminal .mv2-macro b, .mv2-terminal .mv2-gate b, .mv2-terminal .mv2-dot b { color:#f0f0f0; }
 .mv2-terminal .mv2-rrg, .mv2-terminal .mv2-flow-river, .mv2-terminal .mv2-svg-chart, .mv2-terminal .mv2-a-bar { background:#080808; border-color:#242424; }
 .mv2-terminal .mv2-a-pillar { border-top-color:#242424; }
+.mv2-provenance { margin:0 12px 12px; padding:10px 12px; border:1px solid var(--mv2-border); border-radius:8px; background:rgba(255,255,255,.06); display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; font:11px/1.35 var(--font-prose); }
+.mv2-terminal .mv2-provenance { margin:0 4px 12px; background:#101010; border-color:#2a2a2a; color:#b8b8b8; }
+.mv2-editorial .mv2-provenance { background:#fffbf3; border-color:#e1d8c9; color:#6e6258; }
+.mv2-pillarstack .mv2-provenance { background:#fff; border-color:#e6e1d8; color:#6e6258; }
+.mv2-provenance b { display:block; color:inherit; font:900 10px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; margin-bottom:3px; }
+.mv2-provenance span { overflow-wrap:anywhere; }
 @media (max-width: 1050px) {
   .mv2-grid { grid-template-columns: 1fr; }
   .mv2-head { flex-direction:column; }
@@ -562,12 +568,39 @@ def css() -> str:
   .mv2-a-row .hide-sm { display:none; }
   .mv2-metric-deck, .mv2-macro-grid, .mv2-state-grid, .mv2-universe-columns { grid-template-columns:1fr 1fr; }
   .mv2-chart-grid, .mv2-chart-grid.tight, .mv2-article-block, .mv2-pillar-grid, .mv2-a-hero-grid, .mv2-a-pillars, .mv2-a2-lead-grid, .mv2-a2-pillars, .mv2-a2-charts, .mv2-a3-grid, .mv2-a3-flow-cards, .mv2-c-pillar-grid, .mv2-b-article-grid { grid-template-columns:1fr; }
+  .mv2-provenance { grid-template-columns:1fr; }
 }
 """
 
 
 def _esc(value: object) -> str:
     return escape(str(value), quote=True)
+
+
+def _provenance_html(data_provenance: Mapping[str, Any] | None) -> str:
+    if not data_provenance:
+        return ""
+    fields = (
+        ("Market OHLCV", data_provenance.get("market_ohlcv", "")),
+        ("FRED macro", data_provenance.get("fred_macro", "")),
+        ("Provider flow", data_provenance.get("provider_flow", "")),
+        ("Computed", data_provenance.get("computed", "")),
+    )
+    cells = "".join(
+        f'<div><b>{_esc(label)}</b><span>{_esc(value or "unknown")}</span></div>'
+        for label, value in fields
+    )
+    return f'<div class="mv2-provenance" data-testid="momentum-v2-provenance">{cells}</div>'
+
+
+def _with_provenance(html: str, data_provenance: Mapping[str, Any] | None) -> str:
+    banner = _provenance_html(data_provenance)
+    if not banner:
+        return html
+    marker_end = html.find(">")
+    if marker_end < 0 or "<section" not in html[: marker_end + 1]:
+        return banner + html
+    return html[: marker_end + 1] + banner + html[marker_end + 1 :]
 
 
 def _fmt(value: float, suffix: str = "", digits: int = 2) -> str:
@@ -2535,14 +2568,17 @@ def render_display(
     as_of: str,
     screen: str = "overview",
     focus_ticker: str | None = None,
+    data_provenance: Mapping[str, Any] | None = None,
 ) -> str:
     normalized_screen = screen if screen in SCREEN_LABELS else "overview"
     if normalized_screen == "deepdive":
-        return render_deepdive(display, rows, as_of, focus_ticker)
-    if normalized_screen == "rotation":
-        return render_rotation(display, rows, as_of)
-    if display == "A":
-        return render_display_a(rows, as_of).replace('<div class="mv2-a-body">', _tabs_html("overview") + '<div class="mv2-a-body">', 1)
-    if display == "B":
-        return render_display_b(rows, as_of).replace('<div class="mv2-grid">', _tabs_html("overview") + '<div class="mv2-grid">', 1)
-    return render_display_c(rows, as_of).replace('<div class="mv2-grid">', _tabs_html("overview") + '<div class="mv2-grid">', 1)
+        html = render_deepdive(display, rows, as_of, focus_ticker)
+    elif normalized_screen == "rotation":
+        html = render_rotation(display, rows, as_of)
+    elif display == "A":
+        html = render_display_a(rows, as_of).replace('<div class="mv2-a-body">', _tabs_html("overview") + '<div class="mv2-a-body">', 1)
+    elif display == "B":
+        html = render_display_b(rows, as_of).replace('<div class="mv2-grid">', _tabs_html("overview") + '<div class="mv2-grid">', 1)
+    else:
+        html = render_display_c(rows, as_of).replace('<div class="mv2-grid">', _tabs_html("overview") + '<div class="mv2-grid">', 1)
+    return _with_provenance(html, data_provenance)
