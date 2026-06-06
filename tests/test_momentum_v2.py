@@ -173,10 +173,11 @@ def test_display_c_overview_deepdive_rotation_inventory_is_present():
     for marker in (
         "Momentum",
         "Heatmap",
-        "Defensives rotating in. Semis lost leadership.",
+        "lost flow support",
+        "leads sponsorship",
         "The composite, dissected",
-        "State changes",
-        "Your positions",
+        "State queue",
+        "Highest-impact rows",
         "Bullish cohort",
     ):
         assert marker in overview
@@ -214,10 +215,10 @@ def test_display_b_overview_deepdive_rotation_inventory_is_present():
     for marker in (
         "The Sentiment Brief",
         "LIVE",
-        "Semis lost leadership.",
-        "Defensives are bidding.",
+        "lost flow support",
+        "leads sponsorship",
         "By the numbers",
-        "This week's transitions",
+        "Current risk stories",
         "Your positions",
         "Bullish cohort",
         "On watch",
@@ -227,7 +228,7 @@ def test_display_b_overview_deepdive_rotation_inventory_is_present():
 
     for marker in (
         "DEEP-DIVE",
-        "price says fine",
+        "trend confirms",
         "COMPOSITE S",
         "The seven pillars, explained",
         "Exit trigger table",
@@ -241,7 +242,7 @@ def test_display_b_overview_deepdive_rotation_inventory_is_present():
         "FIGURE 1 | RELATIVE ROTATION",
         "Cross-sectional leaderboard",
         "The phase",
-        "If the regime flips",
+        "Current support basket",
         "THE SENTIMENT BRIEF | THE MAP",
     ):
         assert marker in rotation
@@ -285,7 +286,44 @@ def test_deepdive_uses_ticker_report_only_when_focus_is_explicit():
     html = render_display("B", rows, "2026-06-06 16:00 ET", screen="deepdive", focus_ticker="XLF")
 
     assert "Universe deep dive" not in html
-    assert "XLF: price says fine" in html
+    assert "XLF: trend confirms" in html
+
+
+def test_momentum_v2_renderer_does_not_emit_handoff_sample_market_data():
+    rows = build_view_rows(_sample_scored(), phase="MID")
+
+    html = "\n".join(
+        [
+            render_display("B", rows, "2026-06-06 16:00 ET"),
+            render_display("B", rows, "2026-06-06 16:00 ET", screen="deepdive", focus_ticker="XLK"),
+            render_display("B", rows, "2026-06-06 16:00 ET", screen="rotation"),
+            render_display("C", rows, "2026-06-06 16:00 ET"),
+            render_display("C", rows, "2026-06-06 16:00 ET", screen="rotation"),
+        ]
+    )
+
+    stale_samples = (
+        "Semis lost leadership",
+        "Defensives are bidding",
+        "No. 247",
+        "2s10s curve",
+        "Recession prob",
+        "+0.18 flat",
+        "TLT +0.42",
+        "GLD +0.84",
+        "price says fine",
+        "Flow says go",
+        "Tech / Semis",
+        "Energy / Oil",
+        "LIVE FLOW",
+        "CACHE 60min",
+        "last 14 days",
+        "connected | synced",
+        "3 min read",
+        "This week's transitions",
+    )
+    for sample in stale_samples:
+        assert sample not in html
 
 
 def test_css_contains_readability_and_bar_rules():

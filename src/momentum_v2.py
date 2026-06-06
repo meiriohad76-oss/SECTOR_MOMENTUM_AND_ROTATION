@@ -803,12 +803,14 @@ def render_display_c(rows: list[MomentumV2Row], as_of: str) -> str:
     exits = [row for row in rows if row.state in {"EXIT", "BEARISH_STAGE_4"}]
     breadth = sum(row.breadth_50d for row in rows) / max(len(rows), 1)
     avg_s = sum(row.s_score for row in rows) / max(len(rows), 1)
+    headline, story_body = _board_story(rows)
+    phase = _board_phase(rows)
     legend = "".join(
         f'<span><i style="width:12px;height:12px;border-radius:2px;background:{PILLAR_HUES[pillar]};display:inline-block"></i>{pillar} <em style="color:#a89e92;font-style:normal">{PILLAR_WEIGHTS[pillar]:.0%}</em></span>'
         for pillar in PILLAR_ORDER
     )
     rail_changes = "".join(
-        f'<div class="mv2-c-rail-row mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}"><i style="background:{STATE_COLORS_LIGHT.get(row.state, "#777")}"></i><b>{_esc(row.ticker)}</b><span>{_esc(row.identity)} | current -> {_esc(STATE_LABELS.get(row.state, row.state))}</span><span>{_fmt(row.s_score)}</span></div>'
+        f'<div class="mv2-c-rail-row mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}"><i style="background:{STATE_COLORS_LIGHT.get(row.state, "#777")}"></i><b>{_esc(row.ticker)}</b><span>{_esc(row.identity)} | state {_esc(STATE_LABELS.get(row.state, row.state))}</span><span>{_fmt(row.s_score)}</span></div>'
         for row in warnings[:8]
     )
     positions = "".join(
@@ -820,12 +822,12 @@ def render_display_c(rows: list[MomentumV2Row], as_of: str) -> str:
       {_c_topbar("overview", as_of)}
       <div class="mv2-c-weather">
         <div>
-          <div class="mv2-kicker">Today | Late cycle topping</div>
-          <h3>Defensives rotating in. Semis lost leadership.</h3>
-          <p>{len(exits)} EXITs and {len(bullish)} bullish candidates across the current universe.</p>
+          <div class="mv2-kicker">Today | {_esc(phase.lower())}</div>
+          <h3>{_esc(headline)}</h3>
+          <p>{_esc(story_body)} {len(exits)} exit/bearish rows and {len(bullish)} bullish candidates across the current universe.</p>
         </div>
         {_c_weather_item("Regime", "RISK-ON" if avg_s >= 0 else "RISK-OFF", f"average S {_fmt(avg_s)}", "mv2-pos" if avg_s >= 0 else "mv2-neg")}
-        {_c_weather_item("Cycle", "LATE", "macro/flow proxy")}
+        {_c_weather_item("Phase", phase, "S/F/breadth proxy")}
         {_c_weather_item("Warnings", str(len(warnings)), f"{len(exits)} exit", "mv2-neg" if warnings else "mv2-pos")}
         {_c_weather_item("Breadth", f"{breadth:.0%}", "below 50% gate" if breadth < .5 else "above 50% gate", "mv2-pos" if breadth >= .5 else "mv2-neg")}
         {_c_weather_item("Universe", str(len(rows)), f"{len(bullish)} bullish | {len(warnings)} warn")}
@@ -840,11 +842,11 @@ def render_display_c(rows: list[MomentumV2Row], as_of: str) -> str:
         </div>
         <aside class="mv2-c-rail">
           <div class="mv2-c-card">
-            <div class="mv2-c-head"><b>State changes</b><span>last 14 days | {len(warnings)} events</span></div>
+            <div class="mv2-c-head"><b>State queue</b><span>current run | {len(warnings)} risk rows</span></div>
             {rail_changes}
           </div>
           <div class="mv2-c-card">
-            <div class="mv2-c-head"><b>Your positions</b><span>connected | synced</span></div>
+            <div class="mv2-c-head"><b>Highest-impact rows</b><span>current universe | sorted by |S|</span></div>
             {positions}
             <div class="mv2-a2-callout"><strong style="color:#a8721a">Actions queued:</strong> Review warning/exit positions before adding new risk.</div>
           </div>
@@ -905,7 +907,7 @@ def render_display_a(rows: list[MomentumV2Row], as_of: str) -> str:
         <div class="mv2-a-transition mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}">
           <i style="background:{STATE_COLORS_LIGHT.get(row.state, '#777')};box-shadow:0 0 6px {STATE_COLORS_LIGHT.get(row.state, '#777')}66"></i>
           <b>{_esc(row.ticker)}</b>
-          <span>{_esc(row.identity)} | current -> {_esc(STATE_LABELS.get(row.state, row.state))}</span>
+          <span>{_esc(row.identity)} | state {_esc(STATE_LABELS.get(row.state, row.state))}</span>
           <span>{_fmt(row.s_score)}</span>
         </div>
         """
@@ -1010,7 +1012,7 @@ def render_display_a(rows: list[MomentumV2Row], as_of: str) -> str:
       </div>
 
       <div class="mv2-a-footer">
-        <span>{len(rows)} ETFs | 7 PILLARS | LIVE FLOW | CACHE 60min</span>
+        <span>{len(rows)} ETFs | 7 PILLARS | CURRENT DATA</span>
         <span>v2 | TERMINAL | READ-ONLY | MEIRI</span>
       </div>
     </section>
@@ -1021,10 +1023,9 @@ def render_display_b(rows: list[MomentumV2Row], as_of: str) -> str:
     leaders = sorted(rows, key=lambda item: item.s_score, reverse=True)[:8]
     risks = [row for row in rows if row.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"}]
     bullish = [row for row in rows if row.state == "STAGE_2_BULLISH"]
-    exits = [row for row in rows if row.state in {"EXIT", "BEARISH_STAGE_4"}]
-    breadth = sum(row.breadth_50d for row in rows) / max(len(rows), 1)
-    avg_flow = sum(row.f_score for row in rows) / max(len(rows), 1)
     featured = sorted(risks, key=lambda item: (item.state not in {"EXIT", "BEARISH_STAGE_4"}, item.s_score))[:3] or leaders[:3]
+    headline, story_body = _board_story(rows)
+    phase = _board_phase(rows)
     stories = []
     for item in featured:
         pos, pos_value, neg, neg_value = _largest_pillars(item)
@@ -1040,19 +1041,9 @@ def render_display_b(rows: list[MomentumV2Row], as_of: str) -> str:
             </article>
             """
         )
-    numbers = [
-        ("Exits this week", str(len(exits)), "+2", "mv2-neg"),
-        ("Active warnings", str(len(risks)), "+5", "mv2-neg"),
-        ("New buys", str(len(bullish)), "-2", "mv2-pos"),
-        ("SPY vs 10mo SMA", f"{_fmt(sum(row.s_score for row in rows)/max(len(rows),1)*2, '%', 1)}", "trend down", ""),
-        ("Breadth (% > 50dMA)", f"{breadth:.0%}", "-22 wk", "mv2-neg" if breadth < .5 else "mv2-pos"),
-        ("Distribution days", str(max(1, len(risks)//2)), "at threshold", ""),
-        ("2s10s curve", "+0.18", "flattening", ""),
-        ("Recession prob (FRED)", "28%", "+4 mo", ""),
-    ]
     num_rows = "".join(
         f'<div class="mv2-b-num"><span>{_esc(label)}<small style="display:block;color:#8b7e70;font:11px/1.2 var(--font-prose)">{_esc(sub)}</small></span><b class="{tone}">{_esc(value)}</b></div>'
-        for label, value, sub, tone in numbers
+        for label, value, sub, tone in _board_proxy_stats(rows)
     )
     tape_items = [*leaders[:4], *risks[:4]]
     tape = "".join(
@@ -1072,15 +1063,15 @@ def render_display_b(rows: list[MomentumV2Row], as_of: str) -> str:
       <div class="mv2-b-mast">
         <b>The Sentiment Brief</b>
         <span style="flex:1"></span>
-        <span>{_esc(as_of)} | EVENING EDITION | No. 247</span>
+        <span>{_esc(as_of)} | CURRENT RUN | {_esc(phase)}</span>
         <span>SEARCH</span><span>ARCHIVE</span><span>MOON</span>
       </div>
       <div class="mv2-tape"><span>LIVE</span>{tape}<span style="margin-left:auto">UPDATED {_esc(as_of)}</span></div>
       <div class="mv2-b-hero">
         <div>
-          <div class="mv2-kicker">Today's read | Late-cycle topping</div>
-          <h3>Semis lost leadership.<br>Defensives are bidding.</h3>
-          <p>The model is reading the board as a rotation story: trend says what worked, flow says where sponsorship is moving, and the state machine tells you where action is required.</p>
+          <div class="mv2-kicker">Today's read | {_esc(phase.lower())}</div>
+          <h3>{_esc(headline)}</h3>
+          <p>{_esc(story_body)}</p>
           <div class="mv2-kicker" style="margin-top:16px">BY THE MODEL | {len(rows)} ETFS | 7 PILLARS | POSTED {_esc(as_of)}</div>
         </div>
         <div class="mv2-b-numbers">
@@ -1090,7 +1081,7 @@ def render_display_b(rows: list[MomentumV2Row], as_of: str) -> str:
       </div>
       <div class="mv2-grid">
         <div class="mv2-panel">
-          <h3>This week's transitions</h3>
+          <h3>Current risk stories</h3>
           <p>The state machine triggered {len(risks)} caution or exit reads in the current universe. The featured stories below are selected by severity.</p>
           {"".join(stories)}
           <div class="mv2-article-block">
@@ -1108,7 +1099,7 @@ def render_display_b(rows: list[MomentumV2Row], as_of: str) -> str:
           <div class="mv2-panel">
             <h3>Your positions</h3>
             <div class="mv2-rail-list">{position_rows}</div>
-            <p style="margin-top:12px"><em>Two positions require action: review warning and exit labels before Monday's open.</em></p>
+            <p style="margin-top:12px"><em>{len(risks)} current universe rows carry warning, exit, or bearish labels; review those before adding risk.</em></p>
           </div>
           <div class="mv2-panel">
             <h3>Bullish cohort</h3>
@@ -1122,7 +1113,7 @@ def render_display_b(rows: list[MomentumV2Row], as_of: str) -> str:
           </div>
         </aside>
       </div>
-      <div class="mv2-footer"><span>THE SENTIMENT BRIEF | {len(rows)} ETFS | 7 PILLARS | LIVE FLOW | CACHE 60min</span><span><em>Read before you trade.</em> | v2 | EDITORIAL | MEIRI</span></div>
+      <div class="mv2-footer"><span>THE SENTIMENT BRIEF | {len(rows)} ETFS | 7 PILLARS | CURRENT DATA</span><span><em>Read before you trade.</em> | v2 | EDITORIAL | MEIRI</span></div>
     </section>
     """
 
@@ -1197,6 +1188,153 @@ def _state_summary(rows: list[MomentumV2Row]) -> str:
         f"{len(rows)} instruments scanned. {bullish} bullish candidates, {warnings} risk names, "
         f"average S {_fmt(avg_s)}, average F {_fmt(avg_f)}."
     )
+
+
+def _risk_rows(rows: list[MomentumV2Row]) -> list[MomentumV2Row]:
+    return [row for row in rows if row.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"}]
+
+
+def _board_phase(rows: list[MomentumV2Row]) -> str:
+    if not rows:
+        return "NO DATA"
+    breadth = sum(row.breadth_50d for row in rows) / max(len(rows), 1)
+    avg_s = sum(row.s_score for row in rows) / max(len(rows), 1)
+    avg_f = sum(row.f_score for row in rows) / max(len(rows), 1)
+    risk_count = len(_risk_rows(rows))
+    if avg_s < 0 or breadth < 0.45 or risk_count > len(rows) * 0.40:
+        return "RISK-OFF"
+    if avg_f < 0 or breadth < 0.55 or risk_count:
+        return "NARROWING"
+    return "RISK-ON"
+
+
+def _row_name(row: MomentumV2Row | None) -> str:
+    if row is None:
+        return "No data"
+    return f"{row.ticker} | {row.identity}"
+
+
+def _board_story(rows: list[MomentumV2Row]) -> tuple[str, str]:
+    if not rows:
+        return "No instruments loaded.", "The dashboard needs scored rows before it can generate a board story."
+    weakest_flow = min(rows, key=lambda item: item.f_score)
+    strongest_flow = max(rows, key=lambda item: item.f_score)
+    weakest_state = min(rows, key=lambda item: item.s_score)
+    strongest_state = max(rows, key=lambda item: item.s_score)
+    headline = f"{weakest_flow.identity} lost flow support. {strongest_flow.identity} leads sponsorship."
+    body = (
+        f"The current run ranks {_row_name(strongest_state)} highest by composite S "
+        f"({_fmt(strongest_state.s_score)}) and {_row_name(weakest_state)} lowest "
+        f"({_fmt(weakest_state.s_score)}). Flow leadership is {_row_name(strongest_flow)} "
+        f"({_fmt(strongest_flow.f_score)}), while the largest flow drag is {_row_name(weakest_flow)} "
+        f"({_fmt(weakest_flow.f_score)})."
+    )
+    return headline, body
+
+
+def _board_proxy_stats(rows: list[MomentumV2Row]) -> list[tuple[str, str, str, str]]:
+    if not rows:
+        return []
+    risks = _risk_rows(rows)
+    exits = [row for row in risks if row.state in {"EXIT", "BEARISH_STAGE_4"}]
+    bullish = [row for row in rows if row.state == "STAGE_2_BULLISH"]
+    breadth = sum(row.breadth_50d for row in rows) / max(len(rows), 1)
+    avg_s = sum(row.s_score for row in rows) / max(len(rows), 1)
+    avg_f = sum(row.f_score for row in rows) / max(len(rows), 1)
+    avg_mom = sum(row.momentum_pct for row in rows) / max(len(rows), 1)
+    cmf_negative = sum(1 for row in rows if row.cmf21 < 0)
+    return [
+        ("Exit/bearish states", str(len(exits)), "current scored universe", "mv2-neg" if exits else "mv2-pos"),
+        ("Warning states", str(len(risks)), "current scored universe", "mv2-neg" if risks else "mv2-pos"),
+        ("Bullish states", str(len(bullish)), "current scored universe", "mv2-pos" if bullish else ""),
+        ("Average S", _fmt(avg_s), "composite board proxy", _tone_class(avg_s)),
+        ("Average F", _fmt(avg_f), "provider-flow board proxy", _tone_class(avg_f)),
+        ("Breadth > 50dMA", f"{breadth:.0%}", "mean breadth input", "mv2-pos" if breadth >= 0.5 else "mv2-neg"),
+        ("Average momentum", _fmt(avg_mom, "%", 1), "12-1 momentum mean", _tone_class(avg_mom)),
+        ("Negative CMF count", str(cmf_negative), "CMF21 below zero", "mv2-neg" if cmf_negative else "mv2-pos"),
+    ]
+
+
+def _support_count(row: MomentumV2Row) -> tuple[int, int]:
+    supportive = sum(1 for value in row.pillars.values() if value >= 0)
+    return supportive, len(row.pillars)
+
+
+def _deepdive_headline(row: MomentumV2Row) -> tuple[str, str, str]:
+    trend_ok = row.above_30wma and row.ma_slope_pos
+    flow_ok = row.f_score >= 0 and row.cmf21 >= 0
+    price = "trend confirms" if trend_ok else "trend is mixed" if row.above_30wma else "trend broke"
+    flow = "flow confirms" if flow_ok else "flow is warning"
+    subtitle = (
+        f"{row.identity} is in {row.state.replace('_', ' ').title()} with S {_fmt(row.s_score)}, "
+        f"F {_fmt(row.f_score)}, momentum {_fmt(row.momentum_pct, '%', 1)}, and RRG {row.quadrant}. "
+        f"The article explains the exact pillar balance and the nearest exit/escalation gates for this ticker."
+    )
+    return price, flow, subtitle
+
+
+def _deepdive_interpretation(row: MomentumV2Row) -> tuple[str, str, str]:
+    pos, pos_value, neg, neg_value = _largest_pillars(row)
+    failed = [label for ok, label, _ in _gate_rows_for(row) if not ok]
+    support, total = _support_count(row)
+    first = (
+        f"The practical interpretation is based on the current data for {row.ticker}. "
+        f"{support} of {total} pillars are supportive. The largest support is {pos} "
+        f"({_fmt(pos_value, digits=3)}), and the largest drag is {neg} ({_fmt(neg_value, digits=3)})."
+    )
+    second = (
+        f"The dashboard treats {row.ticker} as {row.state.replace('_', ' ').lower()}. "
+        f"Failed gates: {', '.join(failed) if failed else 'none'}. "
+        f"{_next_escalation_text(row)}"
+    )
+    third = (
+        f"For a novice reader: S is the blended score, F is the flow score, and the state label is the action language. "
+        f"For {row.ticker}, do not read one number alone; compare S {_fmt(row.s_score)}, "
+        f"F {_fmt(row.f_score)}, CMF {_fmt(row.cmf21)}, Mansfield {_fmt(row.mansfield_rs)}, "
+        f"and RRG {row.quadrant} together."
+    )
+    return first, second, third
+
+
+def _macro_proxy_stats(rows: list[MomentumV2Row]) -> list[tuple[str, str]]:
+    if not rows:
+        return []
+    breadth = sum(row.breadth_50d for row in rows) / max(len(rows), 1)
+    warnings = len(_risk_rows(rows))
+    avg_s = sum(row.s_score for row in rows) / max(len(rows), 1)
+    avg_f = sum(row.f_score for row in rows) / max(len(rows), 1)
+    avg_mom = sum(row.momentum_pct for row in rows) / max(len(rows), 1)
+    negative_cmf = sum(1 for row in rows if row.cmf21 < 0)
+    return [
+        ("Board phase", _board_phase(rows)),
+        ("Avg S", _fmt(avg_s)),
+        ("Avg F", _fmt(avg_f)),
+        ("Avg momentum", _fmt(avg_mom, "%", 1)),
+        ("Breadth", f"{breadth:.0%}"),
+        ("Risk states", str(warnings)),
+        ("CMF<0 count", str(negative_cmf)),
+    ]
+
+
+def _rotation_summary(rows: list[MomentumV2Row]) -> tuple[str, str]:
+    sectors = [row for row in rows if row.asset_class == "US Sectors"] or rows
+    weakening = [row for row in sectors if row.quadrant == "Weakening"]
+    lagging = [row for row in sectors if row.quadrant == "Lagging"]
+    improving = [row for row in sectors if row.quadrant == "Improving"]
+    leading = [row for row in sectors if row.quadrant == "Leading"]
+    strongest = max(sectors, key=lambda item: item.f_score, default=None)
+    weakest = min(sectors, key=lambda item: item.f_score, default=None)
+    sentence = (
+        f"Current quadrant counts: {len(leading)} leading, {len(weakening)} weakening, "
+        f"{len(lagging)} lagging, {len(improving)} improving. "
+        f"Strongest flow is {_row_name(strongest)}; weakest flow is {_row_name(weakest)}."
+    )
+    caption = (
+        f"Read clockwise using current RRG coordinates. Weakening: "
+        f"{', '.join(row.ticker for row in weakening[:4]) or 'none'}. Improving: "
+        f"{', '.join(row.ticker for row in improving[:4]) or 'none'}."
+    )
+    return sentence, caption
 
 
 def _waterfall_html(row: MomentumV2Row) -> str:
@@ -1509,7 +1647,7 @@ def _deepdive_terminal_body(row: MomentumV2Row, rows: list[MomentumV2Row], as_of
           {peer_rows}
         </div>
       </div>
-      <div class="mv2-a-footer"><span>{_esc(row.ticker)} | {_esc(row.identity.upper())} | {len(rows)} ETFS | 7 PILLARS | LIVE FLOW</span><span>v2 | TERMINAL | DEEP DIVE | MEIRI</span></div>
+      <div class="mv2-a-footer"><span>{_esc(row.ticker)} | {_esc(row.identity.upper())} | {len(rows)} ETFS | 7 PILLARS | CURRENT DATA</span><span>v2 | TERMINAL | DEEP DIVE | MEIRI</span></div>
     """
 
 
@@ -1953,25 +2091,17 @@ def _terminal_flow_detail(rows: list[MomentumV2Row]) -> str:
 
 
 def _terminal_macro_panel(rows: list[MomentumV2Row]) -> str:
-    breadth = sum(row.breadth_50d for row in rows) / max(len(rows), 1)
-    warnings = sum(1 for row in rows if row.state in {"WARNING", "EXIT", "BEARISH_STAGE_4"})
     avg_s = sum(row.s_score for row in rows) / max(len(rows), 1)
     avg_f = sum(row.f_score for row in rows) / max(len(rows), 1)
-    stats = [
-        ("INDPRO YoY", "+0.4% down"),
-        ("2s10s curve", "+0.18 flat"),
-        ("REC prob", "28% up"),
-        ("SPY vs 10mo", f"{_fmt(avg_s * 2.0, '%', 1)}"),
-        ("Breadth", f"{breadth:.0%}"),
-        ("Warnings", str(warnings)),
-    ]
+    support = sorted(rows, key=lambda item: (item.f_score, item.s_score), reverse=True)[:5]
+    support_text = " | ".join(f"{row.ticker} {_fmt(row.f_score)}" for row in support) or "No support rows"
     cells = "".join(
         f'<div class="mv2-a3-macro-stat"><span>{_esc(label)}</span><b>{_esc(value)}</b></div>'
-        for label, value in stats
+        for label, value in _macro_proxy_stats(rows)
     )
     return f"""
       <div class="mv2-a3-macro-stats">{cells}</div>
-      <div class="mv2-a2-callout"><strong style="color:#e6b450">Risk-off basket:</strong> TLT +0.42 | IEF +0.28 | GLD +0.84 | UUP +0.12 | DBC +0.36. If SPY breaks the 10mo SMA, reduce risk before adding new cyclicals.</div>
+      <div class="mv2-a2-callout"><strong style="color:#e6b450">Support basket from current data:</strong> {_esc(support_text)}. If the board phase deteriorates, reduce risk before adding new cyclicals.</div>
       <p class="mv2-a3-caption">Average S {_fmt(avg_s)} and average F {_fmt(avg_f)} summarize whether macro pressure is confirming or fighting the rotation.</p>
     """
 
@@ -2012,11 +2142,11 @@ def _rotation_terminal_body(rows: list[MomentumV2Row], as_of: str) -> str:
           {_terminal_flow_detail(rows)}
         </div>
         <div class="mv2-a3-panel">
-          <div class="mv2-a3-section"><b>MACRO | BUSINESS CYCLE</b><span>FRED + curve + Faber | {_esc(as_of)}</span></div>
+          <div class="mv2-a3-section"><b>MACRO | BUSINESS CYCLE</b><span>board proxies | {_esc(_board_phase(rows))} | {_esc(as_of)}</span></div>
           {_terminal_macro_panel(rows)}
         </div>
       </div>
-      <div class="mv2-a-footer"><span>{len(rows)} ETFS | 7 PILLARS | LIVE FLOW | CACHE 60min</span><span>v2 | TERMINAL | ROTATION | MEIRI</span></div>
+      <div class="mv2-a-footer"><span>{len(rows)} ETFS | 7 PILLARS | CURRENT DATA</span><span>v2 | TERMINAL | ROTATION | MEIRI</span></div>
     """
 
 
@@ -2024,11 +2154,20 @@ def _c_rrg_svg(rows: list[MomentumV2Row]) -> str:
     return _terminal_rrg_svg(rows, width=620, height=530).replace('fill="#070707" stroke="#1f1f1f"', 'fill="#ffffff" stroke="#e6e1d8"').replace('#1a1a1a', '#e6e1d8').replace('#5a5a5a', '#3d362f')
 
 
-def _c_flow_river_svg() -> str:
-    outflows = [("Tech / Semis", 1.4, "#b13a1f"), ("Consumer Disc.", 0.6, "#c66b3a"), ("Financials", 0.7, "#a85a3a"), ("Homebuilders", 0.3, "#9d6638")]
-    inflows = [("Energy / Oil", 1.1, "#1f7a4a"), ("Gold miners", 0.8, "#1d6a3f"), ("Healthcare", 0.6, "#2c8358"), ("Utilities", 0.5, "#3a8a64")]
+def _c_flow_river_svg(rows: list[MomentumV2Row]) -> str:
+    ranked = sorted(rows, key=lambda item: item.f_score)
+    outflow_rows = ranked[:4]
+    inflow_rows = list(reversed(ranked[-4:]))
+    outflows = [
+        (row.display_label, max(0.05, abs(row.f_score)), "#b13a1f")
+        for row in outflow_rows
+    ]
+    inflows = [
+        (row.display_label, max(0.05, abs(row.f_score)), "#1f7a4a")
+        for row in inflow_rows
+    ]
     width, height = 1260, 250
-    total = sum(v for _, v, _ in outflows)
+    total = max(0.1, sum(v for _, v, _ in outflows))
     left_y = 28
     right_y = 28
     left_nodes = []
@@ -2047,22 +2186,29 @@ def _c_flow_river_svg() -> str:
         sw = max(5, ov / total * 34)
         ribbons.append(
             f'<path d="M 250 {oy+oh/2:.1f} C 470 {oy+oh/2:.1f}, 760 {iy+ih/2:.1f}, 1010 {iy+ih/2:.1f}" '
-            f'fill="none" stroke="{ic}" stroke-width="{sw:.1f}" opacity=".34"><title>{_esc(ol)} to {_esc(il)} ${ov:.1f}B</title></path>'
+            f'fill="none" stroke="{ic}" stroke-width="{sw:.1f}" opacity=".34"><title>{_esc(ol)} to {_esc(il)} | flow magnitude {ov:.2f}</title></path>'
         )
     node_html = []
     for label, value, color, y, h in left_nodes:
         node_html.append(f'<rect x="40" y="{y:.1f}" width="190" height="{h:.1f}" rx="7" fill="{color}" opacity=".14" stroke="{color}"/>')
         node_html.append(f'<text x="54" y="{y+18:.1f}" fill="#1a1714" font-size="12" font-family="Arial" font-weight="700">{_esc(label)}</text>')
-        node_html.append(f'<text x="54" y="{y+34:.1f}" fill="#7a7066" font-size="11" font-family="monospace">-${value:.1f}B</text>')
+        node_html.append(f'<text x="54" y="{y+34:.1f}" fill="#7a7066" font-size="11" font-family="monospace">F -{value:.2f}</text>')
     for label, value, color, y, h in right_nodes:
         node_html.append(f'<rect x="1030" y="{y:.1f}" width="190" height="{h:.1f}" rx="7" fill="{color}" opacity=".14" stroke="{color}"/>')
         node_html.append(f'<text x="1044" y="{y+18:.1f}" fill="#1a1714" font-size="12" font-family="Arial" font-weight="700">{_esc(label)}</text>')
-        node_html.append(f'<text x="1044" y="{y+34:.1f}" fill="#7a7066" font-size="11" font-family="monospace">+${value:.1f}B</text>')
+        node_html.append(f'<text x="1044" y="{y+34:.1f}" fill="#7a7066" font-size="11" font-family="monospace">F +{value:.2f}</text>')
     return f'<div class="mv2-c-flow-river"><svg viewBox="0 0 {width} {height}" role="img" aria-label="Flow river from outflows to inflows">{"".join(ribbons + node_html)}</svg></div>'
 
 
 def _rotation_c_body(rows: list[MomentumV2Row], as_of: str) -> str:
     sectors = [row for row in rows if row.asset_class == "US Sectors"] or rows
+    rotation_sentence, _ = _rotation_summary(rows)
+    flow_low = sorted(rows, key=lambda item: item.f_score)[:4]
+    flow_high = sorted(rows, key=lambda item: item.f_score, reverse=True)[:4]
+    flow_note = (
+        f"Weakest current flow: {', '.join(row.ticker for row in flow_low) or 'none'}. "
+        f"Strongest current flow: {', '.join(row.ticker for row in flow_high) or 'none'}."
+    )
     flow_table = "".join(
         f"""
         <div class="mv2-c-flow-row mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}">
@@ -2088,14 +2234,15 @@ def _rotation_c_body(rows: list[MomentumV2Row], as_of: str) -> str:
       <div style="padding:0 12px 16px">
         <div class="mv2-c-card">
           <div class="mv2-c-head"><b>The flow river</b><span>net institutional money | ETF SHO + block trades</span></div>
-          {_c_flow_river_svg()}
-          <p>Width of each strand encodes estimated net dollar flow over the last five sessions. Tech, semis, financials, and homebuilders are the main outflow buckets; energy, gold miners, healthcare, and utilities are the main inflow buckets.</p>
+          {_c_flow_river_svg(rows)}
+          <p>Width of each strand encodes the current flow-score magnitude from the scored universe. {_esc(flow_note)}</p>
         </div>
       </div>
       <div class="mv2-c-rotation-grid" style="padding-top:0">
-        <div class="mv2-c-card"><div class="mv2-c-head"><b>Macro / business cycle</b><span>FRED + Faber + curve | LATE</span></div>{_terminal_macro_panel(rows)}</div>
+        <div class="mv2-c-card"><div class="mv2-c-head"><b>Macro / business cycle</b><span>board proxies | {_esc(_board_phase(rows))}</span></div>{_terminal_macro_panel(rows)}</div>
         <div class="mv2-c-card"><div class="mv2-c-head"><b>Flow detail</b><span>per-ticker | pillar 7 | leads price 1-3 wk</span></div><div class="mv2-c-flow-row" style="border-top:0;color:#7a7066;text-transform:uppercase"><span>TKR</span><span>Name</span><span>CMF</span><span>F</span><span>Flow</span><span>State</span></div>{flow_table}</div>
       </div>
+      <p class="mv2-a3-caption" style="padding:0 12px 16px">{_esc(rotation_sentence)}</p>
       <div class="mv2-a-footer"><span>{len(rows)} ETFS | ROTATION | FLOW RIVER | MACRO</span><span>v2 | PILLAR STACK | ROTATION | MEIRI</span></div>
     """
 
@@ -2104,6 +2251,9 @@ def _rotation_b_body(rows: list[MomentumV2Row], as_of: str) -> str:
     sectors = [row for row in rows if row.asset_class == "US Sectors"] or rows
     leaders = sorted(rows, key=lambda item: item.momentum_pct, reverse=True)[:12]
     laggards = sorted(rows, key=lambda item: item.momentum_pct)[:12]
+    rotation_sentence, rotation_caption = _rotation_summary(rows)
+    flow_leaders = sorted(rows, key=lambda item: item.f_score, reverse=True)[:5]
+    flow_laggards = sorted(rows, key=lambda item: item.f_score)[:5]
 
     def leaderboard(title: str, items: list[MomentumV2Row]) -> str:
         max_abs = max(5.0, max(abs(row.momentum_pct) for row in items))
@@ -2130,12 +2280,16 @@ def _rotation_b_body(rows: list[MomentumV2Row], as_of: str) -> str:
         </div>
         """
         for label, body in (
-            ("ETF primary flow", "Outflows cluster in weakening groups while energy, gold, and defensives absorb the bid."),
-            ("Block-trade ratio", "Leadership groups show healthier up-block participation than warning cohorts."),
-            ("Distribution days", "Distribution clusters are treated as a sponsorship warning before price breaks."),
-            ("OBV / price divergences", "Divergences in XLK, SMH, KRE, and MTUM explain why the map is rotating clockwise."),
-            ("CMF cohort", "XLE, XLV, GDX, XOP, and XLU show the cleaner accumulation reads."),
+            ("Strongest F scores", ", ".join(f"{row.ticker} {_fmt(row.f_score)}" for row in flow_leaders) or "none"),
+            ("Weakest F scores", ", ".join(f"{row.ticker} {_fmt(row.f_score)}" for row in flow_laggards) or "none"),
+            ("Weakening quadrant", ", ".join(row.ticker for row in sectors if row.quadrant == "Weakening") or "none"),
+            ("Lagging quadrant", ", ".join(row.ticker for row in sectors if row.quadrant == "Lagging") or "none"),
+            ("CMF below zero", ", ".join(row.ticker for row in rows if row.cmf21 < 0) or "none"),
         )
+    )
+    support_cells = "".join(
+        f'<div class="mv2-macro"><span>{_esc(row.ticker)}</span><b class="{_tone_class(row.f_score)}">{_fmt(row.f_score)}</b></div>'
+        for row in flow_leaders[:4]
     )
     return f"""
       <div class="mv2-b-mast"><b>The Sentiment Brief</b><span>|</span><span>THE ROTATION MAP</span><span style="flex:1"></span><span>BACK TO BRIEF</span><span>{_esc(as_of)}</span></div>
@@ -2148,21 +2302,18 @@ def _rotation_b_body(rows: list[MomentumV2Row], as_of: str) -> str:
         <main class="mv2-b-main">
           <h3>FIGURE 1 | RELATIVE ROTATION</h3>
           <div class="mv2-panel" style="background:#fffbf3;border-color:#e1d8c9">{_c_rrg_svg(sectors)}</div>
-          <p>The story of this map is clockwise rotation. Technology, discretionary, and financials sit in or near Weakening while defensive and commodity-linked groups improve. That is the late-cycle signature the dashboard is built to surface.</p>
+          <p>{_esc(rotation_caption)} {_esc(rotation_sentence)}</p>
           <h3>Cross-sectional leaderboard</h3>
           <p>12-1 momentum ranking, all ETFs: leaders show where price still works; laggards show where sponsorship already broke.</p>
           <div class="mv2-pillar-grid">{leaderboard("LEADERS", leaders)}{leaderboard("LAGGARDS", laggards)}</div>
         </main>
         <aside class="mv2-b-sidebar">
           <h3>The phase</h3>
-          <p><strong>LATE</strong> | FRED, curve, breadth, and Faber context suggest risk is still on but narrowing.</p>
+          <p><strong>{_esc(_board_phase(rows))}</strong> | Derived from current S, F, breadth, and warning/exit counts in the scored universe.</p>
           <div class="mv2-rail-list">{flow_items}</div>
-          <h3>If the regime flips</h3>
+          <h3>Current support basket</h3>
           <div class="mv2-macro-grid" style="grid-template-columns:1fr 1fr">
-            <div class="mv2-macro"><span>TLT</span><b>+0.42</b></div>
-            <div class="mv2-macro"><span>IEF</span><b>+0.28</b></div>
-            <div class="mv2-macro"><span>GLD</span><b>+0.84</b></div>
-            <div class="mv2-macro"><span>UUP</span><b>+0.12</b></div>
+            {support_cells}
           </div>
         </aside>
       </div>
@@ -2253,6 +2404,9 @@ def _pillar_article_text(row: MomentumV2Row, pillar: str) -> str:
 def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
     s_class = "mv2-pos" if row.s_score >= 0 else "mv2-neg"
     f_class = "mv2-pos" if row.f_score >= 0 else "mv2-neg"
+    price_phrase, flow_phrase, subtitle = _deepdive_headline(row)
+    intro_one, intro_two, intro_three = _deepdive_interpretation(row)
+    support, total = _support_count(row)
     pillar_paras = "".join(
         f"""
         <div class="mv2-pillar-article">
@@ -2274,13 +2428,13 @@ def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
       </div>
       <div class="mv2-article-hero">
         <div class="mv2-kicker">Display B | Editorial deep dive | {_esc(as_of)}</div>
-        <h2>{_esc(row.ticker)}: price says fine.<br><em style="color:#a23a1f">Flow says go.</em></h2>
+        <h2>{_esc(row.ticker)}: {_esc(price_phrase)}.<br><em style="color:#a23a1f">{_esc(flow_phrase)}.</em></h2>
         <p class="mv2-subtitle" style="font-family:Georgia,'Times New Roman',serif;font-size:20px;max-width:940px">
-          {_esc(row.identity)} has a mixed evidence stack: price and trend are still constructive, while flow and rotation are the parts that changed first. The article explains why the current state exists and which exit trigger is nearest.
+          {_esc(subtitle)}
         </p>
         <div class="mv2-article-meta">
           <span>By the model</span>
-          <span>3 min read</span>
+          <span>{len(PILLAR_ORDER)} pillar analysis</span>
           <span>Momentum {_fmt(row.momentum_pct, "%", 1)}</span>
           <span>Flow {_fmt(row.f_score)}</span>
         </div>
@@ -2291,7 +2445,7 @@ def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
         <div><span>Flow F</span><b class="{f_class}">{_fmt(row.f_score)}</b></div>
         <div><span>Momentum</span><b>{_fmt(row.momentum_pct, "%", 1)}</b></div>
         <div><span>RRG</span><b>{_esc(row.quadrant)}</b></div>
-        <div><em>Six of seven pillars can still look calm while the flow pillar changes the decision.</em></div>
+        <div><em>{support} of {total} pillars support the current composite; flow contributes {_fmt(row.pillars['FLOW'], digits=3)}.</em></div>
       </div>
       <div class="mv2-b-article-grid">
         <main class="mv2-b-main">
@@ -2300,13 +2454,13 @@ def _deepdive_article_body(row: MomentumV2Row, as_of: str) -> str:
           {pillar_paras}
           <div class="mv2-article-block">
             <div>
-              <p>The practical interpretation is deliberately conservative. A warning state does not say the instrument must immediately fall; it says the evidence stack has stopped agreeing. In this case the largest disagreement is between price trend and sponsorship. Price remains above the long moving average, but flow and relative rotation are no longer confirming the advance.</p>
-              <p>The dashboard therefore treats the position as a hold-with-conditions rather than a fresh buy. The nearest escalation gate is a weekly close below the 30-week moving average, followed by a deeper CMF break below -0.10 or a sustained Mansfield RS failure. If those gates fire, the model moves from warning to exit without waiting for every pillar to turn negative.</p>
-              <p>For a novice reader, the important idea is simple: the score is not one magic number. It is seven forces. The article view is designed to show which forces still help, which forces hurt, and which one changed most recently.</p>
+              <p>{_esc(intro_one)}</p>
+              <p>{_esc(intro_two)}</p>
+              <p>{_esc(intro_three)}</p>
             </div>
             <div class="mv2-article-side">
               <b>NEXT WATCH LIST</b>
-              <p>Weekly close vs 30wMA<br>CMF relative to -0.10<br>Mansfield RS crossing zero<br>RRG Weakening to Lagging<br>Flow contribution below veto line</p>
+              <p>{'<br>'.join(_esc(label + ': ' + detail) for ok, label, detail in _gate_rows_for(row) if not ok) or 'No failed gates in the current row.'}</p>
             </div>
           </div>
         </main>
