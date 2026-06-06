@@ -30,6 +30,9 @@ Thumbs.db
 .streamlit/secrets.toml.save
 state.json
 data/state.json
+data/state_transitions.jsonl
+data/state_backups/
+data/.state.json.tmp
 *.log
 .cache/
 .browser-qa-cloudflare/

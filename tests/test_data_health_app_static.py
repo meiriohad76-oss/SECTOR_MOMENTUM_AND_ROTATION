@@ -10,6 +10,7 @@ def test_dashboard_renders_data_health_panel_before_market_state():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
     assert "from src.data_health import dashboard_health_summary, data_health_rows" in app_source
+    assert "state_storage_health" in app_source
     assert "provider_flow_health_statuses" in app_source
     assert "provider_flow_feeds_stubbed" in app_source
     assert "def render_data_health():" in app_source
@@ -20,6 +21,8 @@ def test_dashboard_renders_data_health_panel_before_market_state():
     assert "data-health-card" in app_source
     assert "data-health-provider-list" in app_source
     assert "data-health-role" in app_source
+    assert "Persisted state and transitions" in app_source
+    assert "state_persistence" in app_source
     assert "RENDERED | {last_update}" in app_source
     assert "60M CACHE" in app_source
     assert "_render_timed(\"render_data_health\", render_data_health)" in app_source
@@ -40,6 +43,7 @@ def test_data_health_uses_provider_statuses_to_determine_flow_stub_state():
     assert "provider_statuses = provider_flow_health_statuses()" in health_section
     assert "provider_flow_stubbed=provider_flow_feeds_stubbed(provider_statuses)" in health_section
     assert "provider_flow_statuses=provider_statuses" in health_section
+    assert "storage = state_storage_health()" in health_section
 
 
 def test_refresh_action_clears_all_dashboard_data_caches_and_compute_snapshot():
@@ -134,3 +138,10 @@ def test_data_health_panel_renders_lane_refresh_buttons_from_rows():
     assert "_lane_completed_text(" in health_section
     assert 'st.button("Refresh all lanes"' in health_section
     assert 'key="data_health_refresh_all_button"' in health_section
+
+
+def test_recent_transitions_label_is_record_based_not_day_based():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+
+    assert "{len(transitions)} latest records" in app_source
+    assert "{len(transitions)} in last 14d" not in app_source

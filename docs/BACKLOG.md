@@ -464,7 +464,7 @@ Resolved for this backlog pass:
 - **Deploy flow:** edit on Windows → `git add/commit/push` on Windows → SSH to Pi → `git pull` → `sudo systemctl restart sector-dashboard`. Pi never pushes.
 - **Branches:** currently all work lands on `main`. Consider feature branches once collaborating.
 - **Auth:** GitHub Personal Access Token stored in Windows credential helper. Renew every 90 days.
-- **State file:** `state.json` on the Pi is the source of truth for state-machine transitions. Don't delete unless you want to reset history.
+- **State files:** `data/state.json` on the Pi stores the latest state-machine snapshot, while `data/state_transitions.jsonl` is the append-only source of truth for transition history. `data/state_backups/` keeps latest/daily snapshot backups. A legacy repo-root `state.json` is migrated into `data/state.json`; do not delete Pi-local `data/` state files unless you intentionally want to reset history.
 - **Cache TTL:** 1 hour (`@st.cache_data(ttl=3600)` in `app.py`). Click the ↻ button or call `refresh_market_data(_load_data)` to force refresh.
 
 ---

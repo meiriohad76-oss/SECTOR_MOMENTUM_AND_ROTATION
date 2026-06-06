@@ -108,7 +108,7 @@ from src.saved_inputs import (
     save_portfolio,
     save_watchlist,
 )
-from src.scoring import compute_composite, apply_state_machine, recent_transitions
+from src.scoring import compute_composite, apply_state_machine, recent_transitions, state_storage_health
 from src.structured_logging import configure_structured_logging, log_event
 from src.table_sort import (
     FULL_TABLE_SORT_DIRECTIONS,
@@ -581,7 +581,14 @@ def _load_fred(refresh_token: str | None = None) -> dict:
 
 
 def _refresh_data_lane(lane_id: str) -> None:
-    lane_id = lane_id if lane_id in {"all", "market_ohlcv", "fred_macro", "dashboard_compute", "provider_flow"} else "all"
+    lane_id = lane_id if lane_id in {
+        "all",
+        "market_ohlcv",
+        "fred_macro",
+        "dashboard_compute",
+        "provider_flow",
+        "state_persistence",
+    } else "all"
     requested_at = datetime.now(timezone.utc).isoformat()
     cleared_caches: list[str] = []
 
@@ -622,7 +629,13 @@ def _mark_data_refresh_completed(ohlcv_result_obj) -> None:
     st.session_state.data_refresh_completed_request_at = requested_at
     st.session_state.data_refresh_completed_at = completed_at
     completed_by_lane = dict(st.session_state.get("data_refresh_completed_by_lane", {}) or {})
-    lane_ids = ("market_ohlcv", "fred_macro", "dashboard_compute", "provider_flow") if lane_id == "all" else (lane_id,)
+    lane_ids = (
+        "market_ohlcv",
+        "fred_macro",
+        "dashboard_compute",
+        "provider_flow",
+        "state_persistence",
+    ) if lane_id == "all" else (lane_id,)
     for completed_lane in lane_ids:
         completed_by_lane[str(completed_lane)] = completed_at
     st.session_state.data_refresh_completed_by_lane = completed_by_lane
@@ -1743,6 +1756,31 @@ def render_data_health():
         provider_flow_statuses=provider_statuses,
         fred_configured=fred_available(),
     )
+    storage = state_storage_health()
+    storage_status = "healthy" if storage.get("state_file_exists") and storage.get("transition_journal_exists") else "warning"
+    rows.append(
+        {
+            "source": "Persisted state and transitions",
+            "role": "Critical: dashboard memory for state changes, alerts, feeds, and debrief evidence",
+            "status": storage_status,
+            "latest": str(storage.get("state_updated") or "-"),
+            "freshness": (
+                f"{storage.get('by_ticker_count', 0)} states; "
+                f"{storage.get('journal_transition_count', 0)} journaled transitions"
+            ),
+            "coverage": f"latest transition {storage.get('latest_transition_date') or 'none'}",
+            "detail": (
+                f"state={storage.get('state_file')}; "
+                f"journal={storage.get('transition_journal')}; "
+                f"backups={storage.get('backup_dir')}"
+            ),
+            "lane_id": "state_persistence",
+            "sla": "must persist across restarts",
+            "refresh_label": "Re-read state log",
+            "refresh_key": "data_health_refresh_state_persistence",
+            "severity_symbol": "OK" if storage_status == "healthy" else "WARN",
+        }
+    )
     summary = dashboard_health_summary(rows)
     requested_at = st.session_state.get("data_refresh_requested_at")
     refresh_text = f"Manual refresh requested {requested_at}" if requested_at else "No manual refresh in this session"
@@ -1941,7 +1979,7 @@ def render_alerts():
     html = f"""
     <section class="section">
       <div class="section-head">
-        <h2>Recent transitions <span class="count">{len(transitions)} in last 14d</span></h2>
+        <h2>Recent transitions <span class="count">{len(transitions)} latest records</span></h2>
         <div class="right">{datetime.now().strftime('%H:%M').upper()}</div>
       </div>
       <div class="alerts">{rows}</div>

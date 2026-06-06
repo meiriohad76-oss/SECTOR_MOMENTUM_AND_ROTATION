@@ -97,6 +97,12 @@ def test_apply_state_machine_persists_transitions_to_patched_state_file(tmp_path
     assert saved["transitions"][-1]["ticker"] == "XLK"
     assert saved["transitions"][-1]["from"] == "HOLD"
     assert saved["transitions"][-1]["to"] == "WARNING"
+    journal_rows = [
+        json.loads(line)
+        for line in (tmp_path / "state_transitions.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert journal_rows[-1]["ticker"] == "XLK"
+    assert journal_rows[-1]["to"] == "WARNING"
 
 
 def test_state_file_can_be_configured_from_environment(tmp_path, monkeypatch):
@@ -109,6 +115,50 @@ def test_state_file_can_be_configured_from_environment(tmp_path, monkeypatch):
     finally:
         monkeypatch.delenv("STATE_FILE", raising=False)
         importlib.reload(scoring)
+
+
+def test_transition_journal_can_be_configured_from_environment(tmp_path, monkeypatch):
+    state_file = tmp_path / "container-state.json"
+    journal_file = tmp_path / "journal" / "transitions.jsonl"
+
+    monkeypatch.setenv("STATE_FILE", str(state_file))
+    monkeypatch.setenv("STATE_TRANSITION_JOURNAL", str(journal_file))
+    reloaded = importlib.reload(scoring)
+    try:
+        assert reloaded.STATE_FILE == state_file
+        assert reloaded.STATE_TRANSITION_JOURNAL == journal_file
+        assert reloaded._transition_journal_path() == journal_file
+    finally:
+        monkeypatch.delenv("STATE_FILE", raising=False)
+        monkeypatch.delenv("STATE_TRANSITION_JOURNAL", raising=False)
+        importlib.reload(scoring)
+
+
+def test_default_state_file_migrates_legacy_root_state(tmp_path, monkeypatch):
+    legacy_file = tmp_path / "state.json"
+    state_file = tmp_path / "data" / "state.json"
+    legacy_file.write_text(
+        json.dumps(
+            {
+                "updated": "2026-05-18T00:00:00+00:00",
+                "by_ticker": {"XLK": {"state": "HOLD", "date": "2026-05-18"}},
+                "transitions": [
+                    {"ticker": "XLK", "from": "EXIT", "to": "HOLD", "date": "2026-05-18"}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(scoring, "STATE_FILE", state_file)
+    monkeypatch.setattr(scoring, "LEGACY_STATE_FILE", legacy_file)
+    monkeypatch.setattr(scoring, "STATE_TRANSITION_JOURNAL", None)
+    monkeypatch.setattr(scoring, "_STATE_FILE_EXPLICIT", False)
+
+    prior = scoring._load_state()
+
+    assert prior["XLK"]["state"] == "HOLD"
+    assert state_file.exists()
+    assert scoring.recent_transitions(n=1)[0]["ticker"] == "XLK"
 
 
 def test_apply_state_machine_dates_transitions_by_us_eastern_day(tmp_path, monkeypatch):
@@ -163,3 +213,96 @@ def test_apply_state_machine_notifies_after_persisting_transitions(tmp_path, mon
     assert sent[-1]["ticker"] == "XLK"
     assert sent[-1]["from"] == "HOLD"
     assert sent[-1]["to"] == "WARNING"
+
+
+def test_recent_transitions_survives_snapshot_transition_loss(tmp_path, monkeypatch):
+    state_file = tmp_path / "state.json"
+    monkeypatch.setattr(scoring, "STATE_FILE", state_file)
+    monkeypatch.setattr(scoring, "STATE_TRANSITION_JOURNAL", None)
+    monkeypatch.setattr(scoring, "_STATE_FILE_EXPLICIT", True)
+    monkeypatch.setattr(scoring, "_send_transition_alerts", lambda transitions: None)
+    state_file.write_text(
+        json.dumps(
+            {
+                "updated": "2026-05-18T00:00:00",
+                "by_ticker": {"XLK": {"state": "HOLD", "date": "2026-05-18"}},
+                "transitions": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    scoring.apply_state_machine(pd.DataFrame([_row(rrg_quadrant="Weakening", cmf21=0.02)], index=["XLK"]))
+    payload = json.loads(state_file.read_text(encoding="utf-8"))
+    payload["transitions"] = []
+    state_file.write_text(json.dumps(payload), encoding="utf-8")
+
+    rows = scoring.recent_transitions(n=5)
+
+    assert rows[0]["ticker"] == "XLK"
+    assert rows[0]["from"] == "HOLD"
+    assert rows[0]["to"] == "WARNING"
+
+
+def test_save_state_creates_empty_transition_journal_on_baseline_run(tmp_path, monkeypatch):
+    state_file = tmp_path / "state.json"
+    monkeypatch.setattr(scoring, "STATE_FILE", state_file)
+    monkeypatch.setattr(scoring, "STATE_TRANSITION_JOURNAL", None)
+    monkeypatch.setattr(scoring, "_STATE_FILE_EXPLICIT", True)
+    monkeypatch.setattr(scoring, "_send_transition_alerts", lambda transitions: None)
+
+    scoring.apply_state_machine(pd.DataFrame([_row()], index=["XLK"]))
+
+    journal_file = tmp_path / "state_transitions.jsonl"
+    assert journal_file.exists()
+    assert journal_file.read_text(encoding="utf-8") == ""
+
+
+def test_save_state_creates_latest_and_daily_backups(tmp_path, monkeypatch):
+    state_file = tmp_path / "state.json"
+    monkeypatch.setattr(scoring, "STATE_FILE", state_file)
+    monkeypatch.setattr(scoring, "STATE_TRANSITION_JOURNAL", None)
+    monkeypatch.setattr(scoring, "_send_transition_alerts", lambda transitions: None)
+    state_file.write_text(
+        json.dumps(
+            {
+                "updated": "2026-05-18T00:00:00+00:00",
+                "by_ticker": {"XLK": {"state": "HOLD", "date": "2026-05-18"}},
+                "transitions": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    scoring.apply_state_machine(pd.DataFrame([_row(rrg_quadrant="Weakening", cmf21=0.02)], index=["XLK"]))
+
+    backup_dir = tmp_path / "state_backups"
+    assert (backup_dir / "state-latest.json").exists()
+    assert list(backup_dir.glob("state-*.json"))
+
+
+def test_state_storage_health_reports_paths_and_counts(tmp_path, monkeypatch):
+    state_file = tmp_path / "state.json"
+    monkeypatch.setattr(scoring, "STATE_FILE", state_file)
+    monkeypatch.setattr(scoring, "STATE_TRANSITION_JOURNAL", None)
+    monkeypatch.setattr(scoring, "_send_transition_alerts", lambda transitions: None)
+    state_file.write_text(
+        json.dumps(
+            {
+                "updated": "2026-05-18T00:00:00+00:00",
+                "by_ticker": {"XLK": {"state": "HOLD", "date": "2026-05-18"}},
+                "transitions": [
+                    {"ticker": "XLK", "from": "EXIT", "to": "HOLD", "date": "2026-05-18"}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    health = scoring.state_storage_health()
+
+    assert health["state_file"] == str(state_file)
+    assert health["state_file_exists"] is True
+    assert health["by_ticker_count"] == 1
+    assert health["journal_transition_count"] == 1
+    assert health["latest_transition_date"] == "2026-05-18"

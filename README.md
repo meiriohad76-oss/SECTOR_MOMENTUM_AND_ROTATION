@@ -29,7 +29,7 @@ A Streamlit dashboard that monitors **83+ instruments across US sectors, US indu
 - A **single-page Streamlit app** (`app.py`) with two sections:
   - **Top:** 7-pillar heatmap — every ticker scored on every pillar, color-coded, with composite score and current state (`STAGE_2_BULLISH` / `HOLD` / `WARNING` / `EXIT` / `BEARISH_STAGE_4` / `STAGE_1_BASING`).
   - **Below:** drill-down tabs — RRG quadrant chart, cross-sectional momentum bar, institutional flow detail, state-machine transition log, per-ticker deep dive with price/CMF/OBV charts.
-- A **persistent state machine** (`state.json`) so bearish transitions trigger only once and stay visible across sessions.
+- A **persistent state machine** (`data/state.json` plus `data/state_transitions.jsonl`) so bearish transitions trigger only once and stay visible across sessions and restarts.
 - A **bearish alert system** with three severity levels (WARNING → EXIT → BEARISH) plus three flow-only early warnings (distribution day, dark-pool sell, OBV/price divergence).
 - **No paid feeds required for v1** — defaults to free Yahoo Finance data. Historical OHLCV can use Massive when `MASSIVE_API_KEY` is configured, and institutional-flow stubs ship pre-wired so you can drop in iShares SHO, Massive, FINRA, or SEC EDGAR feeds when ready.
 
@@ -348,7 +348,7 @@ URLs, or raw provider payloads.
 
 ## State transition alerts
 
-`apply_state_machine()` writes `state.json` first, then sends optional transition alerts through Telegram, Slack, Discord, and/or Mattermost. Alert delivery deduplicates repeated transition rows and retries transient HTTP failures with bounded backoff. Leave alert secrets unset to disable network calls. To enable alerts, configure `TELEGRAM_BOT_TOKEN` plus `TELEGRAM_CHAT_ID`, and/or `SLACK_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL`, or `MATTERMOST_WEBHOOK_URL`, in Streamlit secrets or environment variables.
+`apply_state_machine()` writes the durable state snapshot to `data/state.json`, appends state changes to `data/state_transitions.jsonl`, keeps local backups under `data/state_backups/`, and then sends optional transition alerts through Telegram, Slack, Discord, and/or Mattermost. If an old repo-root `state.json` exists and no explicit `STATE_FILE` is configured, it is migrated into `data/state.json` before the next write. Alert delivery deduplicates repeated transition rows and retries transient HTTP failures with bounded backoff. Leave alert secrets unset to disable network calls. To enable alerts, configure `TELEGRAM_BOT_TOKEN` plus `TELEGRAM_CHAT_ID`, and/or `SLACK_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL`, or `MATTERMOST_WEBHOOK_URL`, in Streamlit secrets or environment variables.
 
 B-123 adds a Discord/Mattermost-only smoke script so webhook configuration can be checked without touching Telegram or Slack:
 

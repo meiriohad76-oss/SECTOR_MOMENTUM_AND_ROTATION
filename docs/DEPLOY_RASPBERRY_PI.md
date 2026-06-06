@@ -161,6 +161,32 @@ Append:
 
 This hits the dashboard at 22:00 daily, which forces a state-machine pass.
 
+## Verify durable state persistence
+
+The Pi should keep dashboard memory under the checkout's `data/` directory, not
+only in repo-root `state.json`. The service template sets:
+
+```ini
+Environment=STATE_FILE=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION/data/state.json
+Environment=STATE_TRANSITION_JOURNAL=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION/data/state_transitions.jsonl
+```
+
+After deploy/restart, verify the paths and counts:
+
+```bash
+cd ~/SECTOR_MOMENTUM_AND_ROTATION
+./.venv/bin/python - <<'PY'
+from src.scoring import state_storage_health
+print(state_storage_health())
+PY
+ls -lah data/state.json data/state_transitions.jsonl data/state_backups 2>/dev/null || true
+```
+
+If a legacy repo-root `state.json` exists and `data/state.json` does not, the app
+migrates it into `data/state.json` on the next state read/write. The transition
+journal is append-only, so losing or truncating the snapshot should not erase the
+Recent transitions panel.
+
 ## Optional: schedule the 08:00 ET email digest
 
 B-120 ships a LOW-severity digest script and a systemd timer template. Before enabling the timer, configure the SMTP values in `.streamlit/secrets.toml`, then run a no-send diagnostic:

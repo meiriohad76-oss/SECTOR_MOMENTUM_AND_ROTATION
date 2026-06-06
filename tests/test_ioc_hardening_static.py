@@ -52,6 +52,11 @@ def test_systemd_template_targets_current_ahadpi5_checkout():
     assert "User=ahad" in unit
     assert "Group=ahad" in unit
     assert "WorkingDirectory=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION" in unit
+    assert "Environment=STATE_FILE=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION/data/state.json" in unit
+    assert (
+        "Environment=STATE_TRANSITION_JOURNAL=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION/data/state_transitions.jsonl"
+        in unit
+    )
     assert "/home/ahad/SECTOR_MOMENTUM_AND_ROTATION/.venv/bin/streamlit run app.py" in unit
     assert "/home/meiri/sector-rotation-dashboard" not in unit
 

@@ -8,6 +8,8 @@ import json
 from datetime import datetime, timezone
 import os
 from pathlib import Path
+import shutil
+import threading
 from typing import Mapping, Optional
 from zoneinfo import ZoneInfo
 
@@ -18,7 +20,17 @@ from .universe import class_of, TOP_N
 from .macro import cycle_tilt
 
 
-STATE_FILE = Path(os.environ.get("STATE_FILE", Path(__file__).resolve().parent.parent / "state.json"))
+ROOT = Path(__file__).resolve().parent.parent
+LEGACY_STATE_FILE = ROOT / "state.json"
+DEFAULT_STATE_DIR = ROOT / "data"
+_STATE_FILE_EXPLICIT = "STATE_FILE" in os.environ
+STATE_FILE = Path(os.environ.get("STATE_FILE", DEFAULT_STATE_DIR / "state.json"))
+STATE_TRANSITION_JOURNAL = (
+    Path(os.environ["STATE_TRANSITION_JOURNAL"])
+    if os.environ.get("STATE_TRANSITION_JOURNAL")
+    else None
+)
+_STATE_LOCK = threading.RLock()
 EASTERN_TZ = ZoneInfo("America/New_York")
 
 STATES = ["STAGE_2_BULLISH", "HOLD", "WARNING", "EXIT", "BEARISH_STAGE_4", "STAGE_1_BASING"]
@@ -248,30 +260,149 @@ def apply_state_machine(scored_df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _transition_journal_path() -> Path:
+    return Path(STATE_TRANSITION_JOURNAL) if STATE_TRANSITION_JOURNAL else STATE_FILE.with_name("state_transitions.jsonl")
+
+
+def _state_backup_dir() -> Path:
+    return STATE_FILE.with_name("state_backups")
+
+
+def _atomic_write_json(path: Path, payload: Mapping[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.name}.tmp")
+    tmp_path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    os.replace(tmp_path, path)
+
+
+def _read_json_file(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _maybe_migrate_legacy_state() -> None:
+    if _STATE_FILE_EXPLICIT or STATE_FILE.exists() or not LEGACY_STATE_FILE.exists():
+        return
+    try:
+        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(LEGACY_STATE_FILE, STATE_FILE)
+    except Exception:
+        pass
+
+
+def _backup_existing_state(payload: Mapping[str, object]) -> None:
+    if not payload:
+        return
+    try:
+        backup_dir = _state_backup_dir()
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        today = _transition_date()
+        _atomic_write_json(backup_dir / "state-latest.json", payload)
+        _atomic_write_json(backup_dir / f"state-{today}.json", payload)
+    except Exception:
+        pass
+
+
+def _normalize_transition(row: Mapping[str, object]) -> dict:
+    return {
+        "ticker": str(row.get("ticker", "")).upper(),
+        "from": str(row.get("from", "")),
+        "to": str(row.get("to", "")),
+        "date": str(row.get("date", "")),
+    }
+
+
+def _transition_key(row: Mapping[str, object]) -> tuple[str, str, str, str]:
+    normalized = _normalize_transition(row)
+    return (
+        normalized["ticker"],
+        normalized["from"],
+        normalized["to"],
+        normalized["date"],
+    )
+
+
+def _read_transition_journal() -> list[dict]:
+    journal_path = _transition_journal_path()
+    if not journal_path.exists():
+        return []
+    rows: list[dict] = []
+    try:
+        for line in journal_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                parsed = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(parsed, dict):
+                rows.append(_normalize_transition(parsed))
+    except Exception:
+        return rows
+    return rows
+
+
+def _append_transition_journal(transitions: list[dict]) -> None:
+    if not transitions:
+        return
+    journal_path = _transition_journal_path()
+    journal_path.parent.mkdir(parents=True, exist_ok=True)
+    existing_keys = {_transition_key(row) for row in _read_transition_journal()}
+    new_rows = [
+        _normalize_transition(row)
+        for row in transitions
+        if _transition_key(row) not in existing_keys
+    ]
+    if not new_rows:
+        return
+    with journal_path.open("a", encoding="utf-8") as f:
+        for row in new_rows:
+            f.write(json.dumps(row, sort_keys=True, default=str) + "\n")
+
+
+def _ensure_transition_journal_file() -> None:
+    journal_path = _transition_journal_path()
+    journal_path.parent.mkdir(parents=True, exist_ok=True)
+    journal_path.touch(exist_ok=True)
+
+
+def _seed_transition_journal(snapshot_transitions: list[dict]) -> None:
+    journal_path = _transition_journal_path()
+    if journal_path.exists() or not snapshot_transitions:
+        return
+    _append_transition_journal(snapshot_transitions)
+
+
+def _state_payload() -> dict:
+    _maybe_migrate_legacy_state()
+    return _read_json_file(STATE_FILE)
+
+
 def _load_state() -> dict:
-    if STATE_FILE.exists():
-        try:
-            with open(STATE_FILE, "r") as f:
-                return json.load(f).get("by_ticker", {})
-        except Exception:
-            return {}
-    return {}
+    return dict(_state_payload().get("by_ticker", {}) or {})
 
 
 def _save_state(by_ticker: dict, transitions: list[dict]) -> None:
-    payload = {"updated": datetime.now(timezone.utc).isoformat(), "by_ticker": by_ticker}
-    # keep a small rolling alert log
-    log = []
-    if STATE_FILE.exists():
-        try:
-            with open(STATE_FILE, "r") as f:
-                log = json.load(f).get("transitions", [])
-        except Exception:
-            log = []
-    log.extend(transitions)
-    payload["transitions"] = log[-500:]   # cap to last 500 transitions
-    with open(STATE_FILE, "w") as f:
-        json.dump(payload, f, indent=2, default=str)
+    with _STATE_LOCK:
+        existing_payload = _state_payload()
+        _backup_existing_state(existing_payload)
+        log = list(existing_payload.get("transitions", []) or [])
+        _seed_transition_journal(log)
+        normalized_transitions = [_normalize_transition(row) for row in transitions]
+        _append_transition_journal(normalized_transitions)
+        _ensure_transition_journal_file()
+        log.extend(normalized_transitions)
+        payload = {
+            "updated": datetime.now(timezone.utc).isoformat(),
+            "by_ticker": by_ticker,
+            "transitions": log[-500:],   # cap snapshot; journal remains append-only
+            "transition_journal": str(_transition_journal_path()),
+        }
+        _atomic_write_json(STATE_FILE, payload)
     if transitions:
         _send_transition_alerts(transitions)
 
@@ -286,11 +417,33 @@ def _send_transition_alerts(transitions: list[dict]) -> None:
 
 
 def recent_transitions(n: int = 25) -> list[dict]:
-    if not STATE_FILE.exists():
-        return []
-    try:
-        with open(STATE_FILE, "r") as f:
-            d = json.load(f)
-        return list(reversed(d.get("transitions", [])))[:n]
-    except Exception:
-        return []
+    with _STATE_LOCK:
+        payload = _state_payload()
+        snapshot_transitions = list(payload.get("transitions", []) or [])
+        _seed_transition_journal(snapshot_transitions)
+        journal_rows = _read_transition_journal()
+        source_rows = journal_rows if journal_rows else snapshot_transitions
+        return list(reversed(source_rows))[:n]
+
+
+def state_storage_health() -> dict[str, object]:
+    """Return observability for Pi/local state persistence."""
+    with _STATE_LOCK:
+        payload = _state_payload()
+        snapshot_transitions = list(payload.get("transitions", []) or [])
+        _seed_transition_journal(snapshot_transitions)
+        journal_rows = _read_transition_journal()
+        latest_transition = journal_rows[-1] if journal_rows else (snapshot_transitions[-1] if snapshot_transitions else {})
+        return {
+            "state_file": str(STATE_FILE),
+            "state_file_exists": STATE_FILE.exists(),
+            "state_updated": payload.get("updated", ""),
+            "by_ticker_count": len(payload.get("by_ticker", {}) or {}),
+            "snapshot_transition_count": len(snapshot_transitions),
+            "transition_journal": str(_transition_journal_path()),
+            "transition_journal_exists": _transition_journal_path().exists(),
+            "journal_transition_count": len(journal_rows),
+            "latest_transition_date": latest_transition.get("date", "") if isinstance(latest_transition, dict) else "",
+            "backup_dir": str(_state_backup_dir()),
+            "backup_dir_exists": _state_backup_dir().exists(),
+        }
