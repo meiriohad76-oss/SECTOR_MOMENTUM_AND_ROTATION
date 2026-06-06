@@ -66,14 +66,14 @@ python -m pytest tests/test_browser_qa.py tests/test_browser_qa_script_static.py
 Dashboard smoke before capture:
 
 ```powershell
-Invoke-WebRequest http://127.0.0.1:18601/?ticker=XLK
+Invoke-WebRequest http://127.0.0.1:8503/?ticker=XLK
 # HTTP_STATUS=200
 ```
 
 Browser capture:
 
 ```powershell
-python scripts/capture_browser_qa.py --base-url http://127.0.0.1:18601 --browser-channel chrome --out-dir docs/browser-qa/latest --timeout-ms 120000 --settle-ms 5000 --qa-mode browser-qa-secret-free
+python scripts/capture_browser_qa.py --base-url http://127.0.0.1:8503 --browser-channel chrome --out-dir docs/browser-qa/latest --timeout-ms 120000 --settle-ms 5000 --qa-mode browser-qa-secret-free
 # browser_qa=written out_dir=docs\browser-qa\latest qa_mode=browser-qa-secret-free targets=9 failed=0
 ```
 
@@ -121,7 +121,7 @@ Then verify GitHub remote state and the Pi deployment before starting the next b
 
 A local QA Streamlit process may still be running on:
 
-- `http://127.0.0.1:18601/?ticker=XLK`
+- `http://127.0.0.1:8503/?ticker=XLK`
 
 Clean it up before switching tasks:
 

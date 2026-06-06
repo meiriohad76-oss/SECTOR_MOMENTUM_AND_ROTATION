@@ -34,13 +34,16 @@ def test_streamlit_config_sets_safe_server_defaults():
     assert config["theme"]["base"] == "dark"
 
 
-def test_streamlit_secret_template_keeps_tls_on_and_free_finra_live():
+def test_streamlit_secret_template_keeps_tls_on_and_provider_feeds_stub_safe():
     template = (ROOT / ".streamlit" / "secrets.toml.example").read_text(encoding="utf-8")
     parsed = tomllib.loads(template)
 
     assert parsed["MASSIVE_VERIFY_SSL"] == "true"
-    assert parsed["FINRA_ATS_STUB_MODE"] == "false"
-    assert parsed["FINRA_SHORT_INTEREST_STUB_MODE"] == "false"
+    assert parsed["ETF_PRIMARY_FLOW_URL_SOXX"] == ""
+    assert parsed["FINRA_ATS_STUB_MODE"] == "true"
+    assert parsed["FINRA_SHORT_INTEREST_STUB_MODE"] == "true"
+    assert parsed["SEC_13F_DATA_URL"] == ""
+    assert parsed["SEC_13F_CUSIP_XLK"] == ""
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
     assert ".streamlit/secrets.toml" in gitignore
     assert "docs/IOC_AUDIT_*.md" in gitignore

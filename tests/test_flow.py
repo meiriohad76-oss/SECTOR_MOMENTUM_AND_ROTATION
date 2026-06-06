@@ -184,9 +184,27 @@ def test_provider_flow_health_statuses_warn_on_last_live_provider_fallback(monke
     by_id = {row["id"]: row for row in flow.provider_flow_health_statuses()}
 
     assert by_id["finra_ats_dark_pool"]["status"] == "warning"
-    assert by_id["finra_ats_dark_pool"]["mode"] == "request error neutral"
+    assert by_id["finra_ats_dark_pool"]["mode"] == "provider error neutral"
     assert "Timeout" in by_id["finra_ats_dark_pool"]["detail"]
     assert "provider timed out" not in by_id["finra_ats_dark_pool"]["detail"]
+
+
+def test_provider_flow_health_statuses_warn_on_non_http_parse_failure(monkeypatch):
+    flow.reset_provider_flow_runtime_health()
+    monkeypatch.setattr(flow, "FINRA_ATS_STUB_MODE", False, raising=False)
+
+    def fail_parse(ticker):
+        raise ValueError("raw vendor payload should not escape")
+
+    monkeypatch.setattr(flow, "_provider_dark_pool_pct", fail_parse)
+
+    assert flow.dark_pool_pct("XLK") == pytest.approx(0.40)
+    by_id = {row["id"]: row for row in flow.provider_flow_health_statuses()}
+
+    assert by_id["finra_ats_dark_pool"]["status"] == "warning"
+    assert by_id["finra_ats_dark_pool"]["mode"] == "provider error neutral"
+    assert "ValueError" in by_id["finra_ats_dark_pool"]["detail"]
+    assert "raw vendor payload" not in by_id["finra_ats_dark_pool"]["detail"]
 
 
 def test_provider_flow_health_statuses_warn_on_missing_ticker_source(monkeypatch):
@@ -212,6 +230,23 @@ def test_compute_flow_signals_blocks_unexpected_primary_flow_fetch(
 
     with pytest.raises(AssertionError, match="tests must opt in"):
         flow.compute_flow_signals({"XLK": ohlcv_frame_factory(days=80)})
+
+
+def test_compute_flow_signals_replaces_provider_health_snapshot_per_run(monkeypatch, ohlcv_frame_factory):
+    flow.reset_provider_flow_runtime_health()
+    monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", False, raising=False)
+    monkeypatch.setattr(flow, "FINRA_ATS_STUB_MODE", True, raising=False)
+    monkeypatch.setattr(flow, "FINRA_SHORT_INTEREST_STUB_MODE", True, raising=False)
+    monkeypatch.setattr(flow, "SEC_13F_STUB_MODE", True, raising=False)
+    monkeypatch.setattr(flow, "_resolve_secret", lambda name: "secret" if name == "MASSIVE_API_KEY" else None)
+    monkeypatch.setattr(flow, "_provider_block_trade_upside_ratio", lambda ticker: 1.5)
+
+    flow.compute_flow_signals({"XLK": ohlcv_frame_factory(days=80)})
+    flow.compute_flow_signals({"XLF": ohlcv_frame_factory(days=80)})
+    by_id = {row["id"]: row for row in flow.provider_flow_health_statuses()}
+
+    assert "XLF" in by_id["massive_block_trades"]["detail"]
+    assert "XLK" not in by_id["massive_block_trades"]["detail"]
 
 
 def test_flow_composite_z_handles_constant_inputs_without_nan():

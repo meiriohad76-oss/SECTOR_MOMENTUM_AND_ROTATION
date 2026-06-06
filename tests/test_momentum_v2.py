@@ -6,6 +6,10 @@ from src.momentum_v2 import (
     DISPLAY_LABELS,
     PILLAR_ORDER,
     SCREEN_LABELS,
+    _c_momentum_bars,
+    _flow_river_html,
+    _momentum_rows,
+    _terminal_momentum_bars,
     build_view_rows,
     contribution_sum,
     css,
@@ -55,6 +59,13 @@ def test_build_view_rows_exposes_all_seven_pillars_and_identity():
     assert xlk.identity == "Technology sector"
     assert xlk.display_label == "XLK | Technology sector"
     assert xlk.reasons
+
+
+def test_momentum_bar_and_flow_helpers_render_empty_universe_messages():
+    assert "No momentum rows available" in _momentum_rows([])
+    assert "No momentum rows available" in _terminal_momentum_bars([])
+    assert "No momentum rows available" in _c_momentum_bars([])
+    assert "No flow rows" in _flow_river_html([])
 
 
 def test_pillar_contributions_reconstruct_s_score_before_veto():

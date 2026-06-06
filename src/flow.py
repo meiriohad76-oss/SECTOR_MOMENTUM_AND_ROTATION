@@ -6,12 +6,14 @@ configuration. Other provider-backed signals stay neutral until wired.
 """
 from __future__ import annotations
 
+import contextvars
 import csv
 from datetime import datetime, timezone
 import io
 import json
 import os
 import re
+import threading
 import zipfile
 from dataclasses import dataclass
 from typing import Iterable, Optional
@@ -59,12 +61,41 @@ FINRA_SHORT_INTEREST_URL = "https://api.finra.org/data/group/otcmarket/name/cons
 PRIMARY_FLOW_SOURCE_ENV_PREFIX = "ETF_PRIMARY_FLOW_URL_"
 BLOCK_TRADE_MIN_SHARES = 10_000
 BLOCK_TRADE_MIN_NOTIONAL = 200_000.0
+PROVIDER_NEUTRAL_EXCEPTIONS = (
+    requests.RequestException,
+    ValueError,
+    TypeError,
+    KeyError,
+    IndexError,
+    json.JSONDecodeError,
+    zipfile.BadZipFile,
+    csv.Error,
+    pd.errors.ParserError,
+)
 _PROVIDER_FLOW_RUNTIME_HEALTH: dict[str, dict[str, object]] = {}
+_PROVIDER_FLOW_RUNTIME_HEALTH_LOCK = threading.RLock()
+_CURRENT_PROVIDER_FLOW_RUNTIME_HEALTH: contextvars.ContextVar[dict[str, dict[str, object]] | None] = (
+    contextvars.ContextVar("provider_flow_runtime_health", default=None)
+)
 
 
 def reset_provider_flow_runtime_health() -> None:
     """Clear in-process provider-flow diagnostics, primarily for tests and QA runs."""
-    _PROVIDER_FLOW_RUNTIME_HEALTH.clear()
+    with _PROVIDER_FLOW_RUNTIME_HEALTH_LOCK:
+        _PROVIDER_FLOW_RUNTIME_HEALTH.clear()
+    current = _CURRENT_PROVIDER_FLOW_RUNTIME_HEALTH.get()
+    if current is not None:
+        current.clear()
+
+
+def _provider_flow_runtime_health_target() -> dict[str, dict[str, object]]:
+    current = _CURRENT_PROVIDER_FLOW_RUNTIME_HEALTH.get()
+    return current if current is not None else _PROVIDER_FLOW_RUNTIME_HEALTH
+
+
+def _provider_flow_runtime_health_snapshot() -> dict[str, dict[str, object]]:
+    with _PROVIDER_FLOW_RUNTIME_HEALTH_LOCK:
+        return {key: dict(value) for key, value in _PROVIDER_FLOW_RUNTIME_HEALTH.items()}
 
 
 def _provider_runtime_timestamp() -> str:
@@ -91,39 +122,48 @@ def _record_provider_flow_runtime_health(
     if note:
         event_parts.append(note)
     event_detail = "; ".join(event_parts)
-    entry = _PROVIDER_FLOW_RUNTIME_HEALTH.setdefault(
-        row_id,
-        {
-            "last_completed": completed_at,
-            "total_count": 0,
-            "status_counts": {},
-            "mode_counts": {},
-            "samples": [],
-            "events": [],
-        },
-    )
-    entry["last_completed"] = completed_at
-    entry["total_count"] = int(entry.get("total_count", 0)) + 1
-    status_counts = dict(entry.get("status_counts", {}) or {})
-    status_counts[status] = int(status_counts.get(status, 0)) + 1
-    entry["status_counts"] = status_counts
-    mode_counts = dict(entry.get("mode_counts", {}) or {})
-    mode_counts[mode] = int(mode_counts.get(mode, 0)) + 1
-    entry["mode_counts"] = mode_counts
-    samples = list(entry.get("samples", []) or [])
-    if symbol not in samples and len(samples) < 5:
-        samples.append(symbol)
-    entry["samples"] = samples
-    events = list(entry.get("events", []) or [])
-    if len(events) < 5:
-        events.append(event_detail)
-    entry["events"] = events
+    target = _provider_flow_runtime_health_target()
+
+    def update_target() -> None:
+        entry = target.setdefault(
+            row_id,
+            {
+                "last_completed": completed_at,
+                "total_count": 0,
+                "status_counts": {},
+                "mode_counts": {},
+                "samples": [],
+                "events": [],
+            },
+        )
+        entry["last_completed"] = completed_at
+        entry["total_count"] = int(entry.get("total_count", 0)) + 1
+        status_counts = dict(entry.get("status_counts", {}) or {})
+        status_counts[status] = int(status_counts.get(status, 0)) + 1
+        entry["status_counts"] = status_counts
+        mode_counts = dict(entry.get("mode_counts", {}) or {})
+        mode_counts[mode] = int(mode_counts.get(mode, 0)) + 1
+        entry["mode_counts"] = mode_counts
+        samples = list(entry.get("samples", []) or [])
+        if symbol not in samples and len(samples) < 5:
+            samples.append(symbol)
+        entry["samples"] = samples
+        events = list(entry.get("events", []) or [])
+        if len(events) < 5:
+            events.append(event_detail)
+        entry["events"] = events
+
+    if target is _PROVIDER_FLOW_RUNTIME_HEALTH:
+        with _PROVIDER_FLOW_RUNTIME_HEALTH_LOCK:
+            update_target()
+    else:
+        update_target()
 
 
 def _merge_provider_runtime_health(row: dict[str, str], *, stubbed: bool) -> dict[str, str]:
     if stubbed or str(row.get("mode", "")).startswith("missing "):
         return row
-    runtime = _PROVIDER_FLOW_RUNTIME_HEALTH.get(str(row.get("id", "")))
+    runtime = _provider_flow_runtime_health_snapshot().get(str(row.get("id", "")))
     if not runtime:
         return row
     total_count = int(runtime.get("total_count", 0))
@@ -525,12 +565,14 @@ def etf_primary_flow_5d_pct(ticker):
         return 0.0
     try:
         payload = _fetch_primary_flow_payload(ticker)
-    except requests.RequestException as exc:
+        snapshots = parse_primary_flow_snapshots(payload or "")
+        value = primary_flow_5d_pct_from_snapshots(snapshots)
+    except PROVIDER_NEUTRAL_EXCEPTIONS as exc:
         _record_provider_flow_runtime_health(
             "etf_primary_flow",
             ticker=ticker,
             status="warning",
-            mode="request error neutral",
+            mode="provider error neutral",
             error=exc,
         )
         return 0.0
@@ -549,8 +591,6 @@ def etf_primary_flow_5d_pct(ticker):
             note=note,
         )
         return 0.0
-    snapshots = parse_primary_flow_snapshots(payload)
-    value = primary_flow_5d_pct_from_snapshots(snapshots)
     if value is None:
         _record_provider_flow_runtime_health(
             "etf_primary_flow",
@@ -667,12 +707,12 @@ def block_trade_upside_ratio(ticker):
         return 1.0
     try:
         value = _provider_block_trade_upside_ratio(ticker)
-    except requests.RequestException as exc:
+    except PROVIDER_NEUTRAL_EXCEPTIONS as exc:
         _record_provider_flow_runtime_health(
             "massive_block_trades",
             ticker=ticker,
             status="warning",
-            mode="request error neutral",
+            mode="provider error neutral",
             error=exc,
         )
         return 1.0
@@ -759,12 +799,12 @@ def dark_pool_pct(ticker):
         return 0.40
     try:
         value = _provider_dark_pool_pct(ticker)
-    except requests.RequestException as exc:
+    except PROVIDER_NEUTRAL_EXCEPTIONS as exc:
         _record_provider_flow_runtime_health(
             "finra_ats_dark_pool",
             ticker=ticker,
             status="warning",
-            mode="request error neutral",
+            mode="provider error neutral",
             error=exc,
         )
         return 0.40
@@ -863,12 +903,12 @@ def short_interest_delta_15d(ticker):
         return 0.0
     try:
         value = _provider_short_interest_delta_15d(ticker)
-    except requests.RequestException as exc:
+    except PROVIDER_NEUTRAL_EXCEPTIONS as exc:
         _record_provider_flow_runtime_health(
             "finra_short_interest",
             ticker=ticker,
             status="warning",
-            mode="request error neutral",
+            mode="provider error neutral",
             error=exc,
         )
         return 0.0
@@ -971,12 +1011,12 @@ def thirteen_f_net_buys_q(ticker):
         return 0.0
     try:
         value = _provider_thirteen_f_net_buys_q(ticker)
-    except requests.RequestException as exc:
+    except PROVIDER_NEUTRAL_EXCEPTIONS as exc:
         _record_provider_flow_runtime_health(
             "sec_13f",
             ticker=ticker,
             status="warning",
-            mode="request error neutral",
+            mode="provider error neutral",
             error=exc,
         )
         return 0.0
@@ -1001,26 +1041,33 @@ def thirteen_f_net_buys_q(ticker):
 
 
 def compute_flow_signals(ohlcv):
-    reset_provider_flow_runtime_health()
-    rows = []
-    for t, df in ohlcv.items():
-        if str(t).startswith("^"):
-            continue
-        rows.append({
-            "ticker":          t,
-            "cmf21":           chaikin_money_flow(df, 21),
-            "obv_slope":       obv_slope(df, 20),
-            "mfi14":           money_flow_index(df, 14),
-            "rvol":            relative_volume(df, 20),
-            "dist_days_25":    distribution_day_count(df, 25),
-            "obv_divergence":  obv_price_divergence(df, 20),
-            "etf_flow_5d_pct": etf_primary_flow_5d_pct(t),
-            "block_up_ratio":  block_trade_upside_ratio(t),
-            "dark_pool_pct":   dark_pool_pct(t),
-            "si_delta_15d":    short_interest_delta_15d(t),
-            "thirteen_f_q":    thirteen_f_net_buys_q(t),
-        })
-    return pd.DataFrame(rows).set_index("ticker")
+    runtime_health: dict[str, dict[str, object]] = {}
+    token = _CURRENT_PROVIDER_FLOW_RUNTIME_HEALTH.set(runtime_health)
+    try:
+        rows = []
+        for t, df in ohlcv.items():
+            if str(t).startswith("^"):
+                continue
+            rows.append({
+                "ticker":          t,
+                "cmf21":           chaikin_money_flow(df, 21),
+                "obv_slope":       obv_slope(df, 20),
+                "mfi14":           money_flow_index(df, 14),
+                "rvol":            relative_volume(df, 20),
+                "dist_days_25":    distribution_day_count(df, 25),
+                "obv_divergence":  obv_price_divergence(df, 20),
+                "etf_flow_5d_pct": etf_primary_flow_5d_pct(t),
+                "block_up_ratio":  block_trade_upside_ratio(t),
+                "dark_pool_pct":   dark_pool_pct(t),
+                "si_delta_15d":    short_interest_delta_15d(t),
+                "thirteen_f_q":    thirteen_f_net_buys_q(t),
+            })
+        return pd.DataFrame(rows).set_index("ticker")
+    finally:
+        _CURRENT_PROVIDER_FLOW_RUNTIME_HEALTH.reset(token)
+        with _PROVIDER_FLOW_RUNTIME_HEALTH_LOCK:
+            _PROVIDER_FLOW_RUNTIME_HEALTH.clear()
+            _PROVIDER_FLOW_RUNTIME_HEALTH.update(runtime_health)
 
 
 def flow_composite_z(flow_df):

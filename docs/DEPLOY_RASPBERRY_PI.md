@@ -59,7 +59,7 @@ From another machine on your LAN, open `http://<pi-ip>:8501`. You should see the
 Provider keys are intentionally not committed. Put Pi-local secrets in `.streamlit/secrets.toml` under the repo root and keep the file readable only by the service user:
 
 ```bash
-cd ~/sector-rotation-dashboard
+cd "$PI_REPO_PATH"
 mkdir -p .streamlit
 chmod 700 .streamlit
 nano .streamlit/secrets.toml
@@ -139,7 +139,7 @@ systemd `MainPID`, sends `SIGTERM` to the running Streamlit process, lets the
 ## Updating the dashboard later
 
 ```bash
-cd ~/sector-rotation-dashboard
+cd "$PI_REPO_PATH"
 git pull
 source .venv/bin/activate
 pip install -r requirements.txt           # if dependencies changed
@@ -167,14 +167,14 @@ The Pi should keep dashboard memory under the checkout's `data/` directory, not
 only in repo-root `state.json`. The service template sets:
 
 ```ini
-Environment=STATE_FILE=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION/data/state.json
-Environment=STATE_TRANSITION_JOURNAL=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION/data/state_transitions.jsonl
+Environment=STATE_FILE=/home/<pi-user>/<repo-dir>/data/state.json
+Environment=STATE_TRANSITION_JOURNAL=/home/<pi-user>/<repo-dir>/data/state_transitions.jsonl
 ```
 
 After deploy/restart, verify the paths and counts:
 
 ```bash
-cd ~/SECTOR_MOMENTUM_AND_ROTATION
+cd "$PI_REPO_PATH"
 ./.venv/bin/python - <<'PY'
 from src.scoring import state_storage_health
 print(state_storage_health())
@@ -192,14 +192,14 @@ Recent transitions panel.
 B-120 ships a LOW-severity digest script and a systemd timer template. Before enabling the timer, configure the SMTP values in `.streamlit/secrets.toml`, then run a no-send diagnostic:
 
 ```bash
-cd ~/sector-rotation-dashboard
+cd "$PI_REPO_PATH"
 ./.venv/bin/python scripts/send_email_digest.py --dry-run
 ```
 
-Install the timer without sudo on AHADPI5-style user services:
+Install the timer without sudo as a user service:
 
 ```bash
-cd ~/SECTOR_MOMENTUM_AND_ROTATION
+cd "$PI_REPO_PATH"
 mkdir -p ~/.config/systemd/user
 cp systemd/user/sector-email-digest.service ~/.config/systemd/user/
 cp systemd/user/sector-email-digest.timer ~/.config/systemd/user/
@@ -208,7 +208,7 @@ systemctl --user enable --now sector-email-digest.timer
 systemctl --user list-timers sector-email-digest.timer
 ```
 
-The user unit assumes the checkout is at `~/SECTOR_MOMENTUM_AND_ROTATION`. If your checkout path differs, edit `WorkingDirectory=` and `ExecStart=` in `~/.config/systemd/user/sector-email-digest.service`.
+The user unit assumes the checkout path configured in the copied service. If your checkout path differs, edit `WorkingDirectory=` and `ExecStart=` in `~/.config/systemd/user/sector-email-digest.service`.
 
 Alternatively, install the root-level system timer:
 
@@ -227,7 +227,7 @@ Adjust the `User=`, `Group=`, and `WorkingDirectory=` values in `/etc/systemd/sy
 B-122 can write local feed artifacts and optional static copies under `public/feeds/`, which are served by the public methodology landing service when that service is enabled:
 
 ```bash
-cd ~/sector-rotation-dashboard
+cd "$PI_REPO_PATH"
 ./.venv/bin/python scripts/export_transition_feeds.py \
   --publish-dir public/feeds \
   --public-base-url https://www.ahaddashboards.uk/feeds/
@@ -238,7 +238,7 @@ This writes `data/feeds/transitions.rss`, `data/feeds/transitions.ics`, `public/
 To keep the artifacts fresh without sudo, install the user timer:
 
 ```bash
-cd ~/SECTOR_MOMENTUM_AND_ROTATION
+cd "$PI_REPO_PATH"
 mkdir -p ~/.config/systemd/user
 cp systemd/user/sector-transition-feeds.service ~/.config/systemd/user/
 cp systemd/user/sector-transition-feeds.timer ~/.config/systemd/user/
@@ -260,7 +260,7 @@ Run a manual capture after `MASSIVE_API_KEY` is configured in
 `.streamlit/secrets.toml`:
 
 ```bash
-cd ~/SECTOR_MOMENTUM_AND_ROTATION
+cd "$PI_REPO_PATH"
 ./.venv/bin/python scripts/capture_massive_provider_snapshots.py \
   --universe scored \
   --limit 5000 \
@@ -274,7 +274,7 @@ all` if you also want benchmark tickers.
 Install the post-market user timer without sudo:
 
 ```bash
-cd ~/SECTOR_MOMENTUM_AND_ROTATION
+cd "$PI_REPO_PATH"
 mkdir -p ~/.config/systemd/user
 cp systemd/user/sector-massive-provider-snapshots.service ~/.config/systemd/user/
 cp systemd/user/sector-massive-provider-snapshots.timer ~/.config/systemd/user/

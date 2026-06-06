@@ -164,25 +164,59 @@ def compute_composite(
 
 # -------- State machine -----------------------------------------------------------
 
+def _nullable_bool(value) -> bool | None:
+    if value is None or pd.isna(value):
+        return None
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if pd.isna(value):
+            return None
+        return bool(value)
+    text = str(value).strip().lower()
+    if text in {"true", "t", "yes", "y", "1"}:
+        return True
+    if text in {"false", "f", "no", "n", "0"}:
+        return False
+    return None
+
+
+def _nullable_float(value) -> float | None:
+    if value is None or pd.isna(value):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if not pd.isna(parsed) else None
+
+
+def _nullable_int(value) -> int | None:
+    number = _nullable_float(value)
+    if number is None:
+        return None
+    return int(number)
+
+
 def decide_state(row: pd.Series) -> str:
     """Pure-function state assignment for a ticker given today's indicators.
 
     Implements §6 of the methodology.  Conservative ordering: check the
     worst states first so we never under-classify a deteriorating sector.
     """
-    stage = row.get("stage")
-    above = row.get("above_30wma")
-    slope_pos = row.get("ma_slope_pos")
-    mans = row.get("mansfield_rs")
-    ant = row.get("antonacci")
+    stage = _nullable_int(row.get("stage"))
+    above = _nullable_bool(row.get("above_30wma"))
+    slope_pos = _nullable_bool(row.get("ma_slope_pos"))
+    mans = _nullable_float(row.get("mansfield_rs"))
+    ant = _nullable_int(row.get("antonacci"))
     rrg_q = row.get("rrg_quadrant")
-    breadth = row.get("breadth_50d")
-    cmf = row.get("cmf21")
-    rvol = row.get("rvol")
-    nf5d = row.get("etf_flow_5d_pct")
-    blk = row.get("block_up_ratio")
-    obv_div = row.get("obv_divergence")
-    dist = row.get("dist_days_25")
+    breadth = _nullable_float(row.get("breadth_50d"))
+    cmf = _nullable_float(row.get("cmf21"))
+    rvol = _nullable_float(row.get("rvol"))
+    nf5d = _nullable_float(row.get("etf_flow_5d_pct"))
+    blk = _nullable_float(row.get("block_up_ratio"))
+    obv_div = _nullable_bool(row.get("obv_divergence"))
+    dist = _nullable_float(row.get("dist_days_25"))
     bearish = STATE_MACHINE_THRESHOLDS["bearish_stage_4"]
     exit_thresholds = STATE_MACHINE_THRESHOLDS["exit"]
     warning = STATE_MACHINE_THRESHOLDS["warning"]
@@ -208,7 +242,7 @@ def decide_state(row: pd.Series) -> str:
     if (rrg_q == warning["rrg_quadrant_eq"]) \
             or (breadth is not None and breadth < warning["breadth_50d_lt"]) \
             or (cmf is not None and cmf < warning["cmf21_lt"]) \
-            or (obv_div is warning["obv_divergence_eq"]) \
+            or (obv_div == warning["obv_divergence_eq"]) \
             or (dist is not None and dist >= warning["dist_days_25_gte"]):
         return "WARNING"
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import json
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -38,6 +39,36 @@ def test_decide_state_prioritizes_bearish_stage_four_before_exit():
     )
 
     assert scoring.decide_state(row) == "BEARISH_STAGE_4"
+
+
+def test_decide_state_handles_numpy_boolean_gate_values_without_truthy_leakage():
+    row = _row(
+        stage=np.int64(4),
+        above_30wma=np.bool_(False),
+        ma_slope_pos=np.bool_(False),
+        mansfield_rs=np.float64(-7.0),
+        cmf21=np.float64(-0.12),
+    )
+
+    assert scoring.decide_state(row) == "BEARISH_STAGE_4"
+
+
+def test_decide_state_matches_boolean_like_obv_warning_without_identity_checks():
+    row = _row(obv_divergence=np.bool_(True))
+
+    assert scoring.decide_state(row) == "WARNING"
+
+
+def test_decide_state_treats_nullable_gate_values_as_unknown_not_true():
+    row = _row(
+        above_30wma=pd.NA,
+        ma_slope_pos=pd.NA,
+        mansfield_rs=pd.NA,
+        cmf21=pd.NA,
+        obv_divergence=pd.NA,
+    )
+
+    assert scoring.decide_state(row) == "HOLD"
 
 
 def test_decide_state_returns_warning_for_weakening_quadrant():

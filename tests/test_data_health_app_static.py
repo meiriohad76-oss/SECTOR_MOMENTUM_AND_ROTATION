@@ -76,6 +76,9 @@ def test_refresh_token_forces_provider_reload_without_reusing_persistent_cache()
     load_section = app_source[
         app_source.index("def _load_data(") : app_source.index("def _refresh_loaded_data() -> None:")
     ]
+    completion_section = app_source[
+        app_source.index("def _mark_data_refresh_completed(") : app_source.index("def _lane_completed_text(")
+    ]
     compute_section = app_source[
         app_source.index("with PERF_AUDIT.section(\"load_data\")") : app_source.index(
             "with PERF_AUDIT.section(\"compute_signals\")"
@@ -88,6 +91,9 @@ def test_refresh_token_forces_provider_reload_without_reusing_persistent_cache()
     assert 'fred_refresh_token = st.session_state.get("fred_refresh_token")' in compute_section
     assert '_load_data("3y", refresh_token=refresh_token)' in compute_section
     assert "_load_fred(refresh_token=fred_refresh_token)" in app_source
+    assert "def _consume_refresh_tokens(lane_id: str) -> None:" in completion_section
+    assert "_consume_refresh_tokens(lane_id)" in completion_section
+    assert 'st.session_state.pop(key, None)' in completion_section
 
 
 def test_data_health_css_supports_status_cards():

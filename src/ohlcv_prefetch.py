@@ -13,6 +13,7 @@ from .ohlcv_store import ohlcv_cache_enabled
 
 
 PREFETCH_MIN_INTERVAL_SECONDS = 900
+PREFETCH_MAX_TRACKED_KEYS = 64
 
 
 @dataclass(frozen=True)
@@ -84,6 +85,7 @@ def submit_ohlcv_prefetch(
     key = _prefetch_key(tickers, period=period, interval=interval, provider=provider)
     current_time = time.monotonic() if now is None else now
     with _LOCK:
+        _prune_prefetch_state(current_time=current_time, min_interval_seconds=min_interval_seconds)
         existing = _INFLIGHT.get(key)
         if existing is not None and not existing.done():
             return existing
@@ -101,7 +103,28 @@ def submit_ohlcv_prefetch(
         )
         _INFLIGHT[key] = future
         _LAST_SUBMITTED_AT[key] = current_time
+        _prune_prefetch_state(current_time=current_time, min_interval_seconds=min_interval_seconds)
         return future
+
+
+def _prune_prefetch_state(*, current_time: float, min_interval_seconds: int) -> None:
+    expired_keys = [
+        key
+        for key, future in _INFLIGHT.items()
+        if future.done()
+        and current_time - float(_LAST_SUBMITTED_AT.get(key, 0.0)) >= max(min_interval_seconds, PREFETCH_MIN_INTERVAL_SECONDS)
+    ]
+    for key in expired_keys:
+        _INFLIGHT.pop(key, None)
+        _LAST_SUBMITTED_AT.pop(key, None)
+    if len(_LAST_SUBMITTED_AT) <= PREFETCH_MAX_TRACKED_KEYS:
+        return
+    ordered_keys = sorted(_LAST_SUBMITTED_AT, key=lambda item: _LAST_SUBMITTED_AT[item])
+    for key in ordered_keys[: len(_LAST_SUBMITTED_AT) - PREFETCH_MAX_TRACKED_KEYS]:
+        future = _INFLIGHT.get(key)
+        if future is None or future.done():
+            _INFLIGHT.pop(key, None)
+            _LAST_SUBMITTED_AT.pop(key, None)
 
 
 def prefetch_status(future: concurrent.futures.Future | None) -> str:

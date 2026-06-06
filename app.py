@@ -664,6 +664,19 @@ def _mark_data_refresh_completed(ohlcv_result_obj) -> None:
         provider_warning_count=len(getattr(ohlcv_result_obj, "warnings", ()) or ()),
         cache_refresh_forced=bool(getattr(ohlcv_result_obj, "cache_refresh_forced", False)),
     )
+    _consume_refresh_tokens(lane_id)
+
+
+def _consume_refresh_tokens(lane_id: str) -> None:
+    token_keys = {
+        "market_ohlcv": ("data_refresh_token",),
+        "fred_macro": ("fred_refresh_token",),
+        "provider_flow": ("flow_refresh_token",),
+        "dashboard_compute": ("compute_refresh_token",),
+        "all": ("data_refresh_token", "fred_refresh_token", "flow_refresh_token", "compute_refresh_token"),
+    }
+    for key in token_keys.get(lane_id, token_keys["all"]):
+        st.session_state.pop(key, None)
 
 
 def _lane_completed_text(lane_id: str) -> str:

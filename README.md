@@ -226,10 +226,10 @@ The visual/responsive QA evidence for implemented dashboard tickets lives in `do
 ```powershell
 python -m pip install -r requirements-qa.txt
 $env:BROWSER_QA_MODE="1"; $env:MASSIVE_API_KEY=""; $env:FRED_API_KEY=""
-python -m streamlit run app.py --server.address=127.0.0.1 --server.port=18601 --server.headless=true
+python -m streamlit run app.py --server.address=127.0.0.1 --server.port=8503 --server.headless=true
 
 # In a second shell:
-python scripts/capture_browser_qa.py --base-url http://127.0.0.1:18601 --browser-channel chrome --qa-mode browser-qa-secret-free
+python scripts/capture_browser_qa.py --base-url http://127.0.0.1:8503 --browser-channel chrome --qa-mode browser-qa-secret-free
 ```
 
 Use `--browser-channel msedge` if Edge is installed and Chrome is not. The `BROWSER_QA_MODE` flag must be set before starting Streamlit; it enables deterministic visual fixtures for palette, transition-pulse, and provider-status screenshots, forces secret-free yfinance/FRED-off behavior, and clearing `MASSIVE_API_KEY` plus `FRED_API_KEY` keeps the run explicit. The script writes `browser_qa_report.md`, `browser_qa_manifest.json`, and nonblank screenshots without requiring API keys or webhook secrets.
@@ -367,7 +367,7 @@ B-021 Telegram/Slack validation is kept separate:
 B-120 adds an optional LOW-severity email digest for transitions from the previous US/Eastern day. Configure `SMTP_HOST`, optional `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `EMAIL_DIGEST_FROM`, and comma-separated `EMAIL_DIGEST_TO`, then schedule:
 
 ```bash
-cd /home/ahad/SECTOR_MOMENTUM_AND_ROTATION
+cd "$PI_REPO_PATH"
 ./.venv/bin/python scripts/send_email_digest.py
 ```
 
@@ -382,7 +382,7 @@ For 08:00 ET delivery from cron, set `CRON_TZ=America/New_York` and run the comm
 B-122 adds local RSS and iCal feed artifact generation from the same transition log:
 
 ```bash
-cd /home/ahad/SECTOR_MOMENTUM_AND_ROTATION
+cd "$PI_REPO_PATH"
 ./.venv/bin/python scripts/export_transition_feeds.py
 ```
 

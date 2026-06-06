@@ -1948,6 +1948,8 @@ def _rrg_html(rows: list[MomentumV2Row], limit: int = 24) -> str:
 
 def _momentum_rows(rows: list[MomentumV2Row], limit: int = 16) -> str:
     ordered = sorted(rows, key=lambda item: item.momentum_pct, reverse=True)[:limit]
+    if not ordered:
+        return '<p class="mv2-muted">No momentum rows available.</p>'
     max_abs = max(5.0, max(abs(row.momentum_pct) for row in ordered))
     html = []
     for row in ordered:
@@ -1973,6 +1975,8 @@ def _momentum_rows(rows: list[MomentumV2Row], limit: int = 16) -> str:
 def _flow_river_html(rows: list[MomentumV2Row]) -> str:
     outflows = sorted(rows, key=lambda item: item.f_score)[:5]
     inflows = sorted(rows, key=lambda item: item.f_score, reverse=True)[:5]
+    if not outflows or not inflows:
+        return '<div class="mv2-flow-river"><div class="mv2-flow-node" style="left:14px;top:12px"><b>No flow rows</b>Refresh or load a universe to render flow rotation.</div></div>'
     bands = []
     for idx, (left, right) in enumerate(zip(outflows, inflows)):
         top = 22 + idx * 38
@@ -2216,6 +2220,8 @@ def _terminal_rrg_svg(
 
 def _terminal_momentum_bars(rows: list[MomentumV2Row], limit: int = 14) -> str:
     ordered = sorted(rows, key=lambda item: item.momentum_pct, reverse=True)[:limit]
+    if not ordered:
+        return '<p class="mv2-a3-caption">No momentum rows available for the selected universe.</p>'
     max_abs = max(5.0, max(abs(row.momentum_pct) for row in ordered))
     rendered = []
     for row in ordered:
@@ -2244,6 +2250,8 @@ def _terminal_momentum_bars(rows: list[MomentumV2Row], limit: int = 14) -> str:
 
 def _c_momentum_bars(rows: list[MomentumV2Row], limit: int = 12) -> str:
     ordered = sorted(rows, key=lambda item: item.momentum_pct, reverse=True)[:limit]
+    if not ordered:
+        return '<p>No momentum rows available for the selected universe.</p>'
     max_abs = max(5.0, max(abs(row.momentum_pct) for row in ordered))
     rendered = []
     for row in ordered:

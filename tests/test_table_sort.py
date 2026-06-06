@@ -23,6 +23,7 @@ def _frame() -> pd.DataFrame:
             "antonacci": [1, 1, 0, 0],
             "rrg_quadrant": ["Improving", "Leading", "Lagging", "Weakening"],
             "breadth_50d": [0.55, 0.72, 0.20, 0.61],
+            "pillar_count": [5, 7, 0, 4],
         },
         index=["XLK", "XLE", "XLF", "XOP"],
     )

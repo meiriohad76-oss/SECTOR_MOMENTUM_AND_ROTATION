@@ -6,6 +6,9 @@ import io
 import re
 from typing import Iterable
 import zipfile
+
+from defusedxml import ElementTree as DefusedET
+from defusedxml.common import DefusedXmlException
 import xml.etree.ElementTree as ET
 
 import pandas as pd
@@ -236,8 +239,8 @@ def _sanitize_xlsx_optional_metadata(payload: bytes) -> bytes | None:
 
 def _strip_optional_worksheet_metadata(payload: bytes) -> bytes:
     try:
-        root = ET.fromstring(payload)
-    except ET.ParseError:
+        root = DefusedET.fromstring(payload)
+    except (ET.ParseError, DefusedXmlException):
         return payload
 
     changed = False

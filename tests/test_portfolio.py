@@ -132,6 +132,30 @@ def test_parse_holdings_excel_ignores_unsupported_conditional_formatting_metadat
     assert [holding.weight for holding in result.holdings] == pytest.approx([0.6, 0.4])
 
 
+def test_parse_holdings_excel_sanitizer_uses_defusedxml_for_worksheet_xml(monkeypatch):
+    calls = []
+    real_fromstring = portfolio.DefusedET.fromstring
+
+    def tracked_fromstring(payload):
+        calls.append(payload)
+        return real_fromstring(payload)
+
+    monkeypatch.setattr(portfolio.DefusedET, "fromstring", tracked_fromstring)
+
+    payload = (
+        b'<?xml version="1.0" encoding="UTF-8"?>'
+        b'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        b'<sheetData />'
+        b'<conditionalFormatting sqref="A1:A2"><cfRule type="dataBar" priority="1" /></conditionalFormatting>'
+        b'</worksheet>'
+    )
+
+    cleaned = portfolio._strip_optional_worksheet_metadata(payload)
+
+    assert calls == [payload]
+    assert b"conditionalFormatting" not in cleaned
+
+
 def test_parse_holdings_excel_reports_unreadable_workbook_bytes():
     result = portfolio.parse_holdings_excel(b"not an excel file")
 

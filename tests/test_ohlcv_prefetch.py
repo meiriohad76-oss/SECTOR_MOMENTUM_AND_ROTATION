@@ -86,6 +86,33 @@ def test_submit_ohlcv_prefetch_dedupes_inflight_request(monkeypatch):
     assert len(submitted) == 1
 
 
+def test_submit_ohlcv_prefetch_bounds_completed_tracking_state(monkeypatch):
+    ohlcv_prefetch.reset_ohlcv_prefetch_state()
+    monkeypatch.setattr(ohlcv_prefetch, "ohlcv_cache_enabled", lambda: True)
+
+    def fake_submit(fn, *args, **kwargs):
+        future: concurrent.futures.Future = concurrent.futures.Future()
+        future.set_result(
+            ohlcv_prefetch.OhlcvPrefetchSummary(
+                provider="fixture",
+                fetched_count=0,
+                fresh_cache_hit_count=0,
+                stale_cache_hit_count=0,
+                missing_count=0,
+                warning_count=0,
+            )
+        )
+        return future
+
+    monkeypatch.setattr(ohlcv_prefetch, "_submit_future", fake_submit)
+
+    for idx in range(ohlcv_prefetch.PREFETCH_MAX_TRACKED_KEYS + 10):
+        ohlcv_prefetch.submit_ohlcv_prefetch([f"X{idx:03d}"], now=float(idx), min_interval_seconds=0)
+
+    assert len(ohlcv_prefetch._LAST_SUBMITTED_AT) <= ohlcv_prefetch.PREFETCH_MAX_TRACKED_KEYS
+    assert len(ohlcv_prefetch._INFLIGHT) <= ohlcv_prefetch.PREFETCH_MAX_TRACKED_KEYS
+
+
 def test_prefetch_status_summarizes_future_without_exposing_details():
     future: concurrent.futures.Future = concurrent.futures.Future()
     assert ohlcv_prefetch.prefetch_status(future) == "running"
