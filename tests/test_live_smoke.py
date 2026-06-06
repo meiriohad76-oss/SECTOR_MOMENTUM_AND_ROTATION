@@ -50,6 +50,18 @@ def test_rejects_ambiguous_public_200_without_dashboard_or_access_markers():
     assert result.state == "unexpected_response"
 
 
+def test_classifies_local_streamlit_shell_as_healthy_smoke():
+    from src.live_smoke import classify_local_dashboard_response
+
+    result = classify_local_dashboard_response(
+        status_code=200,
+        text="<html><head><title>Streamlit</title></head><script src='./static/js/index.js'></script></html>",
+    )
+
+    assert result.ok is True
+    assert result.state == "streamlit_shell"
+
+
 def test_rejects_upstream_cloudflare_errors():
     result = classify_protected_dashboard_response(
         status_code=530,

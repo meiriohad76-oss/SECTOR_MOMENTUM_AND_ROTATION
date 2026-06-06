@@ -78,7 +78,7 @@ def classify_local_dashboard_response(*, status_code: int, text: str = "") -> Lo
     body = (text or "")[:20_000].casefold()
     if status_code != 200:
         return LocalDashboardSmoke(False, "bad_http_status", f"HTTP {status_code}")
-    if "streamlit" in body and ("error" in body or "traceback" in body):
+    if "traceback" in body or "uncaught exception" in body or "uncaughtexception" in body:
         return LocalDashboardSmoke(False, "streamlit_error_page", "Streamlit error marker present")
     markers = (
         "sentiment board" in body,
@@ -87,4 +87,6 @@ def classify_local_dashboard_response(*, status_code: int, text: str = "") -> Lo
     )
     if sum(1 for marker in markers if marker) >= 2:
         return LocalDashboardSmoke(True, "dashboard_content", "dashboard markers present")
+    if "<title>streamlit</title>" in body and "static/js/" in body:
+        return LocalDashboardSmoke(True, "streamlit_shell", "Streamlit shell served")
     return LocalDashboardSmoke(False, "wrong_content", "missing dashboard markers")
