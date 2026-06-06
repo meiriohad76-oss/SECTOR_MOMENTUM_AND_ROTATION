@@ -159,6 +159,28 @@ def browser_qa_targets() -> tuple[BrowserQaTarget, ...]:
             ),
         ),
         BrowserQaTarget(
+            target_id="desktop-bluf-scroll-lanes",
+            viewport="desktop",
+            width=1800,
+            height=900,
+            path="/?ticker=XLK",
+            tickets=("B-110", "B-147"),
+            checks=(
+                "text:BLUF",
+                "text:EXIT NOW",
+                "text:WATCH CLOSELY",
+                "text:BUY CANDIDATES",
+                "text:Data and dashboard health",
+            ),
+            focus_text="BLUF",
+            actions=(
+                "expect-visible:.bluf-actions",
+                "expect-scrollable:.action-card.exit .action-list",
+                "expect-scrollable:.action-card.warn .action-list",
+                "expect-no-document-overlap:.bluf-actions|.data-health-panel",
+            ),
+        ),
+        BrowserQaTarget(
             target_id="desktop-data-health-lanes",
             viewport="desktop",
             width=1440,

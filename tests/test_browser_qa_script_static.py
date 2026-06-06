@@ -47,6 +47,10 @@ def test_browser_qa_script_writes_report_and_manifest():
     assert "locator(\"label\").filter(has_text=value)" in script
     assert "action == \"hover:first-full-table-row\"" in script
     assert "expect-visible:" in script
+    assert "expect-scrollable:" in script
+    assert "expect-no-document-overlap:" in script
+    assert "element.scrollHeight > element.clientHeight" in script
+    assert "documentTop" in script
     assert "expect-radio-checked:" in script
     assert "querySelector('input')?.checked" in script
     assert "section[data-testid=\"stMain\"]" in script

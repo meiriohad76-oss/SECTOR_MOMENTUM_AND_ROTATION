@@ -197,6 +197,77 @@ def _run_target_actions(page, actions: tuple[str, ...], timeout_ms: int) -> tupl
             page.locator(selector).first.wait_for(state="visible", timeout=action_timeout)
             notes.append(f"visible selector: {selector}")
             continue
+        if action.startswith("expect-scrollable:"):
+            selector = action.removeprefix("expect-scrollable:")
+            locator = page.locator(selector).first
+            locator.wait_for(state="visible", timeout=action_timeout)
+            result = locator.evaluate(
+                """
+                (element) => ({
+                  scrollHeight: Math.round(element.scrollHeight),
+                  clientHeight: Math.round(element.clientHeight),
+                  overflowY: window.getComputedStyle(element).overflowY,
+                  isScrollable: element.scrollHeight > element.clientHeight + 2,
+                })
+                """
+            )
+            if not result.get("isScrollable"):
+                raise AssertionError(
+                    f"{selector} is not scrollable: "
+                    f"scrollHeight={result.get('scrollHeight')} clientHeight={result.get('clientHeight')}"
+                )
+            notes.append(
+                f"scrollable selector: {selector} "
+                f"scrollHeight={result.get('scrollHeight')} clientHeight={result.get('clientHeight')}"
+            )
+            continue
+        if action.startswith("expect-no-document-overlap:"):
+            payload = action.removeprefix("expect-no-document-overlap:")
+            first_selector, second_selector = payload.split("|", 1)
+            page.locator(first_selector).first.wait_for(state="visible", timeout=action_timeout)
+            page.locator(second_selector).first.wait_for(state="visible", timeout=action_timeout)
+            result = page.evaluate(
+                """
+                ({ firstSelector, secondSelector }) => {
+                  const documentTop = (element) => {
+                    const rect = element.getBoundingClientRect();
+                    return {
+                      top: rect.top + window.scrollY,
+                      bottom: rect.bottom + window.scrollY,
+                      height: rect.height,
+                    };
+                  };
+                  const first = document.querySelector(firstSelector);
+                  const second = document.querySelector(secondSelector);
+                  if (!first || !second) {
+                    return { ok: false, error: 'missing element' };
+                  }
+                  const a = documentTop(first);
+                  const b = documentTop(second);
+                  const overlap = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+                  return {
+                    ok: overlap <= 1,
+                    overlap: Math.round(overlap),
+                    firstBottom: Math.round(a.bottom),
+                    secondTop: Math.round(b.top),
+                    firstHeight: Math.round(a.height),
+                    secondHeight: Math.round(b.height),
+                  };
+                }
+                """,
+                {"firstSelector": first_selector, "secondSelector": second_selector},
+            )
+            if not result.get("ok"):
+                raise AssertionError(
+                    f"{first_selector} overlaps {second_selector}: "
+                    f"overlap={result.get('overlap')} firstBottom={result.get('firstBottom')} "
+                    f"secondTop={result.get('secondTop')}"
+                )
+            notes.append(
+                f"no document overlap: {first_selector} -> {second_selector} "
+                f"firstBottom={result.get('firstBottom')} secondTop={result.get('secondTop')}"
+            )
+            continue
         if action.startswith("expect-radio-checked:"):
             value = action.removeprefix("expect-radio-checked:")
             page.wait_for_function(

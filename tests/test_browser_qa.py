@@ -38,6 +38,12 @@ def test_browser_qa_targets_cover_visual_residual_risks():
     assert "expect-visible:.alert-row.pulse-transition" in by_id["desktop-transition-pulse"].actions
     assert by_id["desktop-provider-status-banner"].tickets == ("B-146",)
     assert "expect-visible:.provider-status-banner" in by_id["desktop-provider-status-banner"].actions
+    assert by_id["desktop-bluf-scroll-lanes"].tickets == ("B-110", "B-147")
+    assert "text:EXIT NOW" in by_id["desktop-bluf-scroll-lanes"].checks
+    assert "text:BUY CANDIDATES" in by_id["desktop-bluf-scroll-lanes"].checks
+    assert "expect-scrollable:.action-card.exit .action-list" in by_id["desktop-bluf-scroll-lanes"].actions
+    assert "expect-scrollable:.action-card.warn .action-list" in by_id["desktop-bluf-scroll-lanes"].actions
+    assert "expect-no-document-overlap:.bluf-actions|.data-health-panel" in by_id["desktop-bluf-scroll-lanes"].actions
     assert by_id["desktop-data-health-lanes"].tickets == ("B-147",)
     assert "text:Refresh market OHLCV" in by_id["desktop-data-health-lanes"].checks
     assert "text:Refresh FRED macro" in by_id["desktop-data-health-lanes"].checks
