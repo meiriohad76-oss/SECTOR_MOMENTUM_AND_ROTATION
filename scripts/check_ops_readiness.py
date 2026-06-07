@@ -20,7 +20,7 @@ from src.config_resolver import resolve_config_value  # noqa: E402
 from src.pwa_push import load_push_subscriptions  # noqa: E402
 from src.provider_flow_cache import DEFAULT_CACHE_DB_PATH as DEFAULT_PROVIDER_FLOW_CACHE_PATH  # noqa: E402
 from src.provider_flow_cache import provider_flow_cache_coverage, provider_flow_cache_status  # noqa: E402
-from src.provider_snapshots import DEFAULT_SNAPSHOT_DB_PATH  # noqa: E402
+from src.provider_snapshots import DEFAULT_SNAPSHOT_DB_PATH, provider_snapshot_coverage  # noqa: E402
 from src.run_journal import DEFAULT_JOURNAL_PATH  # noqa: E402
 from src.scoring import STATE_FILE, _transition_journal_path  # noqa: E402
 from src.universe import US_SECTORS  # noqa: E402
@@ -523,6 +523,12 @@ def main(argv: list[str] | None = None) -> int:
                 **_file_status(provider_snapshot_db),
                 "snapshots": snapshot_count,
                 "state": "ready" if snapshot_count and snapshot_count > 0 else "missing_or_empty",
+                "stock_trades_coverage": provider_snapshot_coverage(
+                    provider_snapshot_db,
+                    provider="massive",
+                    dataset="stock_trades",
+                    expected_tickers=tuple(US_SECTORS),
+                ),
                 "capture_timer": _user_timer_status(
                     user_systemd_dir,
                     service="sector-massive-provider-snapshots.service",

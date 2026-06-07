@@ -235,6 +235,76 @@ def list_provider_snapshots(
     return [_record_from_row(row) for row in rows]
 
 
+def provider_snapshot_coverage(
+    db_path: str | Path = DEFAULT_SNAPSHOT_DB_PATH,
+    *,
+    provider: str,
+    dataset: str,
+    expected_tickers: list[str] | tuple[str, ...],
+) -> dict[str, Any]:
+    path = Path(db_path)
+    expected = tuple(_normalize_ticker(ticker) for ticker in expected_tickers)
+    base: dict[str, Any] = {
+        "path": str(path),
+        "provider": _normalize_provider(provider),
+        "dataset": _normalize_dataset(dataset),
+        "expected_ticker_count": len(expected),
+        "covered_ticker_count": 0,
+        "missing_ticker_count": len(expected),
+        "missing_tickers": list(expected),
+        "latest_as_of": "",
+        "latest_captured_at_utc": "",
+        "latest_by_ticker": {},
+        "state": "missing",
+    }
+    if not path.exists() or path.stat().st_size <= 0:
+        return base
+    try:
+        with sqlite3.connect(path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT ticker, MAX(as_of) AS latest_as_of, MAX(captured_at_utc) AS latest_captured_at_utc, COUNT(*) AS rows
+                FROM provider_snapshots
+                WHERE provider = ?
+                  AND dataset = ?
+                GROUP BY ticker
+                """,
+                (_normalize_provider(provider), _normalize_dataset(dataset)),
+            ).fetchall()
+    except sqlite3.Error:
+        return {**base, "state": "unreadable"}
+
+    latest_by_ticker = {
+        str(row["ticker"]).upper(): {
+            "latest_as_of": str(row["latest_as_of"] or ""),
+            "latest_captured_at_utc": str(row["latest_captured_at_utc"] or ""),
+            "rows": int(row["rows"] or 0),
+        }
+        for row in rows
+    }
+    covered = [ticker for ticker in expected if ticker in latest_by_ticker]
+    missing = [ticker for ticker in expected if ticker not in latest_by_ticker]
+    latest_as_of = max((item["latest_as_of"] for item in latest_by_ticker.values()), default="")
+    latest_captured_at = max((item["latest_captured_at_utc"] for item in latest_by_ticker.values()), default="")
+    if not latest_by_ticker:
+        state = "empty"
+    elif missing:
+        state = "incomplete"
+    else:
+        state = "ready"
+    return {
+        **base,
+        "covered_ticker_count": len(covered),
+        "missing_ticker_count": len(missing),
+        "missing_tickers": missing,
+        "latest_as_of": latest_as_of,
+        "latest_captured_at_utc": latest_captured_at,
+        "latest_by_ticker": latest_by_ticker,
+        "state": state,
+    }
+
+
 def _trades_from_payload(payload: Mapping[str, Any]) -> list[dict]:
     rows = payload.get("trades", payload.get("results", payload.get("records", [])))
     return [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []

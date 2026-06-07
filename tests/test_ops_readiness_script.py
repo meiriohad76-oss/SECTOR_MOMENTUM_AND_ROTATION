@@ -6,6 +6,7 @@ import sqlite3
 
 from scripts import check_ops_readiness
 from src.provider_flow_cache import write_provider_flow_cache
+from src.provider_snapshots import upsert_provider_snapshot
 from src.universe import US_SECTORS
 
 
@@ -85,10 +86,16 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     with sqlite3.connect(run_journal) as conn:
         conn.execute("CREATE TABLE runs (run_id TEXT)")
         conn.execute("INSERT INTO runs VALUES ('run-1')")
-    provider_snapshots.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(provider_snapshots) as conn:
-        conn.execute("CREATE TABLE provider_snapshots (provider TEXT)")
-        conn.execute("INSERT INTO provider_snapshots VALUES ('massive')")
+    for ticker in US_SECTORS:
+        upsert_provider_snapshot(
+            provider_snapshots,
+            provider="massive",
+            dataset="stock_trades",
+            ticker=ticker,
+            as_of="2026-05-27",
+            payload={"trades": [{"ticker": ticker, "price": 100.0}]},
+            captured_at_utc="2026-05-27T21:00:00Z",
+        )
     _write_provider_flow_cache_grid(provider_flow_cache)
     ohlcv_cache.parent.mkdir(parents=True, exist_ok=True)
     ohlcv_cache.write_bytes(b"duckdb-placeholder")
@@ -215,7 +222,11 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     assert payload["production"]["state_persistence"]["refresh_timer"]["timer_enabled"] == "enabled"
     assert payload["production"]["state_persistence"]["refresh_timer"]["timer_active"] == "active"
     assert payload["production"]["run_journal"]["runs"] == 1
-    assert payload["production"]["provider_snapshots"]["snapshots"] == 1
+    assert payload["production"]["provider_snapshots"]["snapshots"] == len(US_SECTORS)
+    assert payload["production"]["provider_snapshots"]["stock_trades_coverage"]["state"] == "ready"
+    assert payload["production"]["provider_snapshots"]["stock_trades_coverage"]["covered_ticker_count"] == len(US_SECTORS)
+    assert payload["production"]["provider_snapshots"]["stock_trades_coverage"]["missing_ticker_count"] == 0
+    assert payload["production"]["provider_snapshots"]["stock_trades_coverage"]["latest_as_of"] == "2026-05-27"
     assert payload["production"]["provider_snapshots"]["capture_timer"]["state"] == "ready"
     assert payload["production"]["provider_snapshots"]["capture_timer"]["timer_enabled"] == "enabled"
     assert payload["production"]["provider_snapshots"]["capture_timer"]["timer_active"] == "active"

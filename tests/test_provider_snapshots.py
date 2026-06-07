@@ -127,3 +127,41 @@ def test_provider_snapshot_upsert_replaces_same_as_of_record(tmp_path):
     assert loaded == second
     assert len(rows) == 1
     assert json.dumps(loaded.payload, sort_keys=True) == '{"trades": [{"p": 101.0}]}'
+
+
+def test_provider_snapshot_coverage_reports_missing_and_latest_rows(tmp_path):
+    db_path = tmp_path / "provider_snapshots.sqlite"
+    provider_snapshots.upsert_provider_snapshot(
+        db_path,
+        provider="massive",
+        dataset="stock_trades",
+        ticker="XLK",
+        as_of="2026-05-17",
+        payload={"trades": [{"p": 100.0}]},
+        captured_at_utc="2026-05-17T21:00:00Z",
+    )
+    provider_snapshots.upsert_provider_snapshot(
+        db_path,
+        provider="massive",
+        dataset="stock_trades",
+        ticker="XLF",
+        as_of="2026-05-18",
+        payload={"trades": [{"p": 50.0}]},
+        captured_at_utc="2026-05-18T21:00:00Z",
+    )
+
+    coverage = provider_snapshots.provider_snapshot_coverage(
+        db_path,
+        provider="massive",
+        dataset="stock_trades",
+        expected_tickers=("XLK", "XLF", "XLE"),
+    )
+
+    assert coverage["state"] == "incomplete"
+    assert coverage["expected_ticker_count"] == 3
+    assert coverage["covered_ticker_count"] == 2
+    assert coverage["missing_ticker_count"] == 1
+    assert coverage["missing_tickers"] == ["XLE"]
+    assert coverage["latest_as_of"] == "2026-05-18"
+    assert coverage["latest_captured_at_utc"] == "2026-05-18T21:00:00Z"
+    assert coverage["latest_by_ticker"]["XLK"]["rows"] == 1
