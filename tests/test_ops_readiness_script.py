@@ -93,6 +93,8 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     user_systemd_dir.mkdir(parents=True)
     (user_systemd_dir / "sector-massive-provider-snapshots.service").write_text("[Service]\n", encoding="utf-8")
     (user_systemd_dir / "sector-massive-provider-snapshots.timer").write_text("[Timer]\n", encoding="utf-8")
+    (user_systemd_dir / "sector-provider-flow-cache.service").write_text("[Service]\n", encoding="utf-8")
+    (user_systemd_dir / "sector-provider-flow-cache.timer").write_text("[Timer]\n", encoding="utf-8")
 
     def fake_config(name: str) -> str | None:
         values = {
@@ -131,6 +133,10 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
             ("is-active", "sector-massive-provider-snapshots.timer"): "active",
             ("show", "sector-massive-provider-snapshots.service", "-p", "Result", "--value"): "success",
             ("show", "sector-massive-provider-snapshots.service", "-p", "ExecMainStatus", "--value"): "0",
+            ("is-enabled", "sector-provider-flow-cache.timer"): "enabled",
+            ("is-active", "sector-provider-flow-cache.timer"): "active",
+            ("show", "sector-provider-flow-cache.service", "-p", "Result", "--value"): "success",
+            ("show", "sector-provider-flow-cache.service", "-p", "ExecMainStatus", "--value"): "0",
         }.get(tuple(args)),
     )
 
@@ -180,6 +186,9 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     assert payload["production"]["provider_snapshots"]["capture_timer"]["timer_active"] == "active"
     assert payload["production"]["provider_flow_cache"]["state"] == "ready"
     assert payload["production"]["provider_flow_cache"]["rows"] == 1
+    assert payload["production"]["provider_flow_cache"]["warmup_timer"]["state"] == "ready"
+    assert payload["production"]["provider_flow_cache"]["warmup_timer"]["timer_enabled"] == "enabled"
+    assert payload["production"]["provider_flow_cache"]["warmup_timer"]["timer_active"] == "active"
     assert payload["production"]["ohlcv_cache"]["state"] == "ready"
     assert payload["production"]["browser_qa_fixture_guard"]["state"] == "safe"
     assert set(payload) >= {"B-021", "B-120", "B-121", "B-122", "B-123", "B-131"}

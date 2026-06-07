@@ -15,6 +15,7 @@ DEFAULT_USER_UNIT_DIR = Path.home() / ".config" / "systemd" / "user"
 DEFAULT_TIMERS = (
     "sector-transition-feeds.timer",
     "sector-massive-provider-snapshots.timer",
+    "sector-provider-flow-cache.timer",
 )
 
 

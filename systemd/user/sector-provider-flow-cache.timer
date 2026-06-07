@@ -1,0 +1,13 @@
+# Sector Rotation Provider-Flow Cache Warmup - weekday user timer
+
+[Unit]
+Description=Warm Massive/FINRA provider-flow cache before and after regular US sessions
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 09:20:00 America/New_York
+OnCalendar=Mon..Fri *-*-* 16:20:00 America/New_York
+Persistent=true
+Unit=sector-provider-flow-cache.service
+
+[Install]
+WantedBy=timers.target

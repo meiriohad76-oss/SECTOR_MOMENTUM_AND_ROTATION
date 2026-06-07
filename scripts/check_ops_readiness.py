@@ -260,7 +260,14 @@ def main(argv: list[str] | None = None) -> int:
                     timer="sector-massive-provider-snapshots.timer",
                 ),
             },
-            "provider_flow_cache": provider_flow_cache_status(provider_flow_cache_db),
+            "provider_flow_cache": {
+                **provider_flow_cache_status(provider_flow_cache_db),
+                "warmup_timer": _user_timer_status(
+                    user_systemd_dir,
+                    service="sector-provider-flow-cache.service",
+                    timer="sector-provider-flow-cache.timer",
+                ),
+            },
             "ohlcv_cache": {
                 **_file_status(ohlcv_cache_path),
                 "state": "ready" if ohlcv_cache_path.exists() and ohlcv_cache_path.stat().st_size > 0 else "missing",

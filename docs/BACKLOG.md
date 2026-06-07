@@ -42,6 +42,7 @@ Status legend:
 **Evidence:** `docs/superpowers/plans/2026-05-21-b020-provider-flow-status.md`.
 **Implemented feeds:** Massive `/v3/trades` block-trade upside ratio, FINRA ATS weekly dark-pool percentage, FINRA consolidated short-interest delta, and SEC 13F net-buy parsing from configured data-set zip plus CUSIP mappings.
 **Activation:** deploy safe-config now flips `MASSIVE_TRADES_STUB_MODE=false`, `FINRA_ATS_STUB_MODE=false`, and `FINRA_SHORT_INTEREST_STUB_MODE=false` after live smoke and persistent provider-flow caching are in place. Leave `SEC_13F_STUB_MODE` unset/`true` until SEC URL/User-Agent/CUSIP mappings are configured.
+**Operational cache:** `scripts/warm_provider_flow_cache.py` warms Massive/FINRA provider-flow cache entries for the scored dashboard universe, and the Pi deploy installs `sector-provider-flow-cache.timer` as a non-sudo user timer before the US open and after the close.
 **QA:** `python -m pytest tests/test_flow.py -q` -> `33 passed`; `python -m pytest -q` -> `184 passed`.
 **Residual risk:** live provider validation depends on configured keys/user-agent/CUSIP mappings and should be repeated after provider schema changes.
 

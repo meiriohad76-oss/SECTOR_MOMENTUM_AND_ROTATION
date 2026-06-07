@@ -73,6 +73,7 @@ def test_install_user_timers_defaults_to_operational_non_secret_timers(monkeypat
     assert timers == {
         "sector-transition-feeds.timer",
         "sector-massive-provider-snapshots.timer",
+        "sector-provider-flow-cache.timer",
     }
     assert "sector-email-digest.timer" not in timers
 
