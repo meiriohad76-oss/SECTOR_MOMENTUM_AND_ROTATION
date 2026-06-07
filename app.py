@@ -14,6 +14,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from src.backtest import drawdown_frame, normalized_equity_frame
 from src.ad_hoc_analysis import score_ad_hoc_tickers
@@ -1551,7 +1552,7 @@ def _apply_header_preference(widget_key: str, target_key: str, allowed: tuple[st
 
 
 def render_drill_click_bridge():
-    st.iframe(drill_click_bridge_html(), height=1)
+    components.html(drill_click_bridge_html(), height=0, width=0)
 
 
 def render_header_controls():

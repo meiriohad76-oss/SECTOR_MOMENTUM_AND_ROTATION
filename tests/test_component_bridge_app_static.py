@@ -39,9 +39,10 @@ def test_app_renders_native_header_controls():
 def test_app_mounts_generic_drill_click_bridge_before_clickable_surfaces():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
+    assert "import streamlit.components.v1 as components" in app_source
     assert "drill_click_bridge_html" in app_source
     assert "def render_drill_click_bridge():" in app_source
-    assert "st.iframe(drill_click_bridge_html(), height=1)" in app_source
+    assert "components.html(drill_click_bridge_html(), height=0, width=0)" in app_source
     assert app_source.index('_render_timed("render_drill_click_bridge", render_drill_click_bridge)') < app_source.index(
         '_render_timed("render_bluf", render_bluf)'
     )
