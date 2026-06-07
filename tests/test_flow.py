@@ -8,13 +8,15 @@ import pandas as pd
 import pytest
 
 from src import flow
+from src.provider_flow_cache import write_provider_flow_cache
 
 _REAL_FETCH_PRIMARY_FLOW_PAYLOAD = flow._fetch_primary_flow_payload
 
 
 @pytest.fixture(autouse=True)
-def neutral_primary_flow_provider(monkeypatch):
+def neutral_primary_flow_provider(monkeypatch, tmp_path):
     flow.reset_provider_flow_runtime_health()
+    monkeypatch.setenv("PROVIDER_FLOW_CACHE_PATH", str(tmp_path / "provider_flow_cache.sqlite"))
     # Keep this suite hermetic even when local secrets enable live flow.
     monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", True)
     monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", True, raising=False)
@@ -577,6 +579,61 @@ def test_fetch_massive_stock_trades_can_apply_end_date_bound(monkeypatch):
     assert calls[0][1]["params"]["timestamp.lt"] == "2026-05-20"
 
 
+def test_fetch_massive_stock_trades_uses_fresh_cache_without_network(monkeypatch, tmp_path):
+    cache_path = tmp_path / "provider_flow_cache.sqlite"
+    monkeypatch.setenv("PROVIDER_FLOW_CACHE_PATH", str(cache_path))
+    write_provider_flow_cache(
+        provider="massive",
+        lane="massive_block_trades",
+        ticker="XLK",
+        params={"start_date": "", "end_date": "", "limit": 5_000, "sort": "timestamp", "order": "desc"},
+        payload=[{"p": 102.0, "s": 12_000}],
+        path=cache_path,
+    )
+    monkeypatch.setattr(flow, "_resolve_secret", lambda name: "secret" if name == "MASSIVE_API_KEY" else None)
+
+    def blocked_get(*args, **kwargs):
+        raise AssertionError("fresh cache hit should bypass Massive network call")
+
+    monkeypatch.setattr(flow.requests, "get", blocked_get)
+
+    assert flow._fetch_massive_stock_trades("xlk") == [{"p": 102.0, "s": 12_000}]
+
+
+def test_block_trade_upside_ratio_uses_stale_cache_as_warning_not_live(monkeypatch, tmp_path):
+    cache_path = tmp_path / "provider_flow_cache.sqlite"
+    monkeypatch.setenv("PROVIDER_FLOW_CACHE_PATH", str(cache_path))
+    monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", False, raising=False)
+    monkeypatch.setattr(flow, "_resolve_secret", lambda name: "secret" if name == "MASSIVE_API_KEY" else None)
+    write_provider_flow_cache(
+        provider="massive",
+        lane="massive_block_trades",
+        ticker="XLK",
+        params={"start_date": "", "end_date": "", "limit": 5_000, "sort": "timestamp", "order": "desc"},
+        payload=[
+            {"p": 100.0, "s": 100, "sip_timestamp": 1},
+            {"p": 101.0, "s": 3_000, "sip_timestamp": 2},
+            {"p": 99.0, "s": 4_000, "sip_timestamp": 3},
+        ],
+        path=cache_path,
+        created_at_utc="2020-01-01T00:00:00Z",
+    )
+
+    def failing_get(*args, **kwargs):
+        raise flow.requests.RequestException("provider down")
+
+    monkeypatch.setattr(flow.requests, "get", failing_get)
+
+    value = flow.block_trade_upside_ratio("XLK")
+
+    assert value == pytest.approx((101.0 * 3_000) / (99.0 * 4_000))
+    health = flow.provider_flow_health_statuses()
+    row = next(item for item in health if item["id"] == "massive_block_trades")
+    assert row["status"] == "warning"
+    assert row["mode"] == "stale cache fallback"
+    assert flow._provider_signal_live("massive_block_trades", "XLK") is False
+
+
 def test_block_trade_upside_ratio_uses_massive_provider_when_enabled(monkeypatch):
     monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", False, raising=False)
     monkeypatch.setattr(
@@ -635,6 +692,31 @@ def test_fetch_finra_short_interest_posts_symbol_filter(monkeypatch):
     assert calls[0][1]["json"]["compareFilters"][0]["fieldValue"] == "XLK"
     assert "settlementDate" in calls[0][1]["json"]["fields"]
     assert calls[0][1]["timeout"] == 7
+
+
+def test_fetch_finra_short_interest_writes_cache_and_reuses_it(monkeypatch, tmp_path):
+    cache_path = tmp_path / "provider_flow_cache.sqlite"
+    monkeypatch.setenv("PROVIDER_FLOW_CACHE_PATH", str(cache_path))
+    calls = []
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [{"symbolCode": "XLK", "settlementDate": "2026-05-15", "changePercent": "5.0"}]
+
+    def fake_post(url, **kwargs):
+        calls.append((url, kwargs))
+        return FakeResponse()
+
+    monkeypatch.setattr(flow.requests, "post", fake_post)
+
+    first = flow._fetch_finra_short_interest("xlk", limit=2, timeout=7)
+    second = flow._fetch_finra_short_interest("xlk", limit=2, timeout=7)
+
+    assert first == second == [{"symbolCode": "XLK", "settlementDate": "2026-05-15", "changePercent": "5.0"}]
+    assert len(calls) == 1
 
 
 def test_short_interest_delta_uses_finra_provider_when_enabled(monkeypatch):

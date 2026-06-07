@@ -17,6 +17,8 @@ if str(ROOT) not in sys.path:
 from src.broker_config import broker_config_status  # noqa: E402
 from src.config_resolver import resolve_config_value  # noqa: E402
 from src.pwa_push import load_push_subscriptions  # noqa: E402
+from src.provider_flow_cache import DEFAULT_CACHE_DB_PATH as DEFAULT_PROVIDER_FLOW_CACHE_PATH  # noqa: E402
+from src.provider_flow_cache import provider_flow_cache_status  # noqa: E402
 from src.provider_snapshots import DEFAULT_SNAPSHOT_DB_PATH  # noqa: E402
 from src.run_journal import DEFAULT_JOURNAL_PATH  # noqa: E402
 from src.scoring import STATE_FILE, _transition_journal_path  # noqa: E402
@@ -206,6 +208,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--state-transition-journal", default=str(_transition_journal_path()))
     parser.add_argument("--run-journal-path", default=str(DEFAULT_JOURNAL_PATH))
     parser.add_argument("--provider-snapshot-db", default=str(DEFAULT_SNAPSHOT_DB_PATH))
+    parser.add_argument("--provider-flow-cache-db", default=str(DEFAULT_PROVIDER_FLOW_CACHE_PATH))
     parser.add_argument("--ohlcv-cache-path", default=str(ROOT / "data_cache" / "ohlcv.duckdb"))
     parser.add_argument("--user-systemd-dir", default=str(Path.home() / ".config" / "systemd" / "user"))
     return parser.parse_args(argv)
@@ -230,6 +233,7 @@ def main(argv: list[str] | None = None) -> int:
     public_feed_dir = Path(args.public_feed_dir)
     run_journal_path = Path(args.run_journal_path)
     provider_snapshot_db = Path(args.provider_snapshot_db)
+    provider_flow_cache_db = Path(args.provider_flow_cache_db)
     ohlcv_cache_path = Path(args.ohlcv_cache_path)
     user_systemd_dir = Path(args.user_systemd_dir)
     run_count = _sqlite_count(run_journal_path, "runs")
@@ -256,6 +260,7 @@ def main(argv: list[str] | None = None) -> int:
                     timer="sector-massive-provider-snapshots.timer",
                 ),
             },
+            "provider_flow_cache": provider_flow_cache_status(provider_flow_cache_db),
             "ohlcv_cache": {
                 **_file_status(ohlcv_cache_path),
                 "state": "ready" if ohlcv_cache_path.exists() and ohlcv_cache_path.stat().st_size > 0 else "missing",

@@ -13,6 +13,7 @@ import io
 import json
 import os
 import re
+import sqlite3
 import threading
 import zipfile
 from dataclasses import dataclass
@@ -21,6 +22,12 @@ from typing import Iterable, Optional
 import numpy as np
 import pandas as pd
 import requests
+
+from .provider_flow_cache import (
+    read_provider_flow_cache,
+    ttl_seconds,
+    write_provider_flow_cache,
+)
 
 
 def _resolve_secret(name: str) -> Optional[str]:
@@ -77,6 +84,14 @@ _PROVIDER_FLOW_RUNTIME_HEALTH_LOCK = threading.RLock()
 _CURRENT_PROVIDER_FLOW_RUNTIME_HEALTH: contextvars.ContextVar[dict[str, dict[str, object]] | None] = (
     contextvars.ContextVar("provider_flow_runtime_health", default=None)
 )
+_CURRENT_PROVIDER_FLOW_FETCH_SOURCE: contextvars.ContextVar[dict[str, dict[str, object]] | None] = (
+    contextvars.ContextVar("provider_flow_fetch_source", default=None)
+)
+PROVIDER_FLOW_CACHE_TTL_SECONDS = {
+    "massive_block_trades": ttl_seconds(30),
+    "finra_ats_dark_pool": ttl_seconds(24 * 60),
+    "finra_short_interest": ttl_seconds(24 * 60),
+}
 
 
 def reset_provider_flow_runtime_health() -> None:
@@ -86,6 +101,9 @@ def reset_provider_flow_runtime_health() -> None:
     current = _CURRENT_PROVIDER_FLOW_RUNTIME_HEALTH.get()
     if current is not None:
         current.clear()
+    source = _CURRENT_PROVIDER_FLOW_FETCH_SOURCE.get()
+    if source is not None:
+        source.clear()
 
 
 def _provider_flow_runtime_health_target() -> dict[str, dict[str, object]]:
@@ -154,7 +172,7 @@ def _record_provider_flow_runtime_health(
             events.append(event_detail)
         entry["events"] = events
         live_by_ticker = dict(entry.get("live_by_ticker", {}) or {})
-        live_by_ticker[symbol] = bool(status == "healthy" and mode == "live ok")
+        live_by_ticker[symbol] = bool(status == "healthy" and str(mode).startswith("live ok"))
         entry["live_by_ticker"] = live_by_ticker
 
     if target is _PROVIDER_FLOW_RUNTIME_HEALTH:
@@ -203,6 +221,76 @@ def _provider_signal_live(row_id: str, ticker: str) -> bool:
     runtime = target.get(str(row_id), {})
     live_by_ticker = dict(runtime.get("live_by_ticker", {}) or {})
     return bool(live_by_ticker.get(str(ticker).upper(), False))
+
+
+def _provider_fetch_key(row_id: str, ticker: str) -> str:
+    return f"{row_id}:{str(ticker).upper()}"
+
+
+def _provider_fetch_sources() -> dict[str, dict[str, object]]:
+    current = _CURRENT_PROVIDER_FLOW_FETCH_SOURCE.get()
+    if current is None:
+        current = {}
+        _CURRENT_PROVIDER_FLOW_FETCH_SOURCE.set(current)
+    return current
+
+
+def _remember_provider_fetch_source(
+    row_id: str,
+    ticker: str,
+    *,
+    source: str,
+    age_seconds: float | None = None,
+) -> None:
+    payload: dict[str, object] = {"source": source}
+    if age_seconds is not None:
+        payload["age_seconds"] = float(age_seconds)
+    _provider_fetch_sources()[_provider_fetch_key(row_id, ticker)] = payload
+
+
+def _consume_provider_fetch_source(row_id: str, ticker: str) -> dict[str, object]:
+    return _provider_fetch_sources().pop(_provider_fetch_key(row_id, ticker), {})
+
+
+def _provider_fetch_health(
+    row_id: str,
+    ticker: str,
+    *,
+    default_status: str = "healthy",
+    default_mode: str = "live ok",
+) -> tuple[str, str, str]:
+    source = _consume_provider_fetch_source(row_id, ticker)
+    kind = str(source.get("source", "network"))
+    age = source.get("age_seconds")
+    if kind == "fresh_cache":
+        note = f"cache age {float(age):.0f}s" if isinstance(age, (int, float)) else "fresh cache"
+        return "healthy", "live ok cache", note
+    if kind == "stale_cache":
+        note = f"cache age {float(age):.0f}s" if isinstance(age, (int, float)) else "stale cache"
+        return "warning", "stale cache fallback", note
+    if kind == "network":
+        return default_status, default_mode, "provider network response"
+    return default_status, default_mode, ""
+
+
+def _safe_write_provider_flow_cache(
+    *,
+    provider: str,
+    lane: str,
+    ticker: str,
+    params: dict,
+    payload: list[dict],
+) -> None:
+    try:
+        write_provider_flow_cache(
+            provider=provider,
+            lane=lane,
+            ticker=ticker,
+            params=params,
+            payload=payload,
+        )
+    except (OSError, sqlite3.Error, TypeError, ValueError):
+        return
 
 
 def provider_flow_feeds_stubbed(statuses: Iterable[dict[str, str]] | None = None) -> bool:
@@ -683,6 +771,30 @@ def _fetch_massive_stock_trades(
     limit: int = 5_000,
     timeout: int = 20,
 ) -> list[dict]:
+    symbol = str(ticker).upper()
+    cache_params = {
+        "start_date": start_date or "",
+        "end_date": end_date or "",
+        "limit": int(limit),
+        "sort": "timestamp",
+        "order": "desc",
+    }
+    cached = read_provider_flow_cache(
+        provider="massive",
+        lane="massive_block_trades",
+        ticker=symbol,
+        params=cache_params,
+        ttl_seconds=PROVIDER_FLOW_CACHE_TTL_SECONDS["massive_block_trades"],
+    )
+    if cached is not None:
+        _remember_provider_fetch_source(
+            "massive_block_trades",
+            symbol,
+            source="fresh_cache",
+            age_seconds=cached.age_seconds,
+        )
+        return cached.payload
+
     token = _resolve_secret("MASSIVE_API_KEY")
     if not token:
         return []
@@ -695,18 +807,46 @@ def _fetch_massive_stock_trades(
         params["timestamp.gte"] = start_date
     if end_date:
         params["timestamp.lt"] = end_date
-    response = requests.get(
-        MASSIVE_STOCK_TRADES_URL_TEMPLATE.format(ticker=str(ticker).upper()),
-        params=params,
-        headers={"Authorization": f"Bearer {token}"},
-        timeout=timeout,
-    )
-    response.raise_for_status()
-    payload = response.json()
+    try:
+        response = requests.get(
+            MASSIVE_STOCK_TRADES_URL_TEMPLATE.format(ticker=symbol),
+            params=params,
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except PROVIDER_NEUTRAL_EXCEPTIONS:
+        stale = read_provider_flow_cache(
+            provider="massive",
+            lane="massive_block_trades",
+            ticker=symbol,
+            params=cache_params,
+            ttl_seconds=PROVIDER_FLOW_CACHE_TTL_SECONDS["massive_block_trades"],
+            allow_stale=True,
+        )
+        if stale is not None:
+            _remember_provider_fetch_source(
+                "massive_block_trades",
+                symbol,
+                source="stale_cache",
+                age_seconds=stale.age_seconds,
+            )
+            return stale.payload
+        raise
     if not isinstance(payload, dict):
         return []
     results = payload.get("results", [])
-    return [item for item in results if isinstance(item, dict)] if isinstance(results, list) else []
+    rows = [item for item in results if isinstance(item, dict)] if isinstance(results, list) else []
+    _safe_write_provider_flow_cache(
+        provider="massive",
+        lane="massive_block_trades",
+        ticker=symbol,
+        params=cache_params,
+        payload=rows,
+    )
+    _remember_provider_fetch_source("massive_block_trades", symbol, source="network")
+    return rows
 
 
 def _provider_block_trade_upside_ratio(ticker) -> Optional[float]:
@@ -736,12 +876,19 @@ def block_trade_upside_ratio(ticker):
         )
         return 1.0
     result = _neutral_float(value, 1.0)
+    status, mode, note = _provider_fetch_health(
+        "massive_block_trades",
+        ticker,
+        default_status="healthy" if result == value else "warning",
+        default_mode="live ok" if result == value else "invalid provider value neutral",
+    )
     _record_provider_flow_runtime_health(
         "massive_block_trades",
         ticker=ticker,
-        status="healthy" if result == value else "warning",
-        mode="live ok" if result == value else "invalid provider value neutral",
+        status=status,
+        mode=mode,
         value=result,
+        note=note,
     )
     return result
 
@@ -772,6 +919,7 @@ def dark_pool_pct_from_finra_ats_records(records: list[dict]) -> Optional[float]
 
 
 def _fetch_finra_ats_weekly_summary(ticker: str, limit: int = 40, timeout: int = 20) -> list[dict]:
+    symbol = str(ticker).upper()
     payload = {
         "fields": [
             "issueSymbolIdentifier",
@@ -784,25 +932,70 @@ def _fetch_finra_ats_weekly_summary(ticker: str, limit: int = 40, timeout: int =
             {
                 "compareType": "EQUAL",
                 "fieldName": "issueSymbolIdentifier",
-                "fieldValue": str(ticker).upper(),
+                "fieldValue": symbol,
             }
         ],
         "limit": int(limit),
     }
-    response = requests.post(
-        FINRA_ATS_WEEKLY_SUMMARY_URL,
-        json=payload,
-        headers={"Accept": "application/json", "Content-Type": "application/json"},
-        timeout=timeout,
+    cache_params = {"limit": int(limit), "fields": payload["fields"], "filters": payload["compareFilters"]}
+    cached = read_provider_flow_cache(
+        provider="finra",
+        lane="finra_ats_dark_pool",
+        ticker=symbol,
+        params=cache_params,
+        ttl_seconds=PROVIDER_FLOW_CACHE_TTL_SECONDS["finra_ats_dark_pool"],
     )
-    response.raise_for_status()
-    data = response.json()
+    if cached is not None:
+        _remember_provider_fetch_source(
+            "finra_ats_dark_pool",
+            symbol,
+            source="fresh_cache",
+            age_seconds=cached.age_seconds,
+        )
+        return cached.payload
+    try:
+        response = requests.post(
+            FINRA_ATS_WEEKLY_SUMMARY_URL,
+            json=payload,
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+    except PROVIDER_NEUTRAL_EXCEPTIONS:
+        stale = read_provider_flow_cache(
+            provider="finra",
+            lane="finra_ats_dark_pool",
+            ticker=symbol,
+            params=cache_params,
+            ttl_seconds=PROVIDER_FLOW_CACHE_TTL_SECONDS["finra_ats_dark_pool"],
+            allow_stale=True,
+        )
+        if stale is not None:
+            _remember_provider_fetch_source(
+                "finra_ats_dark_pool",
+                symbol,
+                source="stale_cache",
+                age_seconds=stale.age_seconds,
+            )
+            return stale.payload
+        raise
     if isinstance(data, list):
-        return [item for item in data if isinstance(item, dict)]
-    if isinstance(data, dict):
+        rows = [item for item in data if isinstance(item, dict)]
+    elif isinstance(data, dict):
         records = data.get("data") or data.get("results") or data.get("rows") or []
-        return [item for item in records if isinstance(item, dict)] if isinstance(records, list) else []
-    return []
+        rows = [item for item in records if isinstance(item, dict)] if isinstance(records, list) else []
+    else:
+        rows = []
+    _safe_write_provider_flow_cache(
+        provider="finra",
+        lane="finra_ats_dark_pool",
+        ticker=symbol,
+        params=cache_params,
+        payload=rows,
+    )
+    _remember_provider_fetch_source("finra_ats_dark_pool", symbol, source="network")
+    return rows
 
 
 def dark_pool_pct(ticker):
@@ -828,12 +1021,19 @@ def dark_pool_pct(ticker):
         )
         return 0.40
     result = _neutral_float(value, 0.40)
+    status, mode, note = _provider_fetch_health(
+        "finra_ats_dark_pool",
+        ticker,
+        default_status="healthy" if result == value else "warning",
+        default_mode="live ok" if result == value else "invalid provider value neutral",
+    )
     _record_provider_flow_runtime_health(
         "finra_ats_dark_pool",
         ticker=ticker,
-        status="healthy" if result == value else "warning",
-        mode="live ok" if result == value else "invalid provider value neutral",
+        status=status,
+        mode=mode,
         value=result,
+        note=note,
     )
     return result
 
@@ -875,6 +1075,7 @@ def short_interest_delta_from_finra_records(records: list[dict]) -> Optional[flo
 
 
 def _fetch_finra_short_interest(ticker: str, limit: int = 4, timeout: int = 20) -> list[dict]:
+    symbol = str(ticker).upper()
     payload = {
         "fields": [
             "symbolCode",
@@ -888,25 +1089,70 @@ def _fetch_finra_short_interest(ticker: str, limit: int = 4, timeout: int = 20) 
             {
                 "compareType": "EQUAL",
                 "fieldName": "symbolCode",
-                "fieldValue": str(ticker).upper(),
+                "fieldValue": symbol,
             }
         ],
         "limit": int(limit),
     }
-    response = requests.post(
-        FINRA_SHORT_INTEREST_URL,
-        json=payload,
-        headers={"Accept": "application/json", "Content-Type": "application/json"},
-        timeout=timeout,
+    cache_params = {"limit": int(limit), "fields": payload["fields"], "filters": payload["compareFilters"]}
+    cached = read_provider_flow_cache(
+        provider="finra",
+        lane="finra_short_interest",
+        ticker=symbol,
+        params=cache_params,
+        ttl_seconds=PROVIDER_FLOW_CACHE_TTL_SECONDS["finra_short_interest"],
     )
-    response.raise_for_status()
-    data = response.json()
+    if cached is not None:
+        _remember_provider_fetch_source(
+            "finra_short_interest",
+            symbol,
+            source="fresh_cache",
+            age_seconds=cached.age_seconds,
+        )
+        return cached.payload
+    try:
+        response = requests.post(
+            FINRA_SHORT_INTEREST_URL,
+            json=payload,
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        data = response.json()
+    except PROVIDER_NEUTRAL_EXCEPTIONS:
+        stale = read_provider_flow_cache(
+            provider="finra",
+            lane="finra_short_interest",
+            ticker=symbol,
+            params=cache_params,
+            ttl_seconds=PROVIDER_FLOW_CACHE_TTL_SECONDS["finra_short_interest"],
+            allow_stale=True,
+        )
+        if stale is not None:
+            _remember_provider_fetch_source(
+                "finra_short_interest",
+                symbol,
+                source="stale_cache",
+                age_seconds=stale.age_seconds,
+            )
+            return stale.payload
+        raise
     if isinstance(data, list):
-        return [item for item in data if isinstance(item, dict)]
-    if isinstance(data, dict):
+        rows = [item for item in data if isinstance(item, dict)]
+    elif isinstance(data, dict):
         records = data.get("data") or data.get("results") or data.get("rows") or []
-        return [item for item in records if isinstance(item, dict)] if isinstance(records, list) else []
-    return []
+        rows = [item for item in records if isinstance(item, dict)] if isinstance(records, list) else []
+    else:
+        rows = []
+    _safe_write_provider_flow_cache(
+        provider="finra",
+        lane="finra_short_interest",
+        ticker=symbol,
+        params=cache_params,
+        payload=rows,
+    )
+    _remember_provider_fetch_source("finra_short_interest", symbol, source="network")
+    return rows
 
 
 def short_interest_delta_15d(ticker):
@@ -932,12 +1178,19 @@ def short_interest_delta_15d(ticker):
         )
         return 0.0
     result = _neutral_float(value, 0.0)
+    status, mode, note = _provider_fetch_health(
+        "finra_short_interest",
+        ticker,
+        default_status="healthy" if result == value else "warning",
+        default_mode="live ok" if result == value else "invalid provider value neutral",
+    )
     _record_provider_flow_runtime_health(
         "finra_short_interest",
         ticker=ticker,
-        status="healthy" if result == value else "warning",
-        mode="live ok" if result == value else "invalid provider value neutral",
+        status=status,
+        mode=mode,
         value=result,
+        note=note,
     )
     return result
 

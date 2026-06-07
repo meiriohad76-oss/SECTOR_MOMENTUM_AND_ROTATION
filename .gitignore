@@ -50,6 +50,7 @@ data/.state.json.tmp
 data_cache/
 data/feeds/
 data/logs/
+data/provider_flow_cache/
 data/provider_snapshots/
 data/run_journal/
 data/saved_inputs.json

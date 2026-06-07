@@ -33,6 +33,7 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     transition_journal = tmp_path / "data" / "state_transitions.jsonl"
     run_journal = tmp_path / "data" / "run_journal" / "runs.sqlite"
     provider_snapshots = tmp_path / "data" / "provider_snapshots" / "provider_snapshots.sqlite"
+    provider_flow_cache = tmp_path / "data" / "provider_flow_cache" / "provider_flow_cache.sqlite"
     ohlcv_cache = tmp_path / "data_cache" / "ohlcv.duckdb"
     user_systemd_dir = tmp_path / ".config" / "systemd" / "user"
 
@@ -59,6 +60,34 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     with sqlite3.connect(provider_snapshots) as conn:
         conn.execute("CREATE TABLE provider_snapshots (provider TEXT)")
         conn.execute("INSERT INTO provider_snapshots VALUES ('massive')")
+    provider_flow_cache.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(provider_flow_cache) as conn:
+        conn.execute(
+            """
+            CREATE TABLE provider_flow_cache (
+                provider TEXT,
+                lane TEXT,
+                ticker TEXT,
+                request_hash TEXT,
+                created_at_utc TEXT,
+                payload_json TEXT,
+                payload_sha256 TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO provider_flow_cache VALUES (
+                'massive',
+                'massive_block_trades',
+                'XLK',
+                'hash',
+                '2026-05-27T12:00:00Z',
+                '[]',
+                '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8eaa9b7cde845a1ca951c850'
+            )
+            """
+        )
     ohlcv_cache.parent.mkdir(parents=True, exist_ok=True)
     ohlcv_cache.write_bytes(b"duckdb-placeholder")
     user_systemd_dir.mkdir(parents=True)
@@ -121,6 +150,8 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
             str(run_journal),
             "--provider-snapshot-db",
             str(provider_snapshots),
+            "--provider-flow-cache-db",
+            str(provider_flow_cache),
             "--ohlcv-cache-path",
             str(ohlcv_cache),
             "--user-systemd-dir",
@@ -147,6 +178,8 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     assert payload["production"]["provider_snapshots"]["capture_timer"]["state"] == "ready"
     assert payload["production"]["provider_snapshots"]["capture_timer"]["timer_enabled"] == "enabled"
     assert payload["production"]["provider_snapshots"]["capture_timer"]["timer_active"] == "active"
+    assert payload["production"]["provider_flow_cache"]["state"] == "ready"
+    assert payload["production"]["provider_flow_cache"]["rows"] == 1
     assert payload["production"]["ohlcv_cache"]["state"] == "ready"
     assert payload["production"]["browser_qa_fixture_guard"]["state"] == "safe"
     assert set(payload) >= {"B-021", "B-120", "B-121", "B-122", "B-123", "B-131"}
