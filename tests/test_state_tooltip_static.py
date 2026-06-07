@@ -39,4 +39,6 @@ def test_tooltip_style_supports_longer_explanations():
 
     assert "font-size: 0.92rem;" in tooltip_style
     assert "line-height: 1.55;" in tooltip_style
-    assert "max-width: min(520px, calc(100vw - 40px));" in tooltip_style
+    assert "width: min(420px, calc(100vw - 48px));" in tooltip_style
+    assert "max-width: calc(100vw - 48px);" in tooltip_style
+    assert "overflow-wrap: break-word;" in tooltip_style

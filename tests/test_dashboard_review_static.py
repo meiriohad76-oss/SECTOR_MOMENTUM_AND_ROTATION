@@ -80,8 +80,9 @@ def test_dashboard_review_css_uses_readable_contrast_and_type():
     assert ".quad-card .qtick" in css
     assert "color: var(--ticker-label);" in css
     assert "text-shadow: var(--ticker-label-shadow);" in css
-    assert "overflow-wrap: anywhere;" in css
-    assert "max-width: min(520px, calc(100vw - 40px));" in css
+    assert "overflow-wrap: break-word;" in css
+    assert "width: min(420px, calc(100vw - 48px));" in css
+    assert '[data-tip-edge="right"]::after' in css
 
 
 def test_dashboard_review_source_has_no_mojibake_markers():

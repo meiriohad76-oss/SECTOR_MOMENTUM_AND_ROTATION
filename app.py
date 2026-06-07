@@ -303,6 +303,37 @@ def _display_value(value, *, signed: bool = False, pct: bool = False, decimals: 
     return str(value)
 
 
+def _valid_ratio_value(value):
+    if value is None or pd.isna(value):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if 0.0 <= number <= 1.0 else None
+
+
+def _flow_confirmation_passed(row) -> bool | None:
+    if bool(row.get("veto")):
+        return False
+    flow_value = row.get("F_score")
+    cmf_value = row.get("cmf21")
+    etf_flow_value = row.get("etf_flow_5d_pct")
+    block_value = _valid_ratio_value(row.get("block_up_ratio"))
+    checks = []
+    for value, threshold in (
+        (flow_value, 0.0),
+        (cmf_value, 0.05),
+        (etf_flow_value, 0.0),
+        (block_value, 0.70),
+    ):
+        if value is not None and not pd.isna(value):
+            checks.append(float(value) >= threshold)
+    if not checks:
+        return None
+    return any(checks)
+
+
 def _ticker_identity_subtext(ticker: str) -> str:
     name = _ticker_display_name(ticker)
     normalized = str(ticker or "").strip().upper()
@@ -807,6 +838,19 @@ _md(
     f'document.documentElement.setAttribute("data-palette","{_palette_key}");'
     f'document.documentElement.classList.remove("density-comfortable","density-compact");'
     f'document.documentElement.classList.add("{_density_class}");'
+    f'function sectorMomentumPlaceTooltipEdge(e){{'
+    f'const el=e.target.closest&&e.target.closest("[data-tip]");'
+    f'if(!el)return;'
+    f'el.removeAttribute("data-tip-edge");'
+    f'const rect=el.getBoundingClientRect();'
+    f'const safeWidth=Math.min(420,Math.max(220,window.innerWidth-48));'
+    f'const centeredLeft=rect.left+rect.width/2-safeWidth/2;'
+    f'const centeredRight=rect.left+rect.width/2+safeWidth/2;'
+    f'if(centeredLeft<24){{el.setAttribute("data-tip-edge","left");}}'
+    f'else if(centeredRight>window.innerWidth-24){{el.setAttribute("data-tip-edge","right");}}'
+    f'}}'
+    f'document.addEventListener("mouseover",sectorMomentumPlaceTooltipEdge,true);'
+    f'document.addEventListener("focusin",sectorMomentumPlaceTooltipEdge,true);'
     f'</script>',
 )
 
@@ -1693,7 +1737,8 @@ def _ticker_report_html(ticker: str, row) -> str:
     breadth = _display_value(row.get("breadth_50d"), pct=True, decimals=0)
     cmf = _display_value(row.get("cmf21"), signed=True, decimals=2)
     etf_flow = _display_value(row.get("etf_flow_5d_pct"), signed=True, pct=True, decimals=2)
-    block_ratio = _display_value(row.get("block_up_ratio"), decimals=2)
+    block_value = _valid_ratio_value(row.get("block_up_ratio"))
+    block_ratio = _display_value(block_value, decimals=2)
     cycle_tilt_value = _display_value(row.get("cycle_tilt"), signed=True, decimals=2)
     mansfield = _display_value(row.get("mansfield_rs"), signed=True, decimals=2)
     rank = row.get("rank_in_class")
@@ -1716,7 +1761,7 @@ def _ticker_report_html(ticker: str, row) -> str:
     above_30wma_value = row.get("above_30wma")
     slope_value = row.get("ma_slope_pos")
     antonacci_value = row.get("antonacci")
-    block_value = row.get("block_up_ratio")
+    flow_confirmation = _flow_confirmation_passed(row)
 
     buy_rows = [
         _gate_row("Weinstein trend", f"Stage={stage}; above 30wMA={_display_value(above_30wma_value)}; slope up={_display_value(slope_value)}", "Stage = 2, price above 30wMA, MA slope up", stage_value == 2 and above_30wma_value is not False and slope_value is not False, "The main trend should be advancing."),
@@ -1731,7 +1776,7 @@ def _ticker_report_html(ticker: str, row) -> str:
         _gate_row("Trend break", f"above 30wMA={_display_value(above_30wma_value)}", "Healthy while price remains above 30wMA", None if above_30wma_value is None or pd.isna(above_30wma_value) else above_30wma_value is not False, "A weekly trend break weakens the Stage 2 thesis."),
         _gate_row("Relative strength break", f"Mansfield RS={mansfield}", "Healthy while Mansfield RS >= 0", None if mansfield_value is None or pd.isna(mansfield_value) else mansfield_value >= 0, "Underperformance can precede price damage."),
         _gate_row("Rotation breakdown", f"RRG={rrg}", "Healthy while RRG is not Lagging", None if not rrg_value else rrg_value != "Lagging", "Lagging rotation means relative momentum has broken."),
-        _gate_row("Distribution", f"CMF={cmf}; block up ratio={block_ratio}", "Healthy while CMF >= -0.10 and block ratio >= 0.70", not ((cmf_value is not None and not pd.isna(cmf_value) and cmf_value < -0.10) or (block_value is not None and not pd.isna(block_value) and block_value < 0.70)), "Negative volume pressure can invalidate the setup."),
+        _gate_row("Distribution", f"CMF={cmf}; block up ratio={block_ratio}", "Healthy while CMF >= -0.10 and valid block ratio >= 0.70 when available", not ((cmf_value is not None and not pd.isna(cmf_value) and cmf_value < -0.10) or (block_value is not None and block_value < 0.70)), "Negative volume pressure can invalidate the setup."),
         _gate_row("Absolute momentum", f"Antonacci={antonacci}", "Healthy while Antonacci != 0", None if antonacci_value is None or pd.isna(antonacci_value) else antonacci_value != 0, "The ticker should beat cash/T-bills on the lookback."),
     ]
 
@@ -1742,7 +1787,7 @@ def _ticker_report_html(ticker: str, row) -> str:
         _gate_row("4. Dual momentum", f"MOM={mom}; Antonacci={antonacci}", "Relative and absolute momentum both positive", (row.get("mom_12_1") or 0) > 0 and antonacci_value == 1, "The ticker should beat peers and cash."),
         _gate_row("5. RRG rotation", f"RRG={rrg}; ratio={rs_ratio}; momentum={rs_momentum}", "Leading or Improving preferred", rrg_value in {"Leading", "Improving"}, "Rotation shows where leadership is moving."),
         _gate_row("6. Business cycle", f"Cycle tilt={cycle_tilt_value}", "Positive is supportive", (row.get("cycle_tilt") or 0) > 0, "Macro phase can add or subtract sector tailwind."),
-        _gate_row("7. Institutional flow", f"F={f_score}; CMF={cmf}; ETF flow={etf_flow}; block ratio={block_ratio}", "F > 0 and no veto preferred", (flow_value is not None and not pd.isna(flow_value) and flow_value > 0) and not bool(row.get("veto")), "Flow confirms whether real money supports the signal."),
+        _gate_row("7. Institutional flow", f"F={f_score}; CMF={cmf}; ETF flow={etf_flow}; block ratio={block_ratio}", "No flow veto; at least one valid flow confirmation positive", flow_confirmation, "Flow confirms whether real money supports the signal. Missing or invalid provider enrichments show as n/a, not as bearish evidence."),
     ]
 
     state_color = _state_color_var(state)

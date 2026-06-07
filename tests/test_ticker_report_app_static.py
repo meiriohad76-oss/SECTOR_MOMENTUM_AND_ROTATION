@@ -46,6 +46,24 @@ def test_ticker_report_gate_helpers_normalize_pandas_boolean_results():
     assert "passed is False" not in helper_block
 
 
+def test_ticker_report_flow_gate_ignores_invalid_provider_ratios():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    value_helpers = app_source[
+        app_source.index("def _display_value(") : app_source.index("def _ticker_identity_subtext(")
+    ]
+    report_helper = app_source[
+        app_source.index("def _ticker_report_html(") : app_source.index("def _provider_status_list_html(")
+    ]
+
+    assert "def _valid_ratio_value(" in value_helpers
+    assert "return number if 0.0 <= number <= 1.0 else None" in value_helpers
+    assert "def _flow_confirmation_passed(row)" in value_helpers
+    assert 'block_value = _valid_ratio_value(row.get("block_up_ratio"))' in report_helper
+    assert "flow_confirmation = _flow_confirmation_passed(row)" in report_helper
+    assert "No flow veto; at least one valid flow confirmation positive" in report_helper
+    assert "Missing or invalid provider enrichments show as n/a" in report_helper
+
+
 def test_ticker_report_uses_actual_indicator_values():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
     report_helper = app_source[
@@ -86,3 +104,15 @@ def test_ticker_report_css_is_responsive_and_readable():
     desktop_grid = css[css.index(".ticker-report-grid {") : css.index(".ticker-report-verdict")]
     assert "grid-template-columns: 1.1fr 1fr;" in desktop_grid
     assert ".ticker-report-grid { grid-template-columns: 1fr; }" in css
+
+
+def test_tooltips_are_viewport_safe():
+    css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+
+    assert "width: min(420px, calc(100vw - 48px));" in css
+    assert "overflow-wrap: break-word;" in css
+    assert '[data-tip-edge="left"]::after' in css
+    assert '[data-tip-edge="right"]::after' in css
+    assert "sectorMomentumPlaceTooltipEdge" in app_source
+    assert 'closest("[data-tip]")' in app_source
