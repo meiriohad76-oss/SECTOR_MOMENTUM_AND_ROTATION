@@ -61,7 +61,7 @@ jobs:
           ./.venv/bin/python scripts/smoke_provider_flow_lanes.py --ticker SPY --limit 25 --timeout 20 --require-massive
           ./.venv/bin/python scripts/warm_provider_flow_cache.py --universe us-sectors --timeout 20
           ./.venv/bin/python scripts/refresh_dashboard_state.py --period 3y --provider-flow-mode cache-only
-          ./.venv/bin/python scripts/check_ops_readiness.py
+          ./.venv/bin/python scripts/check_ops_readiness.py --strict-production
 
           # Helper prints restart_result=healthy after the fresh process serves HTTP 200.
           ./.venv/bin/python scripts/restart_sector_dashboard.py \

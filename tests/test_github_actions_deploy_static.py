@@ -33,7 +33,7 @@ def test_pi_deploy_workflow_fast_forwards_tests_and_smokes_service():
     assert "./.venv/bin/python scripts/smoke_provider_flow_lanes.py --ticker SPY --limit 25 --timeout 20 --require-massive" in text
     assert "./.venv/bin/python scripts/warm_provider_flow_cache.py --universe us-sectors --timeout 20" in text
     assert "./.venv/bin/python scripts/refresh_dashboard_state.py --period 3y --provider-flow-mode cache-only" in text
-    assert "./.venv/bin/python scripts/check_ops_readiness.py" in text
+    assert "./.venv/bin/python scripts/check_ops_readiness.py --strict-production" in text
     assert "./.venv/bin/python scripts/restart_sector_dashboard.py" in text
     assert "./.venv/bin/python scripts/smoke_deploy_gate.py" in text
     assert "--service \"$PI_SERVICE_NAME\"" in text
@@ -56,7 +56,7 @@ def test_github_actions_pi_deploy_docs_reference_required_secrets():
     assert "scripts/smoke_provider_flow_lanes.py --ticker SPY --limit 25 --timeout 20 --require-massive" in text
     assert "scripts/warm_provider_flow_cache.py --universe us-sectors --timeout 20" in text
     assert "scripts/refresh_dashboard_state.py --period 3y --provider-flow-mode cache-only" in text
-    assert "scripts/check_ops_readiness.py" in text
+    assert "scripts/check_ops_readiness.py --strict-production" in text
 
 
 def test_backlog_records_live_validated_pi_deploy_status():

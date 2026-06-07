@@ -238,6 +238,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--provider-flow-cache-db", default=str(DEFAULT_PROVIDER_FLOW_CACHE_PATH))
     parser.add_argument("--ohlcv-cache-path", default=str(ROOT / "data_cache" / "ohlcv.duckdb"))
     parser.add_argument("--user-systemd-dir", default=str(Path.home() / ".config" / "systemd" / "user"))
+    parser.add_argument(
+        "--strict-production",
+        action="store_true",
+        help="Exit non-zero when critical production readiness checks are not ready.",
+    )
     return parser.parse_args(argv)
 
 
@@ -251,6 +256,130 @@ def _broker_status() -> dict:
         "missing": status.missing,
         "live_connectivity": status.live_connectivity,
     }
+
+
+def _require(
+    failures: list[dict[str, str]],
+    condition: bool,
+    check_id: str,
+    detail: str,
+) -> None:
+    if not condition:
+        failures.append({"id": check_id, "detail": detail})
+
+
+def _strict_production_failures(payload: dict[str, object]) -> list[dict[str, str]]:
+    production = dict(payload.get("production", {}) or {})
+    failures: list[dict[str, str]] = []
+
+    ohlcv = dict(production.get("ohlcv_provider", {}) or {})
+    _require(
+        failures,
+        ohlcv.get("state") == "configured",
+        "ohlcv_provider",
+        f"OHLCV provider state is {ohlcv.get('state')}",
+    )
+    _require(
+        failures,
+        ohlcv.get("massive_verify_ssl") == "configured_true",
+        "massive_verify_ssl",
+        f"Massive SSL state is {ohlcv.get('massive_verify_ssl')}",
+    )
+
+    fred = dict(production.get("fred", {}) or {})
+    _require(failures, fred.get("api_key") == "configured", "fred", "FRED API key is not configured")
+
+    provider_flow = dict(production.get("provider_flow", {}) or {})
+    for lane in ("massive_block_trades", "finra_ats_dark_pool", "finra_short_interest"):
+        lane_status = dict(provider_flow.get(lane, {}) or {})
+        _require(
+            failures,
+            lane_status.get("state") == "live_configured",
+            f"provider_flow.{lane}",
+            f"{lane} state is {lane_status.get('state')}",
+        )
+
+    state = dict(production.get("state_persistence", {}) or {})
+    _require(
+        failures,
+        state.get("state") == "ready",
+        "state_persistence",
+        f"state persistence is {state.get('state')}",
+    )
+    _require(
+        failures,
+        state.get("freshness_state") == "fresh",
+        "state_freshness",
+        f"state freshness is {state.get('freshness_state')}",
+    )
+    _require(
+        failures,
+        state.get("transitions") == "ready",
+        "transition_journal",
+        f"transition journal state is {state.get('transitions')}",
+    )
+    state_timer = dict(state.get("refresh_timer", {}) or {})
+    _require(
+        failures,
+        state_timer.get("state") == "ready",
+        "state_refresh_timer",
+        f"state refresh timer is {state_timer.get('state')}",
+    )
+
+    run_journal = dict(production.get("run_journal", {}) or {})
+    _require(
+        failures,
+        run_journal.get("state") == "ready",
+        "run_journal",
+        f"run journal state is {run_journal.get('state')}",
+    )
+
+    snapshots = dict(production.get("provider_snapshots", {}) or {})
+    _require(
+        failures,
+        snapshots.get("state") == "ready",
+        "provider_snapshots",
+        f"provider snapshots state is {snapshots.get('state')}",
+    )
+    snapshot_timer = dict(snapshots.get("capture_timer", {}) or {})
+    _require(
+        failures,
+        snapshot_timer.get("state") == "ready",
+        "provider_snapshot_timer",
+        f"provider snapshot timer is {snapshot_timer.get('state')}",
+    )
+
+    flow_cache = dict(production.get("provider_flow_cache", {}) or {})
+    _require(
+        failures,
+        flow_cache.get("state") == "ready",
+        "provider_flow_cache",
+        f"provider-flow cache state is {flow_cache.get('state')}",
+    )
+    warmup_timer = dict(flow_cache.get("warmup_timer", {}) or {})
+    _require(
+        failures,
+        warmup_timer.get("state") == "ready",
+        "provider_flow_cache_timer",
+        f"provider-flow cache warmup timer is {warmup_timer.get('state')}",
+    )
+
+    ohlcv_cache = dict(production.get("ohlcv_cache", {}) or {})
+    _require(
+        failures,
+        ohlcv_cache.get("state") == "ready",
+        "ohlcv_cache",
+        f"OHLCV cache state is {ohlcv_cache.get('state')}",
+    )
+
+    browser_guard = dict(production.get("browser_qa_fixture_guard", {}) or {})
+    _require(
+        failures,
+        browser_guard.get("state") == "safe",
+        "browser_qa_fixture_guard",
+        f"browser QA fixture guard is {browser_guard.get('state')}",
+    )
+    return failures
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -340,8 +469,14 @@ def main(argv: list[str] | None = None) -> int:
         },
         "B-131": _broker_status(),
     }
+    failures = _strict_production_failures(payload)
+    payload["strict_production"] = {
+        "ok": not failures,
+        "failures": failures,
+        "enforced": bool(args.strict_production),
+    }
     print(json.dumps(payload, sort_keys=True))
-    return 0
+    return 2 if args.strict_production and failures else 0
 
 
 if __name__ == "__main__":

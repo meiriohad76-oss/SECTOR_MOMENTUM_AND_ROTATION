@@ -354,6 +354,7 @@ URLs, or raw provider payloads.
 Provider-flow responses are cached in `data/provider_flow_cache/provider_flow_cache.sqlite` so dashboard reruns can reuse fresh Massive/FINRA payloads and degrade to warning-only stale fallback during provider outages.
 The Pi deploy installs `sector-provider-flow-cache.timer`, a non-sudo user timer that warms the cached Massive/FINRA provider-flow lanes for the scored dashboard universe before the US open and after the close.
 The Pi deploy also installs `sector-dashboard-state-refresh.timer`, which runs the methodology headlessly after cache warmup so `data/state.json`, `data/state_transitions.jsonl`, and `data/run_journal/runs.sqlite` stay fresh even when no browser session is open.
+Use `./.venv/bin/python scripts/check_ops_readiness.py --strict-production` for the deploy-grade readiness gate. It fails only critical production lanes; optional secret-backed channels such as Telegram, email, push, Discord, and broker execution remain reported but non-blocking.
 
 ## State transition alerts
 

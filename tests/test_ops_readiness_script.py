@@ -170,6 +170,7 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
             str(ohlcv_cache),
             "--user-systemd-dir",
             str(user_systemd_dir),
+            "--strict-production",
         ]
     )
 
@@ -204,6 +205,7 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     assert payload["production"]["provider_flow_cache"]["warmup_timer"]["timer_active"] == "active"
     assert payload["production"]["ohlcv_cache"]["state"] == "ready"
     assert payload["production"]["browser_qa_fixture_guard"]["state"] == "safe"
+    assert payload["strict_production"] == {"enforced": True, "failures": [], "ok": True}
     assert set(payload) >= {"B-021", "B-120", "B-121", "B-122", "B-123", "B-131"}
     assert payload["B-021"]["telegram"] == "configured"
     assert payload["B-120"]["smtp_delivery"] == "configured"
@@ -233,6 +235,42 @@ def test_ops_readiness_flags_browser_qa_fixtures_as_unsafe(monkeypatch, capsys):
         "state": "unsafe_enabled",
         "flag": "configured",
     }
+    assert payload["strict_production"]["ok"] is False
+    assert any(row["id"] == "browser_qa_fixture_guard" for row in payload["strict_production"]["failures"])
+
+
+def test_ops_readiness_strict_mode_fails_on_stale_state(tmp_path, monkeypatch, capsys):
+    state_file = tmp_path / "state.json"
+    journal = tmp_path / "state_transitions.jsonl"
+    state_file.write_text(
+        json.dumps(
+            {
+                "updated": "2020-01-01T00:00:00Z",
+                "by_ticker": {"XLK": {"state": "HOLD"}},
+                "transitions": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    journal.write_text("", encoding="utf-8")
+    monkeypatch.setattr(check_ops_readiness, "_systemctl_user", lambda args: None)
+
+    exit_code = check_ops_readiness.main(
+        [
+            "--state-file",
+            str(state_file),
+            "--state-transition-journal",
+            str(journal),
+            "--strict-production",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 2
+    assert payload["production"]["state_persistence"]["freshness_state"] == "stale"
+    assert payload["strict_production"]["enforced"] is True
+    assert payload["strict_production"]["ok"] is False
+    assert any(row["id"] == "state_freshness" for row in payload["strict_production"]["failures"])
 
 
 def test_ops_readiness_marks_missing_massive_snapshot_timer(tmp_path, monkeypatch, capsys):
