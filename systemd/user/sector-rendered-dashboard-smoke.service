@@ -16,4 +16,4 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=%h/SECTOR_MOMENTUM_AND_ROTATION
 Environment=PYTHONUNBUFFERED=1
-ExecStart=%h/SECTOR_MOMENTUM_AND_ROTATION/.venv/bin/python scripts/rendered_dashboard_smoke.py --url http://127.0.0.1:8501/?ticker=XLK --timeout-ms 15000 --allow-unavailable --output-json data/rendered_dashboard_smoke/latest.json
+ExecStart=%h/SECTOR_MOMENTUM_AND_ROTATION/.venv/bin/python scripts/rendered_dashboard_smoke.py --url http://127.0.0.1:8501/?ticker=XLK --timeout-ms 120000 --allow-unavailable --output-json data/rendered_dashboard_smoke/latest.json

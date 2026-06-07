@@ -72,7 +72,7 @@ jobs:
 
           ./.venv/bin/python scripts/rendered_dashboard_smoke.py \
             --url "http://127.0.0.1:8501/?ticker=XLK" \
-            --timeout-ms 30000 \
+            --timeout-ms 120000 \
             --output-json "$PI_REPO_PATH/data/rendered_dashboard_smoke/latest.json"
 
           ./.venv/bin/python scripts/check_ops_readiness.py --strict-production

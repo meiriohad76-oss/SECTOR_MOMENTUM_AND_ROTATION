@@ -38,6 +38,7 @@ def test_pi_deploy_workflow_fast_forwards_tests_and_smokes_service():
     assert "./.venv/bin/python scripts/check_ops_readiness.py --strict-production" in text
     assert "./.venv/bin/python scripts/restart_sector_dashboard.py" in text
     assert "./.venv/bin/python scripts/rendered_dashboard_smoke.py" in text
+    assert "--timeout-ms 120000" in text
     assert "--output-json \"$PI_REPO_PATH/data/rendered_dashboard_smoke/latest.json\"" in text
     assert "./.venv/bin/python scripts/smoke_deploy_gate.py" in text
     assert "--service \"$PI_SERVICE_NAME\"" in text

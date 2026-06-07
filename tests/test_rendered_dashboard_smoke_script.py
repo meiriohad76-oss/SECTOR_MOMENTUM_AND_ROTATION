@@ -116,6 +116,7 @@ def test_rendered_smoke_script_is_post_restart_deploy_gate():
 
     assert "scripts/rendered_dashboard_smoke.py" in workflow
     assert workflow.index("scripts/restart_sector_dashboard.py") < workflow.index("scripts/rendered_dashboard_smoke.py")
+    assert "--timeout-ms 120000" in workflow
     assert "--output-json \"$PI_REPO_PATH/data/rendered_dashboard_smoke/latest.json\"" in workflow
 
 
