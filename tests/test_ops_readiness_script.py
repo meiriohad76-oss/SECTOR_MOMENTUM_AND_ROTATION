@@ -364,6 +364,34 @@ def test_ops_readiness_marks_missing_massive_snapshot_timer(tmp_path, monkeypatc
     assert timer["timer_installed"] is False
 
 
+def test_ops_readiness_reports_timer_last_run_failure_separately(tmp_path, monkeypatch, capsys):
+    user_systemd_dir = tmp_path / ".config" / "systemd" / "user"
+    user_systemd_dir.mkdir(parents=True)
+    (user_systemd_dir / "sector-rendered-dashboard-smoke.service").write_text("[Service]\n", encoding="utf-8")
+    (user_systemd_dir / "sector-rendered-dashboard-smoke.timer").write_text("[Timer]\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        check_ops_readiness,
+        "_systemctl_user",
+        lambda args: {
+            ("is-enabled", "sector-rendered-dashboard-smoke.timer"): "enabled",
+            ("is-active", "sector-rendered-dashboard-smoke.timer"): "active",
+            ("show", "sector-rendered-dashboard-smoke.service", "-p", "Result", "--value"): "exit-code",
+            ("show", "sector-rendered-dashboard-smoke.service", "-p", "ExecMainStatus", "--value"): "1",
+        }.get(tuple(args)),
+    )
+
+    exit_code = check_ops_readiness.main(["--user-systemd-dir", str(user_systemd_dir)])
+
+    payload = json.loads(capsys.readouterr().out)
+    timer = payload["production"]["rendered_dashboard_smoke"]["timer"]
+    assert exit_code == 0
+    assert timer["state"] == "ready"
+    assert timer["last_service_result"] == "exit-code"
+    assert timer["last_service_exit_status"] == "1"
+    assert timer["last_service_state"] == "failed"
+
+
 def test_ops_readiness_docs_reference_single_command():
     root = check_ops_readiness.ROOT
     readme = (root / "README.md").read_text(encoding="utf-8")

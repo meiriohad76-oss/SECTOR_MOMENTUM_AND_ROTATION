@@ -250,6 +250,14 @@ def _user_timer_status(unit_dir: Path, *, service: str, timer: str) -> dict[str,
     active = _systemctl_user(["is-active", timer])
     service_result = _systemctl_user(["show", service, "-p", "Result", "--value"])
     service_exit_status = _systemctl_user(["show", service, "-p", "ExecMainStatus", "--value"])
+    if service_result is None and service_exit_status is None:
+        last_service_state = "unknown"
+    elif service_result == "success" and service_exit_status in {None, "", "0"}:
+        last_service_state = "success"
+    elif service_result in {None, "", "success"} and service_exit_status in {None, "", "0", "unknown"}:
+        last_service_state = "unknown"
+    else:
+        last_service_state = "failed"
     installed = service_path.exists() and timer_path.exists()
     systemctl_available = enabled is not None or active is not None
     ready = installed and enabled in {"enabled", "enabled-runtime"} and active == "active"
@@ -271,6 +279,7 @@ def _user_timer_status(unit_dir: Path, *, service: str, timer: str) -> dict[str,
         "timer_active": active or "unknown",
         "last_service_result": service_result or "unknown",
         "last_service_exit_status": service_exit_status or "unknown",
+        "last_service_state": last_service_state,
     }
 
 
