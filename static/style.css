@@ -840,6 +840,15 @@ div[data-testid="stTextArea"] label span {
 }
 .alert-row:last-child { border-bottom: 0; }
 .alert-row:hover { background: var(--panel-hover); }
+.alert-row,
+.alert-row:visited,
+.alert-row:hover,
+.alert-row:focus,
+.alert-row *,
+.alert-row:hover *,
+.alert-row:visited * {
+  text-decoration: none !important;
+}
 .alert-row.STAGE_2_BULLISH { --pulse-color: var(--st-stage2); }
 .alert-row.HOLD { --pulse-color: var(--st-hold); }
 .alert-row.WARNING { --pulse-color: var(--st-warn); }

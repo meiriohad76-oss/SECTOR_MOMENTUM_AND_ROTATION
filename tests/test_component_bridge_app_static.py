@@ -50,10 +50,12 @@ def test_app_mounts_generic_drill_click_bridge_before_clickable_surfaces():
 
 def test_app_adds_whole_card_drill_attributes_to_clickable_surfaces():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    alerts_section = app_source[app_source.index("def render_alerts():") : app_source.index("def render_picks():")]
 
     assert "drill_bridge_attrs(" in app_source
     assert '<div class="pick {state} {pulse_class}" {drill_bridge_attrs(tkr, label=klass_lbl)}>' in app_source
-    assert '<a class="alert-row {new_state} {pulse_class}" href="{drill_href}" {drill_bridge_attrs(ticker, label=new_state)}>' in app_source
+    assert '<a class="alert-row {new_state} {pulse_class}" href="{drill_href}" aria-label="{drill_label}">' in app_source
+    assert "drill_bridge_attrs(ticker, label=new_state)" not in alerts_section
     assert '<div class="quad-card {color_cls}" {drill_bridge_attrs(tickers[0], label=q) if tickers else ""}>' in app_source
 
 

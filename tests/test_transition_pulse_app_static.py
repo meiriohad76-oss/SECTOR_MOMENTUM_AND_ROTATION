@@ -12,7 +12,8 @@ def test_transition_pulse_is_wired_to_alerts_and_picks():
     assert "from src.transition_pulse import transition_pulse_class, transition_row_pulse_class" in app_source
     assert "pulse_class = transition_row_pulse_class(r)" in app_source
     assert "pulse_class = transition_pulse_class(tkr, transitions)" in app_source
-    assert '<a class="alert-row {new_state} {pulse_class}" href="{drill_href}" {drill_bridge_attrs(ticker, label=new_state)}>' in app_source
+    assert '<a class="alert-row {new_state} {pulse_class}" href="{drill_href}" aria-label="{drill_label}">' in app_source
+    assert 'drill_href = f"?ticker={_esc(ticker)}&focus=drill#drill"' in app_source
     assert '<div class="pick {state} {pulse_class}" {drill_bridge_attrs(tkr, label=klass_lbl)}>' in app_source
 
 
