@@ -156,6 +156,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--expect-text", action="append", default=[])
     parser.add_argument("--timeout-ms", type=int, default=90_000)
     parser.add_argument("--settle-ms", type=int, default=2_000)
+    parser.add_argument("--attempts", type=int, default=1, help="Total smoke attempts before returning failure.")
+    parser.add_argument("--retry-delay-ms", type=int, default=5_000, help="Delay between failed attempts.")
     parser.add_argument("--browser-channel", default="")
     parser.add_argument("--user-data-dir", default="")
     parser.add_argument("--headed", action="store_true")
@@ -217,11 +219,44 @@ def _run_rendered_smoke_with_deadline(**kwargs) -> dict[str, object]:
     return result
 
 
+def _run_with_attempts(
+    runner,
+    *,
+    attempts: int,
+    retry_delay_ms: int,
+    **kwargs,
+) -> dict[str, object]:
+    attempt_count = max(1, int(attempts or 1))
+    retry_delay_seconds = max(0, int(retry_delay_ms or 0)) / 1000
+    previous: list[dict[str, object]] = []
+    result: dict[str, object] = {}
+    for index in range(1, attempt_count + 1):
+        result = dict(runner(**kwargs))
+        result["attempt"] = index
+        result["attempts"] = attempt_count
+        if result.get("ok") or index == attempt_count:
+            if previous:
+                result["previous_attempts"] = previous
+            return result
+        previous.append(
+            {
+                "attempt": index,
+                "state": result.get("state"),
+                "detail": result.get("detail"),
+                "missing": result.get("missing", []),
+            }
+        )
+        if retry_delay_seconds:
+            time.sleep(retry_delay_seconds)
+    return result
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     checks = tuple(args.expect_text or DEFAULT_EXPECTED_TEXT)
     runner = _run_rendered_smoke_with_deadline if __name__ == "__main__" else _run_rendered_smoke
-    result = runner(
+    result = _run_with_attempts(
+        runner,
         url=args.url,
         checks=checks,
         timeout_ms=args.timeout_ms,
@@ -229,6 +264,8 @@ def main(argv: list[str] | None = None) -> int:
         browser_channel=args.browser_channel or None,
         user_data_dir=args.user_data_dir or None,
         headed=bool(args.headed),
+        attempts=args.attempts,
+        retry_delay_ms=args.retry_delay_ms,
     )
     result = {
         **result,

@@ -111,6 +111,48 @@ def test_rendered_smoke_writes_timestamped_json_result(monkeypatch, tmp_path, ca
     assert payload["state"] == "playwright_missing"
 
 
+def test_rendered_smoke_retries_transient_render_failures(monkeypatch, tmp_path, capsys):
+    output_path = tmp_path / "smoke" / "latest.json"
+    results = [
+        {
+            "ok": False,
+            "state": "missing_rendered_text",
+            "detail": "render timeout",
+            "missing": ["text:BLUF"],
+        },
+        {
+            "ok": True,
+            "state": "rendered_dashboard",
+            "detail": "matched=3 url_host=127.0.0.1:8501",
+            "missing": [],
+        },
+    ]
+
+    def fake_runner(**kwargs):
+        return results.pop(0)
+
+    monkeypatch.setattr(rendered_dashboard_smoke, "_run_rendered_smoke", fake_runner)
+
+    exit_code = rendered_dashboard_smoke.main(
+        [
+            "--attempts",
+            "2",
+            "--retry-delay-ms",
+            "0",
+            "--output-json",
+            str(output_path),
+        ]
+    )
+
+    output = capsys.readouterr().out
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert exit_code == 0
+    assert "rendered_dashboard_smoke ok=true state=rendered_dashboard" in output
+    assert payload["attempt"] == 2
+    assert payload["attempts"] == 2
+    assert payload["previous_attempts"][0]["state"] == "missing_rendered_text"
+
+
 def test_rendered_smoke_script_is_post_restart_deploy_gate():
     workflow = (ROOT / ".github" / "workflows" / "deploy-pi.yml").read_text(encoding="utf-8")
 
@@ -118,6 +160,14 @@ def test_rendered_smoke_script_is_post_restart_deploy_gate():
     assert workflow.index("scripts/restart_sector_dashboard.py") < workflow.index("scripts/rendered_dashboard_smoke.py")
     assert "--timeout-ms 120000" in workflow
     assert "--output-json \"$PI_REPO_PATH/data/rendered_dashboard_smoke/latest.json\"" in workflow
+
+
+def test_rendered_smoke_timer_retries_transient_service_timing():
+    service = (ROOT / "systemd" / "user" / "sector-rendered-dashboard-smoke.service").read_text(encoding="utf-8")
+
+    assert "scripts/rendered_dashboard_smoke.py" in service
+    assert "--attempts 3" in service
+    assert "--retry-delay-ms 10000" in service
 
 
 def test_readme_documents_rendered_dashboard_smoke_commands():
