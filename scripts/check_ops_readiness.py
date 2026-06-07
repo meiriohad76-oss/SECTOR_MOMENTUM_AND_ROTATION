@@ -19,10 +19,18 @@ from src.broker_config import broker_config_status  # noqa: E402
 from src.config_resolver import resolve_config_value  # noqa: E402
 from src.pwa_push import load_push_subscriptions  # noqa: E402
 from src.provider_flow_cache import DEFAULT_CACHE_DB_PATH as DEFAULT_PROVIDER_FLOW_CACHE_PATH  # noqa: E402
-from src.provider_flow_cache import provider_flow_cache_status  # noqa: E402
+from src.provider_flow_cache import provider_flow_cache_coverage, provider_flow_cache_status  # noqa: E402
 from src.provider_snapshots import DEFAULT_SNAPSHOT_DB_PATH  # noqa: E402
 from src.run_journal import DEFAULT_JOURNAL_PATH  # noqa: E402
 from src.scoring import STATE_FILE, _transition_journal_path  # noqa: E402
+from src.universe import US_SECTORS  # noqa: E402
+
+
+REQUIRED_PROVIDER_FLOW_CACHE_LANES = (
+    "massive_block_trades",
+    "finra_ats_dark_pool",
+    "finra_short_interest",
+)
 
 
 def _label(value: str | None) -> str:
@@ -356,6 +364,18 @@ def _strict_production_failures(payload: dict[str, object]) -> list[dict[str, st
         "provider_flow_cache",
         f"provider-flow cache state is {flow_cache.get('state')}",
     )
+    us_sector_coverage = dict(flow_cache.get("us_sector_coverage", {}) or {})
+    _require(
+        failures,
+        us_sector_coverage.get("state") == "ready",
+        "provider_flow_cache.us_sector_coverage",
+        (
+            "US-sector provider-flow cache coverage is "
+            f"{us_sector_coverage.get('covered_pair_count')}/"
+            f"{us_sector_coverage.get('expected_pair_count')} with "
+            f"{us_sector_coverage.get('missing_pair_count')} missing pairs"
+        ),
+    )
     warmup_timer = dict(flow_cache.get("warmup_timer", {}) or {})
     _require(
         failures,
@@ -425,6 +445,11 @@ def main(argv: list[str] | None = None) -> int:
             },
             "provider_flow_cache": {
                 **provider_flow_cache_status(provider_flow_cache_db),
+                "us_sector_coverage": provider_flow_cache_coverage(
+                    tickers=US_SECTORS,
+                    lanes=REQUIRED_PROVIDER_FLOW_CACHE_LANES,
+                    path=provider_flow_cache_db,
+                ),
                 "warmup_timer": _user_timer_status(
                     user_systemd_dir,
                     service="sector-provider-flow-cache.service",

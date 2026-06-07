@@ -5,6 +5,32 @@ import json
 import sqlite3
 
 from scripts import check_ops_readiness
+from src.provider_flow_cache import write_provider_flow_cache
+from src.universe import US_SECTORS
+
+
+REQUIRED_PROVIDER_FLOW_CACHE_LANES = (
+    "massive_block_trades",
+    "finra_ats_dark_pool",
+    "finra_short_interest",
+)
+
+
+def _write_provider_flow_cache_grid(path, *, omit: tuple[str, str] | None = None) -> None:
+    for ticker in US_SECTORS:
+        for lane in REQUIRED_PROVIDER_FLOW_CACHE_LANES:
+            if omit == (lane, ticker):
+                continue
+            provider = "massive" if lane == "massive_block_trades" else "finra"
+            write_provider_flow_cache(
+                provider=provider,
+                lane=lane,
+                ticker=ticker,
+                params={"test": lane},
+                payload=[{"ticker": ticker, "lane": lane}],
+                path=path,
+                created_at_utc=datetime(2026, 5, 27, 12, tzinfo=timezone.utc),
+            )
 
 
 def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_values(tmp_path, monkeypatch, capsys):
@@ -62,34 +88,7 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     with sqlite3.connect(provider_snapshots) as conn:
         conn.execute("CREATE TABLE provider_snapshots (provider TEXT)")
         conn.execute("INSERT INTO provider_snapshots VALUES ('massive')")
-    provider_flow_cache.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(provider_flow_cache) as conn:
-        conn.execute(
-            """
-            CREATE TABLE provider_flow_cache (
-                provider TEXT,
-                lane TEXT,
-                ticker TEXT,
-                request_hash TEXT,
-                created_at_utc TEXT,
-                payload_json TEXT,
-                payload_sha256 TEXT
-            )
-            """
-        )
-        conn.execute(
-            """
-            INSERT INTO provider_flow_cache VALUES (
-                'massive',
-                'massive_block_trades',
-                'XLK',
-                'hash',
-                '2026-05-27T12:00:00Z',
-                '[]',
-                '4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8eaa9b7cde845a1ca951c850'
-            )
-            """
-        )
+    _write_provider_flow_cache_grid(provider_flow_cache)
     ohlcv_cache.parent.mkdir(parents=True, exist_ok=True)
     ohlcv_cache.write_bytes(b"duckdb-placeholder")
     user_systemd_dir.mkdir(parents=True)
@@ -199,7 +198,11 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     assert payload["production"]["provider_snapshots"]["capture_timer"]["timer_enabled"] == "enabled"
     assert payload["production"]["provider_snapshots"]["capture_timer"]["timer_active"] == "active"
     assert payload["production"]["provider_flow_cache"]["state"] == "ready"
-    assert payload["production"]["provider_flow_cache"]["rows"] == 1
+    assert payload["production"]["provider_flow_cache"]["rows"] == 33
+    assert payload["production"]["provider_flow_cache"]["us_sector_coverage"]["state"] == "ready"
+    assert payload["production"]["provider_flow_cache"]["us_sector_coverage"]["expected_pair_count"] == 33
+    assert payload["production"]["provider_flow_cache"]["us_sector_coverage"]["covered_pair_count"] == 33
+    assert payload["production"]["provider_flow_cache"]["us_sector_coverage"]["missing_pair_count"] == 0
     assert payload["production"]["provider_flow_cache"]["warmup_timer"]["state"] == "ready"
     assert payload["production"]["provider_flow_cache"]["warmup_timer"]["timer_enabled"] == "enabled"
     assert payload["production"]["provider_flow_cache"]["warmup_timer"]["timer_active"] == "active"
@@ -217,6 +220,35 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     assert "telegram-token" not in serialized
     assert "massive-live-secret" not in serialized
     assert "fred-live-secret" not in serialized
+
+
+def test_ops_readiness_strict_mode_fails_when_provider_flow_cache_coverage_is_incomplete(
+    tmp_path, monkeypatch, capsys
+):
+    provider_flow_cache = tmp_path / "provider_flow_cache.sqlite"
+    _write_provider_flow_cache_grid(provider_flow_cache, omit=("finra_short_interest", "XLK"))
+    monkeypatch.setattr(check_ops_readiness, "_systemctl_user", lambda args: None)
+
+    exit_code = check_ops_readiness.main(
+        [
+            "--provider-flow-cache-db",
+            str(provider_flow_cache),
+            "--strict-production",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    coverage = payload["production"]["provider_flow_cache"]["us_sector_coverage"]
+    assert exit_code == 2
+    assert coverage["state"] == "incomplete"
+    assert coverage["expected_pair_count"] == 33
+    assert coverage["covered_pair_count"] == 32
+    assert coverage["missing_pair_count"] == 1
+    assert {"lane": "finra_short_interest", "ticker": "XLK"} in coverage["missing_pairs"]
+    assert any(
+        row["id"] == "provider_flow_cache.us_sector_coverage"
+        for row in payload["strict_production"]["failures"]
+    )
 
 
 def test_ops_readiness_flags_browser_qa_fixtures_as_unsafe(monkeypatch, capsys):

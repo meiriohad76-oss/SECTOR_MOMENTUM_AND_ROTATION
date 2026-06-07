@@ -12,7 +12,8 @@ import json
 import os
 from pathlib import Path
 import sqlite3
-from typing import Any, Mapping
+from collections import defaultdict
+from typing import Any, Iterable, Mapping
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -275,6 +276,82 @@ def provider_flow_cache_status(path: str | Path | None = None) -> dict[str, Any]
     status["rows"] = rows
     status["latest_created_at_utc"] = str(row[1] or "") if row else ""
     status["state"] = "ready" if rows > 0 else "empty"
+    return status
+
+
+def provider_flow_cache_coverage(
+    *,
+    tickers: Iterable[str],
+    lanes: Iterable[str],
+    path: str | Path | None = None,
+) -> dict[str, Any]:
+    expected_tickers = list(dict.fromkeys(_normalize_ticker(ticker) for ticker in tickers if str(ticker).strip()))
+    expected_lanes = list(dict.fromkeys(_normalize_lane(lane) for lane in lanes if str(lane).strip()))
+    expected_pairs = [(lane, ticker) for lane in expected_lanes for ticker in expected_tickers]
+    db_path = cache_path(path)
+    status: dict[str, Any] = {
+        "path": str(db_path),
+        "expected_ticker_count": len(expected_tickers),
+        "expected_lane_count": len(expected_lanes),
+        "expected_pair_count": len(expected_pairs),
+        "covered_pair_count": 0,
+        "missing_pair_count": len(expected_pairs),
+        "coverage_ratio": 0.0,
+        "covered_tickers_by_lane": {lane: 0 for lane in expected_lanes},
+        "latest_created_at_utc": "",
+        "state": "missing",
+        "missing_pairs": [{"lane": lane, "ticker": ticker} for lane, ticker in expected_pairs],
+    }
+    if not db_path.exists() or db_path.stat().st_size <= 0:
+        return status
+
+    try:
+        with sqlite3.connect(db_path) as conn:
+            rows = conn.execute(
+                """
+                SELECT lane, ticker, MAX(created_at_utc)
+                FROM provider_flow_cache
+                GROUP BY lane, ticker
+                """
+            ).fetchall()
+    except sqlite3.Error:
+        status["state"] = "unreadable"
+        return status
+
+    present_pairs: set[tuple[str, str]] = set()
+    latest_by_pair: dict[tuple[str, str], str] = {}
+    for row in rows:
+        lane = _normalize_lane(str(row[0]))
+        ticker = _normalize_ticker(str(row[1]))
+        if (lane, ticker) not in expected_pairs:
+            continue
+        present_pairs.add((lane, ticker))
+        latest_by_pair[(lane, ticker)] = str(row[2] or "")
+
+    missing_pairs = [
+        {"lane": lane, "ticker": ticker}
+        for lane, ticker in expected_pairs
+        if (lane, ticker) not in present_pairs
+    ]
+    covered_by_lane: dict[str, set[str]] = defaultdict(set)
+    for lane, ticker in present_pairs:
+        covered_by_lane[lane].add(ticker)
+
+    covered_count = len(present_pairs)
+    expected_count = len(expected_pairs)
+    status.update(
+        {
+            "covered_pair_count": covered_count,
+            "missing_pair_count": len(missing_pairs),
+            "coverage_ratio": round(covered_count / expected_count, 6) if expected_count else 1.0,
+            "covered_tickers_by_lane": {
+                lane: len(covered_by_lane.get(lane, set())) for lane in expected_lanes
+            },
+            "latest_created_at_utc": max((value for value in latest_by_pair.values() if value), default=""),
+            "state": "ready" if expected_count and not missing_pairs else "incomplete",
+            "missing_pairs": missing_pairs[:50],
+        }
+    )
     return status
 
 
