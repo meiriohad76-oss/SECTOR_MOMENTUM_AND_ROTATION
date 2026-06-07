@@ -117,15 +117,72 @@ def test_capture_massive_provider_snapshots_stores_trade_payloads(monkeypatch, t
     }
     assert xlf is not None
     assert "Saved massive stock_trades snapshot for XLK as_of=2026-05-19 trades=1" in output
+    assert "massive_provider_snapshot_summary requested=2 saved=2 failed=0" in output
     assert "Bearer" not in output
     assert "MASSIVE_API_KEY" not in output
 
 
-def test_capture_massive_provider_snapshots_sanitizes_failure_output(monkeypatch, tmp_path, capsys):
+def test_capture_massive_provider_snapshots_sanitizes_failure_output_and_continues(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    db_path = tmp_path / "provider_snapshots.sqlite"
+
     def fail_fetch(ticker, *, as_of, limit, timeout):
+        if ticker == "XLK":
+            return [{"p": 100.0, "s": 100, "sip_timestamp": 1}]
         raise RuntimeError(
             "request failed headers={'Authorization': 'Bearer SECRET'} env=MASSIVE_API_KEY"
         )
+
+    monkeypatch.setattr(
+        capture_massive_provider_snapshots,
+        "_fetch_massive_trades_for_snapshot",
+        fail_fetch,
+    )
+    monkeypatch.setattr(capture_massive_provider_snapshots, "_bootstrap_massive_secret", lambda: True)
+
+    assert (
+        capture_massive_provider_snapshots.main(
+            [
+                "--ticker",
+                "XLK",
+                "--ticker",
+                "XLF",
+                "--as-of",
+                "2026-05-19",
+                "--db-path",
+                str(db_path),
+            ]
+        )
+        == 1
+    )
+
+    saved = provider_snapshots.load_provider_snapshot_as_of(
+        db_path,
+        provider="massive",
+        dataset="stock_trades",
+        ticker="XLK",
+        as_of="2026-05-19",
+    )
+    output = capsys.readouterr().out
+    assert saved is not None
+    assert "Saved massive stock_trades snapshot for XLK as_of=2026-05-19 trades=1" in output
+    assert "Failed massive stock_trades snapshot for XLF as_of=2026-05-19 error_type=RuntimeError" in output
+    assert "massive_provider_snapshot_summary requested=2 saved=1 failed=1" in output
+    assert "Bearer" not in output
+    assert "SECRET" not in output
+    assert "MASSIVE_API_KEY" not in output
+
+
+def test_capture_massive_provider_snapshots_returns_failure_when_every_ticker_fails(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    def fail_fetch(ticker, *, as_of, limit, timeout):
+        raise RuntimeError("Bearer SECRET")
 
     monkeypatch.setattr(
         capture_massive_provider_snapshots,
@@ -149,10 +206,9 @@ def test_capture_massive_provider_snapshots_sanitizes_failure_output(monkeypatch
     )
 
     output = capsys.readouterr().out
-    assert "Massive provider snapshot capture failed." in output
+    assert "massive_provider_snapshot_summary requested=1 saved=0 failed=1" in output
     assert "Bearer" not in output
     assert "SECRET" not in output
-    assert "MASSIVE_API_KEY" not in output
 
 
 def test_capture_massive_provider_snapshots_supports_scored_universe(monkeypatch, tmp_path):

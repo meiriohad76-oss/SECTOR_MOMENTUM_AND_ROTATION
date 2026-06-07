@@ -6,6 +6,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sqlite3
+import subprocess
 import sys
 
 
@@ -46,6 +47,21 @@ def _sqlite_count(path: Path, table: str) -> int | None:
     except sqlite3.Error:
         return None
     return int(row[0]) if row else None
+
+
+def _systemctl_user(args: list[str]) -> str | None:
+    try:
+        completed = subprocess.run(
+            ["systemctl", "--user", *args],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError, OSError):
+        return None
+    output = (completed.stdout or completed.stderr or "").strip()
+    return output or None
 
 
 def _file_status(path: Path) -> dict[str, object]:
@@ -146,6 +162,37 @@ def _browser_qa_fixture_guard() -> dict[str, str]:
     }
 
 
+def _user_timer_status(unit_dir: Path, *, service: str, timer: str) -> dict[str, object]:
+    service_path = unit_dir / service
+    timer_path = unit_dir / timer
+    enabled = _systemctl_user(["is-enabled", timer])
+    active = _systemctl_user(["is-active", timer])
+    service_result = _systemctl_user(["show", service, "-p", "Result", "--value"])
+    service_exit_status = _systemctl_user(["show", service, "-p", "ExecMainStatus", "--value"])
+    installed = service_path.exists() and timer_path.exists()
+    systemctl_available = enabled is not None or active is not None
+    ready = installed and enabled in {"enabled", "enabled-runtime"} and active == "active"
+    if ready:
+        state = "ready"
+    elif installed and not systemctl_available:
+        state = "installed_not_verified"
+    elif installed:
+        state = "installed_not_active"
+    else:
+        state = "missing"
+    return {
+        "state": state,
+        "service": service,
+        "timer": timer,
+        "service_installed": service_path.exists(),
+        "timer_installed": timer_path.exists(),
+        "timer_enabled": enabled or "unknown",
+        "timer_active": active or "unknown",
+        "last_service_result": service_result or "unknown",
+        "last_service_exit_status": service_exit_status or "unknown",
+    }
+
+
 def _ready_or_missing(paths: list[Path]) -> str:
     return "ready" if all(path.exists() and path.stat().st_size > 0 for path in paths) else "missing"
 
@@ -160,6 +207,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--run-journal-path", default=str(DEFAULT_JOURNAL_PATH))
     parser.add_argument("--provider-snapshot-db", default=str(DEFAULT_SNAPSHOT_DB_PATH))
     parser.add_argument("--ohlcv-cache-path", default=str(ROOT / "data_cache" / "ohlcv.duckdb"))
+    parser.add_argument("--user-systemd-dir", default=str(Path.home() / ".config" / "systemd" / "user"))
     return parser.parse_args(argv)
 
 
@@ -183,6 +231,7 @@ def main(argv: list[str] | None = None) -> int:
     run_journal_path = Path(args.run_journal_path)
     provider_snapshot_db = Path(args.provider_snapshot_db)
     ohlcv_cache_path = Path(args.ohlcv_cache_path)
+    user_systemd_dir = Path(args.user_systemd_dir)
     run_count = _sqlite_count(run_journal_path, "runs")
     snapshot_count = _sqlite_count(provider_snapshot_db, "provider_snapshots")
 
@@ -201,6 +250,11 @@ def main(argv: list[str] | None = None) -> int:
                 **_file_status(provider_snapshot_db),
                 "snapshots": snapshot_count,
                 "state": "ready" if snapshot_count and snapshot_count > 0 else "missing_or_empty",
+                "capture_timer": _user_timer_status(
+                    user_systemd_dir,
+                    service="sector-massive-provider-snapshots.service",
+                    timer="sector-massive-provider-snapshots.timer",
+                ),
             },
             "ohlcv_cache": {
                 **_file_status(ohlcv_cache_path),

@@ -50,6 +50,9 @@ def test_user_massive_provider_snapshot_timer_runs_without_sudo_after_market_clo
     assert "Persistent=true" in timer
     assert "systemctl --user enable --now sector-massive-provider-snapshots.timer" in deploy_docs
     assert "systemd/user/sector-massive-provider-snapshots.service" in backlog
+    assert "massive_provider_snapshot_summary requested=N saved=N failed=N" in deploy_docs
+    assert "scripts/check_ops_readiness.py" in deploy_docs
+    assert "one failed ticker no longer aborts the whole universe" in backlog
 
 
 def test_backlog_references_non_sudo_user_timers():

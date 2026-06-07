@@ -34,6 +34,7 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     run_journal = tmp_path / "data" / "run_journal" / "runs.sqlite"
     provider_snapshots = tmp_path / "data" / "provider_snapshots" / "provider_snapshots.sqlite"
     ohlcv_cache = tmp_path / "data_cache" / "ohlcv.duckdb"
+    user_systemd_dir = tmp_path / ".config" / "systemd" / "user"
 
     state_file.parent.mkdir(parents=True, exist_ok=True)
     state_file.write_text(
@@ -60,6 +61,9 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
         conn.execute("INSERT INTO provider_snapshots VALUES ('massive')")
     ohlcv_cache.parent.mkdir(parents=True, exist_ok=True)
     ohlcv_cache.write_bytes(b"duckdb-placeholder")
+    user_systemd_dir.mkdir(parents=True)
+    (user_systemd_dir / "sector-massive-provider-snapshots.service").write_text("[Service]\n", encoding="utf-8")
+    (user_systemd_dir / "sector-massive-provider-snapshots.timer").write_text("[Timer]\n", encoding="utf-8")
 
     def fake_config(name: str) -> str | None:
         values = {
@@ -90,6 +94,16 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
         return values.get(name)
 
     monkeypatch.setattr(check_ops_readiness, "resolve_config_value", fake_config)
+    monkeypatch.setattr(
+        check_ops_readiness,
+        "_systemctl_user",
+        lambda args: {
+            ("is-enabled", "sector-massive-provider-snapshots.timer"): "enabled",
+            ("is-active", "sector-massive-provider-snapshots.timer"): "active",
+            ("show", "sector-massive-provider-snapshots.service", "-p", "Result", "--value"): "success",
+            ("show", "sector-massive-provider-snapshots.service", "-p", "ExecMainStatus", "--value"): "0",
+        }.get(tuple(args)),
+    )
 
     exit_code = check_ops_readiness.main(
         [
@@ -109,6 +123,8 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
             str(provider_snapshots),
             "--ohlcv-cache-path",
             str(ohlcv_cache),
+            "--user-systemd-dir",
+            str(user_systemd_dir),
         ]
     )
 
@@ -128,6 +144,9 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     assert payload["production"]["state_persistence"]["journal_transition_count"] == 1
     assert payload["production"]["run_journal"]["runs"] == 1
     assert payload["production"]["provider_snapshots"]["snapshots"] == 1
+    assert payload["production"]["provider_snapshots"]["capture_timer"]["state"] == "ready"
+    assert payload["production"]["provider_snapshots"]["capture_timer"]["timer_enabled"] == "enabled"
+    assert payload["production"]["provider_snapshots"]["capture_timer"]["timer_active"] == "active"
     assert payload["production"]["ohlcv_cache"]["state"] == "ready"
     assert payload["production"]["browser_qa_fixture_guard"]["state"] == "safe"
     assert set(payload) >= {"B-021", "B-120", "B-121", "B-122", "B-123", "B-131"}
@@ -159,6 +178,19 @@ def test_ops_readiness_flags_browser_qa_fixtures_as_unsafe(monkeypatch, capsys):
         "state": "unsafe_enabled",
         "flag": "configured",
     }
+
+
+def test_ops_readiness_marks_missing_massive_snapshot_timer(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(check_ops_readiness, "_systemctl_user", lambda args: None)
+
+    exit_code = check_ops_readiness.main(["--user-systemd-dir", str(tmp_path / "missing-user-units")])
+
+    payload = json.loads(capsys.readouterr().out)
+    timer = payload["production"]["provider_snapshots"]["capture_timer"]
+    assert exit_code == 0
+    assert timer["state"] == "missing"
+    assert timer["service_installed"] is False
+    assert timer["timer_installed"] is False
 
 
 def test_ops_readiness_docs_reference_single_command():

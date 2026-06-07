@@ -291,6 +291,18 @@ sqlite3 data/provider_snapshots/provider_snapshots.sqlite \
   "pragma integrity_check; select count(*) from provider_snapshots;"
 ```
 
+The capture job is ticker-isolated: one failed ticker does not stop the rest of
+the universe from being saved. The script prints a final
+`massive_provider_snapshot_summary requested=N saved=N failed=N` line. Exit code
+`0` means every requested ticker was saved, `1` means partial success, and `2`
+means nothing was saved or the job could not start. The consolidated readiness
+check also reports the snapshot DB row count and whether the user timer is
+installed, enabled, and active:
+
+```bash
+./.venv/bin/python scripts/check_ops_readiness.py
+```
+
 ## Resource notes
 
 On a Pi 4 with 4 GB RAM and the full 67-ticker universe:

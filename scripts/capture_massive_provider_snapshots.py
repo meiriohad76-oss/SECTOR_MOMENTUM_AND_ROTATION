@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 from datetime import date, timedelta
 import os
 from pathlib import Path
@@ -18,6 +19,19 @@ from src.universe import ALL_TICKERS, SCORED_TICKERS, US_SECTORS
 
 
 UNIVERSE_CHOICES = ("us-sectors", "scored", "dashboard", "all")
+
+
+@dataclass(frozen=True)
+class CaptureSummary:
+    requested: int
+    saved: int
+    failed: int
+
+    @property
+    def exit_code(self) -> int:
+        if self.failed == 0:
+            return 0
+        return 1 if self.saved > 0 else 2
 
 
 def _tickers_for_universe(name: str) -> list[str]:
@@ -116,6 +130,65 @@ def _snapshot_payload(
     }
 
 
+def _capture_one_ticker(
+    ticker: str,
+    *,
+    as_of: str,
+    db_path: str | Path,
+    limit: int,
+    timeout: int,
+) -> int:
+    trades = _fetch_massive_trades_for_snapshot(
+        ticker,
+        as_of=as_of,
+        limit=limit,
+        timeout=timeout,
+    )
+    upsert_provider_snapshot(
+        db_path,
+        provider="massive",
+        dataset="stock_trades",
+        ticker=ticker,
+        as_of=as_of,
+        payload=_snapshot_payload(ticker, as_of=as_of, limit=limit, trades=trades),
+    )
+    return len(trades)
+
+
+def _capture_tickers(
+    tickers: list[str],
+    *,
+    as_of: str,
+    db_path: str | Path,
+    limit: int,
+    timeout: int,
+) -> CaptureSummary:
+    saved = 0
+    failed = 0
+    for ticker in tickers:
+        try:
+            trade_count = _capture_one_ticker(
+                ticker,
+                as_of=as_of,
+                db_path=db_path,
+                limit=limit,
+                timeout=timeout,
+            )
+        except Exception as exc:
+            failed += 1
+            print(
+                f"Failed massive stock_trades snapshot for {ticker} "
+                f"as_of={as_of} error_type={type(exc).__name__}"
+            )
+            continue
+        saved += 1
+        print(
+            f"Saved massive stock_trades snapshot for {ticker} "
+            f"as_of={as_of} trades={trade_count}"
+        )
+    return CaptureSummary(requested=len(tickers), saved=saved, failed=failed)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv or [])
     tickers = [str(ticker).strip().upper() for ticker in args.ticker if str(ticker).strip()]
@@ -128,30 +201,18 @@ def main(argv: list[str] | None = None) -> int:
     if not _bootstrap_massive_secret():
         print("Massive provider snapshot capture skipped: MASSIVE_API_KEY is not configured.")
         return 2
-    try:
-        for ticker in tickers:
-            trades = _fetch_massive_trades_for_snapshot(
-                ticker,
-                as_of=args.as_of,
-                limit=args.limit,
-                timeout=args.timeout,
-            )
-            upsert_provider_snapshot(
-                args.db_path,
-                provider="massive",
-                dataset="stock_trades",
-                ticker=ticker,
-                as_of=args.as_of,
-                payload=_snapshot_payload(ticker, as_of=args.as_of, limit=args.limit, trades=trades),
-            )
-            print(
-                f"Saved massive stock_trades snapshot for {ticker} "
-                f"as_of={args.as_of} trades={len(trades)}"
-            )
-    except Exception:
-        print("Massive provider snapshot capture failed.")
-        return 2
-    return 0
+    summary = _capture_tickers(
+        tickers,
+        as_of=args.as_of,
+        db_path=args.db_path,
+        limit=args.limit,
+        timeout=args.timeout,
+    )
+    print(
+        "massive_provider_snapshot_summary "
+        f"requested={summary.requested} saved={summary.saved} failed={summary.failed}"
+    )
+    return summary.exit_code
 
 
 if __name__ == "__main__":
