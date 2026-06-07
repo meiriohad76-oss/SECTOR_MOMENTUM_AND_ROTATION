@@ -27,8 +27,16 @@ MASSIVE_AGGS_URL_TEMPLATE = (
     "https://api.massive.com/v2/aggs/ticker/{ticker}/range/"
     "{multiplier}/{timespan}/{from_date}/{to_date}"
 )
+FRED_PUBLIC_CSV_URL_TEMPLATE = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
+MACRO_OHLCV_FRED_FALLBACKS = {
+    "^VIX": {"series_id": "VIXCLS", "scale": 1.0},
+    "^TNX": {"series_id": "DGS10", "scale": 1.0},
+    "^IRX": {"series_id": "DGS3MO", "scale": 1.0},
+}
 PROVIDER_RETRY_ATTEMPTS = 2
 PROVIDER_RETRY_BACKOFF_SECONDS = 0.10
+PUBLIC_FRED_MACRO_TIMEOUT_SECONDS = 6
+PUBLIC_FRED_MACRO_ATTEMPTS = 1
 
 
 @dataclass(frozen=True)
@@ -278,6 +286,87 @@ def _fetch_yfinance_ohlcv(
     return _ProviderFetchResult(out, retry_count)
 
 
+def _fred_public_series_to_ohlcv_frame(series: pd.Series, *, scale: float = 1.0) -> pd.DataFrame:
+    cleaned = pd.to_numeric(series, errors="coerce").dropna()
+    if cleaned.empty:
+        return pd.DataFrame()
+    values = cleaned.astype(float) * float(scale)
+    frame = pd.DataFrame(
+        {
+            "open": values,
+            "high": values,
+            "low": values,
+            "close": values,
+            "volume": 0.0,
+            "adj_close": values,
+        },
+        index=pd.to_datetime(values.index),
+    )
+    return frame.dropna(how="all")
+
+
+def _fetch_public_fred_macro_ohlcv(
+    tickers: list[str],
+    period: str = "3y",
+    interval: str = "1d",
+) -> _ProviderFetchResult:
+    if str(interval).strip().lower() not in {"1d", "1day", "day"}:
+        return _ProviderFetchResult({})
+    try:
+        from_date, to_date = _period_to_date_range(period)
+        start = pd.Timestamp(from_date)
+        end = pd.Timestamp(to_date) + pd.Timedelta(days=1)
+    except Exception:
+        start = pd.Timestamp("1900-01-01")
+        end = pd.Timestamp.today() + pd.Timedelta(days=1)
+
+    out: dict[str, pd.DataFrame] = {}
+    retry_count = 0
+    for ticker in tickers:
+        symbol = str(ticker).upper()
+        config = MACRO_OHLCV_FRED_FALLBACKS.get(symbol)
+        if not config:
+            continue
+        series_id = str(config["series_id"])
+        url = FRED_PUBLIC_CSV_URL_TEMPLATE.format(series_id=series_id)
+        raw_text = ""
+        for attempt in range(1, PUBLIC_FRED_MACRO_ATTEMPTS + 1):
+            try:
+                response = requests.get(url, timeout=PUBLIC_FRED_MACRO_TIMEOUT_SECONDS)
+                response.raise_for_status()
+                raw_text = response.text
+                break
+            except (requests.RequestException, ValueError):
+                if attempt >= PUBLIC_FRED_MACRO_ATTEMPTS:
+                    break
+                retry_count += 1
+                _provider_retry_sleep(PROVIDER_RETRY_BACKOFF_SECONDS * attempt)
+        if not raw_text:
+            continue
+        try:
+            from io import StringIO
+
+            raw = pd.read_csv(StringIO(raw_text))
+            if "observation_date" in raw.columns:
+                date_column = "observation_date"
+            elif "DATE" in raw.columns:
+                date_column = "DATE"
+            else:
+                date_column = str(raw.columns[0])
+            value_column = series_id if series_id in raw.columns else str(raw.columns[-1])
+            series = pd.Series(
+                raw[value_column].replace(".", pd.NA).to_numpy(),
+                index=pd.to_datetime(raw[date_column], errors="coerce"),
+            ).dropna()
+            frame = _fred_public_series_to_ohlcv_frame(series, scale=float(config.get("scale", 1.0)))
+            frame = frame[(frame.index >= start) & (frame.index <= end)]
+            if not frame.empty and len(frame) > 30:
+                out[symbol] = frame
+        except (KeyError, TypeError, ValueError, pd.errors.ParserError):
+            continue
+    return _ProviderFetchResult(out, retry_count)
+
+
 def fetch_ohlcv(
     tickers: Iterable[str],
     period: str = "3y",
@@ -339,6 +428,8 @@ def fetch_ohlcv_result(
     fetched: dict[str, pd.DataFrame] = {}
     provider_retry_count = 0
     yfinance_fallback: dict[str, pd.DataFrame] = {}
+    fred_public_fallback: dict[str, pd.DataFrame] = {}
+    attempted_fred_public: set[str] = set()
     if missing:
         if provider_name == "massive":
             provider_result = _fetch_massive_ohlcv(missing, period=period, interval=interval)
@@ -355,10 +446,39 @@ def fetch_ohlcv_result(
             ticker for ticker in missing if ticker not in fetched and str(ticker).upper() not in fetched
         ]
         if provider_name == "massive" and provider_misses_after_primary:
-            fallback_result = _fetch_yfinance_ohlcv(
-                provider_misses_after_primary,
-                period=period,
-                interval=interval,
+            macro_misses = [
+                ticker
+                for ticker in provider_misses_after_primary
+                if str(ticker).upper() in MACRO_OHLCV_FRED_FALLBACKS
+            ]
+            if macro_misses:
+                attempted_fred_public.update(str(ticker).upper() for ticker in macro_misses)
+                fred_result = _fetch_public_fred_macro_ohlcv(
+                    macro_misses,
+                    period=period,
+                    interval=interval,
+                )
+                fred_public_fallback = fred_result.data
+                provider_retry_count += fred_result.retry_count
+                if fred_public_fallback:
+                    fetched = {**fetched, **fred_public_fallback}
+                    if cache_enabled:
+                        try:
+                            write_cached_ohlcv(fred_public_fallback, provider="fred_public_macro", interval=interval)
+                        except Exception:
+                            pass
+            provider_misses_after_primary = [
+                ticker for ticker in provider_misses_after_primary
+                if ticker not in fetched and str(ticker).upper() not in fetched
+            ]
+            yfinance_candidates = [
+                ticker
+                for ticker in provider_misses_after_primary
+                if str(ticker).upper() not in MACRO_OHLCV_FRED_FALLBACKS
+            ]
+            fallback_result = (
+                _fetch_yfinance_ohlcv(yfinance_candidates, period=period, interval=interval)
+                if yfinance_candidates else _ProviderFetchResult({})
             )
             yfinance_fallback = fallback_result.data
             if yfinance_fallback:
@@ -366,6 +486,27 @@ def fetch_ohlcv_result(
                 if cache_enabled:
                     try:
                         write_cached_ohlcv(yfinance_fallback, provider="yfinance", interval=interval)
+                    except Exception:
+                        pass
+        provider_misses_after_yfinance = [
+            ticker for ticker in missing
+            if ticker not in fetched
+            and str(ticker).upper() not in fetched
+            and str(ticker).upper() not in attempted_fred_public
+        ]
+        if provider_misses_after_yfinance:
+            fred_result = _fetch_public_fred_macro_ohlcv(
+                provider_misses_after_yfinance,
+                period=period,
+                interval=interval,
+            )
+            fred_public_fallback = fred_result.data
+            provider_retry_count += fred_result.retry_count
+            if fred_public_fallback:
+                fetched = {**fetched, **fred_public_fallback}
+                if cache_enabled:
+                    try:
+                        write_cached_ohlcv(fred_public_fallback, provider="fred_public_macro", interval=interval)
                     except Exception:
                         pass
     stale_cached: dict[str, pd.DataFrame] = {}
@@ -408,6 +549,23 @@ def fetch_ohlcv_result(
             f"Massive unavailable for {count} {_warning_symbol_text(count)}; "
             "yfinance fallback used for live OHLCV."
         )
+    if fred_public_fallback:
+        count = len(fred_public_fallback)
+        warnings.append(
+            f"Public FRED macro fallback used for {count} {_warning_symbol_text(count)} "
+            "after live OHLCV providers returned no rows."
+        )
+    failed_fred_public = sorted(
+        symbol
+        for symbol in attempted_fred_public
+        if symbol not in fred_public_fallback
+    )
+    if failed_fred_public:
+        warnings.append(
+            "Public FRED macro fallback unavailable for "
+            + ", ".join(failed_fred_public)
+            + "."
+        )
     if stale_cached:
         count = len(stale_cached)
         warnings.append(
@@ -424,7 +582,10 @@ def fetch_ohlcv_result(
     provider_by_ticker: dict[str, str] = {}
     for key in ordered:
         if key in fetched:
-            if key in yfinance_fallback:
+            if key in fred_public_fallback:
+                source_by_ticker[key] = "fred_public_macro_live"
+                provider_by_ticker[key] = "fred_public_macro"
+            elif key in yfinance_fallback:
                 source_by_ticker[key] = "yfinance_fallback_live"
                 provider_by_ticker[key] = "yfinance"
             else:

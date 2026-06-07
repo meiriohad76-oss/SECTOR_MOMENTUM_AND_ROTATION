@@ -325,6 +325,114 @@ def test_fetch_ohlcv_result_reports_provider_gap_when_no_cache(monkeypatch):
     assert result.warnings == ("Missing OHLCV for 1 symbol after yfinance fetch.",)
 
 
+def test_fetch_ohlcv_result_uses_public_fred_for_macro_symbols_after_provider_miss(monkeypatch):
+    dates = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=45)
+    csv_text = "observation_date,VIXCLS\n" + "\n".join(
+        f"{date.date()},{15.0 + idx / 10:.1f}" for idx, date in enumerate(dates)
+    )
+    calls = []
+
+    def fake_massive(tickers, period, interval):
+        calls.append(("massive", tuple(tickers), period, interval))
+        return data._ProviderFetchResult({})
+
+    def fake_yfinance(tickers, period, interval):
+        calls.append(("yfinance", tuple(tickers), period, interval))
+        return data._ProviderFetchResult({})
+
+    class FakeResponse:
+        text = csv_text
+
+        def raise_for_status(self):
+            return None
+
+    def fake_get(url, timeout):
+        calls.append(("fred_public", url, timeout))
+        return FakeResponse()
+
+    monkeypatch.setattr(data, "_fetch_massive_ohlcv", fake_massive)
+    monkeypatch.setattr(data, "_fetch_yfinance_ohlcv", fake_yfinance)
+    monkeypatch.setattr(
+        data,
+        "requests",
+        SimpleNamespace(get=fake_get, RequestException=RuntimeError),
+        raising=False,
+    )
+
+    result = data.fetch_ohlcv_result(["^VIX"], period="1y", provider="massive")
+
+    assert calls[0] == ("massive", ("^VIX",), "1y", "1d")
+    assert calls[1][0] == "fred_public"
+    assert "VIXCLS" in calls[1][1]
+    assert not any(call[0] == "yfinance" for call in calls)
+    assert list(result.data) == ["^VIX"]
+    assert result.fetched == ("^VIX",)
+    assert result.missing == ()
+    assert result.source_by_ticker == {"^VIX": "fred_public_macro_live"}
+    assert result.provider_by_ticker == {"^VIX": "fred_public_macro"}
+    assert len(result.data["^VIX"]) > 30
+    assert result.data["^VIX"]["close"].iloc[-1] > 18.0
+    assert result.warnings == (
+        "Public FRED macro fallback used for 1 symbol after live OHLCV providers returned no rows.",
+        "OHLCV source mix: fred_public_macro=1.",
+    )
+
+
+def test_public_fred_macro_fallback_only_handles_known_macro_symbols(monkeypatch):
+    calls = []
+
+    def fake_get(url, timeout):
+        calls.append(url)
+        raise AssertionError("unknown equity tickers should not call public FRED fallback")
+
+    monkeypatch.setattr(
+        data,
+        "requests",
+        SimpleNamespace(get=fake_get, RequestException=RuntimeError),
+        raising=False,
+    )
+
+    result = data._fetch_public_fred_macro_ohlcv(["XLK"], period="1y")
+
+    assert result.data == {}
+    assert calls == []
+
+
+def test_fetch_ohlcv_result_reports_public_fred_macro_fallback_failure(monkeypatch):
+    calls = []
+
+    def fake_massive(tickers, period, interval):
+        calls.append(("massive", tuple(tickers)))
+        return data._ProviderFetchResult({})
+
+    def fake_yfinance(tickers, period, interval):
+        calls.append(("yfinance", tuple(tickers)))
+        return data._ProviderFetchResult({})
+
+    def fail_get(url, timeout):
+        calls.append(("fred_public", url, timeout))
+        raise RuntimeError("timeout")
+
+    monkeypatch.setattr(data, "_fetch_massive_ohlcv", fake_massive)
+    monkeypatch.setattr(data, "_fetch_yfinance_ohlcv", fake_yfinance)
+    monkeypatch.setattr(
+        data,
+        "requests",
+        SimpleNamespace(get=fail_get, RequestException=RuntimeError),
+        raising=False,
+    )
+
+    result = data.fetch_ohlcv_result(["^TNX"], period="1y", provider="massive")
+
+    assert result.data == {}
+    assert result.missing == ("^TNX",)
+    assert not any(call[0] == "yfinance" for call in calls)
+    assert result.warnings == (
+        "Public FRED macro fallback unavailable for ^TNX.",
+        "Missing OHLCV for 1 symbol after massive fetch.",
+    )
+
+
 def test_fetch_ohlcv_result_uses_yfinance_fallback_when_massive_misses(monkeypatch):
     dates = pd.bdate_range("2024-01-01", periods=40)
     fallback_frame = pd.DataFrame(
