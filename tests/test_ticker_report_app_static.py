@@ -64,6 +64,45 @@ def test_ticker_report_flow_gate_ignores_invalid_provider_ratios():
     assert "Missing or invalid provider enrichments show as n/a" in report_helper
 
 
+def test_ticker_report_explains_rrg_warning_and_exit_distinction_with_values():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    value_helpers = app_source[
+        app_source.index("def _ticker_report_buy_meanings(") : app_source.index("def _forecast_horizon_for_state(")
+    ]
+    report_helper = app_source[
+        app_source.index("def _ticker_report_html(") : app_source.index("def _provider_status_list_html(")
+    ]
+
+    assert "RRG buy gate fails: RS-Ratio" in value_helpers
+    assert "is above 100 but RS-Momentum" in value_helpers
+    assert "is below 100, so relative leadership is fading" in value_helpers
+    assert "Rotation is a warning, not an exit" in value_helpers
+    assert "Weakening means leadership is fading, but the exit rule waits for Lagging" in value_helpers
+    assert "Strict buy gate wants RRG = Leading" in report_helper
+    assert 'risk_meanings["rotation"]' in report_helper
+
+
+def test_ticker_report_uses_value_specific_trigger_and_risk_narratives():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    value_helpers = app_source[
+        app_source.index("def _ticker_report_buy_meanings(") : app_source.index("def _forecast_horizon_for_state(")
+    ]
+    report_helper = app_source[
+        app_source.index("def _ticker_report_html(") : app_source.index("def _provider_status_list_html(")
+    ]
+
+    assert "Relative strength passes: Mansfield RS is" in value_helpers
+    assert "Breadth passes:" in value_helpers
+    assert "Money flow passes: CMF is" in value_helpers
+    assert "Hard veto passes: F-score is" in value_helpers
+    assert "No distribution exit: CMF is" in value_helpers
+    assert "block-ratio data is unavailable or invalid and is ignored" in value_helpers
+    assert 'buy_meanings["trend"]' in report_helper
+    assert 'buy_meanings["strength"]' in report_helper
+    assert 'buy_meanings["flow"]' in report_helper
+    assert 'risk_meanings["distribution"]' in report_helper
+
+
 def test_ticker_report_uses_actual_indicator_values():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
     report_helper = app_source[

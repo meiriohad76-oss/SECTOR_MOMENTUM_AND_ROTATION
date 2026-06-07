@@ -1709,6 +1709,159 @@ def _gate_row(label: str, actual: str, rule: str, passed: bool | None, meaning: 
     )
 
 
+def _metric_number(value):
+    if value is None or pd.isna(value):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _ticker_report_buy_meanings(
+    *,
+    ticker_label: str,
+    stage_value,
+    above_30wma_value,
+    slope_value,
+    mansfield_value,
+    rrg_value: str,
+    rs_ratio_value,
+    rs_momentum_value,
+    breadth_value,
+    cmf_value,
+    flow_value,
+    etf_flow_value,
+    veto_active: bool,
+) -> dict[str, str]:
+    stage_ok = stage_value == 2 and above_30wma_value is not False and slope_value is not False
+    mansfield_num = _metric_number(mansfield_value)
+    rs_ratio_num = _metric_number(rs_ratio_value)
+    rs_momentum_num = _metric_number(rs_momentum_value)
+    breadth_num = _metric_number(breadth_value)
+    cmf_num = _metric_number(cmf_value)
+    flow_num = _metric_number(flow_value)
+    etf_flow_num = _metric_number(etf_flow_value)
+    trend_status = (
+        "Trend gate passes: Stage 2, price above the 30-week average, and a rising average all support an advancing trend."
+        if stage_ok
+        else "Trend gate is not fully confirmed: the model needs Stage 2 plus price above a rising 30-week average before calling this a clean buy setup."
+    )
+    if mansfield_num is None:
+        strength_status = "Relative strength is unavailable, so this gate cannot confirm whether the ticker is beating its benchmark."
+    elif mansfield_num > 0:
+        strength_status = f"Relative strength passes: Mansfield RS is {mansfield_num:+.2f}, meaning {ticker_label} is outperforming its benchmark."
+    else:
+        strength_status = f"Relative strength fails: Mansfield RS is {mansfield_num:+.2f}, so the ticker is lagging its benchmark."
+    if rrg_value == "Leading":
+        rotation_status = (
+            f"RRG buy gate passes: {ticker_label} is in Leading with RS-Ratio {rs_ratio_num:.1f} and RS-Momentum {rs_momentum_num:.1f}; leadership is already visible."
+            if rs_ratio_num is not None and rs_momentum_num is not None
+            else "RRG buy gate passes because the ticker is in Leading."
+        )
+    elif rrg_value == "Improving":
+        rotation_status = (
+            f"RRG is Improving, not Leading yet: RS-Ratio {rs_ratio_num:.1f} and RS-Momentum {rs_momentum_num:.1f} suggest improving rotation, but the strict fresh-buy gate still prefers Leading."
+            if rs_ratio_num is not None and rs_momentum_num is not None
+            else "RRG is Improving, which is constructive but not the strict Leading buy gate."
+        )
+    elif rrg_value == "Weakening":
+        rotation_status = (
+            f"RRG buy gate fails: RS-Ratio {rs_ratio_num:.1f} is above 100 but RS-Momentum {rs_momentum_num:.1f} is below 100, so relative leadership is fading rather than strengthening."
+            if rs_ratio_num is not None and rs_momentum_num is not None
+            else "RRG buy gate fails because the ticker is in Weakening; leadership is fading."
+        )
+    elif rrg_value == "Lagging":
+        rotation_status = "RRG buy gate fails: Lagging means both relative strength and relative momentum are weak versus the benchmark."
+    else:
+        rotation_status = "RRG data is unavailable, so rotation cannot confirm the buy setup."
+    if breadth_num is None:
+        breadth_status = "Breadth is unavailable, so participation cannot be verified."
+    elif breadth_num >= 0.60:
+        breadth_status = f"Breadth passes: {breadth_num:.0%} participation is above the 60% gate, so the move is broad enough."
+    else:
+        breadth_status = f"Breadth fails: {breadth_num:.0%} participation is below the 60% gate, so too few constituents support the move."
+    if cmf_num is None:
+        flow_status = "Money-flow input is unavailable, so accumulation cannot confirm the setup."
+    elif cmf_num > 0.05 and (etf_flow_num is None or etf_flow_num >= 0):
+        flow_status = f"Money flow passes: CMF is {cmf_num:+.2f}, above +0.05, and ETF flow is not negative."
+    elif cmf_num > 0.05:
+        flow_status = f"Mixed money flow: CMF is supportive at {cmf_num:+.2f}, but ETF 5-day flow is {etf_flow_num:+.2%}, so fund-flow confirmation is weak."
+    else:
+        flow_status = f"Money-flow gate fails: CMF is {cmf_num:+.2f}, below the +0.05 accumulation threshold."
+    if veto_active:
+        veto_status = "Hard veto fails: the flow veto is active, so the model blocks a bullish upgrade even if price signals look good."
+    elif flow_num is None:
+        veto_status = "Hard veto passes by absence: no flow-veto flag is active, but the F-score is unavailable."
+    else:
+        veto_status = f"Hard veto passes: F-score is {flow_num:+.2f}, above the -0.50 veto line."
+    return {
+        "trend": trend_status,
+        "strength": strength_status,
+        "rotation": rotation_status,
+        "breadth": breadth_status,
+        "flow": flow_status,
+        "veto": veto_status,
+    }
+
+
+def _ticker_report_risk_meanings(
+    *,
+    ticker_label: str,
+    above_30wma_value,
+    mansfield_value,
+    rrg_value: str,
+    cmf_value,
+    block_value,
+    antonacci_value,
+) -> dict[str, str]:
+    mansfield_num = _metric_number(mansfield_value)
+    cmf_num = _metric_number(cmf_value)
+    antonacci_num = _metric_number(antonacci_value)
+    trend_status = (
+        "No trend-break exit: price remains above the 30-week average."
+        if above_30wma_value is not False
+        else "Trend-break exit is active: price is below the 30-week average."
+    )
+    if mansfield_num is None:
+        strength_status = "Relative-strength exit cannot be evaluated because Mansfield RS is unavailable."
+    elif mansfield_num >= 0:
+        strength_status = f"No relative-strength exit: Mansfield RS is {mansfield_num:+.2f}, still above zero."
+    else:
+        strength_status = f"Relative-strength exit is active: Mansfield RS is {mansfield_num:+.2f}, below zero."
+    if rrg_value == "Lagging":
+        rotation_status = f"Rotation exit is active: {ticker_label} is in Lagging, so relative momentum has broken."
+    elif rrg_value == "Weakening":
+        rotation_status = "Rotation is a warning, not an exit: Weakening means leadership is fading, but the exit rule waits for Lagging."
+    elif rrg_value in {"Leading", "Improving"}:
+        rotation_status = f"No rotation exit: {rrg_value} is still acceptable for the risk table."
+    else:
+        rotation_status = "Rotation exit cannot be evaluated because RRG is unavailable."
+    if cmf_num is None and block_value is None:
+        distribution_status = "Distribution exit cannot be evaluated because CMF and valid block-ratio data are unavailable."
+    elif cmf_num is not None and cmf_num < -0.10:
+        distribution_status = f"Distribution risk is active: CMF {cmf_num:+.2f} is below the -0.10 risk line."
+    elif block_value is not None and block_value < 0.70:
+        distribution_status = f"Distribution risk is active: valid block ratio {block_value:.2f} is below the 0.70 risk line."
+    elif block_value is None:
+        distribution_status = f"No distribution exit: CMF is {cmf_num:+.2f}; block-ratio data is unavailable or invalid and is ignored."
+    else:
+        distribution_status = f"No distribution exit: CMF is {cmf_num:+.2f} and valid block ratio is {block_value:.2f}."
+    if antonacci_num is None:
+        absolute_status = "Absolute momentum cannot be evaluated because Antonacci data is unavailable."
+    elif antonacci_num != 0:
+        absolute_status = "No absolute-momentum exit: Antonacci=1, so the ticker is still beating cash/T-bills."
+    else:
+        absolute_status = "Absolute-momentum exit is active: Antonacci=0, so the ticker is not beating cash/T-bills."
+    return {
+        "trend": trend_status,
+        "strength": strength_status,
+        "rotation": rotation_status,
+        "distribution": distribution_status,
+        "absolute": absolute_status,
+    }
+
+
 def _forecast_horizon_for_state(state: str) -> str:
     return {
         "STAGE_2_BULLISH": "Evidence window: trend and Stage 2 evidence is usually reviewed over 4-26 weeks; flow evidence is shorter-term.",
@@ -1765,22 +1918,46 @@ def _ticker_report_html(ticker: str, row) -> str:
     slope_value = row.get("ma_slope_pos")
     antonacci_value = row.get("antonacci")
     flow_confirmation = _flow_confirmation_passed(row)
+    buy_meanings = _ticker_report_buy_meanings(
+        ticker_label=ticker_label,
+        stage_value=stage_value,
+        above_30wma_value=above_30wma_value,
+        slope_value=slope_value,
+        mansfield_value=mansfield_value,
+        rrg_value=rrg_value,
+        rs_ratio_value=row.get("rs_ratio"),
+        rs_momentum_value=row.get("rs_momentum"),
+        breadth_value=breadth_value,
+        cmf_value=cmf_value,
+        flow_value=flow_value,
+        etf_flow_value=etf_flow_value,
+        veto_active=bool(row.get("veto")),
+    )
+    risk_meanings = _ticker_report_risk_meanings(
+        ticker_label=ticker_label,
+        above_30wma_value=above_30wma_value,
+        mansfield_value=mansfield_value,
+        rrg_value=rrg_value,
+        cmf_value=cmf_value,
+        block_value=block_value,
+        antonacci_value=antonacci_value,
+    )
 
     buy_rows = [
-        _gate_row("Weinstein trend", f"Stage={stage}; above 30wMA={_display_value(above_30wma_value)}; slope up={_display_value(slope_value)}", "Stage = 2, price above 30wMA, MA slope up", stage_value == 2 and above_30wma_value is not False and slope_value is not False, "The main trend should be advancing."),
-        _gate_row("Relative strength", f"Mansfield RS={mansfield}", "Mansfield RS > 0", None if mansfield_value is None or pd.isna(mansfield_value) else mansfield_value > 0, "The ticker should beat its benchmark."),
-        _gate_row("RRG rotation", f"RRG={rrg}; RS Ratio={rs_ratio}; RS Momentum={rs_momentum}", "RRG quadrant = Leading", rrg_value == "Leading", "Leadership should be visible in relative rotation."),
-        _gate_row("Breadth confirmation", f"Breadth={breadth}", "Breadth >= 60%", None if breadth_value is None or pd.isna(breadth_value) else breadth_value >= 0.60, "More constituents should participate in the move."),
-        _gate_row("Money flow", f"CMF={cmf}; Flow={f_score}; ETF 5d flow={etf_flow}", "CMF > +0.05 and ETF flow >= 0", None if cmf_value is None or pd.isna(cmf_value) else cmf_value > 0.05 and (etf_flow_value is None or pd.isna(etf_flow_value) or etf_flow_value >= 0), "Accumulation should support the price trend."),
-        _gate_row("Hard veto", veto_text, "F-score must stay above -0.5 sigma", not bool(row.get("veto")), "A flow veto blocks an otherwise strong setup."),
+        _gate_row("Weinstein trend", f"Stage={stage}; above 30wMA={_display_value(above_30wma_value)}; slope up={_display_value(slope_value)}", "Stage = 2, price above 30wMA, MA slope up", stage_value == 2 and above_30wma_value is not False and slope_value is not False, buy_meanings["trend"]),
+        _gate_row("Relative strength", f"Mansfield RS={mansfield}", "Mansfield RS > 0", None if mansfield_value is None or pd.isna(mansfield_value) else mansfield_value > 0, buy_meanings["strength"]),
+        _gate_row("RRG rotation", f"RRG={rrg}; RS Ratio={rs_ratio}; RS Momentum={rs_momentum}", "Strict buy gate wants RRG = Leading", rrg_value == "Leading", buy_meanings["rotation"]),
+        _gate_row("Breadth confirmation", f"Breadth={breadth}", "Breadth >= 60%", None if breadth_value is None or pd.isna(breadth_value) else breadth_value >= 0.60, buy_meanings["breadth"]),
+        _gate_row("Money flow", f"CMF={cmf}; Flow={f_score}; ETF 5d flow={etf_flow}", "CMF > +0.05 and ETF flow >= 0", None if cmf_value is None or pd.isna(cmf_value) else cmf_value > 0.05 and (etf_flow_value is None or pd.isna(etf_flow_value) or etf_flow_value >= 0), buy_meanings["flow"]),
+        _gate_row("Hard veto", veto_text, "F-score must stay above -0.5 sigma", not bool(row.get("veto")), buy_meanings["veto"]),
     ]
 
     risk_rows = [
-        _gate_row("Trend break", f"above 30wMA={_display_value(above_30wma_value)}", "Healthy while price remains above 30wMA", None if above_30wma_value is None or pd.isna(above_30wma_value) else above_30wma_value is not False, "A weekly trend break weakens the Stage 2 thesis."),
-        _gate_row("Relative strength break", f"Mansfield RS={mansfield}", "Healthy while Mansfield RS >= 0", None if mansfield_value is None or pd.isna(mansfield_value) else mansfield_value >= 0, "Underperformance can precede price damage."),
-        _gate_row("Rotation breakdown", f"RRG={rrg}", "Healthy while RRG is not Lagging", None if not rrg_value else rrg_value != "Lagging", "Lagging rotation means relative momentum has broken."),
-        _gate_row("Distribution", f"CMF={cmf}; block up ratio={block_ratio}", "Healthy while CMF >= -0.10 and valid block ratio >= 0.70 when available", not ((cmf_value is not None and not pd.isna(cmf_value) and cmf_value < -0.10) or (block_value is not None and block_value < 0.70)), "Negative volume pressure can invalidate the setup."),
-        _gate_row("Absolute momentum", f"Antonacci={antonacci}", "Healthy while Antonacci != 0", None if antonacci_value is None or pd.isna(antonacci_value) else antonacci_value != 0, "The ticker should beat cash/T-bills on the lookback."),
+        _gate_row("Trend break", f"above 30wMA={_display_value(above_30wma_value)}", "Healthy while price remains above 30wMA", None if above_30wma_value is None or pd.isna(above_30wma_value) else above_30wma_value is not False, risk_meanings["trend"]),
+        _gate_row("Relative strength break", f"Mansfield RS={mansfield}", "Healthy while Mansfield RS >= 0", None if mansfield_value is None or pd.isna(mansfield_value) else mansfield_value >= 0, risk_meanings["strength"]),
+        _gate_row("Rotation breakdown", f"RRG={rrg}", "Healthy while RRG is not Lagging", None if not rrg_value else rrg_value != "Lagging", risk_meanings["rotation"]),
+        _gate_row("Distribution", f"CMF={cmf}; block up ratio={block_ratio}", "Healthy while CMF >= -0.10 and valid block ratio >= 0.70 when available", not ((cmf_value is not None and not pd.isna(cmf_value) and cmf_value < -0.10) or (block_value is not None and block_value < 0.70)), risk_meanings["distribution"]),
+        _gate_row("Absolute momentum", f"Antonacci={antonacci}", "Healthy while Antonacci != 0", None if antonacci_value is None or pd.isna(antonacci_value) else antonacci_value != 0, risk_meanings["absolute"]),
     ]
 
     pillar_rows = [
