@@ -75,6 +75,7 @@ def test_install_user_timers_defaults_to_operational_non_secret_timers(monkeypat
         "sector-massive-provider-snapshots.timer",
         "sector-provider-flow-cache.timer",
         "sector-dashboard-state-refresh.timer",
+        "sector-rendered-dashboard-smoke.timer",
     }
     assert "sector-email-digest.timer" not in timers
 

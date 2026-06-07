@@ -77,6 +77,40 @@ def test_rendered_smoke_fails_for_rendered_content_errors_even_with_allow_unavai
     assert "rendered_dashboard_smoke ok=false state=missing_rendered_text" in output
 
 
+def test_rendered_smoke_writes_timestamped_json_result(monkeypatch, tmp_path, capsys):
+    output_path = tmp_path / "smoke" / "latest.json"
+    monkeypatch.setattr(
+        rendered_dashboard_smoke,
+        "_run_rendered_smoke",
+        lambda **kwargs: {
+            "ok": False,
+            "state": "playwright_missing",
+            "detail": "No module named playwright",
+        },
+    )
+
+    exit_code = rendered_dashboard_smoke.main(
+        [
+            "--allow-unavailable",
+            "--url",
+            "http://127.0.0.1:8501/?ticker=XLK",
+            "--expect-text",
+            "text:SENTIMENT BOARD",
+            "--output-json",
+            str(output_path),
+        ]
+    )
+
+    output = capsys.readouterr().out
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert exit_code == 0
+    assert "rendered_dashboard_smoke ok=false state=playwright_missing" in output
+    assert payload["checked_at_utc"].endswith("Z")
+    assert payload["url"] == "http://127.0.0.1:8501/?ticker=XLK"
+    assert payload["expected_text"] == ["text:SENTIMENT BOARD"]
+    assert payload["state"] == "playwright_missing"
+
+
 def test_rendered_smoke_script_is_not_core_deploy_gate_yet():
     workflow = (ROOT / ".github" / "workflows" / "deploy-pi.yml").read_text(encoding="utf-8")
 

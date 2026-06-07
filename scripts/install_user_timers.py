@@ -17,6 +17,7 @@ DEFAULT_TIMERS = (
     "sector-massive-provider-snapshots.timer",
     "sector-provider-flow-cache.timer",
     "sector-dashboard-state-refresh.timer",
+    "sector-rendered-dashboard-smoke.timer",
 )
 
 

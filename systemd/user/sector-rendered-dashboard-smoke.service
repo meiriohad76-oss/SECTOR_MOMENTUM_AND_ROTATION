@@ -1,0 +1,19 @@
+# Sector Rotation Rendered Dashboard Smoke - user systemd one-shot unit
+#
+# Install without sudo:
+#   mkdir -p ~/.config/systemd/user
+#   cp systemd/user/sector-rendered-dashboard-smoke.service ~/.config/systemd/user/
+#   cp systemd/user/sector-rendered-dashboard-smoke.timer ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now sector-rendered-dashboard-smoke.timer
+
+[Unit]
+Description=Sector Rotation Rendered Dashboard Smoke
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/SECTOR_MOMENTUM_AND_ROTATION
+Environment=PYTHONUNBUFFERED=1
+ExecStart=%h/SECTOR_MOMENTUM_AND_ROTATION/.venv/bin/python scripts/rendered_dashboard_smoke.py --url http://127.0.0.1:8501/?ticker=XLK --timeout-ms 15000 --allow-unavailable --output-json data/rendered_dashboard_smoke/latest.json

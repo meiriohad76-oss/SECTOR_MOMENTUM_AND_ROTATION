@@ -8,6 +8,7 @@ Playwright and a browser are available.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import json
 import multiprocessing as mp
 import sys
@@ -158,12 +159,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--browser-channel", default="")
     parser.add_argument("--user-data-dir", default="")
     parser.add_argument("--headed", action="store_true")
+    parser.add_argument("--output-json", default="", help="Optional path to write the latest smoke result JSON.")
     parser.add_argument(
         "--allow-unavailable",
         action="store_true",
         help="Exit 0 when Playwright/browser setup is unavailable; rendered content failures still exit non-zero.",
     )
     return parser.parse_args(argv)
+
+
+def _utc_stamp() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _write_json_atomic(path: str | Path, payload: dict[str, object]) -> None:
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = output_path.with_suffix(output_path.suffix + ".tmp")
+    temp_path.write_text(json.dumps(payload, sort_keys=True) + "\n", encoding="utf-8")
+    temp_path.replace(output_path)
 
 
 def _run_rendered_smoke_worker(queue: mp.Queue, kwargs: dict[str, object]) -> None:
@@ -216,6 +230,14 @@ def main(argv: list[str] | None = None) -> int:
         user_data_dir=args.user_data_dir or None,
         headed=bool(args.headed),
     )
+    result = {
+        **result,
+        "checked_at_utc": _utc_stamp(),
+        "url": args.url,
+        "expected_text": list(checks),
+    }
+    if args.output_json:
+        _write_json_atomic(args.output_json, result)
     print(
         "rendered_dashboard_smoke "
         f"ok={str(bool(result.get('ok'))).lower()} "

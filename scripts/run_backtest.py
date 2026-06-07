@@ -2109,17 +2109,27 @@ def _validate_required_prices(prices) -> list[str]:
 def _run_live_smoke(period: str) -> int:
     provider = _provider()
     try:
-        _, prices, _ = _download_prices(period=period, provider=provider)
+        _, prices, fetch_result = _download_prices(period=period, provider=provider, use_cache=False)
     except Exception as exc:
         print(f"Manual backtest data download failed: {exc}")
         return 2
     missing = _validate_required_prices(prices)
     if missing:
         print(f"Missing required price data for manual backtest: {', '.join(missing)}")
+        if fetch_result is not None:
+            print(
+                "Live backtest smoke source "
+                f"fetched={len(getattr(fetch_result, 'fetched', ()))} "
+                f"fresh_cache={len(getattr(fetch_result, 'fresh_cache_hits', ()))} "
+                f"stale_cache={len(getattr(fetch_result, 'stale_cache_hits', ()))} "
+                f"missing={len(getattr(fetch_result, 'missing', ()))}"
+            )
         return 2
     print(
         f"Live backtest smoke passed for {len(REQUIRED_TICKERS)} tickers "
-        f"with provider={provider} period={period}; artifacts were not written."
+        f"with provider={provider} period={period}; "
+        f"fetched={len(getattr(fetch_result, 'fetched', ())) if fetch_result is not None else 0}; "
+        f"cache=disabled; artifacts were not written."
     )
     return 0
 

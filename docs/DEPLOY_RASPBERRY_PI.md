@@ -303,6 +303,28 @@ installed, enabled, and active:
 ./.venv/bin/python scripts/check_ops_readiness.py
 ```
 
+## Optional rendered dashboard smoke
+
+The deploy can also install a non-sudo browser observability timer. It does not
+replace the strict production readiness gate; it records whether the Streamlit
+page actually rendered the key dashboard labels when Playwright/browser support
+is available on the Pi.
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp systemd/user/sector-rendered-dashboard-smoke.service ~/.config/systemd/user/
+cp systemd/user/sector-rendered-dashboard-smoke.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now sector-rendered-dashboard-smoke.timer
+systemctl --user list-timers sector-rendered-dashboard-smoke.timer
+cat data/rendered_dashboard_smoke/latest.json
+```
+
+The timer runs every 30 minutes and writes
+`data/rendered_dashboard_smoke/latest.json`. `scripts/check_ops_readiness.py`
+reports this artifact and timer state as optional observability; Playwright or
+browser setup failures are warning-only until browser QA is stable on the Pi.
+
 ## Resource notes
 
 On a Pi 4 with 4 GB RAM and the full 67-ticker universe:

@@ -145,6 +145,50 @@ def _json_state_status(path: Path, journal_path: Path) -> dict[str, object]:
     }
 
 
+def _rendered_smoke_status(path: Path, unit_dir: Path) -> dict[str, object]:
+    timer = _user_timer_status(
+        unit_dir,
+        service="sector-rendered-dashboard-smoke.service",
+        timer="sector-rendered-dashboard-smoke.timer",
+    )
+    base: dict[str, object] = {
+        **_file_status(path),
+        "timer": timer,
+    }
+    if not path.exists() or path.stat().st_size <= 0:
+        return {**base, "state": "missing", "ok": False}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return {**base, "state": "unreadable", "ok": False}
+
+    checked_at = str(payload.get("checked_at_utc") or "")
+    parsed = _parse_utc_timestamp(checked_at)
+    age_seconds = None
+    if parsed is not None:
+        age_seconds = int((datetime.now(timezone.utc) - parsed).total_seconds())
+    smoke_state = str(payload.get("state") or "unknown")
+    smoke_ok = bool(payload.get("ok"))
+    if age_seconds is not None and age_seconds > 2 * 60 * 60:
+        state = "stale"
+    elif smoke_ok:
+        state = "ok"
+    elif smoke_state in {"playwright_missing", "browser_error", "browser_timeout"}:
+        state = "warning"
+    else:
+        state = "failed"
+    return {
+        **base,
+        "state": state,
+        "ok": smoke_ok,
+        "smoke_state": smoke_state,
+        "checked_at_utc": checked_at,
+        "checked_at_age_seconds": age_seconds,
+        "url": str(payload.get("url") or ""),
+        "expected_text_count": len(payload.get("expected_text", []) or []),
+    }
+
+
 def _ohlcv_provider_status() -> dict[str, object]:
     selected = (resolve_config_value("OHLCV_PROVIDER") or "yfinance").strip().lower()
     massive_key = resolve_config_value("MASSIVE_API_KEY")
@@ -245,6 +289,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--provider-snapshot-db", default=str(DEFAULT_SNAPSHOT_DB_PATH))
     parser.add_argument("--provider-flow-cache-db", default=str(DEFAULT_PROVIDER_FLOW_CACHE_PATH))
     parser.add_argument("--ohlcv-cache-path", default=str(ROOT / "data_cache" / "ohlcv.duckdb"))
+    parser.add_argument("--rendered-smoke-json", default=str(ROOT / "data" / "rendered_dashboard_smoke" / "latest.json"))
     parser.add_argument("--user-systemd-dir", default=str(Path.home() / ".config" / "systemd" / "user"))
     parser.add_argument(
         "--strict-production",
@@ -411,6 +456,7 @@ def main(argv: list[str] | None = None) -> int:
     provider_snapshot_db = Path(args.provider_snapshot_db)
     provider_flow_cache_db = Path(args.provider_flow_cache_db)
     ohlcv_cache_path = Path(args.ohlcv_cache_path)
+    rendered_smoke_json = Path(args.rendered_smoke_json)
     user_systemd_dir = Path(args.user_systemd_dir)
     run_count = _sqlite_count(run_journal_path, "runs")
     snapshot_count = _sqlite_count(provider_snapshot_db, "provider_snapshots")
@@ -461,6 +507,7 @@ def main(argv: list[str] | None = None) -> int:
                 "state": "ready" if ohlcv_cache_path.exists() and ohlcv_cache_path.stat().st_size > 0 else "missing",
             },
             "browser_qa_fixture_guard": _browser_qa_fixture_guard(),
+            "rendered_dashboard_smoke": _rendered_smoke_status(rendered_smoke_json, user_systemd_dir),
         },
         "B-021": {
             "telegram": "configured"

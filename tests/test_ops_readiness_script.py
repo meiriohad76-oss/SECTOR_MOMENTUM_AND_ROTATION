@@ -62,6 +62,7 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     provider_snapshots = tmp_path / "data" / "provider_snapshots" / "provider_snapshots.sqlite"
     provider_flow_cache = tmp_path / "data" / "provider_flow_cache" / "provider_flow_cache.sqlite"
     ohlcv_cache = tmp_path / "data_cache" / "ohlcv.duckdb"
+    rendered_smoke_json = tmp_path / "data" / "rendered_dashboard_smoke" / "latest.json"
     user_systemd_dir = tmp_path / ".config" / "systemd" / "user"
 
     state_file.parent.mkdir(parents=True, exist_ok=True)
@@ -91,6 +92,19 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     _write_provider_flow_cache_grid(provider_flow_cache)
     ohlcv_cache.parent.mkdir(parents=True, exist_ok=True)
     ohlcv_cache.write_bytes(b"duckdb-placeholder")
+    rendered_smoke_json.parent.mkdir(parents=True, exist_ok=True)
+    rendered_smoke_json.write_text(
+        json.dumps(
+            {
+                "ok": True,
+                "state": "rendered_dashboard",
+                "checked_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "url": "http://127.0.0.1:8501/?ticker=XLK",
+                "expected_text": ["text:SENTIMENT BOARD", "text:BLUF"],
+            }
+        ),
+        encoding="utf-8",
+    )
     user_systemd_dir.mkdir(parents=True)
     (user_systemd_dir / "sector-massive-provider-snapshots.service").write_text("[Service]\n", encoding="utf-8")
     (user_systemd_dir / "sector-massive-provider-snapshots.timer").write_text("[Timer]\n", encoding="utf-8")
@@ -98,6 +112,8 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     (user_systemd_dir / "sector-provider-flow-cache.timer").write_text("[Timer]\n", encoding="utf-8")
     (user_systemd_dir / "sector-dashboard-state-refresh.service").write_text("[Service]\n", encoding="utf-8")
     (user_systemd_dir / "sector-dashboard-state-refresh.timer").write_text("[Timer]\n", encoding="utf-8")
+    (user_systemd_dir / "sector-rendered-dashboard-smoke.service").write_text("[Service]\n", encoding="utf-8")
+    (user_systemd_dir / "sector-rendered-dashboard-smoke.timer").write_text("[Timer]\n", encoding="utf-8")
 
     def fake_config(name: str) -> str | None:
         values = {
@@ -144,6 +160,10 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
             ("is-active", "sector-dashboard-state-refresh.timer"): "active",
             ("show", "sector-dashboard-state-refresh.service", "-p", "Result", "--value"): "success",
             ("show", "sector-dashboard-state-refresh.service", "-p", "ExecMainStatus", "--value"): "0",
+            ("is-enabled", "sector-rendered-dashboard-smoke.timer"): "enabled",
+            ("is-active", "sector-rendered-dashboard-smoke.timer"): "active",
+            ("show", "sector-rendered-dashboard-smoke.service", "-p", "Result", "--value"): "success",
+            ("show", "sector-rendered-dashboard-smoke.service", "-p", "ExecMainStatus", "--value"): "0",
         }.get(tuple(args)),
     )
 
@@ -167,6 +187,8 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
             str(provider_flow_cache),
             "--ohlcv-cache-path",
             str(ohlcv_cache),
+            "--rendered-smoke-json",
+            str(rendered_smoke_json),
             "--user-systemd-dir",
             str(user_systemd_dir),
             "--strict-production",
@@ -208,6 +230,11 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     assert payload["production"]["provider_flow_cache"]["warmup_timer"]["timer_active"] == "active"
     assert payload["production"]["ohlcv_cache"]["state"] == "ready"
     assert payload["production"]["browser_qa_fixture_guard"]["state"] == "safe"
+    assert payload["production"]["rendered_dashboard_smoke"]["state"] == "ok"
+    assert payload["production"]["rendered_dashboard_smoke"]["ok"] is True
+    assert payload["production"]["rendered_dashboard_smoke"]["smoke_state"] == "rendered_dashboard"
+    assert payload["production"]["rendered_dashboard_smoke"]["expected_text_count"] == 2
+    assert payload["production"]["rendered_dashboard_smoke"]["timer"]["state"] == "ready"
     assert payload["strict_production"] == {"enforced": True, "failures": [], "ok": True}
     assert set(payload) >= {"B-021", "B-120", "B-121", "B-122", "B-123", "B-131"}
     assert payload["B-021"]["telegram"] == "configured"

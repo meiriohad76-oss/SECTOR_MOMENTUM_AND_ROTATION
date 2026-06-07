@@ -1578,12 +1578,21 @@ def test_run_backtest_live_smoke_fetches_short_period_without_artifacts(
 ):
     calls = []
 
-    def fake_fetch(tickers, period, provider):
-        calls.append((list(tickers), period, provider))
-        return {
-            ticker: ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0005)
-            for ticker in tickers
-        }
+    def fake_fetch_result(tickers, period, provider, use_cache=True):
+        calls.append((list(tickers), period, provider, use_cache))
+        return SimpleNamespace(
+            data={
+                ticker: ohlcv_frame_factory(days=40, start_price=100.0, daily_return=0.0005)
+                for ticker in tickers
+            },
+            provider=provider,
+            fetched=tuple(tickers),
+            fresh_cache_hits=(),
+            stale_cache_hits=(),
+            missing=(),
+            warnings=(),
+            used_stale_cache=False,
+        )
 
     def fail_target_builder(*args, **kwargs):
         raise AssertionError("live smoke should not run the expensive historical target builder")
@@ -1594,7 +1603,7 @@ def test_run_backtest_live_smoke_fetches_short_period_without_artifacts(
     monkeypatch.setattr(run_backtest, "STATES_PATH", tmp_path / "backtest_states.csv")
     monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
     monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
-    monkeypatch.setattr(run_backtest, "fetch_ohlcv", fake_fetch)
+    monkeypatch.setattr(run_backtest, "fetch_ohlcv_result", fake_fetch_result)
     monkeypatch.setattr(
         run_backtest.backtest,
         "build_historical_methodology_targets",
@@ -1603,7 +1612,7 @@ def test_run_backtest_live_smoke_fetches_short_period_without_artifacts(
 
     assert run_backtest.main(["--live-smoke"]) == 0
 
-    assert calls == [(run_backtest.REQUIRED_TICKERS, "2mo", "auto")]
+    assert calls == [(run_backtest.REQUIRED_TICKERS, "2mo", "auto", False)]
     assert not run_backtest.REPORT_PATH.exists()
     assert not run_backtest.METHODOLOGY_REPORT_PATH.exists()
     assert not run_backtest.EQUITY_PATH.exists()
@@ -1612,6 +1621,49 @@ def test_run_backtest_live_smoke_fetches_short_period_without_artifacts(
     output = capsys.readouterr().out
     assert "Live backtest smoke passed" in output
     assert "14 tickers" in output
+    assert "cache=disabled" in output
+    assert "fetched=14" in output
+
+
+def test_run_backtest_live_smoke_fails_closed_when_live_provider_returns_no_rows(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    calls = []
+
+    def fake_fetch_result(tickers, period, provider, use_cache=True):
+        calls.append((list(tickers), period, provider, use_cache))
+        return SimpleNamespace(
+            data={},
+            provider=provider,
+            fetched=(),
+            fresh_cache_hits=(),
+            stale_cache_hits=(),
+            missing=tuple(tickers),
+            warnings=("provider failed",),
+            used_stale_cache=False,
+        )
+
+    monkeypatch.setattr(run_backtest, "REPORT_PATH", tmp_path / "backtest_report.md")
+    monkeypatch.setattr(run_backtest, "METHODOLOGY_REPORT_PATH", tmp_path / "backtest_methodology_report.md")
+    monkeypatch.setattr(run_backtest, "EQUITY_PATH", tmp_path / "backtest_equity.csv")
+    monkeypatch.setattr(run_backtest, "STATES_PATH", tmp_path / "backtest_states.csv")
+    monkeypatch.setattr(run_backtest, "METADATA_PATH", tmp_path / "backtest_metadata.json")
+    monkeypatch.delenv("OHLCV_PROVIDER", raising=False)
+    monkeypatch.setattr(run_backtest, "fetch_ohlcv_result", fake_fetch_result)
+
+    assert run_backtest.main(["--live-smoke"]) == 2
+
+    assert calls == [(run_backtest.REQUIRED_TICKERS, "2mo", "auto", False)]
+    assert not run_backtest.REPORT_PATH.exists()
+    assert not run_backtest.METHODOLOGY_REPORT_PATH.exists()
+    assert not run_backtest.EQUITY_PATH.exists()
+    assert not run_backtest.STATES_PATH.exists()
+    assert not run_backtest.METADATA_PATH.exists()
+    output = capsys.readouterr().out
+    assert "Missing required price data for manual backtest" in output
+    assert "Live backtest smoke source fetched=0 fresh_cache=0 stale_cache=0 missing=14" in output
 
 
 def test_run_backtest_returns_manual_data_error_when_prices_are_too_short(

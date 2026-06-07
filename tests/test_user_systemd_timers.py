@@ -55,6 +55,20 @@ def test_user_massive_provider_snapshot_timer_runs_without_sudo_after_market_clo
     assert "one failed ticker no longer aborts the whole universe" in backlog
 
 
+def test_user_rendered_dashboard_smoke_timer_runs_optional_browser_observability():
+    service = _read_unit("sector-rendered-dashboard-smoke.service")
+    timer = _read_unit("sector-rendered-dashboard-smoke.timer")
+
+    assert "WorkingDirectory=%h/SECTOR_MOMENTUM_AND_ROTATION" in service
+    assert "scripts/rendered_dashboard_smoke.py --url http://127.0.0.1:8501/?ticker=XLK" in service
+    assert "--allow-unavailable" in service
+    assert "--output-json data/rendered_dashboard_smoke/latest.json" in service
+    assert "User=" not in service
+    assert "OnUnitActiveSec=30min" in timer
+    assert "Persistent=true" in timer
+    assert "Unit=sector-rendered-dashboard-smoke.service" in timer
+
+
 def test_backlog_references_non_sudo_user_timers():
     backlog = (ROOT / "docs" / "BACKLOG.md").read_text(encoding="utf-8")
 
