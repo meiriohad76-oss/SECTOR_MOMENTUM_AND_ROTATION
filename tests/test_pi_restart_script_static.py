@@ -15,6 +15,7 @@ def test_pi_restart_script_uses_non_interactive_mainpid_restart():
     assert "MainPID" in script
     assert "os.kill" in script
     assert "signal.SIGTERM" in script
+    assert 'getattr(signal, "SIGKILL", signal.SIGTERM)' in script
     assert "urllib.request.urlopen" in script
     assert "classify_local_dashboard_response" in script
     assert "sudo" not in script.lower()
@@ -95,3 +96,43 @@ def test_restart_helper_rejects_http_200_with_wrong_content(monkeypatch, capsys)
     captured = capsys.readouterr().out
     assert exit_code == 1
     assert "content=wrong_content" in captured
+
+
+def test_restart_helper_escalates_wedged_old_pid_with_dead_http(monkeypatch, capsys):
+    pids = iter([123, 123, 123, 123, 123, 123, 124])
+    probes = iter(
+        [
+            (0, ""),
+            (0, ""),
+            (0, ""),
+            (0, ""),
+            (0, ""),
+            (200, "SENTIMENT BOARD BLUF Data and dashboard health"),
+        ]
+    )
+    kills: list[tuple[int, int]] = []
+
+    monkeypatch.setattr(restart_sector_dashboard, "_main_pid", lambda service: next(pids, 124))
+    monkeypatch.setattr(restart_sector_dashboard, "_active", lambda service: "active")
+    monkeypatch.setattr(restart_sector_dashboard, "_http_probe", lambda url, timeout: next(probes))
+
+    def record_kill(pid, sig):
+        kills.append((pid, sig))
+
+    monkeypatch.setattr(restart_sector_dashboard.os, "kill", record_kill)
+
+    exit_code = restart_sector_dashboard.restart_and_wait(
+        "sector-dashboard",
+        "http://127.0.0.1:8501/?ticker=XLK",
+        timeout_seconds=5,
+        poll_seconds=0,
+    )
+
+    captured = capsys.readouterr().out
+    assert exit_code == 0
+    assert kills == [
+        (123, restart_sector_dashboard.signal.SIGTERM),
+        (123, restart_sector_dashboard.SIGKILL),
+    ]
+    assert "restart_action=sent_sigkill" in captured
+    assert "restart_result=healthy" in captured

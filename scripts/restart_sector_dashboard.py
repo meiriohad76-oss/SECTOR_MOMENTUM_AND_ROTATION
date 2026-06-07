@@ -16,6 +16,9 @@ sys.path.insert(0, str(ROOT))
 from src.live_smoke import classify_local_dashboard_response
 
 
+SIGKILL = getattr(signal, "SIGKILL", signal.SIGTERM)
+
+
 def _run_text(args: list[str]) -> str:
     result = subprocess.run(args, check=False, capture_output=True, text=True, timeout=10)
     return result.stdout.strip()
@@ -59,6 +62,7 @@ def restart_and_wait(service: str, url: str, timeout_seconds: int, poll_seconds:
 
     deadline = time.monotonic() + timeout_seconds
     attempt = 0
+    sigkill_sent = False
     while time.monotonic() < deadline:
         attempt += 1
         active = _active(service)
@@ -69,6 +73,17 @@ def restart_and_wait(service: str, url: str, timeout_seconds: int, poll_seconds:
         if active == "active" and smoke.ok and pid > 0 and pid != old_pid:
             print(f"restart_result=healthy service={service} pid={pid} http={status} content={smoke.state}")
             return 0
+        if not sigkill_sent and attempt >= 5 and pid == old_pid and status == 0:
+            try:
+                os.kill(old_pid, SIGKILL)
+                sigkill_sent = True
+                print(f"restart_action=sent_sigkill pid={old_pid} service={service}")
+            except ProcessLookupError:
+                sigkill_sent = True
+                print(f"restart_action=mainpid_exited_before_sigkill pid={old_pid} service={service}")
+            except PermissionError:
+                print(f"restart_result=failed_permission_sigkill pid={old_pid} service={service}")
+                return 1
         time.sleep(poll_seconds)
 
     status, body = _http_probe(url, timeout=5)
