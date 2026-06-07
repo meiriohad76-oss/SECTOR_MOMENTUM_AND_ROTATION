@@ -3,9 +3,21 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
+from src import flow
 from src import scoring
 from src.ad_hoc_analysis import score_ad_hoc_tickers
+
+
+@pytest.fixture(autouse=True)
+def _stub_provider_flow(monkeypatch):
+    monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", True)
+    monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", True)
+    monkeypatch.setattr(flow, "FINRA_ATS_STUB_MODE", True)
+    monkeypatch.setattr(flow, "FINRA_SHORT_INTEREST_STUB_MODE", True)
+    monkeypatch.setattr(flow, "SEC_13F_STUB_MODE", True)
+    flow.reset_provider_flow_runtime_health()
 
 
 def test_score_ad_hoc_tickers_builds_read_only_snapshot_without_state_write(
