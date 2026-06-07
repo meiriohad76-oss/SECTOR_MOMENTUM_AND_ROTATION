@@ -56,6 +56,8 @@ jobs:
           git pull --ff-only origin backlog-stepwise-qa
           ./.venv/bin/python -m pip install -r requirements.txt
           ./.venv/bin/python -m pytest -q
+          ./.venv/bin/python scripts/install_user_timers.py --repo-root "$PI_REPO_PATH"
+          ./.venv/bin/python scripts/check_ops_readiness.py
 
           # Helper prints restart_result=healthy after the fresh process serves HTTP 200.
           ./.venv/bin/python scripts/restart_sector_dashboard.py \

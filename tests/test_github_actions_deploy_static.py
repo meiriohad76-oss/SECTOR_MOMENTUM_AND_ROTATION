@@ -28,6 +28,8 @@ def test_pi_deploy_workflow_fast_forwards_tests_and_smokes_service():
     assert "git pull --ff-only origin backlog-stepwise-qa" in text
     assert "./.venv/bin/python -m pip install -r requirements.txt" in text
     assert "./.venv/bin/python -m pytest -q" in text
+    assert "./.venv/bin/python scripts/install_user_timers.py --repo-root \"$PI_REPO_PATH\"" in text
+    assert "./.venv/bin/python scripts/check_ops_readiness.py" in text
     assert "./.venv/bin/python scripts/restart_sector_dashboard.py" in text
     assert "./.venv/bin/python scripts/smoke_deploy_gate.py" in text
     assert "--service \"$PI_SERVICE_NAME\"" in text
@@ -45,6 +47,8 @@ def test_github_actions_pi_deploy_docs_reference_required_secrets():
     assert "backlog-stepwise-qa" in text
     assert "self-hosted" in text
     assert "sector-pi" in text
+    assert "scripts/install_user_timers.py --repo-root \"$PI_REPO_PATH\"" in text
+    assert "scripts/check_ops_readiness.py" in text
 
 
 def test_backlog_records_live_validated_pi_deploy_status():

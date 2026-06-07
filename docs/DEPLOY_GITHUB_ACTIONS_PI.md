@@ -34,9 +34,11 @@ git checkout backlog-stepwise-qa
 git pull --ff-only origin backlog-stepwise-qa
 ./.venv/bin/python -m pip install -r requirements.txt
 ./.venv/bin/python -m pytest -q
+./.venv/bin/python scripts/install_user_timers.py --repo-root "$PI_REPO_PATH"
+./.venv/bin/python scripts/check_ops_readiness.py
 ```
 
-If tests pass, it terminates the current Streamlit service `MainPID` so systemd restarts the dashboard, then polls `http://127.0.0.1:8501/?ticker=XLK` until the service is active and HTTP returns `200`.
+If tests pass, it installs/refreshes the non-sudo user timers for transition-feed exports and Massive provider snapshot capture, prints the secret-safe ops-readiness JSON, terminates the current Streamlit service `MainPID` so systemd restarts the dashboard, then polls `http://127.0.0.1:8501/?ticker=XLK` until the service is active and HTTP returns `200`.
 
 ## Pi Requirements
 
