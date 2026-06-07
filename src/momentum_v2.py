@@ -416,8 +416,11 @@ def css() -> str:
 .mv2-a-class { display:flex; align-items:center; gap:8px; margin:12px 0 4px; color:#7c7c7c; font:900 10px/1 var(--font-mono); letter-spacing:.12em; text-transform:uppercase; }
 .mv2-a-class:after { content:""; flex:1; height:1px; background:#1f1f1f; }
 .mv2-a-rail { display:flex; flex-direction:column; gap:16px; min-width:0; }
-.mv2-a-transition, .mv2-a-holding { display:grid; grid-template-columns:10px 44px 1fr auto; gap:8px; align-items:center; padding:7px 0; border-top:1px solid #1f1f1f; color:#b8b8b8; font:800 11px/1.2 var(--font-mono); }
+.mv2-a-transition, .mv2-a-holding { display:grid; grid-template-columns:10px minmax(124px, .65fr) minmax(0, 1.35fr) auto; gap:12px; align-items:center; padding:7px 0; border-top:1px solid #1f1f1f; color:#b8b8b8; font:800 11px/1.2 var(--font-mono); }
 .mv2-a-transition i, .mv2-a-holding i { width:6px; height:6px; border-radius:50%; display:block; }
+.mv2-a-transition .mv2-a-id, .mv2-a-holding .mv2-a-id { min-width:0; }
+.mv2-a-transition .mv2-a-id b, .mv2-a-holding .mv2-a-id b { display:block; color:#e8e8e8; font:900 12px/1.15 var(--font-mono); white-space:nowrap; }
+.mv2-a-transition .mv2-a-id small, .mv2-a-holding .mv2-a-id small { display:block; margin-top:4px; color:#d4d4d4; font:800 11px/1.2 var(--font-prose); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .mv2-a-transition span, .mv2-a-holding span { color:#7c7c7c; font:800 10px/1.2 var(--font-mono); }
 .mv2-a-callout { margin-top:10px; border:1px solid #5d4213; background:#1d1606; color:#f1cf86; padding:10px 12px; font:12px/1.4 var(--font-prose); }
 .mv2-a-footer { display:flex; justify-content:space-between; gap:16px; padding:10px 4px 0; border-top:1px solid #1f1f1f; color:#5a5a5a; font:900 10px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; }
@@ -1082,8 +1085,8 @@ def render_display_a(
         f"""
         <div class="mv2-a-transition mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}">
           <i style="background:{STATE_COLORS_LIGHT.get(row.state, '#777')};box-shadow:0 0 6px {STATE_COLORS_LIGHT.get(row.state, '#777')}66"></i>
-          <b>{_esc(row.ticker)}</b>
-          <span>{_esc(row.identity)} | state {_esc(STATE_LABELS.get(row.state, row.state))}</span>
+          <div class="mv2-a-id"><b>{_esc(row.ticker)}</b><small>{_esc(row.identity)}</small></div>
+          <span>state {_esc(STATE_LABELS.get(row.state, row.state))}</span>
           <span>{_fmt(row.s_score)}</span>
         </div>
         """
@@ -1093,8 +1096,8 @@ def render_display_a(
         f"""
         <div class="mv2-a-holding">
           <i style="background:{STATE_COLORS_LIGHT.get(row.state, '#777')}"></i>
-          <b>{_esc(row.ticker)}</b>
-          <span>{_esc(row.identity)} | S {_fmt(row.s_score)} | F {_fmt(row.f_score)}</span>
+          <div class="mv2-a-id"><b>{_esc(row.ticker)}</b><small>{_esc(row.identity)}</small></div>
+          <span>S {_fmt(row.s_score)} | F {_fmt(row.f_score)}</span>
           {_state_pill(row.state)}
         </div>
         """

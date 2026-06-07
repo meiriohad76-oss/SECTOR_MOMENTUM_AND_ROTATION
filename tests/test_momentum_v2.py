@@ -128,6 +128,18 @@ def test_warning_state_pill_uses_readable_dark_text_on_yellow_background():
     assert 'style="background:#C68A1E;color:#171006">WARN</span>' in _state_pill("WARNING")
 
 
+def test_display_a_transition_identity_does_not_wrap_inside_narrow_ticker_column():
+    stylesheet = css()
+    rows = build_view_rows(_sample_scored(), phase="MID")
+    html = render_display("A", rows, "2026-06-06 16:00 ET")
+
+    assert "grid-template-columns:10px minmax(124px, .65fr) minmax(0, 1.35fr) auto" in stylesheet
+    assert ".mv2-a-transition .mv2-a-id small" in stylesheet
+    assert "white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" in stylesheet
+    assert '<div class="mv2-a-id"><b>XLK</b><small>Technology sector</small></div>' in html
+    assert "| state" not in html
+
+
 def test_display_a_heatmap_supports_sorting_by_visible_headers():
     rows = build_view_rows(_sample_scored(), phase="MID")
 
