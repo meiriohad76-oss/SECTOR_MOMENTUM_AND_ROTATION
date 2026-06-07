@@ -15,8 +15,12 @@ _REAL_FETCH_PRIMARY_FLOW_PAYLOAD = flow._fetch_primary_flow_payload
 @pytest.fixture(autouse=True)
 def neutral_primary_flow_provider(monkeypatch):
     flow.reset_provider_flow_runtime_health()
-    # Keep this suite hermetic even when the host environment enables live flow.
+    # Keep this suite hermetic even when local secrets enable live flow.
     monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", True)
+    monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", True, raising=False)
+    monkeypatch.setattr(flow, "FINRA_ATS_STUB_MODE", True, raising=False)
+    monkeypatch.setattr(flow, "FINRA_SHORT_INTEREST_STUB_MODE", True, raising=False)
+    monkeypatch.setattr(flow, "SEC_13F_STUB_MODE", True, raising=False)
 
     def blocked_fetch(ticker):
         raise AssertionError("tests must opt in before fetching primary-flow payloads")
@@ -70,6 +74,11 @@ def test_compute_flow_signals_excludes_index_tickers_and_uses_stub_values(
     assert out.loc["XLK", "dark_pool_pct"] == 0.40
     assert out.loc["XLK", "si_delta_15d"] == 0.0
     assert out.loc["XLK", "thirteen_f_q"] == 0.0
+    assert bool(out.loc["XLK", "etf_flow_5d_pct_live"]) is False
+    assert bool(out.loc["XLK", "block_up_ratio_live"]) is False
+    assert bool(out.loc["XLK", "dark_pool_pct_live"]) is False
+    assert bool(out.loc["XLK", "si_delta_15d_live"]) is False
+    assert bool(out.loc["XLK", "thirteen_f_q_live"]) is False
 
 
 def test_provider_flow_health_statuses_report_each_provider_without_secret_values(monkeypatch):
@@ -249,6 +258,23 @@ def test_compute_flow_signals_replaces_provider_health_snapshot_per_run(monkeypa
     assert "XLK" not in by_id["massive_block_trades"]["detail"]
 
 
+def test_compute_flow_signals_marks_only_successful_provider_values_live(monkeypatch, ohlcv_frame_factory):
+    flow.reset_provider_flow_runtime_health()
+    monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", True)
+    monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", False, raising=False)
+    monkeypatch.setattr(flow, "FINRA_ATS_STUB_MODE", True, raising=False)
+    monkeypatch.setattr(flow, "FINRA_SHORT_INTEREST_STUB_MODE", True, raising=False)
+    monkeypatch.setattr(flow, "SEC_13F_STUB_MODE", True, raising=False)
+    monkeypatch.setattr(flow, "_resolve_secret", lambda name: "secret" if name == "MASSIVE_API_KEY" else None)
+    monkeypatch.setattr(flow, "_provider_block_trade_upside_ratio", lambda ticker: 1.5)
+
+    out = flow.compute_flow_signals({"XLK": ohlcv_frame_factory(days=80)})
+
+    assert out.loc["XLK", "block_up_ratio"] == pytest.approx(1.5)
+    assert bool(out.loc["XLK", "block_up_ratio_live"]) is True
+    assert bool(out.loc["XLK", "etf_flow_5d_pct_live"]) is False
+
+
 def test_flow_composite_z_handles_constant_inputs_without_nan():
     flow_df = pd.DataFrame(
         {
@@ -268,6 +294,27 @@ def test_flow_composite_z_handles_constant_inputs_without_nan():
     assert list(out.index) == ["XLK", "XLF"]
     assert not out.isna().any()
     assert out.tolist() == [0.0, 0.0]
+
+
+def test_flow_composite_z_ignores_provider_values_without_live_flags():
+    flow_df = pd.DataFrame(
+        {
+            "cmf21": [0.1, 0.1, 0.1],
+            "obv_slope": [0.0, 0.0, 0.0],
+            "etf_flow_5d_pct": [10.0, -10.0, 0.0],
+            "etf_flow_5d_pct_live": [False, False, False],
+            "block_up_ratio": [3.0, 0.1, 1.0],
+            "block_up_ratio_live": [False, False, False],
+            "rvol": [1.0, 1.0, 1.0],
+            "si_delta_15d": [50.0, -50.0, 0.0],
+            "si_delta_15d_live": [False, False, False],
+        },
+        index=["XLK", "XLF", "XLE"],
+    )
+
+    out = flow.flow_composite_z(flow_df)
+
+    assert out.tolist() == [0.0, 0.0, 0.0]
 
 
 def test_parse_primary_flow_snapshots_accepts_json_records():

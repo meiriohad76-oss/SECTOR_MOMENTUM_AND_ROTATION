@@ -198,6 +198,13 @@ def _nullable_int(value) -> int | None:
     return int(number)
 
 
+def _provider_gate_live(row: pd.Series, field: str) -> bool:
+    if field not in row:
+        return True
+    parsed = _nullable_bool(row.get(field))
+    return bool(parsed)
+
+
 def decide_state(row: pd.Series) -> str:
     """Pure-function state assignment for a ticker given today's indicators.
 
@@ -215,6 +222,8 @@ def decide_state(row: pd.Series) -> str:
     rvol = _nullable_float(row.get("rvol"))
     nf5d = _nullable_float(row.get("etf_flow_5d_pct"))
     blk = _nullable_float(row.get("block_up_ratio"))
+    nf5d_live = _provider_gate_live(row, "etf_flow_5d_pct_live")
+    blk_live = _provider_gate_live(row, "block_up_ratio_live")
     obv_div = _nullable_bool(row.get("obv_divergence"))
     dist = _nullable_float(row.get("dist_days_25"))
     bearish = STATE_MACHINE_THRESHOLDS["bearish_stage_4"]
@@ -234,8 +243,8 @@ def decide_state(row: pd.Series) -> str:
             or (ant == exit_thresholds["antonacci_eq"]) \
             or (rrg_q == exit_thresholds["rrg_quadrant_eq"]) \
             or (cmf is not None and cmf < exit_thresholds["cmf21_lt"]) \
-            or (nf5d is not None and nf5d < exit_thresholds["etf_flow_5d_pct_lt"]) \
-            or (blk is not None and blk < exit_thresholds["block_up_ratio_lt"]):
+            or (nf5d_live and nf5d is not None and nf5d < exit_thresholds["etf_flow_5d_pct_lt"]) \
+            or (blk_live and blk is not None and blk < exit_thresholds["block_up_ratio_lt"]):
         return "EXIT"
 
     # ---- WARNING ----
@@ -250,7 +259,7 @@ def decide_state(row: pd.Series) -> str:
     if (stage == bullish["stage_eq"]) and (rrg_q == bullish["rrg_quadrant_eq"]) \
             and (breadth is not None and breadth >= bullish["breadth_50d_gte"]) \
             and (cmf is not None and cmf > bullish["cmf21_gt"]) \
-            and (nf5d is not None and nf5d >= bullish["etf_flow_5d_pct_gte"]):
+            and (not nf5d_live or (nf5d is not None and nf5d >= bullish["etf_flow_5d_pct_gte"])):
         return "STAGE_2_BULLISH"
 
     # ---- HOLD (Stage 2 intact but not strict-Bullish gate) ----

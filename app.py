@@ -2102,15 +2102,16 @@ def _momentum_v2_data_provenance(as_of: str) -> dict[str, str]:
         fred_text = f"FRED unavailable; regime uses OHLCV/yield fallback; phase {regime.phase_hint}"
 
     flow_rows = provider_flow_health_statuses()
+    optional_flow_rows = [row for row in flow_rows if row.get("id") != "ohlcv_derived"]
     live_flow = sum(
         1
-        for row in flow_rows
-        if "live" in str(row.get("mode", "")).lower() or row.get("status") == "healthy"
+        for row in optional_flow_rows
+        if str(row.get("mode", "")).lower() == "live ok"
     )
-    stubbed_flow = sum(1 for row in flow_rows if str(row.get("mode", "")).startswith("stubbed"))
-    warning_flow = sum(1 for row in flow_rows if row.get("status") in {"warning", "stale"})
+    stubbed_flow = sum(1 for row in optional_flow_rows if str(row.get("mode", "")).startswith("stubbed"))
+    warning_flow = sum(1 for row in optional_flow_rows if row.get("status") in {"warning", "stale"})
     flow_text = (
-        f"{live_flow} live/configured, {stubbed_flow} neutral-stubbed, {warning_flow} warning; "
+        f"{live_flow} live provider feeds, {stubbed_flow} neutral-stubbed, {warning_flow} warning; "
         "F score = OHLCV-derived flow plus configured provider feeds"
     )
 
@@ -3793,7 +3794,7 @@ def render_debrief_lab():
 
 
 def render_footer():
-    flow_status_label = "NEUTRAL" if provider_flow_feeds_stubbed() else "LIVE"
+    flow_status_label = _provider_flow_footer_label(provider_flow_health_statuses())
     html = f"""
     <div class="footer">
       <span>{len(scored)} INSTRUMENTS | 7 PILLARS | PROVIDER FLOW {flow_status_label} | DATA CACHE 60min</span>
@@ -3802,6 +3803,20 @@ def render_footer():
     </div>
     """  # closes <div class="app">
     _md(html)
+
+
+def _provider_flow_footer_label(statuses) -> str:
+    optional_rows = [row for row in statuses if row.get("id") != "ohlcv_derived"]
+    if not optional_rows or provider_flow_feeds_stubbed(statuses):
+        return "NEUTRAL"
+    live_rows = [row for row in optional_rows if str(row.get("mode", "")).lower() == "live ok"]
+    warning_rows = [row for row in optional_rows if row.get("status") in {"warning", "stale"}]
+    stubbed_rows = [row for row in optional_rows if str(row.get("mode", "")).startswith("stubbed")]
+    if live_rows and not warning_rows and not stubbed_rows:
+        return "LIVE"
+    if live_rows:
+        return "PARTIAL"
+    return "WARNING"
 
 
 # =============================== compose page ====================================

@@ -51,6 +51,25 @@ def test_app_live_scoring_path_uses_online_provider_results_not_static_artifacts
     assert "browser_qa_ohlcv_result" not in compute_section
 
 
+def test_provider_flow_footer_and_provenance_do_not_label_config_warnings_as_live():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    provenance_section = app_source[
+        app_source.index("def _momentum_v2_data_provenance") : app_source.index("def render_momentum_v2_screens")
+    ]
+    footer_section = app_source[
+        app_source.index("def render_footer():") : app_source.index("# =============================== compose page")
+    ]
+
+    assert 'optional_flow_rows = [row for row in flow_rows if row.get("id") != "ohlcv_derived"]' in provenance_section
+    assert 'str(row.get("mode", "")).lower() == "live ok"' in provenance_section
+    assert "live provider feeds" in provenance_section
+    assert 'flow_status_label = _provider_flow_footer_label(provider_flow_health_statuses())' in footer_section
+    assert "def _provider_flow_footer_label(statuses) -> str:" in footer_section
+    assert 'if not optional_rows or provider_flow_feeds_stubbed(statuses):' in footer_section
+    assert 'return "PARTIAL"' in footer_section
+    assert 'return "WARNING"' in footer_section
+
+
 def test_provider_status_banner_css_exists():
     css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
 

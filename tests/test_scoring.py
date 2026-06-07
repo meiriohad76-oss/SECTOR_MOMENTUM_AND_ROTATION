@@ -81,6 +81,34 @@ def test_decide_state_returns_strict_stage_two_bullish():
     assert scoring.decide_state(_row()) == "STAGE_2_BULLISH"
 
 
+def test_decide_state_ignores_stubbed_provider_flow_for_exit_gates():
+    row = _row(
+        etf_flow_5d_pct=-5.0,
+        etf_flow_5d_pct_live=False,
+        block_up_ratio=0.1,
+        block_up_ratio_live=False,
+    )
+
+    assert scoring.decide_state(row) == "STAGE_2_BULLISH"
+
+
+def test_decide_state_uses_live_provider_flow_when_available():
+    row = _row(
+        etf_flow_5d_pct=-5.0,
+        etf_flow_5d_pct_live=True,
+        block_up_ratio=0.1,
+        block_up_ratio_live=True,
+    )
+
+    assert scoring.decide_state(row) == "EXIT"
+
+
+def test_decide_state_does_not_require_missing_provider_flow_for_stage_two():
+    row = _row(etf_flow_5d_pct=0.0, etf_flow_5d_pct_live=False)
+
+    assert scoring.decide_state(row) == "STAGE_2_BULLISH"
+
+
 def test_compute_composite_applies_flow_veto_and_ranks_within_class():
     indicators_df = pd.DataFrame(
         {

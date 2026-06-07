@@ -134,6 +134,7 @@ def _record_provider_flow_runtime_health(
                 "mode_counts": {},
                 "samples": [],
                 "events": [],
+                "live_by_ticker": {},
             },
         )
         entry["last_completed"] = completed_at
@@ -152,6 +153,9 @@ def _record_provider_flow_runtime_health(
         if len(events) < 5:
             events.append(event_detail)
         entry["events"] = events
+        live_by_ticker = dict(entry.get("live_by_ticker", {}) or {})
+        live_by_ticker[symbol] = bool(status == "healthy" and mode == "live ok")
+        entry["live_by_ticker"] = live_by_ticker
 
     if target is _PROVIDER_FLOW_RUNTIME_HEALTH:
         with _PROVIDER_FLOW_RUNTIME_HEALTH_LOCK:
@@ -192,6 +196,13 @@ def _merge_provider_runtime_health(row: dict[str, str], *, stubbed: bool) -> dic
     if warning_events:
         detail_parts.append(f"warnings: {'; '.join(warning_events)}")
     return {**row, "status": status, "mode": mode, "detail": "; ".join(detail_parts)}
+
+
+def _provider_signal_live(row_id: str, ticker: str) -> bool:
+    target = _provider_flow_runtime_health_target()
+    runtime = target.get(str(row_id), {})
+    live_by_ticker = dict(runtime.get("live_by_ticker", {}) or {})
+    return bool(live_by_ticker.get(str(ticker).upper(), False))
 
 
 def provider_flow_feeds_stubbed(statuses: Iterable[dict[str, str]] | None = None) -> bool:
@@ -1048,6 +1059,11 @@ def compute_flow_signals(ohlcv):
         for t, df in ohlcv.items():
             if str(t).startswith("^"):
                 continue
+            etf_flow_5d_pct = etf_primary_flow_5d_pct(t)
+            block_up_ratio = block_trade_upside_ratio(t)
+            dark_pool_share = dark_pool_pct(t)
+            si_delta_15d = short_interest_delta_15d(t)
+            thirteen_f_q = thirteen_f_net_buys_q(t)
             rows.append({
                 "ticker":          t,
                 "cmf21":           chaikin_money_flow(df, 21),
@@ -1056,11 +1072,16 @@ def compute_flow_signals(ohlcv):
                 "rvol":            relative_volume(df, 20),
                 "dist_days_25":    distribution_day_count(df, 25),
                 "obv_divergence":  obv_price_divergence(df, 20),
-                "etf_flow_5d_pct": etf_primary_flow_5d_pct(t),
-                "block_up_ratio":  block_trade_upside_ratio(t),
-                "dark_pool_pct":   dark_pool_pct(t),
-                "si_delta_15d":    short_interest_delta_15d(t),
-                "thirteen_f_q":    thirteen_f_net_buys_q(t),
+                "etf_flow_5d_pct": etf_flow_5d_pct,
+                "etf_flow_5d_pct_live": _provider_signal_live("etf_primary_flow", t),
+                "block_up_ratio":  block_up_ratio,
+                "block_up_ratio_live": _provider_signal_live("massive_block_trades", t),
+                "dark_pool_pct":   dark_pool_share,
+                "dark_pool_pct_live": _provider_signal_live("finra_ats_dark_pool", t),
+                "si_delta_15d":    si_delta_15d,
+                "si_delta_15d_live": _provider_signal_live("finra_short_interest", t),
+                "thirteen_f_q":    thirteen_f_q,
+                "thirteen_f_q_live": _provider_signal_live("sec_13f", t),
             })
         return pd.DataFrame(rows).set_index("ticker")
     finally:
@@ -1078,12 +1099,19 @@ def flow_composite_z(flow_df):
             return s * 0.0
         return (s - s.mean()) / std
 
+    def _provider_series(value_col: str, live_col: str) -> pd.Series:
+        values = flow_df[value_col].astype(float)
+        if live_col not in flow_df:
+            return values
+        live = flow_df[live_col].fillna(False).map(bool)
+        return values.where(live)
+
     z_cmf = _z(flow_df["cmf21"])
     z_obv = _z(flow_df["obv_slope"])
-    z_etf = _z(flow_df["etf_flow_5d_pct"])
-    z_blk = _z(flow_df["block_up_ratio"])
+    z_etf = _z(_provider_series("etf_flow_5d_pct", "etf_flow_5d_pct_live"))
+    z_blk = _z(_provider_series("block_up_ratio", "block_up_ratio_live"))
     z_vel = _z(flow_df["rvol"])
-    z_si = _z(flow_df["si_delta_15d"]) * -1
+    z_si = _z(_provider_series("si_delta_15d", "si_delta_15d_live")) * -1
     F = (0.30 * z_cmf + 0.20 * z_obv + 0.20 * z_etf + 0.10 * z_blk
          + 0.10 * z_vel + 0.10 * z_si).fillna(0)
     F.name = "F"
