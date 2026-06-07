@@ -53,6 +53,10 @@ STATE_COLORS_LIGHT = {
     "BEARISH_STAGE_4": "#8C1A26",
     "STAGE_1_BASING": "#888888",
 }
+STATE_TEXT_COLORS = {
+    "WARNING": "#171006",
+    "STAGE_1_BASING": "#111111",
+}
 STATE_LABELS = {
     "STAGE_2_BULLISH": "BULLISH",
     "HOLD": "HOLD",
@@ -704,7 +708,11 @@ def _fmt(value: float, suffix: str = "", digits: int = 2) -> str:
 
 def _state_pill(state: str) -> str:
     color = STATE_COLORS_LIGHT.get(state, "#777")
-    return f'<span class="mv2-state" style="background:{color}">{_esc(STATE_LABELS.get(state, state))}</span>'
+    text_color = STATE_TEXT_COLORS.get(state, "#ffffff")
+    return (
+        f'<span class="mv2-state" style="background:{color};color:{text_color}">'
+        f'{_esc(STATE_LABELS.get(state, state))}</span>'
+    )
 
 
 def _pillar_bar(row: MomentumV2Row) -> str:

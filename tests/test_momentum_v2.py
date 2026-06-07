@@ -12,6 +12,7 @@ from src.momentum_v2 import (
     _c_momentum_bars,
     _flow_river_html,
     _momentum_rows,
+    _state_pill,
     _terminal_momentum_bars,
     build_view_rows,
     contribution_sum,
@@ -121,6 +122,10 @@ def test_display_a_overview_matches_terminal_handoff_structure():
     assert "Open XLK drill-down for Technology sector" in html
     assert "Technology sector" in html
     assert "Energy sector" in html
+
+
+def test_warning_state_pill_uses_readable_dark_text_on_yellow_background():
+    assert 'style="background:#C68A1E;color:#171006">WARN</span>' in _state_pill("WARNING")
 
 
 def test_display_a_heatmap_supports_sorting_by_visible_headers():
