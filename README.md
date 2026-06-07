@@ -368,7 +368,7 @@ Provider-flow responses are cached in `data/provider_flow_cache/provider_flow_ca
 The Pi deploy installs `sector-provider-flow-cache.timer`, a non-sudo user timer that warms the cached Massive/FINRA provider-flow lanes for the scored dashboard universe before the US open and after the close.
 The Pi deploy also installs `sector-dashboard-state-refresh.timer`, which runs the methodology headlessly after cache warmup so `data/state.json`, `data/state_transitions.jsonl`, and `data/run_journal/runs.sqlite` stay fresh even when no browser session is open.
 `sector-rendered-dashboard-smoke.timer` adds continuous browser observability: every 30 minutes it attempts a rendered Playwright smoke against `http://127.0.0.1:8501/?ticker=XLK` and writes `data/rendered_dashboard_smoke/latest.json`. The deploy also runs the same smoke after restart as a mandatory rendered-DOM gate.
-Use `./.venv/bin/python scripts/check_ops_readiness.py --strict-production` for the deploy-grade readiness gate. It fails only critical production lanes; optional secret-backed channels such as Telegram, email, push, Discord, and broker execution remain reported but non-blocking.
+Use `./.venv/bin/python scripts/check_ops_readiness.py --strict-production` for the deploy-grade data/process readiness gate, and add `--require-rendered-smoke` after running `scripts/rendered_dashboard_smoke.py` when you also want the latest browser-render evidence enforced. Optional secret-backed channels such as Telegram, email, push, Discord, and broker execution remain reported but non-blocking.
 
 ## State transition alerts
 

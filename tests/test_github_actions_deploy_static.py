@@ -36,6 +36,7 @@ def test_pi_deploy_workflow_fast_forwards_tests_and_smokes_service():
     assert "./.venv/bin/python scripts/warm_provider_flow_cache.py --universe us-sectors --timeout 20" in text
     assert "./.venv/bin/python scripts/refresh_dashboard_state.py --period 3y --provider-flow-mode cache-only" in text
     assert "./.venv/bin/python scripts/check_ops_readiness.py --strict-production" in text
+    assert "./.venv/bin/python scripts/check_ops_readiness.py --strict-production --require-rendered-smoke" in text
     assert "./.venv/bin/python scripts/restart_sector_dashboard.py" in text
     assert "./.venv/bin/python scripts/rendered_dashboard_smoke.py" in text
     assert "--timeout-ms 120000" in text
@@ -72,6 +73,7 @@ def test_github_actions_pi_deploy_docs_reference_required_secrets():
     assert "scripts/warm_provider_flow_cache.py --universe us-sectors --timeout 20" in text
     assert "scripts/refresh_dashboard_state.py --period 3y --provider-flow-mode cache-only" in text
     assert "scripts/check_ops_readiness.py --strict-production" in text
+    assert "scripts/check_ops_readiness.py --strict-production --require-rendered-smoke" in text
     assert "scripts/rendered_dashboard_smoke.py --url" in text
     assert "data/rendered_dashboard_smoke/latest.json" in text
 

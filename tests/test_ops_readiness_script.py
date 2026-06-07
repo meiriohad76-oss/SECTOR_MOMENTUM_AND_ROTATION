@@ -278,6 +278,25 @@ def test_ops_readiness_strict_mode_fails_when_provider_flow_cache_coverage_is_in
     )
 
 
+def test_ops_readiness_rendered_smoke_gate_fails_when_evidence_is_missing(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(check_ops_readiness, "_systemctl_user", lambda args: None)
+
+    exit_code = check_ops_readiness.main(
+        [
+            "--rendered-smoke-json",
+            str(tmp_path / "missing-rendered-smoke.json"),
+            "--require-rendered-smoke",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert exit_code == 2
+    assert payload["production"]["rendered_dashboard_smoke"]["state"] == "missing"
+    assert payload["strict_production"]["enforced"] is True
+    assert payload["strict_production"]["ok"] is False
+    assert any(row["id"] == "rendered_dashboard_smoke" for row in payload["strict_production"]["failures"])
+
+
 def test_ops_readiness_flags_browser_qa_fixtures_as_unsafe(monkeypatch, capsys):
     def fake_config(name: str) -> str | None:
         if name == "BROWSER_QA_ALLOW_FIXTURES":

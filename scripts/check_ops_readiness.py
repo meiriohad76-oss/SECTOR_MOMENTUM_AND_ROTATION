@@ -296,6 +296,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Exit non-zero when critical production readiness checks are not ready.",
     )
+    parser.add_argument(
+        "--require-rendered-smoke",
+        action="store_true",
+        help=(
+            "Include the latest rendered Playwright dashboard smoke in the enforced readiness gate. "
+            "Use this after running scripts/rendered_dashboard_smoke.py."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -447,6 +455,29 @@ def _strict_production_failures(payload: dict[str, object]) -> list[dict[str, st
     return failures
 
 
+def _rendered_smoke_failures(payload: dict[str, object]) -> list[dict[str, str]]:
+    production = dict(payload.get("production", {}) or {})
+    rendered = dict(production.get("rendered_dashboard_smoke", {}) or {})
+    failures: list[dict[str, str]] = []
+    _require(
+        failures,
+        rendered.get("state") == "ok" and rendered.get("ok") is True,
+        "rendered_dashboard_smoke",
+        (
+            "rendered dashboard smoke state is "
+            f"{rendered.get('state')} / {rendered.get('smoke_state')}"
+        ),
+    )
+    timer = dict(rendered.get("timer", {}) or {})
+    _require(
+        failures,
+        timer.get("state") == "ready",
+        "rendered_dashboard_smoke_timer",
+        f"rendered dashboard smoke timer is {timer.get('state')}",
+    )
+    return failures
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     subscriptions = load_push_subscriptions(args.subscriptions_path)
@@ -542,13 +573,15 @@ def main(argv: list[str] | None = None) -> int:
         "B-131": _broker_status(),
     }
     failures = _strict_production_failures(payload)
+    if args.require_rendered_smoke:
+        failures.extend(_rendered_smoke_failures(payload))
     payload["strict_production"] = {
         "ok": not failures,
         "failures": failures,
-        "enforced": bool(args.strict_production),
+        "enforced": bool(args.strict_production or args.require_rendered_smoke),
     }
     print(json.dumps(payload, sort_keys=True))
-    return 2 if args.strict_production and failures else 0
+    return 2 if (args.strict_production or args.require_rendered_smoke) and failures else 0
 
 
 if __name__ == "__main__":
