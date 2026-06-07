@@ -2256,12 +2256,23 @@ def methodology_score_snapshot(
         bench_ticker=bench_ticker,
         bil_ticker=bil_ticker,
     )
-    prior_primary_flow_mode = flow.ETF_PRIMARY_FLOW_STUB_MODE
+    prior_flow_modes = {
+        "ETF_PRIMARY_FLOW_STUB_MODE": flow.ETF_PRIMARY_FLOW_STUB_MODE,
+        "MASSIVE_TRADES_STUB_MODE": flow.MASSIVE_TRADES_STUB_MODE,
+        "FINRA_ATS_STUB_MODE": flow.FINRA_ATS_STUB_MODE,
+        "FINRA_SHORT_INTEREST_STUB_MODE": flow.FINRA_SHORT_INTEREST_STUB_MODE,
+        "SEC_13F_STUB_MODE": flow.SEC_13F_STUB_MODE,
+    }
     flow.ETF_PRIMARY_FLOW_STUB_MODE = True
+    flow.MASSIVE_TRADES_STUB_MODE = True
+    flow.FINRA_ATS_STUB_MODE = True
+    flow.FINRA_SHORT_INTEREST_STUB_MODE = True
+    flow.SEC_13F_STUB_MODE = True
     try:
         flow_df = flow.compute_flow_signals(ohlcv).reindex(indicators_df.index)
     finally:
-        flow.ETF_PRIMARY_FLOW_STUB_MODE = prior_primary_flow_mode
+        for name, value in prior_flow_modes.items():
+            setattr(flow, name, value)
     flow_z = flow.flow_composite_z(flow_df)
     return scoring.compute_composite(indicators_df, flow_df, flow_z, phase)
 

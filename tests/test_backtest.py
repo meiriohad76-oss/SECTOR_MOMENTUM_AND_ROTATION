@@ -1804,11 +1804,18 @@ def test_historical_methodology_targets_do_not_fetch_provider_flow(
     from src import flow
 
     monkeypatch.setattr(flow, "ETF_PRIMARY_FLOW_STUB_MODE", False)
+    monkeypatch.setattr(flow, "MASSIVE_TRADES_STUB_MODE", False)
+    monkeypatch.setattr(flow, "FINRA_ATS_STUB_MODE", False)
+    monkeypatch.setattr(flow, "FINRA_SHORT_INTEREST_STUB_MODE", False)
+    monkeypatch.setattr(flow, "SEC_13F_STUB_MODE", False)
 
     def fail_fetch(ticker):
         raise AssertionError("historical target building must stay OHLCV-only")
 
     monkeypatch.setattr(flow, "_fetch_primary_flow_payload", fail_fetch)
+    monkeypatch.setattr(flow, "_fetch_massive_stock_trades", fail_fetch)
+    monkeypatch.setattr(flow, "_fetch_finra_ats_weekly_summary", fail_fetch)
+    monkeypatch.setattr(flow, "_fetch_finra_short_interest", fail_fetch)
     last_date = market_ohlcv["SPY"].index[-1]
 
     result = backtest.build_historical_methodology_targets(
@@ -1819,3 +1826,7 @@ def test_historical_methodology_targets_do_not_fetch_provider_flow(
 
     assert result.target_weights.index.tolist() == [last_date]
     assert flow.ETF_PRIMARY_FLOW_STUB_MODE is False
+    assert flow.MASSIVE_TRADES_STUB_MODE is False
+    assert flow.FINRA_ATS_STUB_MODE is False
+    assert flow.FINRA_SHORT_INTEREST_STUB_MODE is False
+    assert flow.SEC_13F_STUB_MODE is False

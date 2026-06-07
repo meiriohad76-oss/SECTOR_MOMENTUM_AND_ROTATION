@@ -211,8 +211,8 @@ def browser_qa_targets() -> tuple[BrowserQaTarget, ...]:
             ),
             focus_text="BUY CANDIDATES",
             actions=(
-                "expect-visible:.action-card [data-drill-ticker]",
-                "click-drill:.action-card [data-drill-ticker]",
+                "expect-visible:.action-card[data-drill-ticker]",
+                "click-drill:.action-card[data-drill-ticker]",
             ),
         ),
         BrowserQaTarget(

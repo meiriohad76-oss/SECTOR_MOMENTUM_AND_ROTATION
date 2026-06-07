@@ -50,6 +50,8 @@ def test_browser_qa_script_writes_report_and_manifest():
     assert "expect-visible:" in script
     assert "click-drill:" in script
     assert "data-drill-ticker" in script
+    assert 'get_attribute("data-drill-ticker")' in script
+    assert "has no data-drill-ticker attribute" in script
     assert "Per-ticker drill-down" in script
     assert "expect-scrollable:" in script
     assert "expect-no-document-overlap:" in script

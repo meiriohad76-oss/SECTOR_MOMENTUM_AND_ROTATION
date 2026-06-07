@@ -45,7 +45,8 @@ def test_browser_qa_targets_cover_visual_residual_risks():
     assert "expect-scrollable:.action-card.warn .action-list" in by_id["desktop-bluf-scroll-lanes"].actions
     assert "expect-no-document-overlap:.bluf-actions|.data-health-panel" in by_id["desktop-bluf-scroll-lanes"].actions
     assert by_id["desktop-drill-click-bridge"].tickets == ("B-112",)
-    assert "click-drill:.action-card [data-drill-ticker]" in by_id["desktop-drill-click-bridge"].actions
+    assert "expect-visible:.action-card[data-drill-ticker]" in by_id["desktop-drill-click-bridge"].actions
+    assert "click-drill:.action-card[data-drill-ticker]" in by_id["desktop-drill-click-bridge"].actions
     assert by_id["desktop-rrg-readability"].tickets == ("B-112", "B-147")
     assert "text:Relative Rotation Graph" in by_id["desktop-rrg-readability"].checks
     assert "text:DRILL-DOWN FROM RRG" in by_id["desktop-rrg-readability"].checks
