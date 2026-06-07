@@ -71,6 +71,28 @@ SCREEN_LABELS = {
     "deepdive": "Deep dive",
     "rotation": "Rotation",
 }
+DISPLAY_A_SORT_FIELDS = {
+    "ticker": "TKR",
+    "identity": "NOTE",
+    "state": "STATE",
+    "pillar_sum": "7 PILLARS",
+    "s_score": "S",
+    "f_score": "F",
+    "momentum_pct": "MOM",
+    "trend_90d": "90D",
+}
+DISPLAY_A_SORT_DIRECTIONS = {
+    "desc": "High to low",
+    "asc": "Low to high",
+}
+_STATE_SORT_RANK = {
+    "BEARISH_STAGE_4": 0,
+    "EXIT": 1,
+    "WARNING": 2,
+    "STAGE_1_BASING": 3,
+    "HOLD": 4,
+    "STAGE_2_BULLISH": 5,
+}
 
 
 @dataclass(frozen=True)
@@ -222,12 +244,70 @@ def contribution_sum(row: MomentumV2Row) -> float:
     return float(sum(row.pillars.values()))
 
 
-def rows_by_class(rows: Iterable[MomentumV2Row]) -> dict[str, list[MomentumV2Row]]:
+def normalize_display_a_sort(field: str | None, direction: str | None) -> tuple[str, str]:
+    normalized_field = str(field or "").strip()
+    normalized_direction = str(direction or "").strip().lower()
+    if normalized_field not in DISPLAY_A_SORT_FIELDS:
+        normalized_field = "s_score"
+    if normalized_direction not in DISPLAY_A_SORT_DIRECTIONS:
+        normalized_direction = "desc"
+    return normalized_field, normalized_direction
+
+
+def _display_a_trend_value(row: MomentumV2Row) -> float:
+    return float(row.momentum_pct * 0.84 + row.mansfield_rs * 0.15)
+
+
+def _display_a_sort_key(row: MomentumV2Row, field: str):
+    if field == "ticker":
+        return row.ticker.upper()
+    if field == "identity":
+        return row.identity.upper()
+    if field == "state":
+        return _STATE_SORT_RANK.get(row.state, -1)
+    if field == "pillar_sum":
+        return contribution_sum(row)
+    if field == "f_score":
+        return row.f_score
+    if field == "momentum_pct":
+        return row.momentum_pct
+    if field == "trend_90d":
+        return _display_a_trend_value(row)
+    return row.s_score
+
+
+def sort_display_a_rows(
+    rows: Iterable[MomentumV2Row],
+    field: str | None = "s_score",
+    direction: str | None = "desc",
+) -> list[MomentumV2Row]:
+    normalized_field, normalized_direction = normalize_display_a_sort(field, direction)
+    reverse = normalized_direction == "desc"
+    return sorted(
+        rows,
+        key=lambda item: (
+            _display_a_sort_key(item, normalized_field),
+            item.s_score,
+            item.ticker.upper(),
+        ),
+        reverse=reverse,
+    )
+
+
+def rows_by_class(
+    rows: Iterable[MomentumV2Row],
+    sort_field: str | None = "s_score",
+    sort_direction: str | None = "desc",
+) -> dict[str, list[MomentumV2Row]]:
     grouped: dict[str, list[MomentumV2Row]] = {}
     for row in rows:
         grouped.setdefault(row.asset_class, []).append(row)
     for asset_class in grouped:
-        grouped[asset_class].sort(key=lambda item: item.s_score, reverse=True)
+        grouped[asset_class] = sort_display_a_rows(
+            grouped[asset_class],
+            field=sort_field,
+            direction=sort_direction,
+        )
     return grouped
 
 
@@ -321,6 +401,9 @@ def css() -> str:
 .mv2-a-header-row { color:#7c7c7c; font:900 10px/1 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; border-top:0; padding-top:2px; }
 .mv2-a-row { display:grid; grid-template-columns:46px minmax(180px,1fr) 80px 90px 56px 56px 56px 60px; gap:8px; align-items:center; min-height:30px; border-top:1px solid #1f1f1f; padding:5px 0; }
 .mv2-a-row b { color:#e8e8e8; font:900 12px/1 var(--font-mono); }
+.mv2-a-sort { color:#e8e8e8; font:900 12px/1 var(--font-mono); text-decoration:none; white-space:nowrap; cursor:pointer; }
+.mv2-a-sort span { color:#26d65b; font:900 10px/1 var(--font-mono); margin-left:3px; }
+.mv2-a-sort:hover, .mv2-a-sort.active { color:#26d65b; text-decoration:underline; text-underline-offset:3px; }
 .mv2-a-row .note { color:#b8b8b8; font:12px/1.2 var(--font-prose); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .mv2-a-row .num { text-align:right; font:900 12px/1 var(--font-mono); }
 .mv2-a-row svg { display:block; }
@@ -738,6 +821,38 @@ def _terminal_row_html(row: MomentumV2Row) -> str:
     """
 
 
+def _display_a_sort_header(field: str, label: str, active_field: str, active_direction: str) -> str:
+    is_active = field == active_field
+    next_direction = "asc" if is_active and active_direction == "desc" else "desc"
+    arrow = " v" if is_active and active_direction == "desc" else " ^" if is_active else ""
+    class_name = "mv2-a-sort active" if is_active else "mv2-a-sort"
+    href = f"?mv2_sort={_esc(field)}&mv2_dir={_esc(next_direction)}"
+    title = f"Sort heatmap by {label} {'ascending' if next_direction == 'asc' else 'descending'}"
+    numeric = " num" if field in {"s_score", "f_score", "momentum_pct"} else ""
+    hide = " hide-sm" if field == "trend_90d" else ""
+    return (
+        f'<a class="{class_name}{numeric}{hide}" href="{href}" title="{_esc(title)}" '
+        f'data-mv2-sort="{_esc(field)}">{_esc(label)}<span>{_esc(arrow)}</span></a>'
+    )
+
+
+def _display_a_header_row(active_field: str, active_direction: str) -> str:
+    headers = (
+        ("ticker", "TKR"),
+        ("identity", "NOTE"),
+        ("state", "STATE"),
+        ("pillar_sum", "7 PILLARS"),
+        ("s_score", "S"),
+        ("f_score", "F"),
+        ("momentum_pct", "MOM"),
+        ("trend_90d", "90D"),
+    )
+    return '<div class="mv2-a-row mv2-a-header-row">' + "".join(
+        _display_a_sort_header(field, label, active_field, active_direction)
+        for field, label in headers
+    ) + "</div>"
+
+
 def _row_html(row: MomentumV2Row) -> str:
     s_class = "mv2-pos" if row.s_score >= 0 else "mv2-neg"
     f_class = "mv2-pos" if row.f_score >= 0 else "mv2-neg"
@@ -905,8 +1020,16 @@ def render_display_c(rows: list[MomentumV2Row], as_of: str) -> str:
     """
 
 
-def render_display_a(rows: list[MomentumV2Row], as_of: str) -> str:
-    grouped = rows_by_class(rows)
+def render_display_a(
+    rows: list[MomentumV2Row],
+    as_of: str,
+    sort_field: str | None = "s_score",
+    sort_direction: str | None = "desc",
+) -> str:
+    sort_field, sort_direction = normalize_display_a_sort(sort_field, sort_direction)
+    sort_label = DISPLAY_A_SORT_FIELDS[sort_field]
+    direction_label = DISPLAY_A_SORT_DIRECTIONS[sort_direction]
+    grouped = rows_by_class(rows, sort_field=sort_field, sort_direction=sort_direction)
     body_parts = []
     for asset_class, items in grouped.items():
         bullish_in_class = sum(1 for item in items if item.state == "STAGE_2_BULLISH")
@@ -1036,10 +1159,8 @@ def render_display_a(rows: list[MomentumV2Row], as_of: str) -> str:
 
       <div class="mv2-a-body">
         <div class="mv2-a-panel">
-          <div class="mv2-a-head"><b>7-PILLAR HEATMAP</b><span>composite = weighted sum of signed pillar contributions | sorted by S within class</span></div>
-          <div class="mv2-a-row mv2-a-header-row">
-            <b>TKR</b><b>NOTE</b><b>STATE</b><b>7 PILLARS</b><b class="num">S</b><b class="num">F</b><b class="num">MOM</b><b class="hide-sm">90D</b>
-          </div>
+          <div class="mv2-a-head"><b>7-PILLAR HEATMAP</b><span>composite = weighted sum of signed pillar contributions | sorted by {_esc(sort_label)} within class | {_esc(direction_label)}</span></div>
+          {_display_a_header_row(sort_field, sort_direction)}
           {body}
         </div>
         <aside class="mv2-a-rail">
@@ -2814,6 +2935,8 @@ def render_display(
     screen: str = "overview",
     focus_ticker: str | None = None,
     data_provenance: Mapping[str, Any] | None = None,
+    display_a_sort_field: str | None = "s_score",
+    display_a_sort_direction: str | None = "desc",
 ) -> str:
     normalized_screen = screen if screen in SCREEN_LABELS else "overview"
     if normalized_screen == "deepdive":
@@ -2821,7 +2944,12 @@ def render_display(
     elif normalized_screen == "rotation":
         html = render_rotation(display, rows, as_of)
     elif display == "A":
-        html = render_display_a(rows, as_of).replace('<div class="mv2-a-body">', _tabs_html("overview") + '<div class="mv2-a-body">', 1)
+        html = render_display_a(
+            rows,
+            as_of,
+            sort_field=display_a_sort_field,
+            sort_direction=display_a_sort_direction,
+        ).replace('<div class="mv2-a-body">', _tabs_html("overview") + '<div class="mv2-a-body">', 1)
     elif display == "B":
         html = render_display_b(rows, as_of).replace('<div class="mv2-grid">', _tabs_html("overview") + '<div class="mv2-grid">', 1)
     else:

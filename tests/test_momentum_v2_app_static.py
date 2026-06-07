@@ -11,9 +11,15 @@ def test_app_wires_momentum_v2_display_selector_and_renderer():
     assert "momentum_v2_screen" in APP
     assert "MOMENTUM_V2_DISPLAY_LABELS" in APP
     assert "MOMENTUM_V2_SCREEN_LABELS" in APP
+    assert "MOMENTUM_V2_A_SORT_FIELDS" in APP
+    assert "MOMENTUM_V2_A_SORT_DIRECTIONS" in APP
     assert "render_momentum_v2_display" in APP
     assert "_momentum_v2_data_provenance(as_of)" in APP
     assert "data_provenance=_momentum_v2_data_provenance(as_of)" in APP
+    assert 'st.selectbox(\n                "Heatmap sort column"' in APP
+    assert 'st.segmented_control(\n                "Heatmap sort direction"' in APP
+    assert "display_a_sort_field=heatmap_sort_field" in APP
+    assert "display_a_sort_direction=heatmap_sort_direction" in APP
 
 
 def test_app_momentum_v2_provenance_uses_live_compute_objects():

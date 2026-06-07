@@ -50,6 +50,8 @@ from src.indicators import compute_all_indicators
 from src.macro import assess_regime
 from src.macro_tiles import MACRO_CONTEXT_SYMBOLS, fred_macro_snapshot, fred_macro_tile_groups, macro_tile_rows, session_range_tile
 from src.momentum_v2 import (
+    DISPLAY_A_SORT_DIRECTIONS as MOMENTUM_V2_A_SORT_DIRECTIONS,
+    DISPLAY_A_SORT_FIELDS as MOMENTUM_V2_A_SORT_FIELDS,
     DISPLAY_LABELS as MOMENTUM_V2_DISPLAY_LABELS,
     SCREEN_LABELS as MOMENTUM_V2_SCREEN_LABELS,
     build_view_rows as build_momentum_v2_rows,
@@ -2244,6 +2246,26 @@ def render_momentum_v2_screens():
         )
     selected_display = selected_display if selected_display in MOMENTUM_V2_DISPLAY_LABELS else "C"
     selected_screen = selected_screen if selected_screen in MOMENTUM_V2_SCREEN_LABELS else "overview"
+    heatmap_sort_field = st.session_state.get("momentum_v2_heatmap_sort_field", "s_score")
+    heatmap_sort_direction = st.session_state.get("momentum_v2_heatmap_sort_direction", "desc")
+    if selected_display == "A" and selected_screen == "overview":
+        sort_col, direction_col = st.columns([1.1, 1])
+        with sort_col:
+            heatmap_sort_field = st.selectbox(
+                "Heatmap sort column",
+                options=list(MOMENTUM_V2_A_SORT_FIELDS.keys()),
+                format_func=lambda key: MOMENTUM_V2_A_SORT_FIELDS[key],
+                key="momentum_v2_heatmap_sort_field",
+            )
+        with direction_col:
+            heatmap_sort_direction = st.segmented_control(
+                "Heatmap sort direction",
+                options=list(MOMENTUM_V2_A_SORT_DIRECTIONS.keys()),
+                format_func=lambda key: MOMENTUM_V2_A_SORT_DIRECTIONS[key],
+                key="momentum_v2_heatmap_sort_direction",
+            )
+    heatmap_sort_field = heatmap_sort_field if heatmap_sort_field in MOMENTUM_V2_A_SORT_FIELDS else "s_score"
+    heatmap_sort_direction = heatmap_sort_direction if heatmap_sort_direction in MOMENTUM_V2_A_SORT_DIRECTIONS else "desc"
     try:
         created = pd.Timestamp.fromtimestamp(float(dashboard_compute_created_at))
         as_of = created.strftime("%Y-%m-%d %H:%M")
@@ -2257,6 +2279,8 @@ def render_momentum_v2_screens():
         screen=selected_screen,
         focus_ticker=None,
         data_provenance=_momentum_v2_data_provenance(as_of),
+        display_a_sort_field=heatmap_sort_field,
+        display_a_sort_direction=heatmap_sort_direction,
     ))
 
 

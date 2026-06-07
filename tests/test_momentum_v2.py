@@ -3,6 +3,8 @@ from __future__ import annotations
 import pytest
 
 from src.momentum_v2 import (
+    DISPLAY_A_SORT_DIRECTIONS,
+    DISPLAY_A_SORT_FIELDS,
     DISPLAY_LABELS,
     PILLAR_ORDER,
     SCREEN_LABELS,
@@ -15,6 +17,7 @@ from src.momentum_v2 import (
     contribution_sum,
     css,
     render_display,
+    sort_display_a_rows,
 )
 from src.scoring import compute_composite
 
@@ -118,6 +121,31 @@ def test_display_a_overview_matches_terminal_handoff_structure():
     assert "Open XLK drill-down for Technology sector" in html
     assert "Technology sector" in html
     assert "Energy sector" in html
+
+
+def test_display_a_heatmap_supports_sorting_by_visible_headers():
+    rows = build_view_rows(_sample_scored(), phase="MID")
+
+    assert {"ticker", "identity", "state", "pillar_sum", "s_score", "f_score", "momentum_pct", "trend_90d"} == set(
+        DISPLAY_A_SORT_FIELDS
+    )
+    assert DISPLAY_A_SORT_DIRECTIONS == {"desc": "High to low", "asc": "Low to high"}
+    assert [row.ticker for row in sort_display_a_rows(rows, "ticker", "asc")] == ["XLE", "XLF", "XLK"]
+    assert [row.ticker for row in sort_display_a_rows(rows, "f_score", "desc")] == ["XLK", "XLF", "XLE"]
+    assert [row.ticker for row in sort_display_a_rows(rows, "momentum_pct", "asc")] == ["XLE", "XLF", "XLK"]
+
+    html = render_display(
+        "A",
+        rows,
+        "2026-06-06 16:00 ET",
+        display_a_sort_field="f_score",
+        display_a_sort_direction="asc",
+    )
+
+    assert "sorted by F within class | Low to high" in html
+    assert 'class="mv2-a-sort active num"' in html
+    assert 'data-mv2-sort="f_score"' in html
+    assert "?mv2_sort=ticker&mv2_dir=desc" in html
 
 
 def test_display_a_deepdive_matches_terminal_handoff_structure_for_focus_ticker():
