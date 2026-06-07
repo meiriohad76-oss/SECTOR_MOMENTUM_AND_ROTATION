@@ -30,6 +30,10 @@ def test_fred_series_cover_expanded_macro_context():
     assert context_series.issubset(fred_data.FRED_SERIES)
 
 
+def test_fred_data_uses_shared_system_trust_store():
+    assert fred_data.ensure_system_trust_store() is True
+
+
 def test_fetch_fred_uses_injected_client_and_skips_bad_series(monkeypatch):
     calls = []
 

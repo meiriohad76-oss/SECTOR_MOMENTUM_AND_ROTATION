@@ -25,6 +25,10 @@ from typing import Callable, Optional
 
 import pandas as pd
 
+from .tls import ensure_system_trust_store
+
+ensure_system_trust_store()
+
 
 FRED_SERIES = {
     "T10Y2Y": "Yield curve 10Y - 2Y",
