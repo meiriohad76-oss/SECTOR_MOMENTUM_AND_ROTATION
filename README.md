@@ -247,10 +247,10 @@ python scripts/rendered_dashboard_smoke.py --url http://127.0.0.1:8501/?ticker=X
 ```
 
 This verifies that the browser-rendered page contains core dashboard sections
-such as `SENTIMENT BOARD`, `BLUF`, and `Data and dashboard health`. It is
-separate from the mandatory Pi deploy gate until Playwright/browser availability
-on the Pi is proven stable; use `--allow-unavailable` for non-blocking
-observability runs.
+such as `SENTIMENT BOARD`, `BLUF`, and `Data and dashboard health`. The Pi deploy
+installs Playwright Chromium and runs this smoke after the dashboard restart as a
+mandatory rendered-DOM gate. Use `--allow-unavailable` only for non-blocking
+ad hoc observability runs.
 
 For the protected Pi route, authenticate through Cloudflare Access first, then run the
 same capture against the public dashboard URL:
@@ -367,7 +367,7 @@ URLs, or raw provider payloads.
 Provider-flow responses are cached in `data/provider_flow_cache/provider_flow_cache.sqlite` so dashboard reruns can reuse fresh Massive/FINRA payloads and degrade to warning-only stale fallback during provider outages.
 The Pi deploy installs `sector-provider-flow-cache.timer`, a non-sudo user timer that warms the cached Massive/FINRA provider-flow lanes for the scored dashboard universe before the US open and after the close.
 The Pi deploy also installs `sector-dashboard-state-refresh.timer`, which runs the methodology headlessly after cache warmup so `data/state.json`, `data/state_transitions.jsonl`, and `data/run_journal/runs.sqlite` stay fresh even when no browser session is open.
-`sector-rendered-dashboard-smoke.timer` is optional browser observability: every 30 minutes it attempts a rendered Playwright smoke against `http://127.0.0.1:8501/?ticker=XLK` and writes `data/rendered_dashboard_smoke/latest.json`. Browser setup failures are warning-only until the Pi browser stack is proven stable.
+`sector-rendered-dashboard-smoke.timer` adds continuous browser observability: every 30 minutes it attempts a rendered Playwright smoke against `http://127.0.0.1:8501/?ticker=XLK` and writes `data/rendered_dashboard_smoke/latest.json`. The deploy also runs the same smoke after restart as a mandatory rendered-DOM gate.
 Use `./.venv/bin/python scripts/check_ops_readiness.py --strict-production` for the deploy-grade readiness gate. It fails only critical production lanes; optional secret-backed channels such as Telegram, email, push, Discord, and broker execution remain reported but non-blocking.
 
 ## State transition alerts

@@ -111,10 +111,12 @@ def test_rendered_smoke_writes_timestamped_json_result(monkeypatch, tmp_path, ca
     assert payload["state"] == "playwright_missing"
 
 
-def test_rendered_smoke_script_is_not_core_deploy_gate_yet():
+def test_rendered_smoke_script_is_post_restart_deploy_gate():
     workflow = (ROOT / ".github" / "workflows" / "deploy-pi.yml").read_text(encoding="utf-8")
 
-    assert "scripts/rendered_dashboard_smoke.py" not in workflow
+    assert "scripts/rendered_dashboard_smoke.py" in workflow
+    assert workflow.index("scripts/restart_sector_dashboard.py") < workflow.index("scripts/rendered_dashboard_smoke.py")
+    assert "--output-json \"$PI_REPO_PATH/data/rendered_dashboard_smoke/latest.json\"" in workflow
 
 
 def test_readme_documents_rendered_dashboard_smoke_commands():

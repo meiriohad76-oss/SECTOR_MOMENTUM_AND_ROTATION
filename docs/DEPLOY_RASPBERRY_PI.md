@@ -303,12 +303,11 @@ installed, enabled, and active:
 ./.venv/bin/python scripts/check_ops_readiness.py
 ```
 
-## Optional rendered dashboard smoke
+## Rendered dashboard smoke
 
-The deploy can also install a non-sudo browser observability timer. It does not
-replace the strict production readiness gate; it records whether the Streamlit
-page actually rendered the key dashboard labels when Playwright/browser support
-is available on the Pi.
+The deploy installs Playwright Chromium and runs a post-restart rendered smoke
+as a mandatory DOM gate. A non-sudo user timer keeps the same check running as
+continuous browser observability between deploys.
 
 ```bash
 mkdir -p ~/.config/systemd/user
@@ -322,8 +321,9 @@ cat data/rendered_dashboard_smoke/latest.json
 
 The timer runs every 30 minutes and writes
 `data/rendered_dashboard_smoke/latest.json`. `scripts/check_ops_readiness.py`
-reports this artifact and timer state as optional observability; Playwright or
-browser setup failures are warning-only until browser QA is stable on the Pi.
+reports this artifact and timer state. During deploy, `rendered_dashboard_smoke.py`
+runs without `--allow-unavailable`, so browser setup or rendered-content failures
+stop the deployment instead of being hidden behind the HTTP shell smoke.
 
 ## Resource notes
 
