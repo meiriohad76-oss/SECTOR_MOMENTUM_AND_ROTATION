@@ -38,6 +38,9 @@ def test_bluf_action_list_scrolls_instead_of_hiding_extra_tickers():
     assert "max-height: 260px;" in css
     assert "overflow-y: auto !important;" in css
     assert "contain: layout paint;" in css
+    assert "grid-template-columns: minmax(112px, 0.8fr) minmax(0, 1.2fr);" in css
+    assert ".action-list .t small {\n  color: var(--ticker-label);\n  white-space: nowrap;" in css
+    assert "text-overflow: ellipsis;" in css
 
 
 def test_tooltip_overflow_reset_does_not_disable_bluf_action_scroll():

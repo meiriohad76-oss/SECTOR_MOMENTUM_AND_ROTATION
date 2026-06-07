@@ -573,11 +573,12 @@ div[data-testid="stTextArea"] label span {
 }
 .action-list li {
   display: grid;
-  grid-template-columns: 56px 1fr;
-  gap: 12px;
+  grid-template-columns: minmax(112px, 0.8fr) minmax(0, 1.2fr);
+  gap: 14px;
   align-items: start;
   padding: 6px 0;
   border-top: 1px dashed var(--border);
+  min-width: 0;
 }
 .action-list li:first-child { border-top: 0; padding-top: 2px; }
 .action-list .t {
@@ -592,6 +593,7 @@ div[data-testid="stTextArea"] label span {
   font-size: 0.74rem;
   color: var(--muted);
   line-height: 1.4;
+  min-width: 0;
 }
 /* ---------- Status row ---------- */
 .status-row {
@@ -858,6 +860,16 @@ div[data-testid="stTextArea"] label span {
   color: var(--fg-dim);
   text-transform: none;
   white-space: normal;
+}
+.action-list .t,
+.action-list .t small {
+  min-width: 0;
+}
+.action-list .t small {
+  color: var(--ticker-label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .transition-badge {
   display: inline-flex;
