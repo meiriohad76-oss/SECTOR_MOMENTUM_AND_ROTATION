@@ -74,6 +74,8 @@ jobs:
             --url "http://127.0.0.1:8501/?ticker=XLK" \
             --timeout-ms 120000 \
             --output-json "$PI_REPO_PATH/data/rendered_dashboard_smoke/latest.json"
+          systemctl --user reset-failed sector-rendered-dashboard-smoke.service || true
+          systemctl --user start sector-rendered-dashboard-smoke.service
 
           ./.venv/bin/python scripts/check_ops_readiness.py --strict-production --require-rendered-smoke
 

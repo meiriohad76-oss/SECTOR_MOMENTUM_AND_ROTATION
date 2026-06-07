@@ -41,6 +41,8 @@ def test_pi_deploy_workflow_fast_forwards_tests_and_smokes_service():
     assert "./.venv/bin/python scripts/rendered_dashboard_smoke.py" in text
     assert "--timeout-ms 120000" in text
     assert "--output-json \"$PI_REPO_PATH/data/rendered_dashboard_smoke/latest.json\"" in text
+    assert "systemctl --user reset-failed sector-rendered-dashboard-smoke.service || true" in text
+    assert "systemctl --user start sector-rendered-dashboard-smoke.service" in text
     assert "./.venv/bin/python scripts/smoke_deploy_gate.py" in text
     assert "--service \"$PI_SERVICE_NAME\"" in text
     assert "http://127.0.0.1:8501/?ticker=XLK" in text
@@ -75,6 +77,7 @@ def test_github_actions_pi_deploy_docs_reference_required_secrets():
     assert "scripts/check_ops_readiness.py --strict-production" in text
     assert "scripts/check_ops_readiness.py --strict-production --require-rendered-smoke" in text
     assert "scripts/rendered_dashboard_smoke.py --url" in text
+    assert "systemctl --user start sector-rendered-dashboard-smoke.service" in text
     assert "data/rendered_dashboard_smoke/latest.json" in text
 
 

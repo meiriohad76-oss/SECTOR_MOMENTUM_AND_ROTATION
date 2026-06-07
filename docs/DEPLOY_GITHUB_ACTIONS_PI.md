@@ -43,6 +43,8 @@ git pull --ff-only origin backlog-stepwise-qa
 ./.venv/bin/python scripts/check_ops_readiness.py --strict-production
 ./.venv/bin/python scripts/restart_sector_dashboard.py --service "$PI_SERVICE_NAME" --url "http://127.0.0.1:8501/?ticker=XLK" --timeout-seconds 60
 ./.venv/bin/python scripts/rendered_dashboard_smoke.py --url "http://127.0.0.1:8501/?ticker=XLK" --timeout-ms 120000 --output-json "$PI_REPO_PATH/data/rendered_dashboard_smoke/latest.json"
+systemctl --user reset-failed sector-rendered-dashboard-smoke.service || true
+systemctl --user start sector-rendered-dashboard-smoke.service
 ./.venv/bin/python scripts/check_ops_readiness.py --strict-production --require-rendered-smoke
 ./.venv/bin/python scripts/smoke_deploy_gate.py \
   --local-dashboard-url "http://127.0.0.1:8501/?ticker=XLK" \
@@ -54,7 +56,7 @@ git pull --ff-only origin backlog-stepwise-qa
 ```
 
 If tests pass, it enforces `MASSIVE_VERIFY_SSL = "true"` and enables the cached Massive/FINRA provider-flow lanes in the Pi-local Streamlit secrets file without printing or changing API keys, installs/refreshes the non-sudo user timers for transition-feed exports, Massive provider snapshot capture, provider-flow cache warming, and headless state refresh, runs a narrow secret-safe Massive/FINRA provider-flow smoke for `SPY`, warms the US-sector provider-flow cache, refreshes the dashboard state/run journal headlessly, runs strict secret-safe ops-readiness gates, terminates the current Streamlit service `MainPID` so systemd restarts the dashboard, then polls `http://127.0.0.1:8501/?ticker=XLK` until the service is active and HTTP returns `200`.
-After restart, it runs a mandatory rendered Playwright smoke against the local Streamlit URL and records `data/rendered_dashboard_smoke/latest.json`; a second strict readiness pass requires that fresh browser evidence before the final public/Cloudflare deploy smoke.
+After restart, it runs a mandatory rendered Playwright smoke against the local Streamlit URL and records `data/rendered_dashboard_smoke/latest.json`. It then starts the installed `sector-rendered-dashboard-smoke.service` once, proving the scheduled user-service command itself works and refreshing its `last_service_state`; a second strict readiness pass requires the fresh browser evidence before the final public/Cloudflare deploy smoke.
 
 ## Pi Requirements
 
