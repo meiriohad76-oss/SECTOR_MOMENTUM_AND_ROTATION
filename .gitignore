@@ -36,6 +36,9 @@ data/.state.json.tmp
 *.log
 .cache/
 .browser-qa-cloudflare/
+.browser-qa-cloudflare-cdp/
+momentum v2/
+momentum v2.zip
 
 # --- OS junk ---
 *.tmp
