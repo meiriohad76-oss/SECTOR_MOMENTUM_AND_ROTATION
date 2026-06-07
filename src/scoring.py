@@ -277,6 +277,18 @@ def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _parse_state_updated(value: object) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 def _transition_date(now: datetime | None = None) -> str:
     current = now or _now_utc()
     if current.tzinfo is None:
@@ -479,10 +491,25 @@ def state_storage_health() -> dict[str, object]:
             _ensure_transition_journal_file()
         journal_rows = _read_transition_journal()
         latest_transition = journal_rows[-1] if journal_rows else (snapshot_transitions[-1] if snapshot_transitions else {})
+        state_updated = payload.get("updated", "")
+        parsed_state_updated = _parse_state_updated(state_updated)
+        state_updated_age_seconds = (
+            int((_now_utc() - parsed_state_updated).total_seconds())
+            if parsed_state_updated is not None
+            else None
+        )
+        if not state_updated:
+            freshness_state = "missing"
+        elif state_updated_age_seconds is not None and state_updated_age_seconds > 84 * 60 * 60:
+            freshness_state = "stale"
+        else:
+            freshness_state = "fresh"
         return {
             "state_file": str(STATE_FILE),
             "state_file_exists": STATE_FILE.exists(),
-            "state_updated": payload.get("updated", ""),
+            "state_updated": state_updated,
+            "state_updated_age_seconds": state_updated_age_seconds,
+            "freshness_state": freshness_state,
             "by_ticker_count": len(payload.get("by_ticker", {}) or {}),
             "snapshot_transition_count": len(snapshot_transitions),
             "transition_journal": str(_transition_journal_path()),

@@ -38,10 +38,11 @@ git pull --ff-only origin backlog-stepwise-qa
 ./.venv/bin/python scripts/install_user_timers.py --repo-root "$PI_REPO_PATH"
 ./.venv/bin/python scripts/smoke_provider_flow_lanes.py --ticker SPY --limit 25 --timeout 20 --require-massive
 ./.venv/bin/python scripts/warm_provider_flow_cache.py --universe us-sectors --timeout 20
+./.venv/bin/python scripts/refresh_dashboard_state.py --period 3y --provider-flow-mode cache-only
 ./.venv/bin/python scripts/check_ops_readiness.py
 ```
 
-If tests pass, it enforces `MASSIVE_VERIFY_SSL = "true"` and enables the cached Massive/FINRA provider-flow lanes in the Pi-local Streamlit secrets file without printing or changing API keys, installs/refreshes the non-sudo user timers for transition-feed exports, Massive provider snapshot capture, and provider-flow cache warming, runs a narrow secret-safe Massive/FINRA provider-flow smoke for `SPY`, warms the US-sector provider-flow cache, prints the secret-safe ops-readiness JSON, terminates the current Streamlit service `MainPID` so systemd restarts the dashboard, then polls `http://127.0.0.1:8501/?ticker=XLK` until the service is active and HTTP returns `200`.
+If tests pass, it enforces `MASSIVE_VERIFY_SSL = "true"` and enables the cached Massive/FINRA provider-flow lanes in the Pi-local Streamlit secrets file without printing or changing API keys, installs/refreshes the non-sudo user timers for transition-feed exports, Massive provider snapshot capture, provider-flow cache warming, and headless state refresh, runs a narrow secret-safe Massive/FINRA provider-flow smoke for `SPY`, warms the US-sector provider-flow cache, refreshes the dashboard state/run journal headlessly, prints the secret-safe ops-readiness JSON, terminates the current Streamlit service `MainPID` so systemd restarts the dashboard, then polls `http://127.0.0.1:8501/?ticker=XLK` until the service is active and HTTP returns `200`.
 
 ## Pi Requirements
 

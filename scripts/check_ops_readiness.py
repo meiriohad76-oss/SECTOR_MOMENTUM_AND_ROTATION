@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import importlib.util
 import json
 from pathlib import Path
@@ -74,6 +75,18 @@ def _file_status(path: Path) -> dict[str, object]:
     }
 
 
+def _parse_utc_timestamp(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 def _json_state_status(path: Path, journal_path: Path) -> dict[str, object]:
     by_ticker_count = 0
     snapshot_transition_count = 0
@@ -96,12 +109,26 @@ def _json_state_status(path: Path, journal_path: Path) -> dict[str, object]:
         except OSError:
             journal_transition_count = 0
 
+    parsed_state_updated = _parse_utc_timestamp(state_updated)
+    state_updated_age_seconds = None
+    if parsed_state_updated is not None:
+        state_updated_age_seconds = int((datetime.now(timezone.utc) - parsed_state_updated).total_seconds())
+
+    if not state_updated:
+        freshness_state = "missing"
+    elif state_updated_age_seconds is not None and state_updated_age_seconds > 84 * 60 * 60:
+        freshness_state = "stale"
+    else:
+        freshness_state = "fresh"
+
     state_file = _file_status(path)
     transition_journal = _file_status(journal_path)
     return {
         "state_file": state_file,
         "transition_journal": transition_journal,
         "state_updated": state_updated,
+        "state_updated_age_seconds": state_updated_age_seconds,
+        "freshness_state": freshness_state,
         "by_ticker_count": by_ticker_count,
         "snapshot_transition_count": snapshot_transition_count,
         "journal_transition_count": journal_transition_count,
@@ -244,7 +271,14 @@ def main(argv: list[str] | None = None) -> int:
             "ohlcv_provider": _ohlcv_provider_status(),
             "fred": {"api_key": _label(resolve_config_value("FRED_API_KEY"))},
             "provider_flow": _provider_flow_status(),
-            "state_persistence": _json_state_status(Path(args.state_file), Path(args.state_transition_journal)),
+            "state_persistence": {
+                **_json_state_status(Path(args.state_file), Path(args.state_transition_journal)),
+                "refresh_timer": _user_timer_status(
+                    user_systemd_dir,
+                    service="sector-dashboard-state-refresh.service",
+                    timer="sector-dashboard-state-refresh.timer",
+                ),
+            },
             "run_journal": {
                 **_file_status(run_journal_path),
                 "runs": run_count,

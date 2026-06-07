@@ -16,6 +16,7 @@ DEFAULT_TIMERS = (
     "sector-transition-feeds.timer",
     "sector-massive-provider-snapshots.timer",
     "sector-provider-flow-cache.timer",
+    "sector-dashboard-state-refresh.timer",
 )
 
 

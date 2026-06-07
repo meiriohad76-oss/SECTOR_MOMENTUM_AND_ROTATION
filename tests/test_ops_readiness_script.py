@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 import sqlite3
 
@@ -38,10 +39,11 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     user_systemd_dir = tmp_path / ".config" / "systemd" / "user"
 
     state_file.parent.mkdir(parents=True, exist_ok=True)
+    state_updated = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     state_file.write_text(
         json.dumps(
             {
-                "updated": "2026-05-27T12:00:00Z",
+                "updated": state_updated,
                 "by_ticker": {"XLK": {"state": "STAGE_2_BULLISH"}},
                 "transitions": [{"ticker": "XLK", "from": "HOLD", "to": "STAGE_2_BULLISH"}],
             }
@@ -95,6 +97,8 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     (user_systemd_dir / "sector-massive-provider-snapshots.timer").write_text("[Timer]\n", encoding="utf-8")
     (user_systemd_dir / "sector-provider-flow-cache.service").write_text("[Service]\n", encoding="utf-8")
     (user_systemd_dir / "sector-provider-flow-cache.timer").write_text("[Timer]\n", encoding="utf-8")
+    (user_systemd_dir / "sector-dashboard-state-refresh.service").write_text("[Service]\n", encoding="utf-8")
+    (user_systemd_dir / "sector-dashboard-state-refresh.timer").write_text("[Timer]\n", encoding="utf-8")
 
     def fake_config(name: str) -> str | None:
         values = {
@@ -137,6 +141,10 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
             ("is-active", "sector-provider-flow-cache.timer"): "active",
             ("show", "sector-provider-flow-cache.service", "-p", "Result", "--value"): "success",
             ("show", "sector-provider-flow-cache.service", "-p", "ExecMainStatus", "--value"): "0",
+            ("is-enabled", "sector-dashboard-state-refresh.timer"): "enabled",
+            ("is-active", "sector-dashboard-state-refresh.timer"): "active",
+            ("show", "sector-dashboard-state-refresh.service", "-p", "Result", "--value"): "success",
+            ("show", "sector-dashboard-state-refresh.service", "-p", "ExecMainStatus", "--value"): "0",
         }.get(tuple(args)),
     )
 
@@ -179,6 +187,11 @@ def test_ops_readiness_reports_all_pending_integration_tickets_without_secret_va
     assert payload["production"]["provider_flow"]["sec_13f"]["state"] == "live_configured"
     assert payload["production"]["state_persistence"]["by_ticker_count"] == 1
     assert payload["production"]["state_persistence"]["journal_transition_count"] == 1
+    assert payload["production"]["state_persistence"]["freshness_state"] == "fresh"
+    assert payload["production"]["state_persistence"]["state_updated_age_seconds"] is not None
+    assert payload["production"]["state_persistence"]["refresh_timer"]["state"] == "ready"
+    assert payload["production"]["state_persistence"]["refresh_timer"]["timer_enabled"] == "enabled"
+    assert payload["production"]["state_persistence"]["refresh_timer"]["timer_active"] == "active"
     assert payload["production"]["run_journal"]["runs"] == 1
     assert payload["production"]["provider_snapshots"]["snapshots"] == 1
     assert payload["production"]["provider_snapshots"]["capture_timer"]["state"] == "ready"

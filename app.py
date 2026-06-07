@@ -1877,7 +1877,19 @@ def render_data_health():
         fred_configured=fred_available(),
     )
     storage = state_storage_health()
-    storage_status = "healthy" if storage.get("state_file_exists") and storage.get("transition_journal_exists") else "warning"
+    storage_freshness = str(storage.get("freshness_state") or "missing")
+    storage_status = (
+        "healthy"
+        if storage.get("state_file_exists")
+        and storage.get("transition_journal_exists")
+        and storage_freshness != "stale"
+        else "warning"
+    )
+    state_age_seconds = storage.get("state_updated_age_seconds")
+    if isinstance(state_age_seconds, int):
+        state_age_text = f"age {state_age_seconds // 3600}h"
+    else:
+        state_age_text = "age unknown"
     rows.append(
         {
             "source": "Persisted state and transitions",
@@ -1886,7 +1898,8 @@ def render_data_health():
             "latest": str(storage.get("state_updated") or "-"),
             "freshness": (
                 f"{storage.get('by_ticker_count', 0)} states; "
-                f"{storage.get('journal_transition_count', 0)} journaled transitions"
+                f"{storage.get('journal_transition_count', 0)} journaled transitions; "
+                f"{storage_freshness} ({state_age_text})"
             ),
             "coverage": f"latest transition {storage.get('latest_transition_date') or 'none'}",
             "detail": (

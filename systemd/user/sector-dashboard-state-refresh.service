@@ -1,0 +1,19 @@
+# Sector Rotation Dashboard State Refresh - user systemd one-shot unit
+#
+# Install without sudo:
+#   mkdir -p ~/.config/systemd/user
+#   cp systemd/user/sector-dashboard-state-refresh.service ~/.config/systemd/user/
+#   cp systemd/user/sector-dashboard-state-refresh.timer ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now sector-dashboard-state-refresh.timer
+
+[Unit]
+Description=Sector Rotation Headless Dashboard State Refresh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/SECTOR_MOMENTUM_AND_ROTATION
+Environment=PYTHONUNBUFFERED=1
+ExecStart=%h/SECTOR_MOMENTUM_AND_ROTATION/.venv/bin/python scripts/refresh_dashboard_state.py --period 3y --provider-flow-mode cache-only

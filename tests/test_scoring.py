@@ -345,6 +345,8 @@ def test_state_storage_health_reports_paths_and_counts(tmp_path, monkeypatch):
     monkeypatch.setattr(scoring, "STATE_FILE", state_file)
     monkeypatch.setattr(scoring, "STATE_TRANSITION_JOURNAL", None)
     monkeypatch.setattr(scoring, "_send_transition_alerts", lambda transitions: None)
+    now = scoring.datetime.fromisoformat("2026-05-18T02:00:00+00:00")
+    monkeypatch.setattr(scoring, "_now_utc", lambda: now)
     state_file.write_text(
         json.dumps(
             {
@@ -365,6 +367,8 @@ def test_state_storage_health_reports_paths_and_counts(tmp_path, monkeypatch):
     assert health["by_ticker_count"] == 1
     assert health["journal_transition_count"] == 1
     assert health["latest_transition_date"] == "2026-05-18"
+    assert health["state_updated_age_seconds"] == 7200
+    assert health["freshness_state"] == "fresh"
 
 
 def test_state_storage_health_initializes_empty_journal_for_existing_snapshot(tmp_path, monkeypatch):
