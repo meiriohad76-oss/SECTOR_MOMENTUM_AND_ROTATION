@@ -58,6 +58,7 @@ jobs:
           ./.venv/bin/python -m pytest -q
           ./.venv/bin/python scripts/enforce_safe_config.py --secrets-path "$PI_REPO_PATH/.streamlit/secrets.toml"
           ./.venv/bin/python scripts/install_user_timers.py --repo-root "$PI_REPO_PATH"
+          ./.venv/bin/python scripts/smoke_provider_flow_lanes.py --ticker SPY --limit 25 --timeout 20 --require-massive
           ./.venv/bin/python scripts/check_ops_readiness.py
 
           # Helper prints restart_result=healthy after the fresh process serves HTTP 200.

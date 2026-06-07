@@ -30,6 +30,7 @@ def test_pi_deploy_workflow_fast_forwards_tests_and_smokes_service():
     assert "./.venv/bin/python -m pytest -q" in text
     assert "./.venv/bin/python scripts/enforce_safe_config.py --secrets-path \"$PI_REPO_PATH/.streamlit/secrets.toml\"" in text
     assert "./.venv/bin/python scripts/install_user_timers.py --repo-root \"$PI_REPO_PATH\"" in text
+    assert "./.venv/bin/python scripts/smoke_provider_flow_lanes.py --ticker SPY --limit 25 --timeout 20 --require-massive" in text
     assert "./.venv/bin/python scripts/check_ops_readiness.py" in text
     assert "./.venv/bin/python scripts/restart_sector_dashboard.py" in text
     assert "./.venv/bin/python scripts/smoke_deploy_gate.py" in text
@@ -50,6 +51,7 @@ def test_github_actions_pi_deploy_docs_reference_required_secrets():
     assert "sector-pi" in text
     assert "scripts/enforce_safe_config.py --secrets-path \"$PI_REPO_PATH/.streamlit/secrets.toml\"" in text
     assert "scripts/install_user_timers.py --repo-root \"$PI_REPO_PATH\"" in text
+    assert "scripts/smoke_provider_flow_lanes.py --ticker SPY --limit 25 --timeout 20 --require-massive" in text
     assert "scripts/check_ops_readiness.py" in text
 
 
