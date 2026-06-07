@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.live_smoke import classify_protected_dashboard_response
+from src.live_smoke import classify_local_dashboard_response, classify_protected_dashboard_response
 
 
 def test_classifies_cloudflare_access_challenge_as_healthy_protected_route():
@@ -51,8 +51,6 @@ def test_rejects_ambiguous_public_200_without_dashboard_or_access_markers():
 
 
 def test_classifies_local_streamlit_shell_as_healthy_smoke():
-    from src.live_smoke import classify_local_dashboard_response
-
     result = classify_local_dashboard_response(
         status_code=200,
         text="<html><head><title>Streamlit</title></head><script src='./static/js/index.js'></script></html>",
@@ -60,6 +58,29 @@ def test_classifies_local_streamlit_shell_as_healthy_smoke():
 
     assert result.ok is True
     assert result.state == "streamlit_shell"
+
+
+def test_strict_local_dashboard_smoke_rejects_streamlit_shell_without_dashboard_markers():
+    result = classify_local_dashboard_response(
+        status_code=200,
+        text="<html><head><title>Streamlit</title></head><script src='./static/js/index.js'></script></html>",
+        require_dashboard_markers=True,
+    )
+
+    assert result.ok is False
+    assert result.state == "missing_dashboard_markers"
+    assert "sentiment board" in result.detail
+
+
+def test_strict_local_dashboard_smoke_requires_all_core_markers():
+    result = classify_local_dashboard_response(
+        status_code=200,
+        text="<html><body>SENTIMENT BOARD BLUF Data and dashboard health</body></html>",
+        require_dashboard_markers=True,
+    )
+
+    assert result.ok is True
+    assert result.state == "dashboard_content"
 
 
 def test_rejects_upstream_cloudflare_errors():

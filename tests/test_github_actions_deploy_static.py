@@ -39,6 +39,9 @@ def test_pi_deploy_workflow_fast_forwards_tests_and_smokes_service():
     assert "--service \"$PI_SERVICE_NAME\"" in text
     assert "http://127.0.0.1:8501/?ticker=XLK" in text
     assert "https://sentimentdashboard.ahaddashboards.uk/?ticker=XLK" in text
+    assert "--state-file \"$PI_REPO_PATH/data/state.json\"" in text
+    assert "--min-state-tickers 80" in text
+    assert "--max-state-age-seconds 300" in text
     assert "--expect-cloudflare-access" in text
     assert "restart_result=healthy" in text
 

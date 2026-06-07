@@ -72,7 +72,12 @@ def classify_protected_dashboard_response(
     return ProtectedRouteSmoke(False, "unexpected_response", f"HTTP {status_code}")
 
 
-def classify_local_dashboard_response(*, status_code: int, text: str = "") -> LocalDashboardSmoke:
+def classify_local_dashboard_response(
+    *,
+    status_code: int,
+    text: str = "",
+    require_dashboard_markers: bool = False,
+) -> LocalDashboardSmoke:
     """Classify whether a local dashboard URL served the Streamlit app content."""
 
     body = (text or "")[:20_000].casefold()
@@ -80,13 +85,19 @@ def classify_local_dashboard_response(*, status_code: int, text: str = "") -> Lo
         return LocalDashboardSmoke(False, "bad_http_status", f"HTTP {status_code}")
     if "traceback" in body or "uncaught exception" in body or "uncaughtexception" in body:
         return LocalDashboardSmoke(False, "streamlit_error_page", "Streamlit error marker present")
-    markers = (
-        "sentiment board" in body,
-        "data and dashboard health" in body,
-        "bluf" in body,
+    required_markers = (
+        "sentiment board",
+        "data and dashboard health",
+        "bluf",
     )
-    if sum(1 for marker in markers if marker) >= 2:
+    present_markers = [marker for marker in required_markers if marker in body]
+    if len(present_markers) == len(required_markers):
         return LocalDashboardSmoke(True, "dashboard_content", "dashboard markers present")
+    if require_dashboard_markers:
+        missing = [marker for marker in required_markers if marker not in present_markers]
+        return LocalDashboardSmoke(False, "missing_dashboard_markers", f"missing: {', '.join(missing)}")
+    if len(present_markers) >= 2:
+        return LocalDashboardSmoke(True, "dashboard_content_partial", "partial dashboard markers present")
     if "<title>streamlit</title>" in body and "static/js/" in body:
         return LocalDashboardSmoke(True, "streamlit_shell", "Streamlit shell served")
     return LocalDashboardSmoke(False, "wrong_content", "missing dashboard markers")

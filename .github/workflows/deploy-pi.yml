@@ -71,6 +71,9 @@ jobs:
 
           ./.venv/bin/python scripts/smoke_deploy_gate.py \
             --local-dashboard-url "http://127.0.0.1:8501/?ticker=XLK" \
+            --state-file "$PI_REPO_PATH/data/state.json" \
+            --min-state-tickers 80 \
+            --max-state-age-seconds 300 \
             --public-dashboard-url "https://sentimentdashboard.ahaddashboards.uk/?ticker=XLK" \
             --expect-cloudflare-access
           REMOTE
