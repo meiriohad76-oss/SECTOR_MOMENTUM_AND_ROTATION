@@ -2479,8 +2479,9 @@ def render_alerts():
         ticker_name = _ticker_identity_subtext(ticker)
         pulse_class = transition_row_pulse_class(r)
         sentiment_class, sentiment_label, sentiment_symbol = _transition_sentiment(r)
+        drill_href = f"?ticker={_esc(ticker)}#drill"
         rows += f"""
-        <div class="alert-row {new_state} {pulse_class}" {drill_bridge_attrs(ticker, label=new_state)}>
+        <a class="alert-row {new_state} {pulse_class}" href="{drill_href}" {drill_bridge_attrs(ticker, label=new_state)}>
           <span class="dot" style="background:{dot_color}"></span>
           <span class="t">{_esc(ticker)}<small>{_esc(ticker_name)}</small></span>
           <span class="transition-badge {sentiment_class}"><span>{sentiment_symbol}</span>{sentiment_label}</span>
@@ -2491,7 +2492,7 @@ def render_alerts():
           </span>
           <span class="when">{when}</span>
           <span class="chev">></span>
-        </div>
+        </a>
         """
     if not rows:
         storage = state_storage_health()

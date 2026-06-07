@@ -23,7 +23,7 @@ def test_mobile_responsive_css_covers_phone_layouts():
     assert ".header {" in css_source
     assert ".header .meta {" in css_source
     assert ".section-head {" in css_source
-    assert "grid-template-columns: 16px minmax(52px, 64px) minmax(72px, 92px) 1fr;" in css_source
+    assert "grid-template-columns: 16px minmax(120px, 1fr) minmax(72px, 92px) minmax(0, 1fr);" in css_source
     assert ".alert-row .transition-badge {" in css_source
     assert ".alert-row .change { min-width: 0; overflow-wrap: anywhere; }" in css_source
     assert ".full-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }" in css_source

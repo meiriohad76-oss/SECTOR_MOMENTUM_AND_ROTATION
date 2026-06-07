@@ -73,7 +73,7 @@ def test_dashboard_review_css_uses_readable_contrast_and_type():
     assert "font-size: 16px;" in css
     assert ".section-head h2 {\n  margin: 0;\n  font-family: var(--font-mono);\n  font-size: 0.92rem;" in css
     assert ".tile-label {\n  font-family: var(--font-prose);\n  font-size: 0.82rem;" in css
-    assert ".alert-row {\n  display: grid;\n  grid-template-columns: 24px 86px 120px 1fr auto 30px;" in css
+    assert ".alert-row {\n  display: grid;\n  grid-template-columns: 24px minmax(154px, 210px) 120px minmax(0, 1fr) auto 30px;" in css
     assert ".pick-metrics {\n  display: grid;\n  grid-template-columns: 1fr 1fr;\n  gap: 8px 14px;\n  font-family: var(--font-mono);\n  font-size: 0.92rem;" in css
     assert 'div[data-testid="stButton"] > button' in css
     assert ".drill-selector-slot" in css

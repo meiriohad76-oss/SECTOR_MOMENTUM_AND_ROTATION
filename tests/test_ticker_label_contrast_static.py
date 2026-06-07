@@ -31,6 +31,8 @@ def test_dashboard_ticker_labels_use_high_contrast_token():
     ]
     for selector in expected_selectors:
         assert selector in css
+    assert ".alert-row .t small {\n  color: var(--ticker-label);\n  white-space: nowrap;" in css
+    assert "grid-template-columns: 24px minmax(154px, 210px) 120px minmax(0, 1fr) auto 30px;" in css
 
 
 def test_dark_rrg_ticker_text_uses_readable_foreground():

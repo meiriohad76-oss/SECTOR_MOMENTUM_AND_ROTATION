@@ -352,6 +352,7 @@ def test_fetch_ohlcv_result_uses_public_fred_for_macro_symbols_after_provider_mi
 
     monkeypatch.setattr(data, "_fetch_massive_ohlcv", fake_massive)
     monkeypatch.setattr(data, "_fetch_yfinance_ohlcv", fake_yfinance)
+    monkeypatch.setattr(data, "_fetch_configured_fred_macro_ohlcv", lambda tickers, period, interval: data._ProviderFetchResult({}))
     monkeypatch.setattr(
         data,
         "requests",
@@ -412,6 +413,7 @@ def test_fetch_ohlcv_result_reports_public_fred_macro_fallback_failure(monkeypat
 
     monkeypatch.setattr(data, "_fetch_massive_ohlcv", fake_massive)
     monkeypatch.setattr(data, "_fetch_yfinance_ohlcv", fake_yfinance)
+    monkeypatch.setattr(data, "_fetch_configured_fred_macro_ohlcv", lambda tickers, period, interval: data._ProviderFetchResult({}))
     monkeypatch.setattr(
         data,
         "requests",
