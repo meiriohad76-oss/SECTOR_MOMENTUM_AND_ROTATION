@@ -40,7 +40,7 @@ git pull --ff-only origin backlog-stepwise-qa
 ./.venv/bin/python scripts/check_ops_readiness.py
 ```
 
-If tests pass, it enforces `MASSIVE_VERIFY_SSL = "true"` in the Pi-local Streamlit secrets file without printing or changing API keys, installs/refreshes the non-sudo user timers for transition-feed exports and Massive provider snapshot capture, runs a narrow secret-safe Massive/FINRA provider-flow smoke for `SPY`, prints the secret-safe ops-readiness JSON, terminates the current Streamlit service `MainPID` so systemd restarts the dashboard, then polls `http://127.0.0.1:8501/?ticker=XLK` until the service is active and HTTP returns `200`.
+If tests pass, it enforces `MASSIVE_VERIFY_SSL = "true"` and enables the cached Massive/FINRA provider-flow lanes in the Pi-local Streamlit secrets file without printing or changing API keys, installs/refreshes the non-sudo user timers for transition-feed exports and Massive provider snapshot capture, runs a narrow secret-safe Massive/FINRA provider-flow smoke for `SPY`, prints the secret-safe ops-readiness JSON, terminates the current Streamlit service `MainPID` so systemd restarts the dashboard, then polls `http://127.0.0.1:8501/?ticker=XLK` until the service is active and HTTP returns `200`.
 
 ## Pi Requirements
 

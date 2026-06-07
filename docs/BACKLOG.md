@@ -41,7 +41,7 @@ Status legend:
 **Files:** `src/flow.py`, `tests/test_flow.py`, `.streamlit/secrets.toml.example`, `README.md`.
 **Evidence:** `docs/superpowers/plans/2026-05-21-b020-provider-flow-status.md`.
 **Implemented feeds:** Massive `/v3/trades` block-trade upside ratio, FINRA ATS weekly dark-pool percentage, FINRA consolidated short-interest delta, and SEC 13F net-buy parsing from configured data-set zip plus CUSIP mappings.
-**Activation:** leave `MASSIVE_TRADES_STUB_MODE`, `FINRA_ATS_STUB_MODE`, `FINRA_SHORT_INTEREST_STUB_MODE`, and `SEC_13F_STUB_MODE` unset/`true` until each feed is configured; flip individual flags to `false` for live validation.
+**Activation:** deploy safe-config now flips `MASSIVE_TRADES_STUB_MODE=false`, `FINRA_ATS_STUB_MODE=false`, and `FINRA_SHORT_INTEREST_STUB_MODE=false` after live smoke and persistent provider-flow caching are in place. Leave `SEC_13F_STUB_MODE` unset/`true` until SEC URL/User-Agent/CUSIP mappings are configured.
 **QA:** `python -m pytest tests/test_flow.py -q` -> `33 passed`; `python -m pytest -q` -> `184 passed`.
 **Residual risk:** live provider validation depends on configured keys/user-agent/CUSIP mappings and should be repeated after provider schema changes.
 

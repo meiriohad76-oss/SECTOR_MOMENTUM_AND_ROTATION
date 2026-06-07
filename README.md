@@ -333,7 +333,7 @@ sector-rotation-dashboard/
 
 Each provider-backed signal has a hook in `src/flow.py`. ETF primary flow now has a provider seam: leave `FLOW_STUB_MODE=true` or unset for neutral behavior, or set `FLOW_STUB_MODE=false` plus `MASSIVE_API_KEY` and `ETF_PRIMARY_FLOW_URL_<TICKER>` values in Streamlit secrets or environment variables.
 
-The remaining provider seams have independent safety flags. Leave each unset/`true` for neutral behavior until that feed is fully configured:
+The deploy hardening script now enables the Massive block-trade and free FINRA lanes after the live smoke test and persistent provider-flow cache are in place. Leave `FLOW_STUB_MODE` and `SEC_13F_STUB_MODE` unset/`true` until those feed-specific inputs are configured:
 
 - `MASSIVE_TRADES_STUB_MODE`
 - `FINRA_ATS_STUB_MODE`
@@ -351,6 +351,7 @@ lane runs, the panel also shows its last in-process outcome: live OK, missing ti
 source, no provider data, invalid provider value, or request-error neutral fallback.
 These diagnostics are secret-safe and intentionally do not print API keys, webhook
 URLs, or raw provider payloads.
+Provider-flow responses are cached in `data/provider_flow_cache/provider_flow_cache.sqlite` so dashboard reruns can reuse fresh Massive/FINRA payloads and degrade to warning-only stale fallback during provider outages.
 
 ## State transition alerts
 
