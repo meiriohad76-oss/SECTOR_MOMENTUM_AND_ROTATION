@@ -55,6 +55,12 @@ def test_fetch_fred_uses_injected_client_and_skips_bad_series(monkeypatch):
     assert out["T10Y2Y"].index.tolist() == list(pd.to_datetime(["2026-01-01", "2026-01-03"]))
     assert out["T10Y2Y"].tolist() == [1.0, 4.0]
     assert calls[0] == ("fred-secret", "T10Y2Y", "2020-01-01")
+    diagnostics = fred_data.fred_fetch_diagnostics()
+    assert diagnostics["status"] == "partial"
+    assert diagnostics["configured"] is True
+    assert diagnostics["series_loaded"] == len(fred_data.FRED_SERIES) - 1
+    assert diagnostics["series_failed"] == 1
+    assert diagnostics["errors"] == ["T10Y3M: RuntimeError"]
 
 
 def test_fetch_fred_returns_empty_without_key(monkeypatch):
@@ -65,3 +71,19 @@ def test_fetch_fred_returns_empty_without_key(monkeypatch):
         raise AssertionError("missing key should not build a FRED client")
 
     assert fred_data.fetch_fred(client_factory=fail_factory) == {}
+    assert fred_data.fred_fetch_diagnostics()["status"] == "missing_key"
+
+
+def test_fetch_fred_records_client_error_without_leaking_key(monkeypatch):
+    monkeypatch.setenv("FRED_API_KEY", "fred-secret")
+
+    def fail_factory(api_key):
+        raise RuntimeError(f"bad secret {api_key}")
+
+    assert fred_data.fetch_fred(client_factory=fail_factory) == {}
+    diagnostics = fred_data.fred_fetch_diagnostics()
+
+    assert diagnostics["status"] == "client_error"
+    assert diagnostics["configured"] is True
+    assert diagnostics["errors"] == ["client: RuntimeError"]
+    assert "fred-secret" not in str(diagnostics)

@@ -45,7 +45,7 @@ from src.data_health import dashboard_health_summary, data_health_rows
 from src.data import fetch_ohlcv_result, _select_ohlcv_provider
 from src.evidence_gates import evaluate_promotion_gate, promotion_gate_decisions_frame
 from src.flow import compute_flow_signals, flow_composite_z, provider_flow_feeds_stubbed, provider_flow_health_statuses
-from src.fred_data import fred_available
+from src.fred_data import fred_available, fred_fetch_diagnostics
 from src.indicators import compute_all_indicators
 from src.macro import assess_regime
 from src.macro_tiles import MACRO_CONTEXT_SYMBOLS, fred_macro_snapshot, fred_macro_tile_groups, macro_tile_rows, session_range_tile
@@ -2090,6 +2090,46 @@ def _count_values(values) -> str:
     return ", ".join(f"{key}:{counts[key]}" for key in sorted(counts)) or "unknown"
 
 
+def _provider_flow_mode_text(row: dict) -> str:
+    return str(row.get("mode", "") or "").strip().lower()
+
+
+def _provider_flow_status_text(row: dict) -> str:
+    return str(row.get("status", "") or "").strip().lower()
+
+
+def _provider_flow_mode_is_stubbed(row: dict) -> bool:
+    return _provider_flow_mode_text(row).startswith("stubbed")
+
+
+def _provider_flow_mode_is_live(row: dict) -> bool:
+    mode = _provider_flow_mode_text(row)
+    status = _provider_flow_status_text(row)
+    return status == "healthy" and ("live ok" in mode or mode == "enabled")
+
+
+def _provider_flow_mode_is_warning(row: dict) -> bool:
+    mode = _provider_flow_mode_text(row)
+    status = _provider_flow_status_text(row)
+    return status in {"warning", "stale"} or "warning" in mode or "stale" in mode
+
+
+def _fred_diagnostic_suffix() -> str:
+    diagnostics = fred_fetch_diagnostics()
+    status = str(diagnostics.get("status") or "unknown")
+    if status in {"ok", "not_attempted"}:
+        return ""
+    loaded = diagnostics.get("series_loaded")
+    failed = diagnostics.get("series_failed")
+    errors = [str(item) for item in diagnostics.get("errors", []) or []]
+    parts = [f"FRED status {status}"]
+    if isinstance(loaded, int) and isinstance(failed, int):
+        parts.append(f"{loaded} loaded / {failed} failed")
+    if errors:
+        parts.append("sample errors " + ", ".join(errors[:3]))
+    return "; " + "; ".join(parts)
+
+
 def _momentum_v2_data_provenance(as_of: str) -> dict[str, str]:
     provider_by_ticker = dict(getattr(ohlcv_result, "provider_by_ticker", {}) or {})
     source_by_ticker = dict(getattr(ohlcv_result, "source_by_ticker", {}) or {})
@@ -2107,22 +2147,19 @@ def _momentum_v2_data_provenance(as_of: str) -> dict[str, str]:
         market_parts.append(f"{len(getattr(ohlcv_result, 'missing', ()))} missing")
 
     fred_series_count = len(_fred_data or {})
+    fred_suffix = _fred_diagnostic_suffix()
     if regime.fred_used:
-        fred_text = f"FRED classifier live; {fred_series_count} series; phase {regime.phase_hint}"
+        fred_text = f"FRED classifier live; {fred_series_count} series; phase {regime.phase_hint}{fred_suffix}"
     elif fred_series_count:
-        fred_text = f"FRED fetched {fred_series_count} series; regime used fallback/proxy; phase {regime.phase_hint}"
+        fred_text = f"FRED fetched {fred_series_count} series; regime used fallback/proxy; phase {regime.phase_hint}{fred_suffix}"
     else:
-        fred_text = f"FRED unavailable; regime uses OHLCV/yield fallback; phase {regime.phase_hint}"
+        fred_text = f"FRED unavailable; regime uses OHLCV/yield fallback; phase {regime.phase_hint}{fred_suffix}"
 
     flow_rows = provider_flow_health_statuses()
     optional_flow_rows = [row for row in flow_rows if row.get("id") != "ohlcv_derived"]
-    live_flow = sum(
-        1
-        for row in optional_flow_rows
-        if str(row.get("mode", "")).lower() == "live ok"
-    )
-    stubbed_flow = sum(1 for row in optional_flow_rows if str(row.get("mode", "")).startswith("stubbed"))
-    warning_flow = sum(1 for row in optional_flow_rows if row.get("status") in {"warning", "stale"})
+    live_flow = sum(1 for row in optional_flow_rows if _provider_flow_mode_is_live(row))
+    stubbed_flow = sum(1 for row in optional_flow_rows if _provider_flow_mode_is_stubbed(row))
+    warning_flow = sum(1 for row in optional_flow_rows if _provider_flow_mode_is_warning(row))
     flow_text = (
         f"{live_flow} live provider feeds, {stubbed_flow} neutral-stubbed, {warning_flow} warning; "
         "F score = OHLCV-derived flow plus configured provider feeds"
@@ -3142,9 +3179,13 @@ def render_calibration_lab():
     )
     baseline_status = status_rows[0]["Status"]
     baseline_verified = baseline_status == "VERIFIED"
+    report_status = status_rows[1]["Status"]
+    summary_status = status_rows[2]["Status"]
     candidate_status = status_rows[3]["Status"]
     candidate_config_status = status_rows[4]["Status"]
     metadata_status = status_rows[5]["Status"]
+    report_verified = report_status == "VERIFIED" and metadata_status == "VERIFIED"
+    summary_verified = summary_status == "VERIFIED" and metadata_status == "VERIFIED"
     candidate_artifact_verified = candidate_status == "VERIFIED" and metadata_status == "VERIFIED"
     candidate_config_verified = (
         candidate_config_status == "VERIFIED" and metadata_status == "VERIFIED"
@@ -3220,9 +3261,19 @@ def render_calibration_lab():
             """
         )
 
-    if CALIBRATION_REPORT_PATH.exists():
+    if CALIBRATION_REPORT_PATH.exists() and report_verified:
         with st.expander("Calibration report", expanded=False):
             st.markdown(CALIBRATION_REPORT_PATH.read_text(encoding="utf-8"))
+    elif CALIBRATION_REPORT_PATH.exists():
+        _md(
+            """
+            <div class="chart-help">
+              Calibration report artifact hash is <code>UNVERIFIED</code>.
+              The report is hidden until metadata proves this file belongs to the current
+              research run. Run <code>python scripts/run_backtest.py</code> to refresh it.
+            </div>
+            """
+        )
     else:
         _md(
             """
@@ -3234,9 +3285,18 @@ def render_calibration_lab():
             """
         )
 
-    summary = _read_csv_artifact(CALIBRATION_SUMMARY_PATH)
+    summary = _read_csv_artifact(CALIBRATION_SUMMARY_PATH) if summary_verified else pd.DataFrame()
     if not summary.empty:
         st.dataframe(summary, hide_index=True, width="stretch")
+    elif CALIBRATION_SUMMARY_PATH.exists() and not summary_verified:
+        _md(
+            """
+            <div class="chart-help">
+              Calibration summary artifact hash is <code>UNVERIFIED</code>.
+              The table is hidden until the metadata hash matches the CSV.
+            </div>
+            """
+        )
 
     candidates = (
         _read_csv_artifact(CALIBRATION_CANDIDATES_PATH)
@@ -3544,6 +3604,18 @@ def _render_personal_trade_backtest_content():
 
     metadata = _load_backtest_metadata()
     states = _load_backtest_states(metadata)
+    provider_flags = dict((metadata or {}).get("provider_flags", {}) or {})
+    historical_provider_flow = str(provider_flags.get("historical_provider_flow") or "unknown")
+    _md(
+        f"""
+        <div class="chart-help">
+          This is an offline alignment check against hashed historical state artifacts.
+          Historical provider-flow mode: <code>{_esc(historical_provider_flow)}</code>.
+          When this value is <code>neutral_stub</code>, Massive/FINRA/SEC flow did not
+          influence the historical state labels used for trade comparison.
+        </div>
+        """
+    )
     if states is None:
         _md(
             """
@@ -3564,10 +3636,11 @@ def _render_personal_trade_backtest_content():
     if uploaded is None:
         _md(
             """
-            <div class="chart-help">
-              Upload a trade-history CSV/XLS/XLSX with date, ticker, side, shares, and price columns.
-              The comparison uses the latest historical methodology state at or before each trade date.
-            </div>
+              <div class="chart-help">
+                Upload a trade-history CSV/XLS/XLSX with date, ticker, side, shares, and price columns.
+                The comparison uses the latest historical methodology state at or before each trade date,
+                with the provider-flow limitation stated above.
+              </div>
             """
         )
         return
@@ -3822,9 +3895,9 @@ def _provider_flow_footer_label(statuses) -> str:
     optional_rows = [row for row in statuses if row.get("id") != "ohlcv_derived"]
     if not optional_rows or provider_flow_feeds_stubbed(statuses):
         return "NEUTRAL"
-    live_rows = [row for row in optional_rows if str(row.get("mode", "")).lower() == "live ok"]
-    warning_rows = [row for row in optional_rows if row.get("status") in {"warning", "stale"}]
-    stubbed_rows = [row for row in optional_rows if str(row.get("mode", "")).startswith("stubbed")]
+    live_rows = [row for row in optional_rows if _provider_flow_mode_is_live(row)]
+    warning_rows = [row for row in optional_rows if _provider_flow_mode_is_warning(row)]
+    stubbed_rows = [row for row in optional_rows if _provider_flow_mode_is_stubbed(row)]
     if live_rows and not warning_rows and not stubbed_rows:
         return "LIVE"
     if live_rows:

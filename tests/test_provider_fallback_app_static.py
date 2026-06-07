@@ -61,13 +61,17 @@ def test_provider_flow_footer_and_provenance_do_not_label_config_warnings_as_liv
     ]
 
     assert 'optional_flow_rows = [row for row in flow_rows if row.get("id") != "ohlcv_derived"]' in provenance_section
-    assert 'str(row.get("mode", "")).lower() == "live ok"' in provenance_section
     assert "live provider feeds" in provenance_section
+    assert "def _provider_flow_mode_is_live(row: dict) -> bool:" in app_source
+    assert '"live ok" in mode or mode == "enabled"' in app_source
+    assert "_provider_flow_mode_is_live(row)" in provenance_section
     assert 'flow_status_label = _provider_flow_footer_label(provider_flow_health_statuses())' in footer_section
     assert "def _provider_flow_footer_label(statuses) -> str:" in footer_section
     assert 'if not optional_rows or provider_flow_feeds_stubbed(statuses):' in footer_section
+    assert "_provider_flow_mode_is_live(row)" in footer_section
     assert 'return "PARTIAL"' in footer_section
     assert 'return "WARNING"' in footer_section
+    assert 'str(row.get("mode", "")).lower() == "live ok"' not in app_source
 
 
 def test_provider_status_banner_css_exists():

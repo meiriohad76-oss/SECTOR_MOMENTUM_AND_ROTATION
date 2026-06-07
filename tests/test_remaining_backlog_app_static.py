@@ -14,6 +14,9 @@ def test_app_wires_pnl_tracker_and_personal_trade_backtest_sections():
     assert "def render_personal_trade_backtest():" in app_source
     assert "Personal trade backtest" in app_source
     assert 'with st.expander("Personal trade backtest", expanded=False):' in app_source
+    assert "Historical provider-flow mode:" in app_source
+    assert "neutral_stub" in app_source
+    assert "Massive/FINRA/SEC flow did not" in app_source
     assert 'with st.expander("P&L tracker", expanded=False):' in app_source
     assert "latest_prices_from_ohlcv(ohlcv)" in app_source
     assert "evaluate_trade_history(" in app_source

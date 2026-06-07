@@ -50,6 +50,36 @@ FRED_SERIES = {
     "DTWEXBGS": "Nominal Broad U.S. Dollar Index",
 }
 
+_LAST_FETCH_DIAGNOSTICS: dict[str, object] = {
+    "status": "not_attempted",
+    "configured": False,
+    "series_loaded": 0,
+    "series_failed": 0,
+    "errors": [],
+}
+
+
+def _set_fetch_diagnostics(**updates: object) -> None:
+    _LAST_FETCH_DIAGNOSTICS.clear()
+    _LAST_FETCH_DIAGNOSTICS.update(
+        {
+            "status": "not_attempted",
+            "configured": False,
+            "series_loaded": 0,
+            "series_failed": 0,
+            "errors": [],
+        }
+    )
+    _LAST_FETCH_DIAGNOSTICS.update(updates)
+
+
+def fred_fetch_diagnostics() -> dict[str, object]:
+    """Return secret-safe diagnostics for the most recent FRED fetch attempt."""
+    return {
+        **_LAST_FETCH_DIAGNOSTICS,
+        "errors": list(_LAST_FETCH_DIAGNOSTICS.get("errors", []) or []),
+    }
+
 
 def _resolve_api_key() -> Optional[str]:
     """Pull the FRED API key from env first, then Streamlit secrets."""
@@ -93,17 +123,28 @@ def fetch_fred(
     """
     key = _resolve_api_key()
     if key is None:
+        _set_fetch_diagnostics(status="missing_key", configured=False)
         return {}
 
     if client_factory is None:
         try:
             from fredapi import Fred  # type: ignore
         except ImportError:
+            _set_fetch_diagnostics(status="missing_library", configured=True)
             return {}
         client_factory = Fred
 
-    fred = client_factory(key)
+    try:
+        fred = client_factory(key)
+    except Exception as exc:
+        _set_fetch_diagnostics(
+            status="client_error",
+            configured=True,
+            errors=[f"client: {type(exc).__name__}"],
+        )
+        return {}
     out: dict[str, pd.Series] = {}
+    errors: list[str] = []
     for series_id in FRED_SERIES:
         try:
             s = fred.get_series(series_id, observation_start=start_date)
@@ -112,9 +153,23 @@ def fetch_fred(
                 if cleaned.index.has_duplicates:
                     cleaned = cleaned.groupby(level=0).last()
                 out[series_id] = cleaned
-        except Exception:
-            # Bad key, network blip, series renamed - skip and continue
+        except Exception as exc:
+            errors.append(f"{series_id}: {type(exc).__name__}")
             continue
+    failed = len(FRED_SERIES) - len(out)
+    if out and errors:
+        status = "partial"
+    elif out:
+        status = "ok"
+    else:
+        status = "failed"
+    _set_fetch_diagnostics(
+        status=status,
+        configured=True,
+        series_loaded=len(out),
+        series_failed=failed,
+        errors=errors[:8],
+    )
     return out
 
 

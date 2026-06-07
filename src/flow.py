@@ -28,6 +28,9 @@ from .provider_flow_cache import (
     ttl_seconds,
     write_provider_flow_cache,
 )
+from .tls import ensure_system_trust_store
+
+ensure_system_trust_store()
 
 
 def _resolve_secret(name: str) -> Optional[str]:

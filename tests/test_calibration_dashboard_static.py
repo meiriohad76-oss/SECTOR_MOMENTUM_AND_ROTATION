@@ -59,10 +59,14 @@ def test_app_surfaces_calibration_artifacts_without_running_calibration():
     assert "candidate_config_hash = shared_artifact_hash(" in app_source
     assert 'baseline_status = status_rows[0]["Status"]' in app_source
     assert 'baseline_verified = baseline_status == "VERIFIED"' in app_source
+    assert 'report_status = status_rows[1]["Status"]' in app_source
+    assert 'summary_status = status_rows[2]["Status"]' in app_source
     assert 'candidate_status = status_rows[3]["Status"]' in app_source
     assert 'candidate_config_status = status_rows[4]["Status"]' in app_source
     assert 'metadata_status = status_rows[5]["Status"]' in app_source
     assert 'metadata_status == "VERIFIED"' in app_source
+    assert 'report_verified = report_status == "VERIFIED" and metadata_status == "VERIFIED"' in app_source
+    assert 'summary_verified = summary_status == "VERIFIED" and metadata_status == "VERIFIED"' in app_source
     assert 'candidate_status == "VERIFIED"' in app_source
     assert 'candidate_config_status == "VERIFIED"' in app_source
     assert "history_window_status" in app_source
@@ -70,6 +74,10 @@ def test_app_surfaces_calibration_artifacts_without_running_calibration():
     assert "Effective calibration" in app_source
     assert "Hash status" in app_source
     assert "UNVERIFIED" in app_source
+    assert "Calibration report artifact hash is <code>UNVERIFIED</code>" in app_source
+    assert "Calibration summary artifact hash is <code>UNVERIFIED</code>" in app_source
+    assert "CALIBRATION_REPORT_PATH.exists() and report_verified" in app_source
+    assert "if not summary.empty:" in app_source
     assert "_read_csv_artifact(CALIBRATION_SUMMARY_PATH)" in app_source
     assert "_read_csv_artifact(CALIBRATION_CANDIDATES_PATH)" in app_source
     assert "CALIBRATION_CANDIDATE_CONFIG_PATH.read_text" in app_source

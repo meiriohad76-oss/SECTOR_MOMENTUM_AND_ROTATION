@@ -18,6 +18,9 @@ import requests
 import yfinance as yf
 
 from .ohlcv_store import ohlcv_cache_enabled, read_cached_ohlcv_metadata, write_cached_ohlcv
+from .tls import ensure_system_trust_store
+
+ensure_system_trust_store()
 
 
 MASSIVE_AGGS_URL_TEMPLATE = (

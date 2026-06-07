@@ -24,7 +24,7 @@ def resolve_config_value(name: str, *, root: str | Path | None = None) -> str | 
     if not secrets_path.exists():
         return None
     try:
-        payload = tomllib.loads(secrets_path.read_text(encoding="utf-8"))
+        payload = tomllib.loads(secrets_path.read_text(encoding="utf-8-sig"))
     except (OSError, tomllib.TOMLDecodeError):
         return None
 
