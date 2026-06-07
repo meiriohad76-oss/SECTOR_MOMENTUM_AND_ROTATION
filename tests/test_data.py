@@ -368,14 +368,11 @@ def test_fetch_ohlcv_result_uses_public_fred_for_macro_symbols_after_provider_mi
     assert list(result.data) == ["^VIX"]
     assert result.fetched == ("^VIX",)
     assert result.missing == ()
-    assert result.source_by_ticker == {"^VIX": "fred_public_macro_live"}
-    assert result.provider_by_ticker == {"^VIX": "fred_public_macro"}
+    assert result.source_by_ticker == {"^VIX": "fred_macro_live"}
+    assert result.provider_by_ticker == {"^VIX": "fred_macro"}
     assert len(result.data["^VIX"]) > 30
     assert result.data["^VIX"]["close"].iloc[-1] > 18.0
-    assert result.warnings == (
-        "Public FRED macro fallback used for 1 symbol after live OHLCV providers returned no rows.",
-        "OHLCV source mix: fred_public_macro=1.",
-    )
+    assert result.warnings == ()
 
 
 def test_public_fred_macro_fallback_only_handles_known_macro_symbols(monkeypatch):
@@ -428,7 +425,7 @@ def test_fetch_ohlcv_result_reports_public_fred_macro_fallback_failure(monkeypat
     assert result.missing == ("^TNX",)
     assert not any(call[0] == "yfinance" for call in calls)
     assert result.warnings == (
-        "Public FRED macro fallback unavailable for ^TNX.",
+        "FRED macro fallback unavailable for ^TNX.",
         "Missing OHLCV for 1 symbol after massive fetch.",
     )
 
@@ -461,20 +458,52 @@ def test_fetch_ohlcv_result_uses_yfinance_fallback_when_massive_misses(monkeypat
 
     result = data.fetch_ohlcv_result(["XLK"], period="2mo", provider="massive")
 
-    assert calls == [
-        ("massive", ("XLK",), "2mo", "1d"),
-        ("yfinance", ("XLK",), "2mo", "1d"),
-    ]
+    assert calls == [("massive", ("XLK",), "2mo", "1d")]
     assert result.provider == "massive"
-    assert list(result.data) == ["XLK"]
-    assert result.fetched == ("XLK",)
-    assert result.missing == ()
-    assert result.source_by_ticker == {"XLK": "yfinance_fallback_live"}
-    assert result.provider_by_ticker == {"XLK": "yfinance"}
-    assert result.warnings == (
-        "Massive unavailable for 1 symbol; yfinance fallback used for live OHLCV.",
-        "OHLCV source mix: yfinance=1.",
+    assert result.data == {}
+    assert result.fetched == ()
+    assert result.missing == ("XLK",)
+    assert result.source_by_ticker == {}
+    assert result.provider_by_ticker == {}
+    assert result.warnings == ("Missing OHLCV for 1 symbol after massive fetch.",)
+
+
+def test_fetch_ohlcv_result_ignores_yfinance_cache_when_massive_is_requested(tmp_path, monkeypatch):
+    from src import ohlcv_store
+
+    cache_path = tmp_path / "ohlcv.duckdb"
+    dates = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=50)
+    row_count = len(dates)
+    cached_frame = pd.DataFrame(
+        {
+            "open": range(row_count),
+            "high": range(1, row_count + 1),
+            "low": range(row_count),
+            "close": range(100, 100 + row_count),
+            "volume": [1_000_000] * row_count,
+            "adj_close": range(100, 100 + row_count),
+        },
+        index=dates,
     )
+    ohlcv_store.write_cached_ohlcv({"XLK": cached_frame}, cache_path=cache_path, provider="yfinance")
+    monkeypatch.setenv("OHLCV_CACHE_PATH", str(cache_path))
+    monkeypatch.setenv("OHLCV_CACHE_ENABLED", "true")
+    monkeypatch.setattr(data, "_fetch_massive_ohlcv", lambda tickers, period, interval: data._ProviderFetchResult({}))
+    monkeypatch.setattr(
+        data,
+        "_fetch_yfinance_ohlcv",
+        lambda tickers, period, interval: (_ for _ in ()).throw(
+            AssertionError("Massive production path must not fall back to yfinance")
+        ),
+    )
+
+    result = data.fetch_ohlcv_result(["XLK"], period="2mo", provider="massive")
+
+    assert result.data == {}
+    assert result.fresh_cache_hits == ()
+    assert result.missing == ("XLK",)
+    assert result.provider_by_ticker == {}
+    assert result.warnings == ("Missing OHLCV for 1 symbol after massive fetch.",)
 
 
 def test_fetch_ohlcv_result_can_bypass_fresh_cache_for_validation(tmp_path, monkeypatch):

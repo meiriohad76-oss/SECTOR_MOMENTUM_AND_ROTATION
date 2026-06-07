@@ -16,6 +16,7 @@ def test_dashboard_renders_data_health_panel_before_market_state():
     assert "def render_data_health():" in app_source
     assert "Data and dashboard health" in app_source
     assert "Refresh all lanes" in app_source
+    assert 'with st.expander("Data lane details and refresh controls", expanded=False):' in app_source
     assert "REFRESH DATA NOW" not in app_source
     assert "data-health-panel" in app_source
     assert "data-health-card" in app_source
@@ -132,11 +133,15 @@ def test_data_health_panel_renders_lane_refresh_buttons_from_rows():
         app_source.index("def render_data_health():") : app_source.index("def render_status():")
     ]
 
+    assert 'with st.expander("Data lane details and refresh controls", expanded=False):' in health_section
+    assert health_section.index("data-health-summary") < health_section.index(
+        'with st.expander("Data lane details and refresh controls", expanded=False):'
+    )
     assert "data-health-refresh-grid" in health_section
     assert "for idx, row in enumerate(rows):" in health_section
     assert "refresh_label = str(row.get(\"refresh_label\"" in health_section
     assert "refresh_key = str(row.get(\"refresh_key\"" in health_section
-    assert "st.button(refresh_label" in health_section
+    assert "st.button(\n                    refresh_label," in health_section
     assert 'on_click=_refresh_data_lane' in health_section
     assert 'args=(str(row.get("lane_id")),)' in health_section
     assert "lane-refresh-caption" in health_section

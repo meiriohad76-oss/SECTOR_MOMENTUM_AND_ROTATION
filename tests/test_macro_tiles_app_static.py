@@ -15,7 +15,7 @@ def test_app_fetches_macro_context_symbols_for_header_tiles():
     ) in app_source
     assert "DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + [\"^TNX\", \"^IRX\"]))" in app_source
     assert "tickers = DATA_SYMBOLS" in app_source
-    assert "daily OHLCV (3y, {len(DATA_SYMBOLS)} symbols)" in app_source
+    assert "Massive daily OHLCV + FRED macro context (3y, {len(DATA_SYMBOLS)} symbols)" in app_source
     assert "missing_ohlcv\": sorted(set(DATA_SYMBOLS) - set(ohlcv_payload))" in app_source
     assert "scoring_ohlcv = {t: ohlcv[t] for t in ALL_TICKERS if t in ohlcv}" in app_source
     assert "compute_all_indicators(scoring_ohlcv, bench_ticker, bil_ticker)" in app_source

@@ -421,7 +421,7 @@ SYSTEM_EXPLAINER_HTML = f"""
 <p><b>Evidence-based signal system.</b> The Sentiment Board monitors {len(SCORED_TICKERS)} instruments across US sectors, industries, countries, factors, themes, crypto exposures, and mega-cap stocks, then applies a 7-pillar methodology to rank current evidence. Scores and states are decision-support signals, not guaranteed predictions or financial advice. Each pillar has research support and failure modes; always check data health and risk context.</p>
 
 <h3>Data flow</h3>
-<pre class="flow">yfinance daily OHLCV (3y, {len(DATA_SYMBOLS)} symbols)
+<pre class="flow">Massive daily OHLCV + FRED macro context (3y, {len(DATA_SYMBOLS)} symbols)
         |
         v
 weekly + monthly resamples for stage / Faber
@@ -1953,26 +1953,33 @@ def render_data_health():
             <span>{_esc(summary['label'])}</span>
             <b>{_esc(summary['detail'])}</b>
           </div>
-          <div class="data-health-grid">{cards_html}</div>
         </section>
         """
     )
-    _md('<div class="data-health-refresh-grid">')
-    refresh_cols = st.columns(len(rows))
-    for idx, row in enumerate(rows):
-        with refresh_cols[idx]:
-            refresh_label = str(row.get("refresh_label", "Refresh lane"))
-            refresh_key = str(row.get("refresh_key", f"data_health_refresh_{idx}"))
-            lane_id = str(row.get("lane_id"))
-            st.button(refresh_label, key=refresh_key, on_click=_refresh_data_lane, args=(str(row.get("lane_id")),), width="stretch")
-            _md(
-                f'<div class="lane-refresh-caption">{_esc(str(row.get("severity_symbol", "")))} | '
-                f'{_esc(str(row.get("freshness", "-")))} | {_esc(str(row.get("sla", "")))} | '
-                f'{_esc(_lane_completed_text(lane_id))}</div>'
-            )
-    _md("</div>")
-    if st.button("Refresh all lanes", key="data_health_refresh_all_button", on_click=_refresh_loaded_data, width="stretch"):
-        pass
+    with st.expander("Data lane details and refresh controls", expanded=False):
+        _md(f'<div class="data-health-grid">{cards_html}</div>')
+        _md('<div class="data-health-refresh-grid">')
+        refresh_cols = st.columns(len(rows))
+        for idx, row in enumerate(rows):
+            with refresh_cols[idx]:
+                refresh_label = str(row.get("refresh_label", "Refresh lane"))
+                refresh_key = str(row.get("refresh_key", f"data_health_refresh_{idx}"))
+                lane_id = str(row.get("lane_id"))
+                st.button(
+                    refresh_label,
+                    key=refresh_key,
+                    on_click=_refresh_data_lane,
+                    args=(str(row.get("lane_id")),),
+                    width="stretch",
+                )
+                _md(
+                    f'<div class="lane-refresh-caption">{_esc(str(row.get("severity_symbol", "")))} | '
+                    f'{_esc(str(row.get("freshness", "-")))} | {_esc(str(row.get("sla", "")))} | '
+                    f'{_esc(_lane_completed_text(lane_id))}</div>'
+                )
+        _md("</div>")
+        if st.button("Refresh all lanes", key="data_health_refresh_all_button", on_click=_refresh_loaded_data, width="stretch"):
+            pass
 
 
 def render_status():

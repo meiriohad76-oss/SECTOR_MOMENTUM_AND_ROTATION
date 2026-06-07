@@ -367,6 +367,66 @@ def _fetch_public_fred_macro_ohlcv(
     return _ProviderFetchResult(out, retry_count)
 
 
+def _fetch_configured_fred_macro_ohlcv(
+    tickers: list[str],
+    period: str = "3y",
+    interval: str = "1d",
+) -> _ProviderFetchResult:
+    if str(interval).strip().lower() not in {"1d", "1day", "day"}:
+        return _ProviderFetchResult({})
+    token = _resolve_secret("FRED_API_KEY")
+    if not token:
+        return _ProviderFetchResult({})
+    try:
+        from fredapi import Fred  # type: ignore
+    except ImportError:
+        return _ProviderFetchResult({})
+    try:
+        from_date, to_date = _period_to_date_range(period)
+    except Exception:
+        from_date, to_date = "1900-01-01", date.today().isoformat()
+    try:
+        client = Fred(token)
+    except Exception:
+        return _ProviderFetchResult({})
+
+    out: dict[str, pd.DataFrame] = {}
+    for ticker in tickers:
+        symbol = str(ticker).upper()
+        config = MACRO_OHLCV_FRED_FALLBACKS.get(symbol)
+        if not config:
+            continue
+        series_id = str(config["series_id"])
+        try:
+            series = client.get_series(series_id, observation_start=from_date, observation_end=to_date)
+            frame = _fred_public_series_to_ohlcv_frame(series, scale=float(config.get("scale", 1.0)))
+            if not frame.empty and len(frame) > 30:
+                out[symbol] = frame
+        except Exception:
+            continue
+    return _ProviderFetchResult(out)
+
+
+def _fetch_fred_macro_ohlcv(
+    tickers: list[str],
+    period: str = "3y",
+    interval: str = "1d",
+) -> _ProviderFetchResult:
+    configured_result = _fetch_configured_fred_macro_ohlcv(tickers, period=period, interval=interval)
+    missing = [
+        ticker
+        for ticker in tickers
+        if ticker not in configured_result.data and str(ticker).upper() not in configured_result.data
+    ]
+    if not missing:
+        return configured_result
+    public_result = _fetch_public_fred_macro_ohlcv(missing, period=period, interval=interval)
+    return _ProviderFetchResult(
+        {**configured_result.data, **public_result.data},
+        configured_result.retry_count + public_result.retry_count,
+    )
+
+
 def fetch_ohlcv(
     tickers: Iterable[str],
     period: str = "3y",
@@ -399,6 +459,31 @@ def _provider_retry_warning(provider_name: str, retry_count: int) -> str:
     return f"Provider retry recovered {retry_count} {provider_name} {request_text} before data loaded."
 
 
+def _cache_provider_allowed(requested_provider: str, ticker: str, cached_provider: object) -> bool:
+    provider = str(cached_provider or "").strip().lower()
+    if not provider:
+        return False
+    if requested_provider == "massive":
+        if provider == "massive":
+            return True
+        return provider in {"fred_macro", "fred_public_macro"} and str(ticker).upper() in MACRO_OHLCV_FRED_FALLBACKS
+    if requested_provider == "yfinance":
+        return provider in {"yfinance", "unit-test"}
+    return provider == requested_provider
+
+
+def _filter_cache_metadata_by_provider(
+    metadata: dict[str, dict[str, object]],
+    *,
+    requested_provider: str,
+) -> dict[str, dict[str, object]]:
+    return {
+        ticker: meta
+        for ticker, meta in metadata.items()
+        if _cache_provider_allowed(requested_provider, ticker, meta.get("provider"))
+    }
+
+
 def fetch_ohlcv_result(
     tickers: Iterable[str],
     period: str = "3y",
@@ -416,6 +501,10 @@ def fetch_ohlcv_result(
     if cache_enabled and not force_refresh:
         try:
             cached_meta = read_cached_ohlcv_metadata(tickers, period=period, interval=interval)
+            cached_meta = _filter_cache_metadata_by_provider(
+                cached_meta,
+                requested_provider=provider_name,
+            )
             cached = {
                 ticker: meta["frame"]
                 for ticker, meta in cached_meta.items()
@@ -427,7 +516,6 @@ def fetch_ohlcv_result(
     missing = [ticker for ticker in tickers if ticker not in cached]
     fetched: dict[str, pd.DataFrame] = {}
     provider_retry_count = 0
-    yfinance_fallback: dict[str, pd.DataFrame] = {}
     fred_public_fallback: dict[str, pd.DataFrame] = {}
     attempted_fred_public: set[str] = set()
     if missing:
@@ -453,7 +541,7 @@ def fetch_ohlcv_result(
             ]
             if macro_misses:
                 attempted_fred_public.update(str(ticker).upper() for ticker in macro_misses)
-                fred_result = _fetch_public_fred_macro_ohlcv(
+                fred_result = _fetch_fred_macro_ohlcv(
                     macro_misses,
                     period=period,
                     interval=interval,
@@ -464,30 +552,13 @@ def fetch_ohlcv_result(
                     fetched = {**fetched, **fred_public_fallback}
                     if cache_enabled:
                         try:
-                            write_cached_ohlcv(fred_public_fallback, provider="fred_public_macro", interval=interval)
+                            write_cached_ohlcv(fred_public_fallback, provider="fred_macro", interval=interval)
                         except Exception:
                             pass
             provider_misses_after_primary = [
                 ticker for ticker in provider_misses_after_primary
                 if ticker not in fetched and str(ticker).upper() not in fetched
             ]
-            yfinance_candidates = [
-                ticker
-                for ticker in provider_misses_after_primary
-                if str(ticker).upper() not in MACRO_OHLCV_FRED_FALLBACKS
-            ]
-            fallback_result = (
-                _fetch_yfinance_ohlcv(yfinance_candidates, period=period, interval=interval)
-                if yfinance_candidates else _ProviderFetchResult({})
-            )
-            yfinance_fallback = fallback_result.data
-            if yfinance_fallback:
-                fetched = {**fetched, **yfinance_fallback}
-                if cache_enabled:
-                    try:
-                        write_cached_ohlcv(yfinance_fallback, provider="yfinance", interval=interval)
-                    except Exception:
-                        pass
         provider_misses_after_yfinance = [
             ticker for ticker in missing
             if ticker not in fetched
@@ -495,7 +566,7 @@ def fetch_ohlcv_result(
             and str(ticker).upper() not in attempted_fred_public
         ]
         if provider_misses_after_yfinance:
-            fred_result = _fetch_public_fred_macro_ohlcv(
+            fred_result = _fetch_fred_macro_ohlcv(
                 provider_misses_after_yfinance,
                 period=period,
                 interval=interval,
@@ -506,7 +577,7 @@ def fetch_ohlcv_result(
                 fetched = {**fetched, **fred_public_fallback}
                 if cache_enabled:
                     try:
-                        write_cached_ohlcv(fred_public_fallback, provider="fred_public_macro", interval=interval)
+                        write_cached_ohlcv(fred_public_fallback, provider="fred_macro", interval=interval)
                     except Exception:
                         pass
     stale_cached: dict[str, pd.DataFrame] = {}
@@ -519,6 +590,10 @@ def fetch_ohlcv_result(
                 period=period,
                 interval=interval,
                 allow_stale=True,
+            )
+            stale_cached_meta = _filter_cache_metadata_by_provider(
+                stale_cached_meta,
+                requested_provider=provider_name,
             )
             stale_cached = {
                 ticker: meta["frame"]
@@ -543,18 +618,6 @@ def fetch_ohlcv_result(
     warnings: list[str] = []
     if provider_retry_count and fetched:
         warnings.append(_provider_retry_warning(provider_name, provider_retry_count))
-    if yfinance_fallback:
-        count = len(yfinance_fallback)
-        warnings.append(
-            f"Massive unavailable for {count} {_warning_symbol_text(count)}; "
-            "yfinance fallback used for live OHLCV."
-        )
-    if fred_public_fallback:
-        count = len(fred_public_fallback)
-        warnings.append(
-            f"Public FRED macro fallback used for {count} {_warning_symbol_text(count)} "
-            "after live OHLCV providers returned no rows."
-        )
     failed_fred_public = sorted(
         symbol
         for symbol in attempted_fred_public
@@ -562,7 +625,7 @@ def fetch_ohlcv_result(
     )
     if failed_fred_public:
         warnings.append(
-            "Public FRED macro fallback unavailable for "
+            "FRED macro fallback unavailable for "
             + ", ".join(failed_fred_public)
             + "."
         )
@@ -583,11 +646,8 @@ def fetch_ohlcv_result(
     for key in ordered:
         if key in fetched:
             if key in fred_public_fallback:
-                source_by_ticker[key] = "fred_public_macro_live"
-                provider_by_ticker[key] = "fred_public_macro"
-            elif key in yfinance_fallback:
-                source_by_ticker[key] = "yfinance_fallback_live"
-                provider_by_ticker[key] = "yfinance"
+                source_by_ticker[key] = "fred_macro_live"
+                provider_by_ticker[key] = "fred_macro"
             else:
                 source_by_ticker[key] = f"{provider_name}_live"
                 provider_by_ticker[key] = provider_name
@@ -600,7 +660,8 @@ def fetch_ohlcv_result(
 
     if provider_by_ticker:
         provider_mix = sorted(set(provider_by_ticker.values()))
-        if len(provider_mix) > 1 or provider_name not in provider_mix:
+        allowed_massive_mix = provider_name == "massive" and set(provider_mix).issubset({"massive", "fred_macro"})
+        if (len(provider_mix) > 1 or provider_name not in provider_mix) and not allowed_massive_mix:
             warnings.append(
                 "OHLCV source mix: "
                 + ", ".join(
