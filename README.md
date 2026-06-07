@@ -198,11 +198,16 @@ To capture a browser subscription, open `public/pwa.html?vapid_public_key=PUBLIC
 ./.venv/bin/python scripts/register_pwa_subscription.py --label ahad-phone < subscription.json
 ```
 
-Check all optional integration readiness in one sanitized command:
+Check production data readiness and all optional integration readiness in one sanitized command:
 
 ```bash
 ./.venv/bin/python scripts/check_ops_readiness.py
 ```
+
+The readiness output includes secret-safe labels for OHLCV/Massive, FRED, provider-flow live/stub state, state
+persistence, run journal, provider snapshots, the OHLCV cache, the browser-QA fixture guard, and optional alert,
+feed, PWA, email, and broker integrations. It prints configured/missing states and row counts, not API keys, tokens,
+webhook URLs, or raw provider payloads.
 
 ## Quick start
 

@@ -366,7 +366,10 @@ Status legend:
 **Files:** `src/pl_tracker.py`, `src/broker_config.py`, `scripts/check_broker_config.py`, `tests/test_pl_tracker.py`, `tests/test_broker_config.py`, `tests/test_broker_config_script.py`, `app.py`, `tests/test_remaining_backlog_app_static.py`, `.streamlit/secrets.toml.example`, `README.md`, `docs/BACKLOG.md`.
 **Activation:** uploaded/saved holdings work without broker credentials. To check broker readiness without connecting, set `BROKER_PROVIDER=alpaca` or `BROKER_PROVIDER=ibkr` plus the matching secrets, then run `./.venv/bin/python scripts/check_broker_config.py --provider alpaca` or `./.venv/bin/python scripts/check_broker_config.py --provider ibkr`.
 **Behavior:** uploaded/saved holdings with shares and cost basis are joined to the dashboard's already-loaded prices, then surfaced as cost, value, unrealized P&L, P&L %, and missing-input diagnostics. Broker diagnostics report configured/missing field names only. No broker API calls, order placement, cloud sync, state-machine writes, or scoring changes were added.
-**Readiness:** `./.venv/bin/python scripts/check_ops_readiness.py` includes the B-131 broker diagnostic state alongside the provider-specific `scripts/check_broker_config.py` output.
+**Readiness:** `./.venv/bin/python scripts/check_ops_readiness.py` includes core production data readiness
+(OHLCV/Massive, FRED, provider-flow live/stub state, durable state files, run journal, provider snapshots, OHLCV
+cache, and browser-QA fixture safety) alongside the B-131 broker diagnostic state and the provider-specific
+`scripts/check_broker_config.py` output. The command reports only secret-safe labels, paths, and counts.
 **Residual risk:** Alpaca/IBKR import adapters should be added only after broker credentials and account scope are available.
 
 #### B-132 · Backtest "your trades" — IMPLEMENTED

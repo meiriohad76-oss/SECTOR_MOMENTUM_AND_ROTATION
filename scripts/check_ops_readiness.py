@@ -1,10 +1,11 @@
-"""Report optional integration readiness without printing secret values."""
+"""Report production and optional integration readiness without printing secrets."""
 from __future__ import annotations
 
 import argparse
 import importlib.util
 import json
 from pathlib import Path
+import sqlite3
 import sys
 
 
@@ -15,10 +16,134 @@ if str(ROOT) not in sys.path:
 from src.broker_config import broker_config_status  # noqa: E402
 from src.config_resolver import resolve_config_value  # noqa: E402
 from src.pwa_push import load_push_subscriptions  # noqa: E402
+from src.provider_snapshots import DEFAULT_SNAPSHOT_DB_PATH  # noqa: E402
+from src.run_journal import DEFAULT_JOURNAL_PATH  # noqa: E402
+from src.scoring import STATE_FILE, _transition_journal_path  # noqa: E402
 
 
 def _label(value: str | None) -> str:
     return "configured" if value else "missing"
+
+
+def _flag_value(name: str, default: bool) -> tuple[bool, str]:
+    raw = resolve_config_value(name)
+    if raw is None:
+        return default, "default"
+    normalized = str(raw).strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True, "configured"
+    if normalized in {"0", "false", "no", "off"}:
+        return False, "configured"
+    return default, "invalid"
+
+
+def _sqlite_count(path: Path, table: str) -> int | None:
+    if not path.exists() or path.stat().st_size <= 0:
+        return None
+    try:
+        with sqlite3.connect(path) as conn:
+            row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+    except sqlite3.Error:
+        return None
+    return int(row[0]) if row else None
+
+
+def _file_status(path: Path) -> dict[str, object]:
+    return {
+        "path": str(path),
+        "exists": path.exists(),
+        "bytes": path.stat().st_size if path.exists() else 0,
+    }
+
+
+def _json_state_status(path: Path, journal_path: Path) -> dict[str, object]:
+    by_ticker_count = 0
+    snapshot_transition_count = 0
+    state_updated = ""
+    if path.exists() and path.stat().st_size > 0:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            by_ticker_count = len(payload.get("by_ticker", {}) or {})
+            snapshot_transition_count = len(payload.get("transitions", []) or [])
+            state_updated = str(payload.get("updated", "") or "")
+        except (OSError, json.JSONDecodeError, TypeError):
+            pass
+
+    journal_transition_count = 0
+    if journal_path.exists() and journal_path.stat().st_size > 0:
+        try:
+            journal_transition_count = sum(
+                1 for line in journal_path.read_text(encoding="utf-8").splitlines() if line.strip()
+            )
+        except OSError:
+            journal_transition_count = 0
+
+    state_file = _file_status(path)
+    transition_journal = _file_status(journal_path)
+    return {
+        "state_file": state_file,
+        "transition_journal": transition_journal,
+        "state_updated": state_updated,
+        "by_ticker_count": by_ticker_count,
+        "snapshot_transition_count": snapshot_transition_count,
+        "journal_transition_count": journal_transition_count,
+        "state": "ready" if state_file["exists"] and by_ticker_count > 0 else "missing_or_empty",
+        "transitions": "ready" if transition_journal["exists"] else "missing",
+    }
+
+
+def _ohlcv_provider_status() -> dict[str, object]:
+    selected = (resolve_config_value("OHLCV_PROVIDER") or "yfinance").strip().lower()
+    massive_key = resolve_config_value("MASSIVE_API_KEY")
+    ssl_raw = resolve_config_value("MASSIVE_VERIFY_SSL")
+    ssl_status = "missing_default_true"
+    if ssl_raw is not None:
+        ssl_status = "configured_true" if ssl_raw.strip().lower() in {"1", "true", "yes", "on"} else "warning"
+
+    if selected in {"massive", "polygon"} and not massive_key:
+        provider_state = "missing_config"
+    elif selected == "auto" and not massive_key:
+        provider_state = "fallback_yfinance"
+    else:
+        provider_state = "configured"
+
+    return {
+        "provider": "massive" if selected == "polygon" else selected,
+        "state": provider_state,
+        "massive_api_key": _label(massive_key),
+        "massive_verify_ssl": ssl_status,
+    }
+
+
+def _provider_lane_status(flag_name: str, required_config: list[str] | None = None) -> dict[str, object]:
+    stubbed, source = _flag_value(flag_name, True)
+    if source == "invalid":
+        return {"state": "warning", "mode": "stubbed", "flag": "invalid"}
+    if stubbed:
+        return {"state": "stubbed", "mode": "neutral", "flag": source}
+    required = required_config or []
+    missing = [name for name in required if not resolve_config_value(name)]
+    if missing:
+        return {"state": "missing_config", "mode": "live_requested", "missing": missing}
+    return {"state": "live_configured", "mode": "live_requested"}
+
+
+def _provider_flow_status() -> dict[str, object]:
+    return {
+        "etf_primary_flow": _provider_lane_status("FLOW_STUB_MODE", ["MASSIVE_API_KEY"]),
+        "massive_block_trades": _provider_lane_status("MASSIVE_TRADES_STUB_MODE", ["MASSIVE_API_KEY"]),
+        "finra_ats_dark_pool": _provider_lane_status("FINRA_ATS_STUB_MODE"),
+        "finra_short_interest": _provider_lane_status("FINRA_SHORT_INTEREST_STUB_MODE"),
+        "sec_13f": _provider_lane_status("SEC_13F_STUB_MODE", ["SEC_13F_DATA_URL", "SEC_USER_AGENT"]),
+    }
+
+
+def _browser_qa_fixture_guard() -> dict[str, str]:
+    allow_fixtures, source = _flag_value("BROWSER_QA_ALLOW_FIXTURES", False)
+    return {
+        "state": "unsafe_enabled" if allow_fixtures else "safe",
+        "flag": source,
+    }
 
 
 def _ready_or_missing(paths: list[Path]) -> str:
@@ -30,6 +155,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--subscriptions-path", default=str(ROOT / "data" / "pwa_push_subscriptions.json"))
     parser.add_argument("--feed-dir", default=str(ROOT / "data" / "feeds"))
     parser.add_argument("--public-feed-dir", default=str(ROOT / "public" / "feeds"))
+    parser.add_argument("--state-file", default=str(STATE_FILE))
+    parser.add_argument("--state-transition-journal", default=str(_transition_journal_path()))
+    parser.add_argument("--run-journal-path", default=str(DEFAULT_JOURNAL_PATH))
+    parser.add_argument("--provider-snapshot-db", default=str(DEFAULT_SNAPSHOT_DB_PATH))
+    parser.add_argument("--ohlcv-cache-path", default=str(ROOT / "data_cache" / "ohlcv.duckdb"))
     return parser.parse_args(argv)
 
 
@@ -50,8 +180,34 @@ def main(argv: list[str] | None = None) -> int:
     subscriptions = load_push_subscriptions(args.subscriptions_path)
     feed_dir = Path(args.feed_dir)
     public_feed_dir = Path(args.public_feed_dir)
+    run_journal_path = Path(args.run_journal_path)
+    provider_snapshot_db = Path(args.provider_snapshot_db)
+    ohlcv_cache_path = Path(args.ohlcv_cache_path)
+    run_count = _sqlite_count(run_journal_path, "runs")
+    snapshot_count = _sqlite_count(provider_snapshot_db, "provider_snapshots")
 
     payload = {
+        "production": {
+            "ohlcv_provider": _ohlcv_provider_status(),
+            "fred": {"api_key": _label(resolve_config_value("FRED_API_KEY"))},
+            "provider_flow": _provider_flow_status(),
+            "state_persistence": _json_state_status(Path(args.state_file), Path(args.state_transition_journal)),
+            "run_journal": {
+                **_file_status(run_journal_path),
+                "runs": run_count,
+                "state": "ready" if run_count and run_count > 0 else "missing_or_empty",
+            },
+            "provider_snapshots": {
+                **_file_status(provider_snapshot_db),
+                "snapshots": snapshot_count,
+                "state": "ready" if snapshot_count and snapshot_count > 0 else "missing_or_empty",
+            },
+            "ohlcv_cache": {
+                **_file_status(ohlcv_cache_path),
+                "state": "ready" if ohlcv_cache_path.exists() and ohlcv_cache_path.stat().st_size > 0 else "missing",
+            },
+            "browser_qa_fixture_guard": _browser_qa_fixture_guard(),
+        },
         "B-021": {
             "telegram": "configured"
             if resolve_config_value("TELEGRAM_BOT_TOKEN") and resolve_config_value("TELEGRAM_CHAT_ID")
