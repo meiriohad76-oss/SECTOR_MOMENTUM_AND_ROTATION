@@ -55,6 +55,7 @@ data/feeds/
 data/logs/
 data/provider_flow_cache/
 data/provider_snapshots/
+data/rendered_dashboard_smoke/
 data/run_journal/
 data/saved_inputs.json
 data/preference_profiles.json
