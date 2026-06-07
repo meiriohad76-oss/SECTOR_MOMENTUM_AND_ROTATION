@@ -1,6 +1,21 @@
 from scripts import momentum_v2_visual_qa as qa
 
 
+def test_visual_qa_static_fixture_is_explicit_and_not_imported_by_live_app():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    app_source = (root / "app.py").read_text(encoding="utf-8")
+    script_source = (root / "scripts" / "momentum_v2_visual_qa.py").read_text(encoding="utf-8")
+
+    assert "scripts.momentum_v2_visual_qa" not in app_source
+    assert "momentum_v2_visual_qa" not in app_source
+    assert "_fixture_rows(" not in app_source
+    assert "_static_html(" not in app_source
+    assert 'parser.add_argument("--static-fixture", action="store_true"' in script_source
+    assert "if args.static_fixture" in script_source
+
+
 def test_visual_qa_maps_all_handoff_pngs():
     assert len(qa.REFERENCE_MAP) == 9
     assert qa.REFERENCE_MAP[("A", "overview")] == "A1-terminal-overview.png"

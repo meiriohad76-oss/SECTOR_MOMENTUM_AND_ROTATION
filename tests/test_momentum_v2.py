@@ -6,6 +6,7 @@ from src.momentum_v2 import (
     DISPLAY_LABELS,
     PILLAR_ORDER,
     SCREEN_LABELS,
+    _c_flow_river_svg,
     _c_momentum_bars,
     _flow_river_html,
     _momentum_rows,
@@ -221,6 +222,20 @@ def test_display_c_overview_deepdive_rotation_inventory_is_present():
     assert "NET INFLOWS" in rotation
     assert "Technology sector pressure into" in rotation or "Energy sector pressure into" in rotation
     assert "small dot = four-week trail start" in rotation
+
+
+def test_display_c_flow_river_is_derived_from_current_rows_not_handoff_fixture():
+    rows = build_view_rows(_sample_scored(), phase="MID")
+
+    html = _c_flow_river_svg(rows)
+
+    assert "Flow river from outflows to inflows" in html
+    assert "XLK | Technology sector" in html
+    assert "XLE | Energy sector" in html
+    assert "SMH" not in html
+    assert "GDX" not in html
+    assert "Fixture QA" not in html
+    assert "handoff" not in html.lower()
 
 
 def test_display_b_overview_deepdive_rotation_inventory_is_present():
