@@ -240,11 +240,24 @@ python scripts/capture_browser_qa.py --base-url http://127.0.0.1:8503 --browser-
 
 Use `--browser-channel msedge` if Edge is installed and Chrome is not. Both `BROWSER_QA_MODE=1` and `BROWSER_QA_ALLOW_FIXTURES=1` must be set before starting Streamlit; this two-key lock enables deterministic visual fixtures for palette, transition-pulse, provider-status screenshots, and secret-free OHLCV/FRED-off screenshot runs. Clearing `MASSIVE_API_KEY` plus `FRED_API_KEY` keeps the run explicit. Production should not set `BROWSER_QA_ALLOW_FIXTURES`. The script writes `browser_qa_report.md`, `browser_qa_manifest.json`, and nonblank screenshots without requiring API keys or webhook secrets.
 
+For a faster rendered-content smoke without screenshot capture, run:
+
+```powershell
+python scripts/rendered_dashboard_smoke.py --url http://127.0.0.1:8501/?ticker=XLK --browser-channel chrome
+```
+
+This verifies that the browser-rendered page contains core dashboard sections
+such as `SENTIMENT BOARD`, `BLUF`, and `Data and dashboard health`. It is
+separate from the mandatory Pi deploy gate until Playwright/browser availability
+on the Pi is proven stable; use `--allow-unavailable` for non-blocking
+observability runs.
+
 For the protected Pi route, authenticate through Cloudflare Access first, then run the
 same capture against the public dashboard URL:
 
 ```powershell
 python scripts/capture_browser_qa.py --base-url https://sentimentdashboard.ahaddashboards.uk --browser-channel chrome --user-data-dir .browser-qa-cloudflare --headed --qa-mode cloudflare-access-authenticated
+python scripts/rendered_dashboard_smoke.py --url https://sentimentdashboard.ahaddashboards.uk/?ticker=XLK --browser-channel chrome --user-data-dir .browser-qa-cloudflare --headed
 ```
 
 The first headed run can be used to complete Cloudflare Access authentication in the
