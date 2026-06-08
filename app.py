@@ -28,6 +28,7 @@ from src.component_bridge import (
     drill_bridge_attrs,
     drill_click_bridge_html,
     rrg_plotly_click_bridge_html,
+    viewport_tooltip_bridge_html,
 )
 from src.component_docs import DASHBOARD_COMPONENT_DOCS, component_docs_html
 from src.comparison_view import (
@@ -1553,6 +1554,10 @@ def _apply_header_preference(widget_key: str, target_key: str, allowed: tuple[st
 
 def render_drill_click_bridge():
     components.html(drill_click_bridge_html(), height=0, width=0)
+
+
+def render_viewport_tooltip_bridge():
+    components.html(viewport_tooltip_bridge_html(), height=0, width=0)
 
 
 def render_header_controls():
@@ -4171,6 +4176,7 @@ def _render_timed(section_name: str, render_fn):
 _render_timed("render_header", render_header)
 _render_timed("render_header_controls", render_header_controls)
 _render_timed("render_drill_click_bridge", render_drill_click_bridge)
+_render_timed("render_viewport_tooltip_bridge", render_viewport_tooltip_bridge)
 _render_timed("render_view_preferences", render_view_preferences)
 _render_timed("render_explainer", render_explainer)
 _render_timed("render_component_docs", render_component_docs)

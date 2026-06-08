@@ -148,10 +148,20 @@ def test_ticker_report_css_is_responsive_and_readable():
 def test_tooltips_are_viewport_safe():
     css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    bridge_source = (ROOT / "src" / "component_bridge.py").read_text(encoding="utf-8")
 
     assert "width: min(420px, calc(100vw - 48px));" in css
     assert "overflow-wrap: break-word;" in css
     assert '[data-tip-edge="left"]::after' in css
     assert '[data-tip-edge="right"]::after' in css
-    assert "sectorMomentumPlaceTooltipEdge" in app_source
+    assert "viewport_tooltip_bridge_html" in app_source
+    assert "render_viewport_tooltip_bridge" in app_source
+    assert '_render_timed("render_viewport_tooltip_bridge", render_viewport_tooltip_bridge)' in app_source
+    assert "sector-dashboard-tooltip" in bridge_source
+    assert "doc.body.appendChild(tooltip)" in bridge_source
+    assert "position: fixed;" in bridge_source
+    assert "max-width: calc(100vw - 32px);" in bridge_source
+    assert "clamp(centered, margin, parentWindow.innerWidth - width - margin)" in bridge_source
+    assert "html.sector-js-tooltips [data-tip]::after" in css
+    assert "#sector-dashboard-tooltip" in css
     assert 'closest("[data-tip]")' in app_source

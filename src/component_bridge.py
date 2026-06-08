@@ -1,4 +1,4 @@
-"""Small Streamlit component bridges for dashboard controls and drill clicks."""
+"""Small Streamlit component bridges for dashboard controls, clicks, and tooltips."""
 from __future__ import annotations
 
 from collections.abc import Callable, MutableMapping
@@ -112,6 +112,148 @@ def drill_click_bridge_html() -> str:
     event.preventDefault();
     setTicker(node.getAttribute('data-drill-ticker'));
   }, true);
+})();
+</script>
+"""
+
+
+def viewport_tooltip_bridge_html() -> str:
+    """Return a hidden component payload that clamps data-tip tooltips inside the viewport."""
+    return """
+<script>
+(function () {
+  const parentWindow = window.parent || window;
+  let doc;
+  try {
+    doc = parentWindow.document;
+  } catch (error) {
+    return;
+  }
+  if (parentWindow.__sectorViewportTooltipBridgeInstalled) {
+    return;
+  }
+  parentWindow.__sectorViewportTooltipBridgeInstalled = true;
+  doc.documentElement.classList.add('sector-js-tooltips');
+
+  const styleId = 'sector-dashboard-tooltip-style';
+  if (!doc.getElementById(styleId)) {
+    const style = doc.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      #sector-dashboard-tooltip {
+        position: fixed;
+        left: 16px;
+        top: 16px;
+        z-index: 2147483647;
+        box-sizing: border-box;
+        max-width: calc(100vw - 32px);
+        width: max-content;
+        min-width: min(220px, calc(100vw - 32px));
+        padding: 10px 12px;
+        border: 1px solid var(--border-strong, #3f4b5d);
+        border-radius: 6px;
+        background: var(--panel, #111821);
+        color: var(--fg, #f0f4fa);
+        box-shadow: 0 10px 28px rgba(0,0,0,0.55);
+        font: 400 0.92rem/1.55 var(--font-prose, system-ui, sans-serif);
+        letter-spacing: 0;
+        text-align: left;
+        text-transform: none;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: normal;
+        hyphens: auto;
+        pointer-events: none;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 120ms ease, visibility 120ms ease;
+      }
+      #sector-dashboard-tooltip.is-visible {
+        opacity: 1;
+        visibility: visible;
+      }
+    `;
+    doc.head.appendChild(style);
+  }
+
+  const tooltip = doc.createElement('div');
+  tooltip.id = 'sector-dashboard-tooltip';
+  tooltip.setAttribute('role', 'tooltip');
+  doc.body.appendChild(tooltip);
+
+  let activeNode = null;
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), Math.max(min, max));
+  }
+
+  function targetFromEvent(event) {
+    const target = event && event.target;
+    if (!target || typeof target.closest !== 'function') {
+      return null;
+    }
+    return target.closest('[data-tip]');
+  }
+
+  function positionTooltip(target) {
+    const rect = target.getBoundingClientRect();
+    const margin = 16;
+    const maxWidth = Math.max(180, parentWindow.innerWidth - margin * 2);
+    tooltip.style.maxWidth = Math.min(420, maxWidth) + 'px';
+    tooltip.style.left = '0px';
+    tooltip.style.top = '0px';
+    const tipRect = tooltip.getBoundingClientRect();
+    const width = Math.min(tipRect.width || 240, maxWidth);
+    const height = tipRect.height || 48;
+    const centered = rect.left + rect.width / 2 - width / 2;
+    const left = clamp(centered, margin, parentWindow.innerWidth - width - margin);
+    const aboveTop = rect.top - height - 10;
+    const belowTop = rect.bottom + 10;
+    const top = aboveTop >= margin
+      ? aboveTop
+      : clamp(belowTop, margin, parentWindow.innerHeight - height - margin);
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+  }
+
+  function show(event) {
+    const target = targetFromEvent(event);
+    if (!target) {
+      return;
+    }
+    const text = String(target.getAttribute('data-tip') || '').trim();
+    if (!text) {
+      return;
+    }
+    activeNode = target;
+    tooltip.textContent = text;
+    tooltip.classList.add('is-visible');
+    positionTooltip(target);
+  }
+
+  function hide(event) {
+    if (!activeNode) {
+      return;
+    }
+    if (event && event.relatedTarget && activeNode.contains(event.relatedTarget)) {
+      return;
+    }
+    activeNode = null;
+    tooltip.classList.remove('is-visible');
+  }
+
+  function reposition() {
+    if (activeNode) {
+      positionTooltip(activeNode);
+    }
+  }
+
+  doc.addEventListener('mouseover', show, true);
+  doc.addEventListener('focusin', show, true);
+  doc.addEventListener('mouseout', hide, true);
+  doc.addEventListener('focusout', hide, true);
+  doc.addEventListener('scroll', reposition, true);
+  parentWindow.addEventListener('resize', reposition, true);
 })();
 </script>
 """

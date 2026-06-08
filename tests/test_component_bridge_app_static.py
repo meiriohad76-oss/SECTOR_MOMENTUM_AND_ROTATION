@@ -48,6 +48,21 @@ def test_app_mounts_generic_drill_click_bridge_before_clickable_surfaces():
     )
 
 
+def test_app_mounts_viewport_tooltip_bridge_before_tooltip_surfaces():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    bridge_source = (ROOT / "src" / "component_bridge.py").read_text(encoding="utf-8")
+
+    assert "viewport_tooltip_bridge_html" in app_source
+    assert "def render_viewport_tooltip_bridge():" in app_source
+    assert "components.html(viewport_tooltip_bridge_html(), height=0, width=0)" in app_source
+    assert app_source.index(
+        '_render_timed("render_viewport_tooltip_bridge", render_viewport_tooltip_bridge)'
+    ) < app_source.index('_render_timed("render_bluf", render_bluf)')
+    assert "parentWindow.__sectorViewportTooltipBridgeInstalled" in bridge_source
+    assert "doc.documentElement.classList.add('sector-js-tooltips')" in bridge_source
+    assert "target.closest('[data-tip]')" in bridge_source
+
+
 def test_app_adds_whole_card_drill_attributes_to_clickable_surfaces():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
     alerts_section = app_source[app_source.index("def render_alerts():") : app_source.index("def render_picks():")]

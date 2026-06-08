@@ -2143,6 +2143,20 @@ div[class*="st-key-comparison_tickers"] [data-testid="stWidgetLabel"] p {
   opacity: 1;
   visibility: visible;
 }
+html.sector-js-tooltips [data-tip]::after,
+html.sector-js-tooltips [data-tip]::before {
+  content: none !important;
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+#sector-dashboard-tooltip {
+  position: fixed;
+  box-sizing: border-box;
+  max-width: calc(100vw - 32px);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
 /* Anchor variants so we don't get clipped off-screen */
 [data-tip-pos="right"]::after {
   bottom: auto;

@@ -42,6 +42,14 @@ DASHBOARD_COMPONENT_DOCS: tuple[ComponentDoc, ...] = (
         qa=("component bridge tests", "browser click QA"),
     ),
     ComponentDoc(
+        name="Viewport tooltip bridge",
+        section="Shell",
+        render_function="render_viewport_tooltip_bridge",
+        data_inputs=("data-tip tooltip copy", "viewport dimensions"),
+        states=("screen-edge clamp", "hover target", "keyboard focus target"),
+        qa=("component bridge tests", "tooltip viewport static tests"),
+    ),
+    ComponentDoc(
         name="View options",
         section="Shell",
         render_function="render_view_preferences",
