@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-from typing import Any
+from typing import Any, Callable
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +36,19 @@ from src.universe import ALL_TICKERS, BENCH  # noqa: E402
 APP_VERSION = "2026.05.26-ux-hardening"
 DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + ["^TNX", "^IRX"]))
 PROVIDER_FLOW_MODES = ("cache-only", "live", "stubbed")
+ProgressCallback = Callable[[str, int, str, dict[str, Any] | None], None]
+
+
+def _emit_progress(
+    progress_callback: ProgressCallback | None,
+    phase: str,
+    progress_pct: int,
+    message: str,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    if progress_callback is None:
+        return
+    progress_callback(phase, progress_pct, message, metadata)
 
 
 def _bootstrap_runtime_config() -> None:
@@ -254,10 +267,18 @@ def refresh_dashboard_state(
     allow_stale_provider_cache: bool,
     journal_path: str | Path,
     dedupe_journal: bool,
+    progress_callback: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     _bootstrap_runtime_config()
     _configure_provider_flow_mode(provider_flow_mode, allow_stale_cache=allow_stale_provider_cache)
     started_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    _emit_progress(
+        progress_callback,
+        "market_ohlcv",
+        25,
+        "Fetching market OHLCV from the configured provider",
+        {"period": period, "force_refresh": bool(force_refresh)},
+    )
     ohlcv_result = fetch_ohlcv_result(DATA_SYMBOLS, period=period, force_refresh=force_refresh)
     ohlcv = ohlcv_result.data
     bench_ticker = BENCH["US"]
@@ -268,12 +289,33 @@ def refresh_dashboard_state(
             "error": "missing_required_market_data",
             "missing": sorted(set([bench_ticker, bil_ticker]) - set(ohlcv)),
         }
+    _emit_progress(
+        progress_callback,
+        "compute_indicators",
+        50,
+        "Computing momentum, trend, rotation, and flow indicators",
+        {"ticker_count": len([ticker for ticker in ALL_TICKERS if ticker in ohlcv])},
+    )
     scoring_ohlcv = {ticker: ohlcv[ticker] for ticker in ALL_TICKERS if ticker in ohlcv}
     indicators_df = compute_all_indicators(scoring_ohlcv, bench_ticker, bil_ticker)
     flow_df = compute_flow_signals(scoring_ohlcv)
     flow_z = flow_composite_z(flow_df)
+    _emit_progress(
+        progress_callback,
+        "fred_macro",
+        70,
+        "Loading FRED macro context and assessing the regime",
+        {"fred_configured": bool(fred_available())},
+    )
     fred_snapshot = _load_fred_snapshot()
     regime = assess_regime(ohlcv[bench_ticker], ohlcv.get("^TNX"), ohlcv.get("^IRX"), fred_cache=fred_snapshot)
+    _emit_progress(
+        progress_callback,
+        "score_state",
+        85,
+        "Scoring instruments and applying the state machine",
+        {"phase": regime.phase_hint, "fred_used": bool(regime.fred_used)},
+    )
     scored = compute_composite(indicators_df, flow_df, flow_z, phase=regime.phase_hint)
     scored = apply_state_machine(scored)
     bluf = _build_bluf(scored)
@@ -292,6 +334,13 @@ def refresh_dashboard_state(
         "provider_warning_count": len(getattr(ohlcv_result, "warnings", ()) or ()),
         "cache_refresh_forced": bool(getattr(ohlcv_result, "cache_refresh_forced", False)),
     }
+    _emit_progress(
+        progress_callback,
+        "state_and_journal",
+        92,
+        "Persisting state transitions and run-journal evidence",
+        {"provider": provider, "ticker_count": int(len(scored))},
+    )
     journal_result = append_dashboard_run(
         journal_path,
         scored,

@@ -27,7 +27,7 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
   - `GET /api/v1/refresh/{job_id}`
   - `GET /api/v1/refresh/{job_id}/events`
 - [x] Persist refresh progress events in a small local SQLite store for browser reconnects.
-- [ ] Wire the refresh job runner to the real Massive/FRED/dashboard refresh sequence.
+- [x] Wire the refresh job runner to the real Massive/FRED/dashboard refresh sequence.
 - [ ] Build a React/Next.js shell that consumes `/api/v1/health`.
 - [ ] Port A/B/C overview, deep-dive, and rotation screens from the handoff artifacts.
 - [ ] Replace Streamlit custom click/tooltip bridges with native React interactions.
@@ -40,4 +40,5 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - The current production Streamlit service is unchanged.
 - The API contract is pure and unit tested.
 - The optional API server can be enabled after installing dependencies.
+- The refresh runner is explicit opt-in from the API (`run_now: true`) and remains queue-only by default.
 - The backlog records the migration as started, not complete.

@@ -188,6 +188,7 @@ def append_refresh_event(
     now = _utc_now()
     completed_at = now if normalized_status in TERMINAL_STATUSES else None
     started_expr = "COALESCE(started_at_utc, ?)" if normalized_status in {"running", "succeeded", "failed"} else "started_at_utc"
+    job_metadata_json = _json(metadata) if metadata is not None else None
     params: tuple[Any, ...]
     if started_expr.startswith("COALESCE"):
         params = (
@@ -197,6 +198,7 @@ def append_refresh_event(
             progress,
             str(message),
             str(error),
+            job_metadata_json,
             str(job_id),
         )
     else:
@@ -206,6 +208,7 @@ def append_refresh_event(
             progress,
             str(message),
             str(error),
+            job_metadata_json,
             str(job_id),
         )
     with sqlite3.connect(Path(db_path)) as conn:
@@ -220,7 +223,8 @@ def append_refresh_event(
                 completed_at_utc = ?,
                 progress_pct = ?,
                 message = ?,
-                error = ?
+                error = ?,
+                metadata_json = COALESCE(?, metadata_json)
             WHERE job_id = ?
             """,
             params,
