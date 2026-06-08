@@ -22,11 +22,12 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - [x] Declare `fastapi` and `uvicorn` in `requirements.txt`.
 - [x] Add tests proving the API contract is Streamlit-free and provider-fetch-free.
 - [x] Add a real API status provider that reads the latest persisted Pi state, run journal, and provider snapshots without recomputing the dashboard.
-- [ ] Add async refresh job endpoints:
+- [x] Add async refresh job endpoints:
   - `POST /api/v1/refresh`
   - `GET /api/v1/refresh/{job_id}`
   - `GET /api/v1/refresh/{job_id}/events`
-- [ ] Persist refresh progress events in a small local SQLite/JSONL store for browser reconnects.
+- [x] Persist refresh progress events in a small local SQLite store for browser reconnects.
+- [ ] Wire the refresh job runner to the real Massive/FRED/dashboard refresh sequence.
 - [ ] Build a React/Next.js shell that consumes `/api/v1/health`.
 - [ ] Port A/B/C overview, deep-dive, and rotation screens from the handoff artifacts.
 - [ ] Replace Streamlit custom click/tooltip bridges with native React interactions.

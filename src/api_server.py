@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from .api_refresh import create_refresh_job, get_refresh_job, list_refresh_events, queued_refresh_response
 from .api_status import build_persisted_status_payload
 
 
@@ -23,7 +24,7 @@ def default_status_provider() -> dict[str, Any]:
 def create_app(status_provider: StatusProvider | None = None):
     """Create the optional FastAPI app without making FastAPI mandatory at import time."""
     try:
-        from fastapi import FastAPI
+        from fastapi import FastAPI, HTTPException
     except ModuleNotFoundError as exc:  # pragma: no cover - exercised when dependency is absent.
         raise RuntimeError("FastAPI is not installed. Install requirements.txt to run the API server.") from exc
 
@@ -41,6 +42,29 @@ def create_app(status_provider: StatusProvider | None = None):
     @app.get("/api/v1/status")
     def status() -> dict[str, Any]:
         return provider()
+
+    @app.post("/api/v1/refresh", status_code=202)
+    def create_refresh(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        body = payload or {}
+        job = create_refresh_job(
+            lane_id=body.get("lane_id", "all"),
+            metadata={"source": "api", "requested_by": body.get("requested_by", "anonymous")},
+        )
+        return queued_refresh_response(job)
+
+    @app.get("/api/v1/refresh/{job_id}")
+    def refresh_job(job_id: str) -> dict[str, Any]:
+        job = get_refresh_job(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Refresh job not found")
+        return job
+
+    @app.get("/api/v1/refresh/{job_id}/events")
+    def refresh_events(job_id: str) -> dict[str, Any]:
+        job = get_refresh_job(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Refresh job not found")
+        return {"job_id": job_id, "events": list_refresh_events(job_id)}
 
     return app
 
