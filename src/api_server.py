@@ -7,24 +7,17 @@ replaces the Streamlit presentation layer.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timezone
 from typing import Any
 
-from .api_contract import build_dashboard_status_payload
+from .api_status import build_persisted_status_payload
 
 
 StatusProvider = Callable[[], dict[str, Any]]
 
 
 def default_status_provider() -> dict[str, Any]:
-    """Return a minimal process-health payload when no dashboard snapshot is wired."""
-    return build_dashboard_status_payload(
-        [],
-        app_version="unknown",
-        git_sha=None,
-        generated_at=datetime.now(timezone.utc),
-        active_frontend="api",
-    )
+    """Return read-only persisted dashboard health without recomputing providers."""
+    return build_persisted_status_payload()
 
 
 def create_app(status_provider: StatusProvider | None = None):

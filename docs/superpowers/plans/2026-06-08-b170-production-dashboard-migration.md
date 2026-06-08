@@ -21,7 +21,7 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - [x] Add optional `src/api_server.py` FastAPI app factory with `/api/v1/health` and `/api/v1/status`.
 - [x] Declare `fastapi` and `uvicorn` in `requirements.txt`.
 - [x] Add tests proving the API contract is Streamlit-free and provider-fetch-free.
-- [ ] Add a real API status provider that reads the latest persisted Pi state, run journal, provider snapshots, and data-health artifacts without recomputing the dashboard.
+- [x] Add a real API status provider that reads the latest persisted Pi state, run journal, and provider snapshots without recomputing the dashboard.
 - [ ] Add async refresh job endpoints:
   - `POST /api/v1/refresh`
   - `GET /api/v1/refresh/{job_id}`

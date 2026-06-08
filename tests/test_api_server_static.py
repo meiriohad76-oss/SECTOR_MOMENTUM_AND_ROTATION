@@ -11,6 +11,8 @@ def test_api_server_is_optional_fastapi_boundary_not_streamlit_import():
 
     assert "def create_app(" in source
     assert "from fastapi import FastAPI" in source
+    assert "from .api_status import build_persisted_status_payload" in source
+    assert "return build_persisted_status_payload()" in source
     assert 'app.get("/api/v1/health")' in source
     assert 'app.get("/api/v1/status")' in source
     assert "import streamlit" not in source
