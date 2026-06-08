@@ -10,6 +10,14 @@ Status legend:
 
 ## Completed in `backlog-stepwise-qa`
 
+### B-170 · Production dashboard architecture migration foundation - IMPLEMENTED
+**Status:** migration path started without replacing the live Streamlit dashboard.
+**Files:** `src/api_contract.py`, `src/api_server.py`, `tests/test_api_contract.py`, `tests/test_api_server_static.py`, `requirements.txt`, `docs/superpowers/plans/2026-06-08-b170-production-dashboard-migration.md`.
+**Behavior:** adds a pure JSON status contract for dashboard health lanes and an optional FastAPI app factory with `/api/v1/health` and `/api/v1/status`. The contract is independent from Streamlit, provider fetches, and live scoring side effects, so a future React/Next.js frontend can consume the same backend shape while the current dashboard keeps running.
+**Activation:** install `requirements.txt`, then run a future API process with `uvicorn src.api_server:app`; no Pi service switch is made by this ticket.
+**Migration plan:** keep Streamlit as the production frontend until API-backed React screens reach parity. Next slices should add an async refresh job API, API-backed provider/data-health snapshots, React shell parity for the A/B/C screens, browser screenshot QA against the handoff artifacts, and only then retire the Streamlit route.
+**Residual risk:** this is a foundation slice only. It does not yet move live data refreshes, state-machine writes, charts, portfolio uploads, or dashboard routing out of Streamlit.
+
 ### B-001 · HTML render fix for action cards (BLUF) - IMPLEMENTED
 **Status:** `_md()` HTML wrapper is implemented and deployed with the dashboard branch.
 **File:** `app.py`.
