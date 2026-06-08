@@ -108,8 +108,11 @@ def should_reuse_dashboard_compute(
     *,
     now: float | None = None,
     max_age_seconds: int = DASHBOARD_COMPUTE_SNAPSHOT_TTL_SECONDS,
+    refresh_pending: bool = False,
 ) -> bool:
     """Return whether a prior dashboard compute snapshot is safe to reuse."""
+    if refresh_pending:
+        return False
     if classification.kind != "visual_only" or snapshot is None:
         return False
     if not all(key in snapshot for key in COMPUTE_SNAPSHOT_KEYS):

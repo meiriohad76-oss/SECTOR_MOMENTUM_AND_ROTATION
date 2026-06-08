@@ -903,7 +903,19 @@ _palette_css = palette_css_variables(st.session_state.color_palette, st.session_
 PERF_AUDIT = DashboardPerformanceAudit()
 _PERF_START_SNAPSHOT = session_snapshot(st.session_state)
 _PERF_RERUN = classify_rerun(st.session_state.get("performance_last_snapshot"), _PERF_START_SNAPSHOT)
-_REUSED_COMPUTE_SNAPSHOT = should_reuse_dashboard_compute(_PERF_RERUN, st.session_state.get("dashboard_compute_snapshot"))
+
+
+def _refresh_request_pending() -> bool:
+    requested_at = st.session_state.get("data_refresh_requested_at")
+    return bool(requested_at and st.session_state.get("data_refresh_completed_request_at") != requested_at)
+
+
+_REFRESH_REQUEST_PENDING = _refresh_request_pending()
+_REUSED_COMPUTE_SNAPSHOT = should_reuse_dashboard_compute(
+    _PERF_RERUN,
+    st.session_state.get("dashboard_compute_snapshot"),
+    refresh_pending=_REFRESH_REQUEST_PENDING,
+)
 
 _md(
     f"<style>{_CSS}{_EXTRA}{_palette_css}</style>"
@@ -1153,6 +1165,8 @@ else:
                 "regime": regime,
                 "scored": scored,
                 "created_at": _COMPUTE_SNAPSHOT_CREATED_AT,
+                "data_refresh_request_at": st.session_state.get("data_refresh_requested_at"),
+                "data_refresh_completed_after_compute": True,
             }
             _mark_data_refresh_completed(ohlcv_result)
             render_loading_state(

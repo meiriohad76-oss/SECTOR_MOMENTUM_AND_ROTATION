@@ -16,10 +16,9 @@ def test_app_wires_performance_audit_to_structured_logging():
     assert "PERF_AUDIT = DashboardPerformanceAudit()" in app_source
     assert "_PERF_START_SNAPSHOT = session_snapshot(st.session_state)" in app_source
     assert "classify_rerun(st.session_state.get(\"performance_last_snapshot\"), _PERF_START_SNAPSHOT)" in app_source
-    assert (
-        "_REUSED_COMPUTE_SNAPSHOT = should_reuse_dashboard_compute("
-        "_PERF_RERUN, st.session_state.get(\"dashboard_compute_snapshot\")"
-    ) in app_source
+    assert "_REUSED_COMPUTE_SNAPSHOT = should_reuse_dashboard_compute(" in app_source
+    assert "_PERF_RERUN," in app_source
+    assert "refresh_pending=_REFRESH_REQUEST_PENDING" in app_source
     assert '"created_at": _COMPUTE_SNAPSHOT_CREATED_AT' in app_source
     assert 'with PERF_AUDIT.section("load_data"):' in app_source
     assert 'with PERF_AUDIT.section("compute_signals"):' in app_source
@@ -85,8 +84,14 @@ def test_debrief_lab_uses_session_cache_and_logs_cache_health():
 def test_app_reuses_compute_snapshot_before_expensive_sections():
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
 
+    assert "def _refresh_request_pending() -> bool:" in app_source
+    assert "data_refresh_completed_request_at" in app_source
+    assert "_REFRESH_REQUEST_PENDING = _refresh_request_pending()" in app_source
     assert app_source.index("_REUSED_COMPUTE_SNAPSHOT = should_reuse_dashboard_compute(") < app_source.index(
         'with PERF_AUDIT.section("load_data"):'
+    )
+    assert app_source.index("_REFRESH_REQUEST_PENDING = _refresh_request_pending()") < app_source.index(
+        "_REUSED_COMPUTE_SNAPSHOT = should_reuse_dashboard_compute("
     )
     assert 'if _REUSED_COMPUTE_SNAPSHOT:' in app_source
     assert 'compute_snapshot = st.session_state["dashboard_compute_snapshot"]' in app_source
@@ -97,6 +102,22 @@ def test_app_reuses_compute_snapshot_before_expensive_sections():
     assert 'scored = compute_snapshot["scored"]' in app_source
     assert app_source.index("datetime.now().timestamp()") < app_source.index(
         "st.session_state.dashboard_compute_snapshot = {"
+    )
+    assert '"data_refresh_request_at": st.session_state.get("data_refresh_requested_at")' in app_source
+    assert '"data_refresh_completed_after_compute": True' in app_source
+
+
+def test_refresh_completion_is_recorded_only_after_scoring_snapshot_is_written():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+    compute_section = app_source[
+        app_source.index('with PERF_AUDIT.section("compute_signals"):') : app_source.index("finally:")
+    ]
+
+    assert compute_section.index("scored = apply_state_machine(scored)") < compute_section.index(
+        "st.session_state.dashboard_compute_snapshot = {"
+    )
+    assert compute_section.index("st.session_state.dashboard_compute_snapshot = {") < compute_section.index(
+        "_mark_data_refresh_completed(ohlcv_result)"
     )
 
 

@@ -183,6 +183,28 @@ def test_should_reuse_dashboard_compute_rejects_stale_or_missing_snapshot_age():
     assert performance_audit.should_reuse_dashboard_compute(classification, missing_age, now=1_100.0) is False
 
 
+def test_should_reuse_dashboard_compute_rejects_pending_refresh_request():
+    classification = performance_audit.RerunClassification("visual_only", ("theme",))
+    snapshot = {
+        "ohlcv_result": object(),
+        "ohlcv": object(),
+        "fred_data": object(),
+        "regime": object(),
+        "scored": object(),
+        "created_at": 1_000.0,
+    }
+
+    assert (
+        performance_audit.should_reuse_dashboard_compute(
+            classification,
+            snapshot,
+            now=1_100.0,
+            refresh_pending=True,
+        )
+        is False
+    )
+
+
 def test_session_snapshot_tracks_interactive_widget_keys_and_ignores_audit_state():
     snapshot = performance_audit.session_snapshot(
         {
