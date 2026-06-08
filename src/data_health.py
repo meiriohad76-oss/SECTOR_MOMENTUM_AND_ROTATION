@@ -128,30 +128,45 @@ def _ohlcv_health_row(
     now: pd.Timestamp,
 ) -> dict[str, object]:
     expected = tuple(dict.fromkeys(str(symbol) for symbol in expected_symbols))
+    provider_by_ticker = dict(getattr(ohlcv_result, "provider_by_ticker", {}) or {})
+    source_by_ticker = dict(getattr(ohlcv_result, "source_by_ticker", {}) or {})
     latest_dates = []
+    market_dates = []
+    macro_proxy_dates = []
     for symbol in expected:
         frame = ohlcv.get(symbol)
+        actual_symbol = symbol
         if frame is None:
             frame = ohlcv.get(symbol.upper())
+            actual_symbol = symbol.upper()
         latest = _latest_frame_date(frame)
         if latest is not None:
             latest_dates.append(latest)
+            provider = str(provider_by_ticker.get(actual_symbol, provider_by_ticker.get(symbol, ""))).lower()
+            source = str(source_by_ticker.get(actual_symbol, source_by_ticker.get(symbol, ""))).lower()
+            if provider.startswith("fred_macro") or source.startswith("fred_macro"):
+                macro_proxy_dates.append(latest)
+            else:
+                market_dates.append(latest)
     missing = tuple(getattr(ohlcv_result, "missing", ())) or tuple(
         symbol
         for symbol in expected
         if symbol not in ohlcv and symbol.upper() not in ohlcv
     )
-    latest = max(latest_dates) if latest_dates else None
-    oldest = min(latest_dates) if latest_dates else None
+    market_health_dates = market_dates or latest_dates
+    latest = max(market_health_dates) if market_health_dates else None
+    oldest = min(market_health_dates) if market_health_dates else None
+    overall_oldest = min(latest_dates) if latest_dates else None
+    macro_latest = max(macro_proxy_dates) if macro_proxy_dates else None
+    macro_oldest = min(macro_proxy_dates) if macro_proxy_dates else None
     latest_age = _age_days(latest, now)
     oldest_age = _age_days(oldest, now)
+    macro_oldest_age = _age_days(macro_oldest, now)
     stale_cache_hits = tuple(getattr(ohlcv_result, "stale_cache_hits", ()))
     warnings = tuple(getattr(ohlcv_result, "warnings", ()))
-    provider_by_ticker = dict(getattr(ohlcv_result, "provider_by_ticker", {}) or {})
-    source_by_ticker = dict(getattr(ohlcv_result, "source_by_ticker", {}) or {})
 
     status = "healthy"
-    if oldest_age is None or not latest_dates:
+    if oldest_age is None or not market_health_dates:
         status = "stale"
     elif oldest_age > OHLCV_STALE_DAYS or missing:
         status = "stale"
@@ -183,7 +198,12 @@ def _ohlcv_health_row(
     if getattr(ohlcv_result, "cache_refresh_forced", False):
         detail_parts.append("manual refresh bypassed persistent cache")
     if oldest is not None and oldest_age is not None:
-        detail_parts.append(f"oldest loaded bar {oldest.date()} ({oldest_age}d old)")
+        detail_parts.append(f"oldest market bar {oldest.date()} ({oldest_age}d old)")
+    if macro_proxy_dates and macro_oldest is not None and macro_oldest_age is not None:
+        detail_parts.append(
+            f"{len(macro_proxy_dates)} FRED macro proxy bars; oldest {macro_oldest.date()} "
+            f"({macro_oldest_age}d old, cadence adjusted)"
+        )
     if stale_cache_hits:
         detail_parts.append(f"{len(stale_cache_hits)} stale-cache hits")
     if missing:
@@ -191,20 +211,37 @@ def _ohlcv_health_row(
     if warnings:
         detail_parts.append("provider warnings present")
 
-    return {
-        **_lane_metadata("market_ohlcv", status),
-        "source": "Market OHLCV",
-        "role": "Critical: price, volume, trend, momentum, and market proxies",
-        "status": status,
-        "latest": str(latest.date()) if latest is not None else "-",
-        "freshness": (
+    provider_label = str(getattr(ohlcv_result, "provider", "market")).strip() or "market"
+    if macro_proxy_dates and latest is not None:
+        freshness = f"{provider_label.title()} market latest {format_age_label(latest, now)}"
+        if macro_latest is not None:
+            freshness += f"; FRED macro proxies latest {format_age_label(macro_latest, now)}"
+        if macro_oldest is not None and macro_oldest != macro_latest:
+            freshness += f" / oldest {format_age_label(macro_oldest, now)}"
+    else:
+        freshness = (
             f"latest {format_age_label(latest, now)}; oldest {format_age_label(oldest, now)}"
             if latest is not None and oldest is not None and latest != oldest
             else format_age_label(latest, now)
-        ),
+        )
+
+    return {
+        **_lane_metadata("market_ohlcv", status),
+        "source": "Market OHLCV",
+        "role": "Critical: market price/volume/trend data; FRED macro proxies are cadence-adjusted context",
+        "status": status,
+        "latest": str(latest.date()) if latest is not None else "-",
+        "freshness": freshness,
         "age_days": latest_age,
         "oldest_age_days": oldest_age,
-        "coverage": f"oldest {oldest.date()} ({oldest_age}d old)" if oldest is not None and oldest_age is not None else "",
+        "coverage": (
+            f"oldest market {oldest.date()} ({oldest_age}d old); "
+            f"oldest overall {overall_oldest.date()} ({_age_days(overall_oldest, now)}d old)"
+            if oldest is not None and oldest_age is not None and overall_oldest is not None and overall_oldest != oldest
+            else f"oldest {oldest.date()} ({oldest_age}d old)"
+            if oldest is not None and oldest_age is not None
+            else ""
+        ),
         "detail": "; ".join(detail_parts),
     }
 

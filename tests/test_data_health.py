@@ -76,7 +76,9 @@ def test_data_health_rows_show_ohlcv_and_fred_staleness():
     assert by_source["Market OHLCV"]["status"] == "healthy"
     assert by_source["Market OHLCV"]["freshness"] == "4d old"
     assert "2/2 symbols loaded" in by_source["Market OHLCV"]["detail"]
-    assert by_source["Market OHLCV"]["role"] == "Critical: price, volume, trend, momentum, and market proxies"
+    assert by_source["Market OHLCV"]["role"] == (
+        "Critical: market price/volume/trend data; FRED macro proxies are cadence-adjusted context"
+    )
     assert by_source["FRED macro/regime"]["lane_id"] == "fred_macro"
     assert by_source["FRED macro/regime"]["refresh_label"] == "Refresh FRED macro"
     assert by_source["FRED macro/regime"]["refresh_key"] == "data_health_refresh_fred_macro"
@@ -142,7 +144,7 @@ def test_ohlcv_health_headline_uses_latest_bar_age_and_details_oldest_loaded_bar
     assert market_row["latest"] == "2026-05-26"
     assert market_row["freshness"] == "latest today; oldest 5d old"
     assert market_row["coverage"] == "oldest 2026-05-21 (5d old)"
-    assert "oldest loaded bar 2026-05-21 (5d old)" in market_row["detail"]
+    assert "oldest market bar 2026-05-21 (5d old)" in market_row["detail"]
 
 
 def test_ohlcv_health_uses_oldest_loaded_symbol_not_only_latest_symbol():
@@ -167,7 +169,7 @@ def test_ohlcv_health_uses_oldest_loaded_symbol_not_only_latest_symbol():
     assert market_row["status"] == "stale"
     assert market_row["freshness"] == "latest 1d old; oldest 16d old"
     assert market_row["coverage"] == "oldest 2026-05-10 (16d old)"
-    assert "oldest loaded bar 2026-05-10" in market_row["detail"]
+    assert "oldest market bar 2026-05-10" in market_row["detail"]
 
 
 def test_ohlcv_health_discloses_provider_source_mix():
@@ -194,6 +196,45 @@ def test_ohlcv_health_discloses_provider_source_mix():
     assert market_row["status"] == "warning"
     assert "source mix massive:1, yfinance:1" in market_row["detail"]
     assert "paths fresh_cache:1, massive_live:1" in market_row["detail"]
+
+
+def test_ohlcv_health_separates_fred_macro_proxies_from_massive_market_freshness():
+    rows = data_health_rows(
+        ohlcv={
+            "SPY": _ohlcv_frame("2026-06-08"),
+            "XLK": _ohlcv_frame("2026-06-08"),
+            "^TNX": _ohlcv_frame("2026-06-04"),
+            "^IRX": _ohlcv_frame("2026-06-05"),
+        },
+        expected_symbols=("SPY", "XLK", "^TNX", "^IRX"),
+        ohlcv_result=SimpleNamespace(
+            provider="massive",
+            missing=(),
+            stale_cache_hits=(),
+            warnings=(),
+            provider_by_ticker={"SPY": "massive", "XLK": "massive", "^TNX": "fred_macro", "^IRX": "fred_macro"},
+            source_by_ticker={
+                "SPY": "massive_live",
+                "XLK": "massive_live",
+                "^TNX": "fred_macro_live",
+                "^IRX": "fred_macro_live",
+            },
+        ),
+        fred_data={},
+        fred_configured=False,
+        compute_created_at=1_779_760_000.0,
+        now=pd.Timestamp("2026-06-08T18:30:00Z"),
+        provider_flow_stubbed=True,
+    )
+
+    market_row = next(row for row in rows if row["source"] == "Market OHLCV")
+
+    assert market_row["status"] == "healthy"
+    assert market_row["freshness"] == "Massive market latest today; FRED macro proxies latest 3d old / oldest 4d old"
+    assert market_row["coverage"] == "oldest market 2026-06-08 (0d old); oldest overall 2026-06-04 (4d old)"
+    assert "oldest market bar 2026-06-08 (0d old)" in market_row["detail"]
+    assert "2 FRED macro proxy bars; oldest 2026-06-04 (4d old, cadence adjusted)" in market_row["detail"]
+    assert "Critical: market price/volume/trend data" in market_row["role"]
 
 
 def test_fred_health_treats_unconfigured_fred_as_supported_fallback():
