@@ -13,6 +13,14 @@ from .api_refresh import create_refresh_job, get_refresh_job, list_refresh_event
 from .api_refresh_runner import run_refresh_job
 from .api_status import build_persisted_status_payload
 
+try:
+    from fastapi import BackgroundTasks, Body
+except ModuleNotFoundError:  # pragma: no cover - create_app reports the missing runtime dependency.
+    BackgroundTasks = Any  # type: ignore[misc, assignment]
+
+    def Body(default: Any = None) -> Any:  # type: ignore[no-redef]
+        return default
+
 
 StatusProvider = Callable[[], dict[str, Any]]
 RefreshRunner = Callable[..., dict[str, Any]]
@@ -26,7 +34,7 @@ def default_status_provider() -> dict[str, Any]:
 def create_app(status_provider: StatusProvider | None = None, refresh_runner: RefreshRunner | None = None):
     """Create the optional FastAPI app without making FastAPI mandatory at import time."""
     try:
-        from fastapi import BackgroundTasks, Body, FastAPI, HTTPException
+        from fastapi import FastAPI, HTTPException
     except ModuleNotFoundError as exc:  # pragma: no cover - exercised when dependency is absent.
         raise RuntimeError("FastAPI is not installed. Install requirements.txt to run the API server.") from exc
 
