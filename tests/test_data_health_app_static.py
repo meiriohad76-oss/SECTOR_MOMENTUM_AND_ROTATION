@@ -68,6 +68,9 @@ def test_refresh_action_clears_all_dashboard_data_caches_and_compute_snapshot():
     assert "data_refresh_completed_at" in app_source
     assert "data_refresh_completed_request_at" in app_source
     assert "data_refresh_completed_by_lane" in app_source
+    assert "def _refresh_status_text() -> str:" in app_source
+    assert "Refresh complete {completed_label} | lane {lane_id}" in app_source
+    assert "Refresh running/requested {requested_label} | lane {lane_id}" in app_source
     assert 'log_event(APP_LOGGER, "data_lane_refresh_completed"' in app_source
     assert 'log_event(APP_LOGGER, "data_lane_refresh_requested"' in refresh_section
 
@@ -79,6 +82,9 @@ def test_refresh_token_forces_provider_reload_without_reusing_persistent_cache()
     ]
     completion_section = app_source[
         app_source.index("def _mark_data_refresh_completed(") : app_source.index("def _lane_completed_text(")
+    ]
+    lane_text_section = app_source[
+        app_source.index("def _lane_completed_text(") : app_source.index("def _apply_control_bridge_actions")
     ]
     compute_section = app_source[
         app_source.index("with PERF_AUDIT.section(\"load_data\")") : app_source.index(
@@ -95,6 +101,20 @@ def test_refresh_token_forces_provider_reload_without_reusing_persistent_cache()
     assert "def _consume_refresh_tokens(lane_id: str) -> None:" in completion_section
     assert "_consume_refresh_tokens(lane_id)" in completion_section
     assert 'st.session_state.pop(key, None)' in completion_section
+    assert "refresh pending for this render" in lane_text_section
+    assert "completed {parsed.strftime('%Y-%m-%d %H:%M UTC')}" in lane_text_section
+
+
+def test_refresh_completion_is_marked_before_data_health_renders():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+
+    assert "_mark_data_refresh_completed(ohlcv_result)" in app_source
+    assert app_source.index("_mark_data_refresh_completed(ohlcv_result)") < app_source.index(
+        '# =============================== compose page ===================================='
+    )
+    assert app_source.index("_mark_data_refresh_completed(ohlcv_result)") < app_source.index(
+        '_render_timed("render_data_health", render_data_health)'
+    )
 
 
 def test_data_health_css_supports_status_cards():
@@ -147,6 +167,8 @@ def test_data_health_panel_renders_lane_refresh_buttons_from_rows():
     assert "lane-refresh-caption" in health_section
     assert "severity_symbol" in health_section
     assert "_lane_completed_text(" in health_section
+    assert "refresh_text = _refresh_status_text()" in health_section
+    assert "Manual refresh requested" not in health_section
     assert 'st.button("Refresh all lanes"' in health_section
     assert 'key="data_health_refresh_all_button"' in health_section
 

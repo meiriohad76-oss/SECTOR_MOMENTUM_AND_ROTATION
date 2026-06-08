@@ -729,6 +729,11 @@ def _consume_refresh_tokens(lane_id: str) -> None:
 def _lane_completed_text(lane_id: str) -> str:
     completed_by_lane = st.session_state.get("data_refresh_completed_by_lane", {}) or {}
     completed_at = completed_by_lane.get(lane_id)
+    requested_at = st.session_state.get("data_refresh_requested_at")
+    requested_lane = str(st.session_state.get("data_refresh_lane") or "")
+    request_applies = bool(requested_at and (requested_lane == "all" or requested_lane == lane_id))
+    if request_applies and st.session_state.get("data_refresh_completed_request_at") != requested_at:
+        return "refresh pending for this render"
     if not completed_at:
         return "not refreshed yet"
     try:
@@ -736,9 +741,29 @@ def _lane_completed_text(lane_id: str) -> str:
         if parsed.tzinfo is None:
             parsed = parsed.tz_localize("UTC")
         parsed = parsed.tz_convert("UTC")
-        return f"rendered after request {parsed.strftime('%Y-%m-%d %H:%M UTC')}"
+        return f"completed {parsed.strftime('%Y-%m-%d %H:%M UTC')}"
     except Exception:
-        return f"rendered after request {completed_at}"
+        return f"completed {completed_at}"
+
+
+def _refresh_status_text() -> str:
+    requested_at = st.session_state.get("data_refresh_requested_at")
+    if not requested_at:
+        return "No manual refresh in this session"
+    lane_id = str(st.session_state.get("data_refresh_lane") or "all")
+    completed_at = st.session_state.get("data_refresh_completed_at")
+    completed_request = st.session_state.get("data_refresh_completed_request_at")
+    try:
+        requested_label = pd.Timestamp(requested_at).tz_convert("UTC").strftime("%Y-%m-%d %H:%M UTC")
+    except Exception:
+        requested_label = str(requested_at)
+    if completed_request == requested_at and completed_at:
+        try:
+            completed_label = pd.Timestamp(completed_at).tz_convert("UTC").strftime("%Y-%m-%d %H:%M UTC")
+        except Exception:
+            completed_label = str(completed_at)
+        return f"Refresh complete {completed_label} | lane {lane_id}"
+    return f"Refresh running/requested {requested_label} | lane {lane_id}"
 
 
 def _apply_control_bridge_actions() -> None:
@@ -1020,6 +1045,7 @@ else:
                 "scored": scored,
                 "created_at": _COMPUTE_SNAPSHOT_CREATED_AT,
             }
+            _mark_data_refresh_completed(ohlcv_result)
     finally:
         loading_placeholder.empty()
 
@@ -2145,8 +2171,7 @@ def render_data_health():
         }
     )
     summary = dashboard_health_summary(rows)
-    requested_at = st.session_state.get("data_refresh_requested_at")
-    refresh_text = f"Manual refresh requested {requested_at}" if requested_at else "No manual refresh in this session"
+    refresh_text = _refresh_status_text()
     cards_html = ""
     for row in rows:
         status = str(row.get("status", "warning"))
@@ -4200,7 +4225,6 @@ _render_timed("render_full_table", render_full_table)
 _render_timed("render_personal_trade_backtest", render_personal_trade_backtest)
 _render_timed("render_backtest_lab", render_backtest_lab)
 _render_timed("render_footer", render_footer)
-_mark_data_refresh_completed(ohlcv_result)
 _PERF_FINAL_SNAPSHOT = session_snapshot(st.session_state)
 log_event(APP_LOGGER, "dashboard_performance_audit",
     rerun_kind=_PERF_RERUN.kind,
