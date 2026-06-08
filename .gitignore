@@ -53,6 +53,7 @@ momentum v2.zip
 data_cache/
 data/feeds/
 data/logs/
+data/api_refresh/
 data/provider_flow_cache/
 data/provider_snapshots/
 data/rendered_dashboard_smoke/
