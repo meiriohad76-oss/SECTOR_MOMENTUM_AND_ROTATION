@@ -26,7 +26,7 @@ def default_status_provider() -> dict[str, Any]:
 def create_app(status_provider: StatusProvider | None = None, refresh_runner: RefreshRunner | None = None):
     """Create the optional FastAPI app without making FastAPI mandatory at import time."""
     try:
-        from fastapi import BackgroundTasks, FastAPI, HTTPException
+        from fastapi import BackgroundTasks, Body, FastAPI, HTTPException
     except ModuleNotFoundError as exc:  # pragma: no cover - exercised when dependency is absent.
         raise RuntimeError("FastAPI is not installed. Install requirements.txt to run the API server.") from exc
 
@@ -47,7 +47,10 @@ def create_app(status_provider: StatusProvider | None = None, refresh_runner: Re
         return provider()
 
     @app.post("/api/v1/refresh", status_code=202)
-    def create_refresh(background_tasks: BackgroundTasks, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    def create_refresh(
+        background_tasks: BackgroundTasks,
+        payload: dict[str, Any] | None = Body(default=None),
+    ) -> dict[str, Any]:
         body = payload or {}
         lane_id = body.get("lane_id", "all")
         job = create_refresh_job(

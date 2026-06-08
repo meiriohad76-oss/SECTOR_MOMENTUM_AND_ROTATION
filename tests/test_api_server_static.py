@@ -10,7 +10,8 @@ def test_api_server_is_optional_fastapi_boundary_not_streamlit_import():
     source = (ROOT / "src" / "api_server.py").read_text(encoding="utf-8")
 
     assert "def create_app(" in source
-    assert "from fastapi import BackgroundTasks, FastAPI, HTTPException" in source
+    assert "from fastapi import BackgroundTasks, Body, FastAPI, HTTPException" in source
+    assert "payload: dict[str, Any] | None = Body(default=None)" in source
     assert "HTTPException" in source
     assert "from .api_refresh import create_refresh_job, get_refresh_job, list_refresh_events, queued_refresh_response" in source
     assert "from .api_refresh_runner import run_refresh_job" in source
