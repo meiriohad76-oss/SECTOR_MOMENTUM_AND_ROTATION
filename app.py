@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 from datetime import datetime, timedelta, timezone
+from html import escape as html_escape
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -205,7 +206,20 @@ def _browser_qa_query_enabled(name: str) -> bool:
     return _browser_qa_query_value(name).lower() in {"1", "true", "yes", "on"}
 
 
-def render_loading_state(placeholder, label: str, card_count: int = 4) -> None:
+def render_loading_state(
+    placeholder,
+    label: str,
+    card_count: int = 4,
+    *,
+    progress: int | float | None = None,
+    phase: str | None = None,
+    detail: str | None = None,
+    right_label: str = "FETCHING",
+) -> None:
+    progress_value = max(0, min(100, int(progress if progress is not None else 0)))
+    phase_text = html_escape(str(phase or label), quote=True)
+    detail_text = html_escape(str(detail or "Preparing dashboard data without blocking the page chrome."), quote=True)
+    right_text = html_escape(str(right_label), quote=True)
     cards = ""
     for slot in loading_skeleton_slots(card_count):
         cards += f"""
@@ -220,16 +234,47 @@ def render_loading_state(placeholder, label: str, card_count: int = 4) -> None:
     <div class="app loading-app">
       <section class="section loading-state" aria-live="polite" aria-busy="true">
         <div class="section-head">
-          <h2>{label}</h2>
-          <div class="right">FETCHING</div>
+          <h2>{html_escape(str(label), quote=True)}</h2>
+          <div class="right">{right_text}</div>
         </div>
-        <div class="loading-copy">Preparing dashboard data without blocking the page chrome.</div>
+        <div class="refresh-progress" role="status" aria-label="Data refresh progress">
+          <div class="refresh-progress-row">
+            <b>{phase_text}</b>
+            <span>{progress_value}%</span>
+          </div>
+          <div class="refresh-progress-track" aria-hidden="true">
+            <span style="width:{progress_value}%"></span>
+          </div>
+          <div class="loading-copy">{detail_text}</div>
+        </div>
         <div class="picks-grid skeleton-grid">{cards}</div>
       </section>
     </div>
     """
     cleaned = "\n".join(line.lstrip() for line in html.split("\n"))
     placeholder.markdown(cleaned, unsafe_allow_html=True)
+
+
+def _refresh_loading_detail() -> str:
+    lane_id = str(st.session_state.get("data_refresh_lane") or "initial load")
+    provider = _select_ohlcv_provider(None)
+    requested_at = st.session_state.get("data_refresh_requested_at")
+    if requested_at:
+        return f"Lane {lane_id}; provider {provider}; requested {requested_at}."
+    return f"Initial dashboard load; provider {provider}; cache may be reused when fresh."
+
+
+def _provider_result_summary(result) -> str:
+    fetched = len(getattr(result, "fetched", ()) or ())
+    fresh_cache = len(getattr(result, "fresh_cache_hits", ()) or ())
+    stale_cache = len(getattr(result, "stale_cache_hits", ()) or ())
+    missing = len(getattr(result, "missing", ()) or ())
+    warnings = len(getattr(result, "warnings", ()) or ())
+    provider = str(getattr(result, "provider", _select_ohlcv_provider(None)))
+    return (
+        f"{provider}: {fetched} live/provider rows, {fresh_cache} fresh cache, "
+        f"{stale_cache} stale cache, {missing} missing, {warnings} warnings."
+    )
 
 
 
@@ -1009,12 +1054,43 @@ if _REUSED_COMPUTE_SNAPSHOT:
     _render_browser_qa_provider_banner()
 else:
     loading_placeholder = st.empty()
-    render_loading_state(loading_placeholder, "Loading market data", card_count=4)
+    render_loading_state(
+        loading_placeholder,
+        "Refreshing dashboard data" if st.session_state.get("data_refresh_requested_at") else "Loading dashboard data",
+        card_count=4,
+        progress=8,
+        phase="Refresh request accepted" if st.session_state.get("data_refresh_requested_at") else "Initial load started",
+        detail=_refresh_loading_detail(),
+        right_label="RUNNING",
+    )
     try:
         with PERF_AUDIT.section("load_data"):
             refresh_token = st.session_state.get("data_refresh_token")
             fred_refresh_token = st.session_state.get("fred_refresh_token")
+            render_loading_state(
+                loading_placeholder,
+                "Refreshing dashboard data" if refresh_token else "Loading dashboard data",
+                card_count=4,
+                progress=22,
+                phase="Downloading and extracting market OHLCV",
+                detail=(
+                    f"Provider {_select_ohlcv_provider(None)} is loading {len(DATA_SYMBOLS)} symbols. "
+                    "Manual refresh bypasses the persistent cache for this lane."
+                    if refresh_token
+                    else f"Provider {_select_ohlcv_provider(None)} is loading {len(DATA_SYMBOLS)} symbols; fresh cache can be reused."
+                ),
+                right_label="MARKET DATA",
+            )
             ohlcv_result = _load_data("3y", refresh_token=refresh_token)
+            render_loading_state(
+                loading_placeholder,
+                "Refreshing dashboard data",
+                card_count=4,
+                progress=48,
+                phase="Market OHLCV loaded",
+                detail=_provider_result_summary(ohlcv_result),
+                right_label="OHLCV READY",
+            )
             render_provider_status_banner(ohlcv_result)
             _render_browser_qa_provider_banner()
             ohlcv = ohlcv_result.data
@@ -1027,13 +1103,46 @@ else:
         with PERF_AUDIT.section("compute_signals"):
             scoring_ohlcv = {t: ohlcv[t] for t in ALL_TICKERS if t in ohlcv}
 
-            render_loading_state(loading_placeholder, "Computing indicators", card_count=4)
+            render_loading_state(
+                loading_placeholder,
+                "Refreshing dashboard data",
+                card_count=4,
+                progress=62,
+                phase="Loading FRED macro/regime data",
+                detail=(
+                    "Fetching configured FRED series for business-cycle and macro context."
+                    if fred_available()
+                    else "FRED is not configured; supported fallback macro context will be used."
+                ),
+                right_label="FRED",
+            )
+            _fred_data = _load_fred(refresh_token=fred_refresh_token)
+            render_loading_state(
+                loading_placeholder,
+                "Refreshing dashboard data",
+                card_count=4,
+                progress=78,
+                phase="Computing indicators and scoring",
+                detail=(
+                    f"Computing trend, momentum, flow, RRG, and state-machine signals for "
+                    f"{len(scoring_ohlcv)} instruments; FRED series loaded: {len(_fred_data)}."
+                ),
+                right_label="SCORING",
+            )
             indicators_df = compute_all_indicators(scoring_ohlcv, bench_ticker, bil_ticker)
             flow_df = compute_flow_signals(scoring_ohlcv)
             flow_z = flow_composite_z(flow_df)
-            _fred_data = _load_fred(refresh_token=fred_refresh_token)
             regime = assess_regime(ohlcv[bench_ticker], ohlcv.get("^TNX"), ohlcv.get("^IRX"), fred_cache=_fred_data)
             scored = compute_composite(indicators_df, flow_df, flow_z, phase=regime.phase_hint)
+            render_loading_state(
+                loading_placeholder,
+                "Refreshing dashboard data",
+                card_count=4,
+                progress=90,
+                phase="Persisting state transitions",
+                detail=f"Applying state machine and recording transition evidence for {len(scored)} scored instruments.",
+                right_label="STATE",
+            )
             scored = apply_state_machine(scored)
             _COMPUTE_SNAPSHOT_CREATED_AT = datetime.now().timestamp()
             dashboard_compute_created_at = _COMPUTE_SNAPSHOT_CREATED_AT
@@ -1046,6 +1155,26 @@ else:
                 "created_at": _COMPUTE_SNAPSHOT_CREATED_AT,
             }
             _mark_data_refresh_completed(ohlcv_result)
+            render_loading_state(
+                loading_placeholder,
+                "Refreshing dashboard data",
+                card_count=4,
+                progress=100,
+                phase="Refresh complete",
+                detail=f"{_provider_result_summary(ohlcv_result)} Dashboard snapshot updated for {len(scored)} scored instruments.",
+                right_label="COMPLETE",
+            )
+    except Exception as exc:
+        render_loading_state(
+            loading_placeholder,
+            "Refresh failed",
+            card_count=4,
+            progress=100,
+            phase="Refresh failed before dashboard render",
+            detail=f"{type(exc).__name__}: {exc}",
+            right_label="FAILED",
+        )
+        raise
     finally:
         loading_placeholder.empty()
 

@@ -1125,6 +1125,48 @@ div[data-testid="stTextArea"] label span {
   margin-bottom: 14px;
   text-transform: uppercase;
 }
+.refresh-progress {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  margin-bottom: 14px;
+  padding: 12px;
+}
+.refresh-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.refresh-progress-row span {
+  color: var(--accent);
+  white-space: nowrap;
+}
+.refresh-progress-track {
+  height: 9px;
+  border-radius: 999px;
+  background: var(--border);
+  margin-top: 10px;
+  overflow: hidden;
+}
+.refresh-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--green));
+  transition: width 180ms ease;
+}
+.refresh-progress .loading-copy {
+  margin: 10px 0 0;
+  text-transform: none;
+  letter-spacing: 0;
+}
 .skeleton-grid {
   pointer-events: none;
 }
