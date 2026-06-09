@@ -207,6 +207,13 @@ export type TickerFlowPoint = {
   obv: number | null;
 };
 
+export type TickerRelativeStrengthPoint = {
+  date: string;
+  rs_ratio: number | null;
+  momentum_12w: number | null;
+  momentum_52w: number | null;
+};
+
 export type TickerChartPayload = {
   api_version: string;
   generated_at: string;
@@ -221,6 +228,8 @@ export type TickerChartPayload = {
     updated_at: string;
     row_count: number;
     weekly_row_count: number;
+    benchmark: string;
+    benchmark_available: boolean;
   };
   latest: {
     date: string;
@@ -231,9 +240,14 @@ export type TickerChartPayload = {
     cmf21: number | null;
     obv: number | null;
     obv_slope: number | null;
+    rs_ratio: number | null;
+    rs_slope: number | null;
+    momentum_12w: number | null;
+    momentum_52w: number | null;
   };
   series: TickerChartPoint[];
   flow_series: TickerFlowPoint[];
+  relative_strength_series: TickerRelativeStrengthPoint[];
 };
 
 export type PortfolioAnalysisRequest = {
@@ -376,8 +390,10 @@ export async function fetchBacktestArtifacts() {
   return fetchDashboardApi<BacktestArtifactsPayload>("/api/v1/backtest-artifacts");
 }
 
-export async function fetchTickerChart(ticker: string, period = "3y") {
-  const query = `?ticker=${encodeURIComponent(ticker)}&period=${encodeURIComponent(period)}`;
+export async function fetchTickerChart(ticker: string, period = "3y", benchmark?: string) {
+  const query =
+    `?ticker=${encodeURIComponent(ticker)}&period=${encodeURIComponent(period)}` +
+    (benchmark ? `&benchmark=${encodeURIComponent(benchmark)}` : "");
   return fetchDashboardApi<TickerChartPayload>(`/api/v1/ticker-chart${query}`);
 }
 

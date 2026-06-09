@@ -45,7 +45,7 @@ def test_next_shell_fetches_real_api_health_and_data_health_paths():
     assert "fetch(" not in page_source
     assert 'fetchDashboardSnapshot(ticker?: string)' in api_source
     assert "fetchBacktestArtifacts()" in api_source
-    assert "fetchTickerChart(ticker: string, period = \"3y\")" in api_source
+    assert "fetchTickerChart(ticker: string, period = \"3y\", benchmark?: string)" in api_source
     assert "analyzePortfolio(payload: PortfolioAnalysisRequest)" in api_source
     assert 'fetch("' not in client_source
 
@@ -221,7 +221,12 @@ def test_next_shell_deep_dive_fetches_cached_ticker_chart_without_fixture_data()
         "TickerChartPayload",
         "TickerChartPoint",
         "TickerFlowPoint",
+        "TickerRelativeStrengthPoint",
         "/api/v1/ticker-chart",
+        "relative_strength_series",
+        "momentum_12w",
+        "momentum_52w",
+        "fetchTickerChart(ticker: string, period = \"3y\", benchmark?: string)",
     ):
         assert marker in api_source
     for marker in (
@@ -238,6 +243,11 @@ def test_next_shell_deep_dive_fetches_cached_ticker_chart_without_fixture_data()
         "CMF(21)",
         "OBV slope",
         "<TickerFlowChartPanels row={focus} />",
+        "TickerRelativeStrengthPanel",
+        "RelativeMiniLine",
+        "payload?.relative_strength_series",
+        "Relative strength + momentum",
+        "<TickerRelativeStrengthPanel row={focus} />",
     ):
         assert marker in client_source
     for marker in (
@@ -250,6 +260,8 @@ def test_next_shell_deep_dive_fetches_cached_ticker_chart_without_fixture_data()
         ".flow-evidence-grid",
         ".flow-mini-chart.cmf-line",
         ".flow-mini-chart.obv-line",
+        ".flow-mini-chart.rs-line",
+        ".flow-mini-chart.momentum-line",
     ):
         assert marker in css_source
     for forbidden in ("sample close", "demo price", "fixture price"):

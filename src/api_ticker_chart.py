@@ -10,6 +10,7 @@ import pandas as pd
 from .data import close_price, to_weekly
 from .ohlcv_store import read_cached_ohlcv_metadata
 from .ticker_identity import ticker_display_name
+from .universe import BENCH
 
 
 def build_ticker_chart_payload(
@@ -18,14 +19,16 @@ def build_ticker_chart_payload(
     period: str = "3y",
     cache_path: str | Path | None = None,
     max_points: int = 180,
+    benchmark: str | None = None,
 ) -> dict[str, Any]:
     """Return cached weekly price + 30wMA data without provider fetches."""
 
     symbol = str(ticker or "").strip().upper()
+    benchmark_symbol = str(benchmark or BENCH["US"]).strip().upper()
     if not symbol:
         return _empty_payload("", period, "Ticker is required.")
     metadata = read_cached_ohlcv_metadata(
-        [symbol],
+        [symbol, benchmark_symbol],
         period=period,
         cache_path=cache_path,
         allow_stale=True,
@@ -53,6 +56,13 @@ def build_ticker_chart_payload(
         slope_30w = float(ma30.dropna().iloc[-1] - ma30.dropna().iloc[-2])
     flow_frame = _flow_frame(frame, max_points=max_points)
     latest_flow = flow_frame.iloc[-1].to_dict() if not flow_frame.empty else {}
+    benchmark_frame = metadata.get(benchmark_symbol, {}).get("frame") if benchmark_symbol else None
+    rs_frame = _relative_strength_frame(
+        frame,
+        benchmark_frame if isinstance(benchmark_frame, pd.DataFrame) else pd.DataFrame(),
+        max_points=max_points,
+    )
+    latest_rs = rs_frame.iloc[-1].to_dict() if not rs_frame.empty else {}
 
     return {
         "api_version": "v1",
@@ -68,6 +78,8 @@ def build_ticker_chart_payload(
             "updated_at": str(entry.get("updated_at") or ""),
             "row_count": int(len(frame)),
             "weekly_row_count": int(len(rows)),
+            "benchmark": benchmark_symbol,
+            "benchmark_available": bool(isinstance(benchmark_frame, pd.DataFrame) and not benchmark_frame.empty),
         },
         "latest": {
             "date": _date_text(latest.get("date")),
@@ -78,6 +90,10 @@ def build_ticker_chart_payload(
             "cmf21": _float_or_none(latest_flow.get("cmf21")),
             "obv": _float_or_none(latest_flow.get("obv")),
             "obv_slope": _obv_slope(flow_frame["obv"]) if "obv" in flow_frame else None,
+            "rs_ratio": _float_or_none(latest_rs.get("rs_ratio")),
+            "rs_slope": _series_slope(rs_frame["rs_ratio"]) if "rs_ratio" in rs_frame else None,
+            "momentum_12w": _float_or_none(latest_rs.get("momentum_12w")),
+            "momentum_52w": _float_or_none(latest_rs.get("momentum_52w")),
         },
         "series": [
             {
@@ -95,6 +111,15 @@ def build_ticker_chart_payload(
             }
             for row in flow_frame.to_dict(orient="records")
         ],
+        "relative_strength_series": [
+            {
+                "date": _date_text(row["date"]),
+                "rs_ratio": _float_or_none(row["rs_ratio"]),
+                "momentum_12w": _float_or_none(row["momentum_12w"]),
+                "momentum_52w": _float_or_none(row["momentum_52w"]),
+            }
+            for row in rs_frame.to_dict(orient="records")
+        ],
     }
 
 
@@ -108,7 +133,15 @@ def _empty_payload(ticker: str, period: str, message: str) -> dict[str, Any]:
         "ticker": symbol,
         "identity": ticker_display_name(symbol) if symbol else "",
         "period": period,
-        "source": {"mode": "cache-only", "provider": "", "updated_at": "", "row_count": 0, "weekly_row_count": 0},
+        "source": {
+            "mode": "cache-only",
+            "provider": "",
+            "updated_at": "",
+            "row_count": 0,
+            "weekly_row_count": 0,
+            "benchmark": BENCH["US"],
+            "benchmark_available": False,
+        },
         "latest": {
             "date": "",
             "close": None,
@@ -118,9 +151,14 @@ def _empty_payload(ticker: str, period: str, message: str) -> dict[str, Any]:
             "cmf21": None,
             "obv": None,
             "obv_slope": None,
+            "rs_ratio": None,
+            "rs_slope": None,
+            "momentum_12w": None,
+            "momentum_52w": None,
         },
         "series": [],
         "flow_series": [],
+        "relative_strength_series": [],
     }
 
 
@@ -152,6 +190,47 @@ def _obv_slope(obv: pd.Series) -> float | None:
     delta = float(values.iloc[-1] - values.iloc[0])
     normalizer = float(values.abs().mean()) or 1.0
     return delta / normalizer
+
+
+def _relative_strength_frame(
+    frame: pd.DataFrame,
+    benchmark_frame: pd.DataFrame,
+    *,
+    max_points: int,
+) -> pd.DataFrame:
+    if frame.empty or benchmark_frame.empty:
+        return pd.DataFrame(columns=["date", "rs_ratio", "momentum_12w", "momentum_52w"])
+    weekly = to_weekly(frame).dropna(subset=["close"])
+    benchmark_weekly = to_weekly(benchmark_frame).dropna(subset=["close"])
+    if weekly.empty or benchmark_weekly.empty:
+        return pd.DataFrame(columns=["date", "rs_ratio", "momentum_12w", "momentum_52w"])
+    close = close_price(weekly).astype(float)
+    benchmark_close = close_price(benchmark_weekly).astype(float)
+    aligned = pd.concat({"close": close, "benchmark": benchmark_close}, axis=1).dropna()
+    aligned = aligned[(aligned["close"] > 0) & (aligned["benchmark"] > 0)]
+    if aligned.empty:
+        return pd.DataFrame(columns=["date", "rs_ratio", "momentum_12w", "momentum_52w"])
+    relative = aligned["close"] / aligned["benchmark"]
+    base = float(relative.iloc[0]) or 1.0
+    rs_ratio = relative / base * 100.0
+    momentum_12w = aligned["close"].pct_change(12)
+    momentum_52w = aligned["close"].pct_change(52)
+    rows = pd.DataFrame(
+        {
+            "date": aligned.index,
+            "rs_ratio": rs_ratio.to_numpy(),
+            "momentum_12w": momentum_12w.to_numpy(),
+            "momentum_52w": momentum_52w.to_numpy(),
+        }
+    )
+    return rows.dropna(how="all", subset=["rs_ratio", "momentum_12w", "momentum_52w"]).tail(max(1, int(max_points)))
+
+
+def _series_slope(series: pd.Series) -> float | None:
+    values = pd.to_numeric(series, errors="coerce").dropna().tail(12)
+    if len(values) < 2:
+        return None
+    return float(values.iloc[-1] - values.iloc[0])
 
 
 def _float_or_none(value: Any) -> float | None:

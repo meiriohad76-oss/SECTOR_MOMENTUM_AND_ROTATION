@@ -254,9 +254,9 @@ def test_ticker_chart_endpoint_uses_injected_provider():
     )
     client = TestClient(app)
 
-    response = client.get("/api/v1/ticker-chart?ticker=XLK&period=1y")
+    response = client.get("/api/v1/ticker-chart?ticker=XLK&period=1y&benchmark=ACWI")
 
     assert response.status_code == 200
     assert response.json()["ticker"] == "XLK"
     assert response.json()["period"] == "1y"
-    assert calls == [{"ticker": "XLK", "period": "1y"}]
+    assert calls == [{"ticker": "XLK", "period": "1y", "benchmark": "ACWI"}]

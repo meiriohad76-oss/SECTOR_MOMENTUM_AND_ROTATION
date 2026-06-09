@@ -658,6 +658,14 @@ main {
   stroke: #3b6fb6;
 }
 
+.flow-mini-chart.rs-line polyline {
+  stroke: #7a5ad8;
+}
+
+.flow-mini-chart.momentum-line polyline {
+  stroke: #d18b25;
+}
+
 .flow-mini-chart .zero-line {
   stroke: #bcb2a6;
   stroke-width: 1;

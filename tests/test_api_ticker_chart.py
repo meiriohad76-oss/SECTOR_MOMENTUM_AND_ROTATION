@@ -29,7 +29,8 @@ def _daily_frame(days: int = 320, end: date | None = None) -> pd.DataFrame:
 def test_ticker_chart_payload_reads_cached_ohlcv_without_provider_fetch(tmp_path):
     cache_path = tmp_path / "ohlcv.duckdb"
     frame = _daily_frame()
-    write_cached_ohlcv({"XLK": frame}, cache_path=cache_path, provider="massive")
+    benchmark = _daily_frame() * 0.75
+    write_cached_ohlcv({"XLK": frame, "SPY": benchmark}, cache_path=cache_path, provider="massive")
 
     payload = build_ticker_chart_payload("xlk", period="1y", cache_path=cache_path, max_points=20)
 
@@ -38,6 +39,8 @@ def test_ticker_chart_payload_reads_cached_ohlcv_without_provider_fetch(tmp_path
     assert payload["identity"]
     assert payload["source"]["mode"] == "cache-only"
     assert payload["source"]["provider"] == "massive"
+    assert payload["source"]["benchmark"] == "SPY"
+    assert payload["source"]["benchmark_available"] is True
     assert payload["source"]["row_count"] > 30
     assert 1 <= len(payload["series"]) <= 20
     assert payload["series"][-1]["close"] == frame["close"].iloc[-1]
@@ -48,6 +51,12 @@ def test_ticker_chart_payload_reads_cached_ohlcv_without_provider_fetch(tmp_path
     assert payload["flow_series"][-1]["obv"] is not None
     assert payload["latest"]["cmf21"] == payload["flow_series"][-1]["cmf21"]
     assert payload["latest"]["obv_slope"] is not None
+    assert payload["relative_strength_series"]
+    assert payload["relative_strength_series"][-1]["rs_ratio"] is not None
+    assert payload["relative_strength_series"][-1]["momentum_12w"] is not None
+    assert payload["latest"]["rs_ratio"] == payload["relative_strength_series"][-1]["rs_ratio"]
+    assert payload["latest"]["rs_slope"] is not None
+    assert payload["latest"]["momentum_12w"] == payload["relative_strength_series"][-1]["momentum_12w"]
 
 
 def test_ticker_chart_payload_fails_closed_when_cache_missing(tmp_path):
@@ -57,4 +66,6 @@ def test_ticker_chart_payload_fails_closed_when_cache_missing(tmp_path):
     assert payload["ticker"] == "MISSING"
     assert payload["series"] == []
     assert payload["flow_series"] == []
+    assert payload["relative_strength_series"] == []
     assert payload["source"]["mode"] == "cache-only"
+    assert payload["source"]["benchmark_available"] is False

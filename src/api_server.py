@@ -120,8 +120,11 @@ def create_app(
         return backtest_reader()
 
     @app.get("/api/v1/ticker-chart")
-    def ticker_chart(ticker: str, period: str = "3y") -> dict[str, Any]:
-        return ticker_chart_reader(ticker=ticker, period=period)
+    def ticker_chart(ticker: str, period: str = "3y", benchmark: str | None = None) -> dict[str, Any]:
+        kwargs = {"ticker": ticker, "period": period}
+        if benchmark:
+            kwargs["benchmark"] = benchmark
+        return ticker_chart_reader(**kwargs)
 
     @app.post("/api/v1/portfolio/analyze")
     def portfolio_analyze(payload: dict[str, Any] | None = Body(default=None)) -> dict[str, Any]:

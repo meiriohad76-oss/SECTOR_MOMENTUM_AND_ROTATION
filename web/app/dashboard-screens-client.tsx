@@ -1056,6 +1056,7 @@ function CDeepDiveScreen({
           <div className="c-sec-head"><strong>Plain-English read</strong><span>latest saved run</span></div>
           <p>{focus.display_label} currently has S {fmt(focus.s_score)} and F {fmt(focus.f_score)}. A positive S means the pillar stack leans bullish; a negative F means flow is acting as a drag before price/trend may fully react.</p>
         </div>
+        <TickerRelativeStrengthPanel row={focus} />
         <TickerFlowChartPanels row={focus} />
       </div>
     </section>
@@ -1202,6 +1203,91 @@ function FlowMiniLine({
       {valueKey === "cmf21" ? <line x1={pad} x2={width - pad} y1={zeroY} y2={zeroY} className="zero-line" /> : null}
       <polyline points={line} />
     </svg>
+  );
+}
+
+function RelativeMiniLine({
+  points,
+  valueKey,
+  className,
+  ariaLabel,
+}: {
+  points: { date: string; rs_ratio: number | null; momentum_12w: number | null; momentum_52w: number | null }[];
+  valueKey: "rs_ratio" | "momentum_12w" | "momentum_52w";
+  className: string;
+  ariaLabel: string;
+}) {
+  const series = points.filter((point) => typeof point[valueKey] === "number");
+  const width = 360;
+  const height = 130;
+  const pad = 18;
+  const values = series.map((point) => point[valueKey]).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  const baseline = valueKey === "rs_ratio" ? 100 : 0;
+  const min = values.length ? Math.min(...values, baseline) : baseline - 1;
+  const max = values.length ? Math.max(...values, baseline) : baseline + 1;
+  const span = Math.max(max - min, 0.000001);
+  const x = (index: number) => pad + (series.length <= 1 ? 0 : index / (series.length - 1) * (width - pad * 2));
+  const y = (value: number) => pad + (max - value) / span * (height - pad * 2);
+  const line = values.map((value, index) => `${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(" ");
+  return (
+    <svg className={`flow-mini-chart ${className}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
+      <line x1={pad} x2={width - pad} y1={y(baseline)} y2={y(baseline)} className="zero-line" />
+      <polyline points={line} />
+    </svg>
+  );
+}
+
+function TickerRelativeStrengthPanel({ row }: { row: SnapshotRow }) {
+  const [payload, setPayload] = useState<TickerChartPayload | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchTickerChart(row.ticker, "3y").then((response) => {
+      if (cancelled) return;
+      setPayload(response.ok ? response.data : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [row.ticker]);
+
+  const points = payload?.relative_strength_series ?? [];
+  if (payload?.status !== "ready" || !points.length) {
+    return (
+      <div className="c-gate-card c-flow-evidence-panel">
+        <div className="c-sec-head"><strong>Relative strength + momentum</strong><span>cached benchmark unavailable</span></div>
+        <p>Cached benchmark-relative charts are unavailable. The latest saved snapshot still reports RRG {row.quadrant}, RS ratio {fmt(row.rs_ratio, 1)}, RS momentum {fmt(row.rs_momentum, 1)}, and momentum {fmt(row.momentum_pct, 2)}.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="c-gate-card c-flow-evidence-panel">
+      <div className="c-sec-head">
+        <strong>Relative strength + momentum</strong>
+        <span>vs {payload.source.benchmark || "benchmark"}</span>
+      </div>
+      <div className="flow-evidence-grid">
+        <div>
+          <div className="flow-evidence-head">
+            <span>RS ratio</span>
+            <strong className={toneForBool(payload.latest.rs_ratio === null ? null : payload.latest.rs_ratio >= 100)}>{fmt(payload.latest.rs_ratio, 1)}</strong>
+          </div>
+          <RelativeMiniLine points={points} valueKey="rs_ratio" className="rs-line" ariaLabel={`${row.display_label} relative strength ratio chart`} />
+          <p>Above 100 means {row.ticker} has outperformed {payload.source.benchmark || "the benchmark"} over this cached window; falling RS warns that leadership is fading.</p>
+        </div>
+        <div>
+          <div className="flow-evidence-head">
+            <span>12w / 52w momentum</span>
+            <strong className={toneForBool(payload.latest.momentum_12w === null ? null : payload.latest.momentum_12w >= 0)}>
+              {pct(payload.latest.momentum_12w, 1)} / {pct(payload.latest.momentum_52w, 1)}
+            </strong>
+          </div>
+          <RelativeMiniLine points={points} valueKey="momentum_12w" className="momentum-line" ariaLabel={`${row.display_label} 12 week momentum chart`} />
+          <p>Shorter momentum shows recent acceleration; 52-week momentum gives the slower trend backdrop used to interpret the stage label.</p>
+        </div>
+      </div>
+    </div>
   );
 }
 

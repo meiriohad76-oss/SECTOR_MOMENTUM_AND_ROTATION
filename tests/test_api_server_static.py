@@ -39,7 +39,8 @@ def test_api_server_is_optional_fastapi_boundary_not_streamlit_import():
     assert 'app.get("/api/v1/backtest-artifacts")' in source
     assert 'app.get("/api/v1/ticker-chart")' in source
     assert "return backtest_reader()" in source
-    assert "return ticker_chart_reader(ticker=ticker, period=period)" in source
+    assert 'def ticker_chart(ticker: str, period: str = "3y", benchmark: str | None = None)' in source
+    assert "return ticker_chart_reader(**kwargs)" in source
     assert 'app.post("/api/v1/portfolio/analyze")' in source
     assert 'app.get("/api/v1/portfolios")' in source
     assert 'app.post("/api/v1/portfolios")' in source
