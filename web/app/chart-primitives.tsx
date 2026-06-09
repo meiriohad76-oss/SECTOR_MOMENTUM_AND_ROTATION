@@ -139,6 +139,8 @@ export function PillarStackBar({ row }: { row: SnapshotRow }) {
   let negativeOffset = 0;
   return (
     <div className="pillar-stack" aria-label={`${row.ticker} pillar stack`}>
+      <div className="pillar-quarter left" />
+      <div className="pillar-quarter right" />
       <div className="pillar-midline" />
       {contributions.map((pillar) => {
         const width = Math.max(2, Math.abs(pillar.contribution) / maxSide * 44);

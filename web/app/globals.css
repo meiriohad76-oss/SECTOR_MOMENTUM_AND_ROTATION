@@ -3169,11 +3169,12 @@ select:focus-visible {
 
 .pillar-stack {
   position: relative;
-  height: 14px;
-  background: #ede7dd;
-  border: 1px solid #d8d0c4;
-  border-radius: 999px;
+  width: min(460px, 100%);
+  height: 22px;
   overflow: hidden;
+  background:
+    linear-gradient(to right, transparent 0 49.9%, rgba(212, 206, 193, 0.55) 49.9% 50.1%, transparent 50.1%),
+    linear-gradient(to bottom, transparent 0 45%, #f4f1ec 45% 55%, transparent 55%);
 }
 
 .pillar-midline {
@@ -3182,15 +3183,31 @@ select:focus-visible {
   bottom: 0;
   left: 50%;
   width: 1px;
-  background: rgba(26, 23, 20, 0.42);
+  background: #d4cec1;
   z-index: 2;
+}
+
+.pillar-quarter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #e6e1d8;
+}
+
+.pillar-quarter.left {
+  left: 25%;
+}
+
+.pillar-quarter.right {
+  left: 75%;
 }
 
 .pillar-segment {
   position: absolute;
-  top: 2px;
-  height: 8px;
-  border-radius: 999px;
+  top: 3px;
+  height: 16px;
+  border-radius: 0;
 }
 
 .waterfall-chart,
