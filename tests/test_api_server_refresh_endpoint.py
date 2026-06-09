@@ -68,3 +68,40 @@ def test_refresh_endpoint_can_run_worker_synchronously_when_explicitly_requested
         "provider_flow_mode": "cache-only",
         "allow_stale_provider_cache": True,
     }
+
+
+def test_data_health_and_provider_health_endpoints_use_injected_provider():
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from src.api_server import create_app
+
+    payload = {
+        "api_version": "v1",
+        "generated_at": "2026-06-09T10:00:00+00:00",
+        "app": {"name": "sector-momentum-dashboard"},
+        "health": {"status": "warning"},
+        "provider_flow": {"provider_count": 2},
+        "lanes": [
+            {"lane_id": "state_persistence", "status": "healthy"},
+            {"lane_id": "provider_flow_readiness", "status": "warning"},
+            {"lane_id": "provider_flow_cache", "status": "warning"},
+        ],
+    }
+    app = create_app(
+        status_provider=lambda: {"ok": True},
+        data_health_provider=lambda: payload,
+    )
+    client = TestClient(app)
+
+    data_health = client.get("/api/v1/data-health")
+    provider_health = client.get("/api/v1/provider-health")
+
+    assert data_health.status_code == 200
+    assert data_health.json() == payload
+    assert provider_health.status_code == 200
+    assert [lane["lane_id"] for lane in provider_health.json()["lanes"]] == [
+        "provider_flow_readiness",
+        "provider_flow_cache",
+    ]
+    assert provider_health.json()["provider_flow"] == {"provider_count": 2}

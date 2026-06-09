@@ -22,6 +22,9 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - [x] Declare `fastapi` and `uvicorn` in `requirements.txt`.
 - [x] Add tests proving the API contract is Streamlit-free and provider-fetch-free.
 - [x] Add a real API status provider that reads the latest persisted Pi state, run journal, and provider snapshots without recomputing the dashboard.
+- [x] Add API-backed provider/data-health endpoints:
+  - `GET /api/v1/data-health`
+  - `GET /api/v1/provider-health`
 - [x] Add async refresh job endpoints:
   - `POST /api/v1/refresh`
   - `GET /api/v1/refresh/{job_id}`
@@ -41,4 +44,5 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - The API contract is pure and unit tested.
 - The optional API server can be enabled after installing dependencies.
 - The refresh runner is explicit opt-in from the API (`run_now: true`) and remains queue-only by default.
+- Data/provider-health endpoints are read-only and do not call live providers.
 - The backlog records the migration as started, not complete.

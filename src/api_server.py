@@ -11,6 +11,7 @@ from typing import Any
 
 from .api_refresh import create_refresh_job, get_refresh_job, list_refresh_events, queued_refresh_response
 from .api_refresh_runner import run_refresh_job
+from .api_data_health import build_provider_data_health_payload
 from .api_status import build_persisted_status_payload
 
 try:
@@ -23,6 +24,7 @@ except ModuleNotFoundError:  # pragma: no cover - create_app reports the missing
 
 
 StatusProvider = Callable[[], dict[str, Any]]
+DataHealthProvider = Callable[[], dict[str, Any]]
 RefreshRunner = Callable[..., dict[str, Any]]
 
 
@@ -31,7 +33,16 @@ def default_status_provider() -> dict[str, Any]:
     return build_persisted_status_payload()
 
 
-def create_app(status_provider: StatusProvider | None = None, refresh_runner: RefreshRunner | None = None):
+def default_data_health_provider() -> dict[str, Any]:
+    """Return read-only provider/data health for future API clients."""
+    return build_provider_data_health_payload()
+
+
+def create_app(
+    status_provider: StatusProvider | None = None,
+    refresh_runner: RefreshRunner | None = None,
+    data_health_provider: DataHealthProvider | None = None,
+):
     """Create the optional FastAPI app without making FastAPI mandatory at import time."""
     try:
         from fastapi import FastAPI, HTTPException
@@ -39,6 +50,7 @@ def create_app(status_provider: StatusProvider | None = None, refresh_runner: Re
         raise RuntimeError("FastAPI is not installed. Install requirements.txt to run the API server.") from exc
 
     provider = status_provider or default_status_provider
+    data_provider = data_health_provider or default_data_health_provider
     runner = refresh_runner or run_refresh_job
     app = FastAPI(
         title="Sector Momentum Dashboard API",
@@ -53,6 +65,27 @@ def create_app(status_provider: StatusProvider | None = None, refresh_runner: Re
     @app.get("/api/v1/status")
     def status() -> dict[str, Any]:
         return provider()
+
+    @app.get("/api/v1/data-health")
+    def data_health() -> dict[str, Any]:
+        return data_provider()
+
+    @app.get("/api/v1/provider-health")
+    def provider_health() -> dict[str, Any]:
+        payload = data_provider()
+        lanes = [
+            lane
+            for lane in payload.get("lanes", [])
+            if str(lane.get("lane_id", "")).startswith("provider_")
+        ]
+        return {
+            "api_version": payload.get("api_version", "v1"),
+            "generated_at": payload.get("generated_at", ""),
+            "app": payload.get("app", {}),
+            "health": payload.get("health", {}),
+            "provider_flow": payload.get("provider_flow", {}),
+            "lanes": lanes,
+        }
 
     @app.post("/api/v1/refresh", status_code=202)
     def create_refresh(
