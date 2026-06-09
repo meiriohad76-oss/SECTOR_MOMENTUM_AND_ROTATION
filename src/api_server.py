@@ -12,6 +12,11 @@ from typing import Any
 from .api_backtest_artifacts import build_backtest_artifacts_payload
 from .api_refresh import create_refresh_job, get_refresh_job, list_refresh_events, queued_refresh_response
 from .api_refresh_runner import run_refresh_job
+from .api_saved_portfolios import (
+    build_saved_portfolios_payload,
+    delete_saved_portfolio_payload,
+    save_saved_portfolio_payload,
+)
 from .api_data_health import build_provider_data_health_payload
 from .api_dashboard_snapshot import build_latest_dashboard_snapshot_payload
 from .api_portfolio import build_portfolio_analysis_payload
@@ -57,6 +62,7 @@ def create_app(
     snapshot_provider: SnapshotProvider | None = None,
     backtest_artifacts_provider: BacktestArtifactsProvider | None = None,
     ticker_chart_provider: TickerChartProvider | None = None,
+    saved_inputs_path: str | None = None,
 ):
     """Create the optional FastAPI app without making FastAPI mandatory at import time."""
     try:
@@ -121,6 +127,18 @@ def create_app(
     def portfolio_analyze(payload: dict[str, Any] | None = Body(default=None)) -> dict[str, Any]:
         snapshot = snapshot_reader()
         return build_portfolio_analysis_payload(payload or {}, snapshot_payload=snapshot)
+
+    @app.get("/api/v1/portfolios")
+    def saved_portfolios() -> dict[str, Any]:
+        return build_saved_portfolios_payload(saved_inputs_path)
+
+    @app.post("/api/v1/portfolios")
+    def save_saved_portfolio(payload: dict[str, Any] | None = Body(default=None)) -> dict[str, Any]:
+        return save_saved_portfolio_payload(payload or {}, path=saved_inputs_path)
+
+    @app.delete("/api/v1/portfolios")
+    def delete_saved_portfolio(name: str) -> dict[str, Any]:
+        return delete_saved_portfolio_payload(name, path=saved_inputs_path)
 
     @app.post("/api/v1/refresh", status_code=202)
     def create_refresh(

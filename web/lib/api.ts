@@ -244,6 +244,46 @@ export type PortfolioAnalysisRequest = {
   holdings?: Record<string, unknown>[];
 };
 
+export type SavedPortfolioHolding = {
+  ticker: string;
+  shares: number | null;
+  cost_basis: number | null;
+  market_value: number | null;
+  weight: number | null;
+  sector: string | null;
+  account: string | null;
+  notes: string | null;
+};
+
+export type SavedPortfolio = {
+  name: string;
+  updated_at: string;
+  holding_count: number;
+  holdings: SavedPortfolioHolding[];
+};
+
+export type SavedPortfoliosPayload = {
+  api_version: string;
+  status: "ready" | string;
+  portfolio_count: number;
+  portfolios: SavedPortfolio[];
+};
+
+export type SavePortfolioPayload = {
+  api_version: string;
+  status: "ready" | "invalid" | string;
+  message: string;
+  errors: { message: string; row_number: number | null; column: string | null }[];
+  portfolio: SavedPortfolio | null;
+};
+
+export type DeletePortfolioPayload = {
+  api_version: string;
+  status: "deleted" | "missing" | string;
+  message: string;
+  deleted: boolean;
+};
+
 export type ApiResult<T> = {
   ok: boolean;
   data: T | null;
@@ -299,6 +339,26 @@ export async function postDashboardApi<T>(path: string, payload: unknown): Promi
   }
 }
 
+export async function deleteDashboardApi<T>(path: string): Promise<ApiResult<T>> {
+  try {
+    const response = await fetch(endpoint(path), {
+      method: "DELETE",
+      cache: "no-store",
+      headers: { Accept: "application/json" }
+    });
+    if (!response.ok) {
+      return { ok: false, data: null, error: `HTTP ${response.status}` };
+    }
+    return { ok: true, data: (await response.json()) as T, error: "" };
+  } catch (error) {
+    return {
+      ok: false,
+      data: null,
+      error: error instanceof Error ? error.name : "FetchError"
+    };
+  }
+}
+
 export async function fetchHealth() {
   return fetchDashboardApi<DashboardHealthPayload>("/api/v1/health");
 }
@@ -323,4 +383,16 @@ export async function fetchTickerChart(ticker: string, period = "3y") {
 
 export async function analyzePortfolio(payload: PortfolioAnalysisRequest) {
   return postDashboardApi<PortfolioAnalysisPayload>("/api/v1/portfolio/analyze", payload);
+}
+
+export async function fetchSavedPortfolios() {
+  return fetchDashboardApi<SavedPortfoliosPayload>("/api/v1/portfolios");
+}
+
+export async function savePortfolio(name: string, payload: PortfolioAnalysisRequest) {
+  return postDashboardApi<SavePortfolioPayload>("/api/v1/portfolios", { ...payload, name });
+}
+
+export async function deleteSavedPortfolio(name: string) {
+  return deleteDashboardApi<DeletePortfolioPayload>(`/api/v1/portfolios?name=${encodeURIComponent(name)}`);
 }

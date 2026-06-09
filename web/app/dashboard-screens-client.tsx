@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { analyzePortfolio, fetchTickerChart } from "../lib/api";
+import { analyzePortfolio, deleteSavedPortfolio, fetchSavedPortfolios, fetchTickerChart, savePortfolio } from "../lib/api";
 import type {
   BacktestArtifactsPayload,
   DashboardSnapshotPayload,
   PortfolioAnalysisPayload,
   PortfolioAnalysisRequest,
+  SavedPortfolio,
   SnapshotDecision,
   SnapshotPosition,
   SnapshotRow,
@@ -361,32 +362,122 @@ function PortfolioAnalyzerPanel({ onSelectTicker }: { onSelectTicker: (ticker: s
   const [fileContentBase64, setFileContentBase64] = useState("");
   const [mode, setMode] = useState<"ticker" | "csv" | "file">("ticker");
   const [result, setResult] = useState<PortfolioAnalysisPayload | null>(null);
+  const [lastRequest, setLastRequest] = useState<PortfolioAnalysisRequest | null>(null);
+  const [savedPortfolios, setSavedPortfolios] = useState<SavedPortfolio[]>([]);
+  const [selectedSavedName, setSelectedSavedName] = useState("");
+  const [portfolioName, setPortfolioName] = useState("");
+  const [savedMessage, setSavedMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedLoading, setSavedLoading] = useState(false);
+
+  useEffect(() => {
+    void refreshSavedPortfolios();
+  }, []);
+
+  function currentRequest(): PortfolioAnalysisRequest {
+    if (mode === "file") {
+      return { file_name: fileName, content_base64: fileContentBase64 };
+    }
+    if (mode === "csv") {
+      return { csv: csvText };
+    }
+    return { ticker };
+  }
+
+  async function refreshSavedPortfolios() {
+    setSavedLoading(true);
+    const response = await fetchSavedPortfolios();
+    setSavedLoading(false);
+    if (response.ok && response.data) {
+      setSavedPortfolios(response.data.portfolios);
+      setSelectedSavedName((current) => current || response.data?.portfolios[0]?.name || "");
+    }
+  }
 
   async function submit() {
     setError("");
+    setSavedMessage("");
     setLoading(true);
-    const request: PortfolioAnalysisRequest = {};
-    if (mode === "file") {
-      request.file_name = fileName;
-      request.content_base64 = fileContentBase64;
-    } else if (mode === "csv") {
-      request.csv = csvText;
-    } else {
-      request.ticker = ticker;
-    }
+    const request = currentRequest();
     const response = await analyzePortfolio(request);
     setLoading(false);
     if (!response.ok || !response.data) {
       setResult(null);
+      setLastRequest(null);
       setError(response.error || "Portfolio analysis failed.");
       return;
     }
     setResult(response.data);
+    setLastRequest(request);
     if (response.data.status === "invalid") {
       setError(response.data.input.errors.map((item) => item.message).join(" ") || response.data.message);
     }
+  }
+
+  async function saveCurrentPortfolio() {
+    if (!lastRequest) {
+      setSavedMessage("Analyze a ticker or portfolio before saving it.");
+      return;
+    }
+    setSaving(true);
+    setSavedMessage("");
+    const response = await savePortfolio(portfolioName, lastRequest);
+    setSaving(false);
+    if (!response.ok || !response.data) {
+      setSavedMessage(response.error || "Save failed.");
+      return;
+    }
+    if (response.data.status !== "ready") {
+      setSavedMessage(response.data.errors.map((item) => item.message).join(" ") || response.data.message);
+      return;
+    }
+    setSavedMessage(response.data.message);
+    setPortfolioName(response.data.portfolio?.name || portfolioName);
+    setSelectedSavedName(response.data.portfolio?.name || selectedSavedName);
+    await refreshSavedPortfolios();
+  }
+
+  async function loadSavedPortfolio() {
+    const selected = savedPortfolios.find((item) => item.name === selectedSavedName);
+    if (!selected) {
+      setSavedMessage("Select a saved portfolio to load.");
+      return;
+    }
+    const request: PortfolioAnalysisRequest = { holdings: selected.holdings };
+    setLoading(true);
+    setSavedMessage("");
+    const response = await analyzePortfolio(request);
+    setLoading(false);
+    if (!response.ok || !response.data) {
+      setError(response.error || "Saved portfolio analysis failed.");
+      return;
+    }
+    setMode("csv");
+    setCsvText(selected.holdings.map((holding) => `${holding.ticker},${holding.weight ?? ""}`).join("\n"));
+    setPortfolioName(selected.name);
+    setLastRequest(request);
+    setResult(response.data);
+    setSavedMessage(`Loaded ${selected.name}.`);
+    setError(response.data.status === "invalid" ? response.data.message : "");
+  }
+
+  async function deleteSelectedSavedPortfolio() {
+    if (!selectedSavedName) {
+      setSavedMessage("Select a saved portfolio to delete.");
+      return;
+    }
+    setSaving(true);
+    const response = await deleteSavedPortfolio(selectedSavedName);
+    setSaving(false);
+    if (!response.ok || !response.data) {
+      setSavedMessage(response.error || "Delete failed.");
+      return;
+    }
+    setSavedMessage(response.data.message);
+    setSelectedSavedName("");
+    await refreshSavedPortfolios();
   }
 
   return (
@@ -456,6 +547,42 @@ function PortfolioAnalyzerPanel({ onSelectTicker }: { onSelectTicker: (ticker: s
           {loading ? "Analyzing..." : "Analyze"}
         </button>
       </div>
+      <div className="saved-portfolio-grid" aria-label="Saved portfolio controls">
+        <label>
+          Save Name
+          <input
+            value={portfolioName}
+            onChange={(event) => setPortfolioName(event.target.value)}
+            placeholder="Name this portfolio"
+            aria-label="Saved portfolio name"
+          />
+        </label>
+        <button type="button" className="portfolio-submit secondary" onClick={saveCurrentPortfolio} disabled={saving || !lastRequest}>
+          {saving ? "Saving..." : "Save"}
+        </button>
+        <label>
+          Saved Portfolios
+          <select
+            value={selectedSavedName}
+            onChange={(event) => setSelectedSavedName(event.target.value)}
+            aria-label="Saved portfolio selector"
+          >
+            <option value="">{savedLoading ? "Loading..." : "Select saved portfolio"}</option>
+            {savedPortfolios.map((item) => (
+              <option value={item.name} key={item.name}>
+                {item.name} ({item.holding_count})
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" className="portfolio-submit secondary" onClick={loadSavedPortfolio} disabled={loading || !selectedSavedName}>
+          Load
+        </button>
+        <button type="button" className="portfolio-submit danger" onClick={deleteSelectedSavedPortfolio} disabled={saving || !selectedSavedName}>
+          Delete
+        </button>
+      </div>
+      {savedMessage ? <p className="portfolio-footnote" role="status">{savedMessage}</p> : null}
       {error ? <p className="portfolio-error" role="status">{error}</p> : null}
       {result ? (
         <div className="portfolio-results">

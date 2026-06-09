@@ -31,7 +31,7 @@ def build_portfolio_analysis_payload(
     """
 
     body = dict(request or {})
-    parsed = _parse_request(body)
+    parsed = parse_portfolio_request(body)
     snapshot = dict(snapshot_payload or build_latest_dashboard_snapshot_payload())
     scored = _scored_frame_from_snapshot(snapshot)
 
@@ -70,7 +70,9 @@ def build_portfolio_analysis_payload(
     )
 
 
-def _parse_request(body: Mapping[str, Any]) -> PortfolioInputResult:
+def parse_portfolio_request(body: Mapping[str, Any]) -> PortfolioInputResult:
+    """Parse the shared portfolio request shape without provider or state writes."""
+
     ticker = body.get("ticker")
     if isinstance(ticker, str) and ticker.strip():
         return parse_single_ticker(ticker)
@@ -95,6 +97,10 @@ def _parse_request(body: Mapping[str, Any]) -> PortfolioInputResult:
         return parse_holdings_csv(payload)
 
     return PortfolioInputResult([], [_error("ticker, holdings, csv, or content_base64 is required")])
+
+
+def _parse_request(body: Mapping[str, Any]) -> PortfolioInputResult:
+    return parse_portfolio_request(body)
 
 
 def _holdings_from_json(rows: list[Any]) -> list[HoldingInput]:

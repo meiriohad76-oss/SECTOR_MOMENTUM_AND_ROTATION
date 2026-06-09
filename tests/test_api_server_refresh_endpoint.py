@@ -173,6 +173,39 @@ def test_portfolio_analyze_endpoint_uses_injected_snapshot_provider():
     assert calls == [{}]
 
 
+def test_saved_portfolio_routes_use_configured_saved_inputs_path(tmp_path):
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from src.api_server import create_app
+
+    store_path = tmp_path / "saved_inputs.json"
+    app = create_app(
+        status_provider=lambda: {"ok": True},
+        saved_inputs_path=str(store_path),
+    )
+    client = TestClient(app)
+
+    empty = client.get("/api/v1/portfolios")
+    saved = client.post(
+        "/api/v1/portfolios",
+        json={"name": "API Portfolio", "holdings": [{"ticker": "XLK", "weight": 1.0}]},
+    )
+    listed = client.get("/api/v1/portfolios")
+    deleted = client.delete("/api/v1/portfolios", params={"name": "api portfolio"})
+
+    assert empty.status_code == 200
+    assert empty.json()["portfolio_count"] == 0
+    assert saved.status_code == 200
+    assert saved.json()["status"] == "ready"
+    assert listed.status_code == 200
+    assert listed.json()["portfolios"][0]["name"] == "API Portfolio"
+    assert listed.json()["portfolios"][0]["holdings"][0]["ticker"] == "XLK"
+    assert deleted.status_code == 200
+    assert deleted.json()["deleted"] is True
+    assert client.get("/api/v1/portfolios").json()["portfolio_count"] == 0
+
+
 def test_backtest_artifacts_endpoint_uses_injected_provider():
     pytest.importorskip("fastapi")
     from fastapi.testclient import TestClient
