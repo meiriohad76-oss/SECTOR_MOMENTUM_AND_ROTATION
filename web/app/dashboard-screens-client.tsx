@@ -2106,46 +2106,58 @@ function BDeepDiveScreen({
   if (!focus) return <p className="b-empty">Run a dashboard refresh to persist a focus row.</p>;
   const peers = snapshot.rows.filter((row) => row.asset_class === focus.asset_class).sort((a, b) => b.s_score - a.s_score);
   const gates = gateRows(focus);
+  const rank = peers.findIndex((row) => row.ticker === focus.ticker) + 1;
+  const tripped = gates.filter((gate) => gate.ok === false);
+  const nextTicker = peers[(Math.max(rank - 1, 0) + 1) % Math.max(peers.length, 1)]?.ticker || snapshot.rows.find((row) => row.ticker !== focus.ticker)?.ticker || focus.ticker;
+  const strongest = numericPillars(focus).slice().sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
   return (
     <section className="b-screen b-article">
       <header className="b-article-head">
         <span className="b-kicker">{focus.asset_class} | {focus.state.replaceAll("_", " ")} | forward outlook</span>
-        <h1>{focus.ticker}: the model says<br /><em>{focus.s_score >= 0 ? "support is still present." : "risk is now visible."}</em></h1>
-        <p>{focus.identity}. {fieldNarrative(focus)} This article view keeps the same mechanical gates but explains them in novice-friendly prose.</p>
-        <small>BY THE MODEL | LAST SNAPSHOT {snapshot.run?.started_at_utc || snapshot.generated_at}</small>
+        <h1>{focus.ticker}: price says {focus.s_score >= 0 ? "fine." : "careful."}<br /><em>{focus.f_score >= 0 ? "Flow still helps." : "Flow says watch."}</em></h1>
+        <p>{focus.identity}. {fieldNarrative(focus)} The article version keeps the mechanical gates intact, but reads the live values as a plain-English market note.</p>
+        <small>BY THE MODEL | LAST SNAPSHOT {snapshot.run?.started_at_utc || snapshot.generated_at} | RANK {rank || "n/a"} OF {peers.length || snapshot.rows.length} {focus.asset_class.toUpperCase()}</small>
       </header>
       <div className="b-pull-strip">
-        <div><strong className={focus.s_score >= 0 ? "good" : "bad"}>{fmt(focus.s_score)}</strong><span>COMPOSITE S</span></div>
+        <div><strong className={focus.s_score >= 0 ? "good" : "bad"}>{fmt(focus.s_score)}</strong><span>COMPOSITE S | RANK {rank || "n/a"}</span></div>
         <div><strong className={focus.f_score >= 0 ? "good" : "bad"}>{fmt(focus.f_score)}</strong><span>FLOW F</span></div>
         <div><strong>{fmt(focus.momentum_pct, 2)}</strong><span>12-1 MOMENTUM</span></div>
         <div><strong className="warn">{focus.quadrant}</strong><span>RRG QUAD</span></div>
-        <p>{focus.s_score >= 0 ? "The composite still leans supportive, but gates below determine whether it is actionable." : "The composite is warning that several pillars are no longer aligned."}</p>
+        <p>{strongest ? `${strongest[0].replaceAll("_", " ")} is the largest current pillar by magnitude.` : "The live pillar stack defines the article."} {tripped.length ? `${tripped.length} gate${tripped.length === 1 ? "" : "s"} are tripped.` : "No explicit gate is tripped."}</p>
       </div>
       <div className="b-article-grid">
         <main>
-          <BSectionRule title="The seven pillars, explained" sub="Each paragraph below is generated from the latest saved pillar values." />
-          {numericPillars(focus).map(([key, value]) => (
-            <article className="b-pillar-para" key={key}>
-              <h3>{key.toUpperCase()}</h3>
-              <p>{value >= 0 ? "This pillar supports" : "This pillar subtracts from"} {focus.ticker}'s current composite. Latest saved contribution is <strong className={value >= 0 ? "good" : "bad"}>{fmt(value, 3)}</strong>. Positive values improve the setup; negative values are a warning that the pillar is no longer confirming.</p>
-            </article>
-          ))}
-          <BSectionRule title="What would escalate this state" sub="The same gate logic as the terminal view, styled as an editorial table." />
+          <div className="b-article-intro">
+            <p>The model's call on {focus.ticker} is a live snapshot of seven signals, not a single opinion. Composite S is {fmt(focus.s_score)}, flow F is {fmt(focus.f_score)}, momentum is {fmt(focus.momentum_pct, 2)}, and the RRG quadrant is {focus.quadrant}.</p>
+            <p>Read the paragraphs below as the audit trail: which pillars are carrying the setup, which are dragging it, and which gates would force the state machine to escalate.</p>
+          </div>
+          <BSectionRule title="The seven pillars, explained" sub="Each contribution is a signed, weighted model input from the latest saved run." />
+          <div className="b-pillar-stack">
+            {numericPillars(focus).map(([key, value], index) => (
+              <BArticlePillarParagraph row={focus} pillarKey={key} value={value} index={index} key={key} />
+            ))}
+          </div>
+          <BSectionRule title="What would escalate this state" sub="Same engine gates, styled as the article's decision table." />
           <div className="b-gate-table">
             {gates.map((gate) => (
               <div key={gate.label}>
+                <i className={gate.ok === true ? "ok" : gate.ok === false ? "fail" : "neutral"}>{gate.ok === true ? "OK" : gate.ok === false ? "X" : "-"}</i>
                 <span>{gate.label}</span>
                 <strong className={gate.ok === true ? "good" : gate.ok === false ? "bad" : "warn"}>{gate.ok === true ? "Not tripped" : gate.ok === false ? "Tripped" : "Unknown"}</strong>
                 <em>{gate.detail}</em>
               </div>
             ))}
+            <p>{tripped.length ? `${focus.ticker} has ${tripped.length} tripped gate${tripped.length === 1 ? "" : "s"}: ${tripped.map((gate) => gate.label).join(", ")}.` : `${focus.ticker} has no explicit tripped gate in the saved evidence. Keep watching RRG deterioration, CMF below -0.10, and price below the 30-week average.`}</p>
           </div>
         </main>
         <aside className="b-article-side">
           <section>
             <h3>Weekly price vs 30wMA</h3>
-            <div className="b-mini-figure"><ACompositeBreakdown row={focus} /></div>
-            <p>Price, trend, and relative-strength gates are summarized in the same composite breakdown used by the engine.</p>
+            <TickerPriceChartPanel row={focus} />
+          </section>
+          <section>
+            <h3>CMF + OBV</h3>
+            <TickerFlowChartPanels row={focus} />
           </section>
           <section>
             <h3>Related setups</h3>
@@ -2157,8 +2169,98 @@ function BDeepDiveScreen({
           </section>
         </aside>
       </div>
+      <footer className="b-article-footer">
+        <span>The Sentiment Brief | Deep-dive</span>
+        <button type="button" onClick={() => onSelectTicker(nextTicker)}>Next {nextTicker}</button>
+      </footer>
     </section>
   );
+}
+
+function BArticlePillarParagraph({
+  row,
+  pillarKey,
+  value,
+  index,
+}: {
+  row: SnapshotRow;
+  pillarKey: string;
+  value: number;
+  index: number;
+}) {
+  const supportive = value >= 0;
+  const label = bPillarLabel(pillarKey);
+  return (
+    <article className="b-pillar-para">
+      <div className="b-pillar-num"><strong>{index + 1}</strong><span>PILLAR</span></div>
+      <div>
+        <header>
+          <h3>{label}</h3>
+          <span>{bPillarWeight(pillarKey)}</span>
+          <strong className={supportive ? "good" : "bad"}>{fmt(value, 3)}</strong>
+        </header>
+        <p>{bPillarNarrative(row, pillarKey, value)}</p>
+      </div>
+    </article>
+  );
+}
+
+function bPillarLabel(key: string): string {
+  const labels: Record<string, string> = {
+    breadth_50d: "Binary filters and breadth",
+    cmf21: "Institutional flow",
+    cycle_tilt: "Business-cycle tilt",
+    mansfield_rs: "Mansfield relative strength",
+    mom_12_1: "12-month momentum, skip-1",
+    rs_momentum: "Relative-rotation RS-Momentum",
+    rs_ratio: "Relative-rotation RS-Ratio",
+    S: "Composite score",
+    F: "Flow score",
+    MOM: "Momentum",
+    RSR: "Relative-strength ratio",
+    RSM: "Relative-strength momentum",
+    CMF: "Chaikin money flow",
+  };
+  return labels[key] || key.replaceAll("_", " ");
+}
+
+function bPillarWeight(key: string): string {
+  const weights: Record<string, string> = {
+    mom_12_1: "w 22%",
+    mansfield_rs: "w 12%",
+    rs_ratio: "w 15%",
+    rs_momentum: "w 8%",
+    breadth_50d: "w 12%",
+    cycle_tilt: "w 8%",
+    cmf21: "w 23%",
+  };
+  return weights[key] || "live";
+}
+
+function bPillarNarrative(row: SnapshotRow, key: string, value: number): string {
+  const direction = value >= 0 ? "supports" : "drags on";
+  if (key === "mom_12_1" || key === "MOM") {
+    return `${row.ticker} momentum is ${fmt(row.momentum_pct, 2)} in the saved run. This pillar ${direction} the article because persistent winners tend to keep leadership until price momentum fades.`;
+  }
+  if (key === "mansfield_rs" || key === "RSR") {
+    return `Mansfield relative strength is ${fmt(payloadNumber(row, "mansfield_rs"), 2)}. Positive relative strength says the ticker is outperforming its benchmark; a negative or falling reading is often the first warning before price breaks.`;
+  }
+  if (key === "rs_ratio") {
+    return `RRG RS-Ratio is ${fmt(row.rs_ratio, 1)}. Readings above 100 mean relative leadership is still present; compression toward 100 means the leadership cushion is narrowing.`;
+  }
+  if (key === "rs_momentum" || key === "RSM") {
+    return `RRG momentum is ${fmt(row.rs_momentum, 1)} and the quadrant is ${row.quadrant}. That tells whether relative leadership is accelerating or fading over the next rotation window.`;
+  }
+  if (key === "breadth_50d") {
+    return `Breadth and trend filters currently read ${fmt(payloadNumber(row, "breadth_50d"), 2)}. This pillar ${direction} the setup by checking whether enough underlying trend evidence confirms the headline score.`;
+  }
+  if (key === "cycle_tilt") {
+    return `Business-cycle tilt is ${fmt(value, 3)}. It adjusts the score for the current macro phase, helping sectors that usually fit the phase and trimming those that historically struggle there.`;
+  }
+  if (key === "cmf21" || key === "CMF" || key === "F") {
+    return `Flow is the institutional-sponsorship read: CMF is ${fmt(row.cmf21, 2)} and F-score is ${fmt(row.f_score, 2)}. Positive flow confirms demand; negative flow warns before price-based gates may react.`;
+  }
+  return `This live pillar value is ${fmt(value, 3)} and ${direction} ${row.ticker}'s current composite score. It is included directly from the latest persisted methodology snapshot.`;
 }
 
 function BRotationScreen({

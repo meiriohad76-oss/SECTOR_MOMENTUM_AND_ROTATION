@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-09T18:49:00Z",
+  "generated_at_utc": "2026-06-09T19:04:37Z",
   "profile": "c",
   "reference_profile": "Momentum v2 Display C handoff: C1/C2/C3",
   "screens": [
@@ -24,7 +24,7 @@
         "State changes",
         "Bullish cohort"
       ],
-      "rms": 56.3977,
+      "rms": 56.3969,
       "screen": "overview",
       "similarity": 0.7788
     },
@@ -49,7 +49,7 @@
         "FOCUS",
         "State machine"
       ],
-      "rms": 41.1544,
+      "rms": 41.1534,
       "screen": "deepdive",
       "similarity": 0.8386
     },
@@ -74,7 +74,7 @@
         "The flow river",
         "Flow internals"
       ],
-      "rms": 37.6467,
+      "rms": 37.6457,
       "screen": "rotation",
       "similarity": 0.8524
     }

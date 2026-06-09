@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-09T18:49:40Z",
+  "generated_at_utc": "2026-06-09T19:03:33Z",
   "profile": "b",
   "reference_profile": "Momentum v2 Display B handoff: B1/B2/B3",
   "screens": [
@@ -24,7 +24,7 @@
         "BY THE NUMBERS",
         "This week's transitions"
       ],
-      "rms": 40.1057,
+      "rms": 40.1059,
       "screen": "overview",
       "similarity": 0.8427
     },
@@ -32,7 +32,7 @@
       "capture": "docs\\browser-qa\\next-handoff\\latest\\next-b-deepdive.png",
       "capture_size": [
         1440,
-        2364
+        2415
       ],
       "error": "",
       "missing_text": [],
@@ -49,9 +49,9 @@
         "The seven pillars, explained",
         "What would escalate this state"
       ],
-      "rms": 52.1406,
+      "rms": 47.5735,
       "screen": "deepdive",
-      "similarity": 0.7955
+      "similarity": 0.8134
     },
     {
       "capture": "docs\\browser-qa\\next-handoff\\latest\\next-b-rotation.png",

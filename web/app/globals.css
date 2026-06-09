@@ -1316,34 +1316,146 @@ main {
 }
 
 .b-pillar-para {
-  padding: 20px 0;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px 0;
+  border-bottom: 1px solid #e1d8c9;
+}
+
+.b-article-intro {
+  max-width: 740px;
+  margin-bottom: 28px;
+  color: #3d342e;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.b-article-intro p {
+  margin: 0 0 14px;
+}
+
+.b-pillar-stack {
+  margin-top: 22px;
+}
+
+.b-pillar-num {
+  text-align: right;
+}
+
+.b-pillar-num strong {
+  display: block;
+  color: #3d342e;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 32px;
+  line-height: 1;
+}
+
+.b-pillar-num span {
+  display: block;
+  margin-top: 6px;
+  color: #6e6258;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+.b-pillar-para header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 14px;
+  align-items: baseline;
+  padding-bottom: 8px;
   border-bottom: 1px solid #e1d8c9;
 }
 
 .b-pillar-para h3 {
-  margin: 0 0 8px;
+  margin: 0;
   color: #1c1815;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 22px;
+  font-size: 19px;
+}
+
+.b-pillar-para header span {
+  color: #6e6258;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.b-pillar-para header strong {
+  min-width: 58px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 18px;
+  text-align: right;
+}
+
+.b-pillar-para p {
+  margin: 10px 0 0;
 }
 
 .b-gate-table {
   margin-top: 18px;
-  border-top: 1px solid #c9bfae;
+  padding: 12px 18px;
+  background: #fffbf3;
+  border: 1px solid #c9bfae;
 }
 
 .b-gate-table div {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 110px minmax(120px, auto);
+  grid-template-columns: 18px minmax(0, 1fr) 110px minmax(120px, auto);
   gap: 12px;
-  padding: 10px 0;
+  align-items: baseline;
+  padding: 9px 0;
   border-bottom: 1px solid #e1d8c9;
+}
+
+.b-gate-table i {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  align-self: center;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.b-gate-table i.ok {
+  color: #2e7d5b;
+  background: #e7f0e9;
+}
+
+.b-gate-table i.fail {
+  color: #a23a1f;
+  background: #f5e3df;
+}
+
+.b-gate-table i.neutral {
+  color: #b08326;
+  background: #fdf4ea;
 }
 
 .b-gate-table strong,
 .b-gate-table em {
   font-style: normal;
   text-align: right;
+}
+
+.b-gate-table p {
+  margin: 14px 0 0;
+  padding-top: 14px;
+  color: #3d342e;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  font-style: italic;
+  line-height: 1.55;
+  border-top: 1px dashed #c9bfae;
 }
 
 .b-article-side {
@@ -1356,10 +1468,63 @@ main {
   padding: 18px 20px;
 }
 
+.b-article-side .c-gate-card {
+  box-shadow: none;
+}
+
+.b-article-side .c-sec-head {
+  padding: 10px 12px;
+}
+
+.b-article-side .ticker-price-chart {
+  max-height: 155px;
+}
+
+.b-article-side .price-chart-kpis {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 10px 12px;
+}
+
+.b-article-side .price-chart-kpis div,
+.b-article-side .c-price-evidence-grid div {
+  padding: 8px;
+}
+
+.b-article-side .flow-evidence-grid {
+  grid-template-columns: 1fr;
+}
+
+.b-article-side .flow-mini-chart {
+  height: 98px;
+}
+
 .b-mini-figure {
   margin: 12px 0;
   background: #faf6ef;
   border: 1px solid #e1d8c9;
+}
+
+.b-article-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 56px;
+  color: #6e6258;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  border-top: 1px solid #c9bfae;
+}
+
+.b-article-footer button {
+  color: #1c1815;
+  font: inherit;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
 }
 
 .b-map-grid {
