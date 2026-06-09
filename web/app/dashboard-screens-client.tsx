@@ -933,10 +933,14 @@ function COverviewScreen({
     <section className="c-screen" aria-label="Display C heatmap overview">
       <CWeatherStrip snapshot={snapshot} />
       <div className="c-overview-grid">
-        <PillarHeatmap rows={snapshot.rows} onSelectTicker={(ticker) => {
-          onSelectTicker(ticker);
-          setActiveScreen("deepdive");
-        }} />
+        <PillarHeatmap
+          rows={snapshot.rows}
+          sourceNote={`Provider: ${snapshot.run?.provider || "unknown"}. Rows: ${snapshot.summary.universe_count}. Decisions: ${snapshot.decisions.length}. Fed by the latest persisted run journal, not handoff fixture data.`}
+          onSelectTicker={(ticker) => {
+            onSelectTicker(ticker);
+            setActiveScreen("deepdive");
+          }}
+        />
         <aside className="c-right-rail">
           <div className="c-rail-card">
             <div className="c-sec-head"><strong>State changes</strong><span>latest actions</span></div>
@@ -985,10 +989,6 @@ function COverviewScreen({
                 <em>{fmt(row.s_score)}</em>
               </button>
             ))}
-          </div>
-          <div className="c-rail-card">
-            <div className="c-sec-head"><strong>Run journal</strong><span>snapshot scope</span></div>
-            <p>Provider: {snapshot.run?.provider || "unknown"}. Rows: {snapshot.summary.universe_count}. Decisions: {snapshot.decisions.length}. This candidate screen is fed by the latest persisted run journal, not handoff fixture data.</p>
           </div>
         </aside>
       </div>

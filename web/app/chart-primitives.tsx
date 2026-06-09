@@ -159,7 +159,15 @@ export function PillarStackBar({ row }: { row: SnapshotRow }) {
   );
 }
 
-export function PillarHeatmap({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSelectTicker: (ticker: string) => void }) {
+export function PillarHeatmap({
+  rows,
+  onSelectTicker,
+  sourceNote,
+}: {
+  rows: SnapshotRow[];
+  onSelectTicker: (ticker: string) => void;
+  sourceNote?: string;
+}) {
   const grouped = rows.reduce<Record<string, SnapshotRow[]>>((acc, row) => {
     const key = row.asset_class || "Other";
     acc[key] = acc[key] || [];
@@ -172,7 +180,7 @@ export function PillarHeatmap({ rows, onSelectTicker }: { rows: SnapshotRow[]; o
   });
   const sortedRows = rows.slice().sort((a, b) => b.s_score - a.s_score);
   return (
-    <section className="chart-card light-card" aria-label="Composite pillar-stack heatmap">
+    <section className="chart-card light-card" aria-label="Composite pillar-stack heatmap" title={sourceNote}>
       <div className="chart-heading">
         <div>
           <h3>The composite, dissected</h3>
