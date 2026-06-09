@@ -220,6 +220,7 @@ def test_next_shell_deep_dive_fetches_cached_ticker_chart_without_fixture_data()
     for marker in (
         "TickerChartPayload",
         "TickerChartPoint",
+        "TickerFlowPoint",
         "/api/v1/ticker-chart",
     ):
         assert marker in api_source
@@ -231,6 +232,12 @@ def test_next_shell_deep_dive_fetches_cached_ticker_chart_without_fixture_data()
         "30wMA",
         "Source is",
         "<TickerPriceChartPanel row={focus} />",
+        "TickerFlowChartPanels",
+        "FlowMiniLine",
+        "payload?.flow_series",
+        "CMF(21)",
+        "OBV slope",
+        "<TickerFlowChartPanels row={focus} />",
     ):
         assert marker in client_source
     for marker in (
@@ -239,6 +246,10 @@ def test_next_shell_deep_dive_fetches_cached_ticker_chart_without_fixture_data()
         ".ticker-price-chart",
         ".ticker-price-chart .price-line",
         ".ticker-price-chart .ma-line",
+        ".c-flow-evidence-panel",
+        ".flow-evidence-grid",
+        ".flow-mini-chart.cmf-line",
+        ".flow-mini-chart.obv-line",
     ):
         assert marker in css_source
     for forbidden in ("sample close", "demo price", "fixture price"):

@@ -11,11 +11,13 @@ from src.ohlcv_store import write_cached_ohlcv
 def _daily_frame(days: int = 320, end: date | None = None) -> pd.DataFrame:
     dates = pd.bdate_range(end=pd.Timestamp(end or date.today()), periods=days)
     close = pd.Series(range(days), index=dates, dtype=float) + 100.0
+    high = close + 1.0
+    low = close - 1.0
     return pd.DataFrame(
         {
             "open": close - 0.5,
-            "high": close + 1.0,
-            "low": close - 1.0,
+            "high": high,
+            "low": low,
             "close": close,
             "volume": 1_000_000.0,
             "adj_close": close,
@@ -41,6 +43,11 @@ def test_ticker_chart_payload_reads_cached_ohlcv_without_provider_fetch(tmp_path
     assert payload["series"][-1]["close"] == frame["close"].iloc[-1]
     assert payload["series"][-1]["ma30w"] is not None
     assert payload["latest"]["above_30wma"] is True
+    assert payload["flow_series"]
+    assert payload["flow_series"][-1]["cmf21"] is not None
+    assert payload["flow_series"][-1]["obv"] is not None
+    assert payload["latest"]["cmf21"] == payload["flow_series"][-1]["cmf21"]
+    assert payload["latest"]["obv_slope"] is not None
 
 
 def test_ticker_chart_payload_fails_closed_when_cache_missing(tmp_path):
@@ -49,4 +56,5 @@ def test_ticker_chart_payload_fails_closed_when_cache_missing(tmp_path):
     assert payload["status"] == "empty"
     assert payload["ticker"] == "MISSING"
     assert payload["series"] == []
+    assert payload["flow_series"] == []
     assert payload["source"]["mode"] == "cache-only"

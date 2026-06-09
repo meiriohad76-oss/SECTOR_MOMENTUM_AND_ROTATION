@@ -51,6 +51,8 @@ def build_ticker_chart_payload(
     slope_30w = None
     if len(ma30.dropna()) >= 2:
         slope_30w = float(ma30.dropna().iloc[-1] - ma30.dropna().iloc[-2])
+    flow_frame = _flow_frame(frame, max_points=max_points)
+    latest_flow = flow_frame.iloc[-1].to_dict() if not flow_frame.empty else {}
 
     return {
         "api_version": "v1",
@@ -73,6 +75,9 @@ def build_ticker_chart_payload(
             "ma30w": ma_value,
             "above_30wma": above_ma,
             "ma30w_slope": slope_30w,
+            "cmf21": _float_or_none(latest_flow.get("cmf21")),
+            "obv": _float_or_none(latest_flow.get("obv")),
+            "obv_slope": _obv_slope(flow_frame["obv"]) if "obv" in flow_frame else None,
         },
         "series": [
             {
@@ -81,6 +86,14 @@ def build_ticker_chart_payload(
                 "ma30w": _float_or_none(row["ma30w"]),
             }
             for row in rows.to_dict(orient="records")
+        ],
+        "flow_series": [
+            {
+                "date": _date_text(row["date"]),
+                "cmf21": _float_or_none(row["cmf21"]),
+                "obv": _float_or_none(row["obv"]),
+            }
+            for row in flow_frame.to_dict(orient="records")
         ],
     }
 
@@ -96,9 +109,49 @@ def _empty_payload(ticker: str, period: str, message: str) -> dict[str, Any]:
         "identity": ticker_display_name(symbol) if symbol else "",
         "period": period,
         "source": {"mode": "cache-only", "provider": "", "updated_at": "", "row_count": 0, "weekly_row_count": 0},
-        "latest": {"date": "", "close": None, "ma30w": None, "above_30wma": None, "ma30w_slope": None},
+        "latest": {
+            "date": "",
+            "close": None,
+            "ma30w": None,
+            "above_30wma": None,
+            "ma30w_slope": None,
+            "cmf21": None,
+            "obv": None,
+            "obv_slope": None,
+        },
         "series": [],
+        "flow_series": [],
     }
+
+
+def _flow_frame(frame: pd.DataFrame, *, max_points: int) -> pd.DataFrame:
+    values = frame.copy().sort_index()
+    for column in ("high", "low", "close", "volume"):
+        if column not in values.columns:
+            values[column] = pd.NA
+        values[column] = pd.to_numeric(values[column], errors="coerce")
+    high = values["high"]
+    low = values["low"]
+    close = values["close"]
+    volume = values["volume"].fillna(0.0)
+    denominator = (high - low).replace(0, pd.NA)
+    money_flow_multiplier = ((close - low) - (high - close)) / denominator
+    money_flow_volume = money_flow_multiplier.fillna(0.0) * volume
+    cmf21 = money_flow_volume.rolling(21, min_periods=1).sum() / volume.rolling(21, min_periods=1).sum().replace(0, pd.NA)
+    signed_volume = close.diff().fillna(0.0).apply(lambda value: 1 if value > 0 else -1 if value < 0 else 0) * volume
+    obv = signed_volume.cumsum()
+    rows = pd.DataFrame({"date": values.index, "cmf21": cmf21.to_numpy(), "obv": obv.to_numpy()})
+    rows = rows.dropna(how="all", subset=["cmf21", "obv"]).tail(max(1, int(max_points)))
+    return rows
+
+
+def _obv_slope(obv: pd.Series) -> float | None:
+    values = pd.to_numeric(obv, errors="coerce").dropna().tail(20)
+    if len(values) < 2:
+        return None
+    delta = float(values.iloc[-1] - values.iloc[0])
+    normalizer = float(values.abs().mean()) or 1.0
+    return delta / normalizer
 
 
 def _float_or_none(value: Any) -> float | None:

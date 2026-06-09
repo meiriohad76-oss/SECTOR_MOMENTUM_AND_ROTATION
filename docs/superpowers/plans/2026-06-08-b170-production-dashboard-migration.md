@@ -50,8 +50,8 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
   - stays collapsed by default so research/backtest context does not crowd the main dashboard
 - [x] Add read-only ticker chart API and C2 price panel:
   - `GET /api/v1/ticker-chart?ticker=...&period=3y`
-  - reads only cached OHLCV rows, computes weekly close and 30-week moving average, and fails closed if cache data is unavailable
-  - React C2 deep dive fetches the selected ticker chart asynchronously and falls back to saved gate evidence without drawing fixture prices
+  - reads only cached OHLCV rows, computes weekly close, 30-week moving average, CMF(21), OBV, and OBV slope, and fails closed if cache data is unavailable
+  - React C2 deep dive fetches the selected ticker chart asynchronously and renders price/30wMA plus CMF/OBV panels, falling back to saved gate evidence without drawing synthetic prices
 - [x] Build a React/Next.js shell that consumes `/api/v1/health` and `/api/v1/data-health`.
 - [ ] Port A/B/C overview, deep-dive, and rotation screens from the handoff artifacts.
   - [x] Add read-only `/api/v1/dashboard-snapshot` over the latest run-journal scores and decisions.

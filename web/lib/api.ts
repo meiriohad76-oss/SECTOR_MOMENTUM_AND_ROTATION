@@ -201,6 +201,12 @@ export type TickerChartPoint = {
   ma30w: number | null;
 };
 
+export type TickerFlowPoint = {
+  date: string;
+  cmf21: number | null;
+  obv: number | null;
+};
+
 export type TickerChartPayload = {
   api_version: string;
   generated_at: string;
@@ -222,8 +228,12 @@ export type TickerChartPayload = {
     ma30w: number | null;
     above_30wma: boolean | null;
     ma30w_slope: number | null;
+    cmf21: number | null;
+    obv: number | null;
+    obv_slope: number | null;
   };
   series: TickerChartPoint[];
+  flow_series: TickerFlowPoint[];
 };
 
 export type PortfolioAnalysisRequest = {

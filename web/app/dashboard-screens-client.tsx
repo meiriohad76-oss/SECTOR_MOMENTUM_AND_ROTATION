@@ -929,6 +929,7 @@ function CDeepDiveScreen({
           <div className="c-sec-head"><strong>Plain-English read</strong><span>latest saved run</span></div>
           <p>{focus.display_label} currently has S {fmt(focus.s_score)} and F {fmt(focus.f_score)}. A positive S means the pillar stack leans bullish; a negative F means flow is acting as a drag before price/trend may fully react.</p>
         </div>
+        <TickerFlowChartPanels row={focus} />
       </div>
     </section>
   );
@@ -1042,6 +1043,86 @@ function TickerPriceChartPanel({ row }: { row: SnapshotRow }) {
         {payload.ticker} latest cached weekly close is {fmt(payload.latest.close, 2)} versus a 30-week average of {fmt(payload.latest.ma30w, 2)}.
         Source is {payload.source.mode} {payload.source.provider || "unknown"} data updated {payload.source.updated_at || "unknown"}.
       </p>
+    </div>
+  );
+}
+
+function FlowMiniLine({
+  points,
+  valueKey,
+  className,
+  ariaLabel,
+}: {
+  points: { date: string; cmf21: number | null; obv: number | null }[];
+  valueKey: "cmf21" | "obv";
+  className: string;
+  ariaLabel: string;
+}) {
+  const series = points.filter((point) => typeof point[valueKey] === "number");
+  const width = 360;
+  const height = 130;
+  const pad = 18;
+  const values = series.map((point) => point[valueKey]).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  const min = values.length ? Math.min(...values, valueKey === "cmf21" ? -0.1 : values[0]) : 0;
+  const max = values.length ? Math.max(...values, valueKey === "cmf21" ? 0.1 : values[0]) : 1;
+  const span = Math.max(max - min, 0.000001);
+  const x = (index: number) => pad + (series.length <= 1 ? 0 : index / (series.length - 1) * (width - pad * 2));
+  const y = (value: number) => pad + (max - value) / span * (height - pad * 2);
+  const line = values.map((value, index) => `${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(" ");
+  const zeroY = y(0);
+  return (
+    <svg className={`flow-mini-chart ${className}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
+      {valueKey === "cmf21" ? <line x1={pad} x2={width - pad} y1={zeroY} y2={zeroY} className="zero-line" /> : null}
+      <polyline points={line} />
+    </svg>
+  );
+}
+
+function TickerFlowChartPanels({ row }: { row: SnapshotRow }) {
+  const [payload, setPayload] = useState<TickerChartPayload | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchTickerChart(row.ticker, "3y").then((response) => {
+      if (cancelled) return;
+      setPayload(response.ok ? response.data : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [row.ticker]);
+
+  const flow = payload?.flow_series ?? [];
+  if (payload?.status !== "ready" || !flow.length) {
+    return (
+      <div className="c-gate-card c-flow-evidence-panel">
+        <div className="c-sec-head"><strong>CMF + OBV</strong><span>cached flow unavailable</span></div>
+        <p>Cached OHLCV flow charts are unavailable, so the current saved snapshot values are shown instead: CMF {fmt(row.cmf21, 2)}, F {fmt(row.f_score, 2)}.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="c-gate-card c-flow-evidence-panel">
+      <div className="c-sec-head"><strong>CMF + OBV</strong><span>{payload.source.mode} | {payload.source.provider || "unknown"}</span></div>
+      <div className="flow-evidence-grid">
+        <div>
+          <div className="flow-evidence-head">
+            <span>CMF(21)</span>
+            <strong className={toneForBool(payload.latest.cmf21 === null ? null : payload.latest.cmf21 > 0)}>{fmt(payload.latest.cmf21, 2)}</strong>
+          </div>
+          <FlowMiniLine points={flow} valueKey="cmf21" className="cmf-line" ariaLabel={`${row.display_label} CMF 21 chart`} />
+          <p>CMF above +0.05 supports accumulation; below -0.10 is distribution risk.</p>
+        </div>
+        <div>
+          <div className="flow-evidence-head">
+            <span>OBV slope</span>
+            <strong className={toneForBool(payload.latest.obv_slope === null ? null : payload.latest.obv_slope >= 0)}>{fmt(payload.latest.obv_slope, 2)}</strong>
+          </div>
+          <FlowMiniLine points={flow} valueKey="obv" className="obv-line" ariaLabel={`${row.display_label} OBV chart`} />
+          <p>OBV checks whether volume confirms price. Positive slope is healthier than fading volume sponsorship.</p>
+        </div>
+      </div>
     </div>
   );
 }

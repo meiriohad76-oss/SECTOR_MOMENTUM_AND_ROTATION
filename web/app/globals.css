@@ -586,6 +586,91 @@ main {
   stroke-dasharray: 7 5;
 }
 
+.c-flow-evidence-panel {
+  grid-column: 1 / -1;
+}
+
+.flow-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 16px;
+}
+
+.flow-evidence-grid > div {
+  min-width: 0;
+  background: #f4f1ec;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.flow-evidence-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 12px 0;
+}
+
+.flow-evidence-head span {
+  color: #6a625a;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.flow-evidence-head strong {
+  color: #12324a;
+  font-size: 1rem;
+}
+
+.flow-evidence-head strong.good {
+  color: #1f7a4a;
+}
+
+.flow-evidence-head strong.warn {
+  color: #a8721a;
+}
+
+.flow-evidence-head strong.bad {
+  color: #b13a1f;
+}
+
+.flow-mini-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 8px 10px 0;
+}
+
+.flow-mini-chart polyline {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.flow-mini-chart.cmf-line polyline {
+  stroke: #b34a6b;
+}
+
+.flow-mini-chart.obv-line polyline {
+  stroke: #3b6fb6;
+}
+
+.flow-mini-chart .zero-line {
+  stroke: #bcb2a6;
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.flow-evidence-grid p {
+  margin: 0;
+  padding: 0 12px 12px;
+  color: #5d554d;
+  line-height: 1.45;
+}
+
 .c-flow-table {
   margin-top: 20px;
 }
@@ -1853,7 +1938,8 @@ select:focus-visible {
   .c-rotation-grid,
   .c-lower-grid,
   .c-stat-deck,
-  .price-chart-kpis {
+  .price-chart-kpis,
+  .flow-evidence-grid {
     grid-template-columns: 1fr;
   }
 }
