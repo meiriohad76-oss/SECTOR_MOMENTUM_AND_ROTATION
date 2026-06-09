@@ -107,6 +107,57 @@ sudo systemctl status sector-dashboard
 
 You should see `active (running)`. The dashboard is now reachable at `http://<pi-ip>:8501` and will restart on boot or after a crash.
 
+### Optional B-170 API and Next.js candidate services
+
+B-170 adds a candidate FastAPI backend and Next.js frontend for the future
+dashboard migration. These services are optional and should run beside the
+current `sector-dashboard` Streamlit service. Do not stop or reroute
+sector-dashboard until the parity gates below pass.
+
+Install/update the runtime dependencies and build the candidate frontend:
+
+```bash
+cd "$PI_REPO_PATH"
+./.venv/bin/pip install -r requirements.txt
+npm --prefix web ci
+npm --prefix web run build
+```
+
+Install the candidate service templates:
+
+```bash
+cd "$PI_REPO_PATH"
+sudo cp systemd/sector-api.service /etc/systemd/system/
+sudo cp systemd/sector-next.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now sector-api
+sudo systemctl enable --now sector-next
+```
+
+Smoke the local candidate services:
+
+```bash
+curl -s -f http://127.0.0.1:8000/api/v1/health >/dev/null
+curl -s -f http://127.0.0.1:8000/api/v1/data-health >/dev/null
+curl -s -f http://127.0.0.1:8000/api/v1/dashboard-snapshot >/dev/null
+curl -s -f http://127.0.0.1:3000/?presentation=c >/dev/null
+systemctl status sector-api --no-pager
+systemctl status sector-next --no-pager
+```
+
+The candidate frontend reads the API through `API_BASE_URL=http://127.0.0.1:8000`
+inside `systemd/sector-next.service`. The FastAPI service should stay bound to
+localhost unless a separate Cloudflare Access policy and threat model are added.
+
+Before retiring Streamlit, verify and document all gates:
+
+- feature parity: the React route supports the same dashboard workflows.
+- data parity: the React route uses the same Massive/FRED/run-journal data and
+  agrees with Streamlit on key values.
+- visual parity: browser screenshot QA against the A/B/C handoff is accepted.
+- rollback: `sentimentdashboard.ahaddashboards.uk` can be routed back to
+  `http://localhost:8501` and `sector-dashboard` stays installed/enabled.
+
 ### Optional public methodology landing service
 
 B-152 ships a static public landing page under `public/`. To serve it from the same Pi, install `systemd/methodology-landing.service`, adjust the user/path, and bind it to localhost port 8500:

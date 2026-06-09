@@ -1,0 +1,34 @@
+# Sector Rotation Dashboard Next.js frontend - candidate systemd unit
+#
+# Install only after `npm --prefix web ci` and `npm --prefix web run build`:
+#   sudo cp systemd/sector-next.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now sector-next
+#
+# This service is a B-170 candidate frontend. Keep Cloudflare production routed
+# to Streamlit until feature, data, visual, and rollback parity are accepted.
+
+[Unit]
+Description=Sector Rotation Dashboard Next.js Frontend (candidate)
+After=network-online.target sector-api.service
+Wants=network-online.target sector-api.service
+
+[Service]
+Type=simple
+User=ahad
+Group=ahad
+WorkingDirectory=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION/web
+Environment=NODE_ENV=production
+Environment=API_BASE_URL=http://127.0.0.1:8000
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+TimeoutStartSec=120
+TimeoutStopSec=30
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

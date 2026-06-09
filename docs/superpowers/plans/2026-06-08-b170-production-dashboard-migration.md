@@ -48,7 +48,7 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
   - [x] `scripts/serve_next_qa_api.py` provides a QA-only read-only API fallback when FastAPI is not installed locally.
   - [x] Latest evidence targets `http://127.0.0.1:3100/?presentation=c`; similarity scores improved to roughly 0.84-0.86 while remaining below a pixel-parity release gate.
   - [ ] Raise visual similarity through layout/pixel-parity tickets before using the similarity score as a release gate.
-- [ ] Add Pi systemd/API deployment docs and Cloudflare route plan.
+- [x] Add Pi systemd/API deployment docs and Cloudflare route plan.
 - [ ] Retire the Streamlit route only after feature parity, data parity, visual parity, and rollback path are documented.
 
 ## Definition Of Done For This Slice
@@ -60,4 +60,5 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - Data/provider-health endpoints are read-only and do not call live providers.
 - The initial Next.js shell lives under `web/`, is guarded by static tests, has a committed lockfile, and passes `npm audit --omit=dev --audit-level=moderate` plus `npm run build`; Next handoff screenshot QA is repeatable and recorded under `docs/browser-qa/next-handoff/latest`.
 - The first A/B/C React sections are backed by persisted run-journal data through `/api/v1/dashboard-snapshot`; native interaction controls, API-fed chart primitives, and screenshot evidence are implemented in the React shell; handoff visual parity remains a future gate.
+- Candidate Pi units and route docs exist for `sector-api` on `127.0.0.1:8000` and `sector-next` on `127.0.0.1:3000`, while Streamlit remains the production route.
 - The backlog records the migration as started, not complete.

@@ -1,0 +1,35 @@
+# Sector Rotation Dashboard API - candidate systemd unit
+#
+# Install only for the B-170 migration candidate path:
+#   sudo cp systemd/sector-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now sector-api
+#
+# This service does not replace the production Streamlit dashboard. It binds to
+# localhost so the API can be consumed by the local Next.js candidate frontend.
+
+[Unit]
+Description=Sector Rotation Dashboard API (FastAPI candidate)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ahad
+Group=ahad
+WorkingDirectory=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION
+Environment=PYTHONUNBUFFERED=1
+Environment=STATE_FILE=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION/data/state.json
+Environment=STATE_TRANSITION_JOURNAL=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION/data/state_transitions.jsonl
+ExecStart=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION/.venv/bin/python -m uvicorn src.api_server:create_app --factory --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+TimeoutStartSec=120
+TimeoutStopSec=30
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

@@ -91,6 +91,38 @@ ingress:
 
 A copy of this template is in [`../config/cloudflared-config.yml.example`](../config/cloudflared-config.yml.example).
 
+### B-170 candidate Next.js route plan
+
+Keep `sentimentdashboard.ahaddashboards.uk` routed to `http://localhost:8501`
+until the React/Next.js migration passes feature parity, data parity, visual
+parity, and rollback review. The candidate route should use a separate hostname
+so the current Streamlit production route remains untouched:
+
+```yaml
+ingress:
+  - hostname: ahaddashboards.uk
+    service: http://localhost:8500
+  - hostname: www.ahaddashboards.uk
+    service: http://localhost:8500
+  - hostname: sentimentdashboard.ahaddashboards.uk
+    service: http://localhost:8501
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 30s
+  - hostname: next-sentimentdashboard.ahaddashboards.uk
+    service: http://localhost:3000
+    originRequest:
+      connectTimeout: 30s
+  - service: http_status:404
+```
+
+Do not expose the FastAPI service directly unless you add a separate Access
+policy, CORS policy, rate limits, and explicit API threat model. The intended
+candidate shape is Cloudflare -> Next.js on `3000` -> local FastAPI on `8000`.
+The rollback path is to leave or restore the production hostname on
+`http://localhost:8501`, disable the candidate hostname, and stop only
+`sector-next`/`sector-api` if needed.
+
 ## 6. Test the tunnel manually
 
 ```bash
