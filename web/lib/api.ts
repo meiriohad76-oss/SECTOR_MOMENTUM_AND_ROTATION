@@ -77,6 +77,20 @@ export type SnapshotDecision = {
   payload: Record<string, number | string | boolean | null>;
 };
 
+export type SnapshotPosition = {
+  ticker: string;
+  identity: string;
+  shares: number | null;
+  cost_basis: number | null;
+  market_value: number | null;
+  cost: number | null;
+  unrealized_pct: number | null;
+  account: string;
+  notes: string;
+  source_name: string;
+  updated_at: string;
+};
+
 export type DashboardSnapshotPayload = {
   api_version: string;
   generated_at: string;
@@ -103,6 +117,7 @@ export type DashboardSnapshotPayload = {
       leaders?: SnapshotRow[];
       risks?: SnapshotRow[];
       actions?: SnapshotDecision[];
+      positions?: SnapshotPosition[];
     };
     deepdive?: {
       focus?: SnapshotRow | null;

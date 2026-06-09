@@ -70,6 +70,7 @@ def test_next_shell_snapshot_sections_are_api_driven_not_hardcoded():
 
     assert "DashboardScreensClient" in page_source
     assert "snapshot.screens.overview?.leaders" in client_source
+    assert "snapshot.screens.overview?.positions" in client_source
     assert "snapshot.screens.rotation?.sectors" in client_source
     assert "focus?.pillar_scores" in client_source
     assert "decision.rationale" in client_source
@@ -124,6 +125,8 @@ def test_next_shell_chart_primitives_are_snapshot_driven():
         assert component in client_source
     assert "pillarContributions(row: SnapshotRow)" in chart_source
     assert "row.s_score / rawSum" in chart_source
+    assert "positiveOffset += width" in chart_source
+    assert "negativeOffset += width" in chart_source
     assert "x(100)" in chart_source
     assert "y(100)" in chart_source
     assert ".sort((a, b) => (b.momentum_pct ?? 0) - (a.momentum_pct ?? 0))" in chart_source

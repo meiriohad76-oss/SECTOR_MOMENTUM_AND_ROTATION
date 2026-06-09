@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from src.api_dashboard_snapshot import build_latest_dashboard_snapshot_payload
+from src.portfolio import HoldingInput
 from src.run_journal import DecisionRecord, RunRecord, ScoredSnapshotRecord, append_run
+from src.saved_inputs import save_portfolio
 
 
 def test_latest_dashboard_snapshot_returns_empty_payload_without_runs(tmp_path):
@@ -62,6 +64,7 @@ def test_latest_dashboard_snapshot_reads_scores_decisions_and_focus(tmp_path):
 
     payload = build_latest_dashboard_snapshot_payload(
         journal_path=journal_path,
+        saved_inputs_path=tmp_path / "missing-saved-inputs.json",
         focus_ticker="XLE",
         generated_at="2026-06-09T12:00:00+00:00",
     )
@@ -77,3 +80,54 @@ def test_latest_dashboard_snapshot_reads_scores_decisions_and_focus(tmp_path):
     assert payload["focus"]["ticker"] == "XLE"
     assert [row["ticker"] for row in payload["screens"]["overview"]["leaders"][:2]] == ["XLK", "NVDA"]
     assert [row["ticker"] for row in payload["screens"]["rotation"]["sectors"]] == ["XLK", "XLE"]
+    assert payload["screens"]["overview"]["positions"] == []
+
+
+def test_latest_dashboard_snapshot_reads_saved_portfolio_positions(tmp_path):
+    journal_path = tmp_path / "runs.sqlite"
+    saved_inputs_path = tmp_path / "saved_inputs.json"
+    append_run(
+        journal_path,
+        RunRecord(
+            run_id="run-1",
+            started_at_utc="2026-06-09T10:00:00Z",
+            provider="massive",
+            universe_count=1,
+            metadata={},
+        ),
+        scored_rows=[
+            ScoredSnapshotRecord(
+                ticker="XLK",
+                asset_class="US Sectors",
+                state="STAGE_2_BULLISH",
+                s_score=1.2,
+                f_score=0.4,
+                pillar_scores={"mom_12_1": 0.22},
+                payload={},
+            )
+        ],
+        decisions=[],
+    )
+    save_portfolio(
+        "core",
+        [
+            HoldingInput(ticker="XLK", shares=10, cost_basis=100, market_value=1200),
+            HoldingInput(ticker="XLE", shares=5, cost_basis=80),
+        ],
+        path=saved_inputs_path,
+        now="2026-06-09T11:00:00Z",
+    )
+
+    payload = build_latest_dashboard_snapshot_payload(
+        journal_path=journal_path,
+        saved_inputs_path=saved_inputs_path,
+        generated_at="2026-06-09T12:00:00+00:00",
+    )
+    positions = payload["screens"]["overview"]["positions"]
+
+    assert [row["ticker"] for row in positions] == ["XLK", "XLE"]
+    assert positions[0]["source_name"] == "core"
+    assert positions[0]["identity"] == "Technology sector"
+    assert positions[0]["cost"] == 1000.0
+    assert positions[0]["unrealized_pct"] == 0.2
+    assert positions[1]["unrealized_pct"] is None

@@ -114,16 +114,30 @@ function LightStatePill({ state }: { state: string }) {
 
 export function PillarStackBar({ row }: { row: SnapshotRow }) {
   const contributions = pillarContributions(row);
-  const maxAbs = Math.max(1, ...contributions.map((pillar) => Math.abs(pillar.contribution)));
+  const positiveTotal = contributions
+    .filter((pillar) => pillar.contribution > 0)
+    .reduce((total, pillar) => total + pillar.contribution, 0);
+  const negativeTotal = contributions
+    .filter((pillar) => pillar.contribution < 0)
+    .reduce((total, pillar) => total + Math.abs(pillar.contribution), 0);
+  const maxSide = Math.max(1, positiveTotal, negativeTotal);
   const midpoint = 50;
+  let positiveOffset = 0;
+  let negativeOffset = 0;
   return (
     <div className="pillar-stack" aria-label={`${row.ticker} pillar stack`}>
       <div className="pillar-midline" />
       {contributions.map((pillar) => {
-        const width = Math.max(3, Math.abs(pillar.contribution) / maxAbs * 44);
-        const style = pillar.contribution >= 0
-          ? { left: `${midpoint}%`, width: `${width}%`, background: pillar.hue }
-          : { left: `${midpoint - width}%`, width: `${width}%`, background: pillar.hue };
+        const width = Math.max(2, Math.abs(pillar.contribution) / maxSide * 44);
+        let left = midpoint;
+        if (pillar.contribution >= 0) {
+          left = midpoint + positiveOffset;
+          positiveOffset += width;
+        } else {
+          left = midpoint - negativeOffset - width;
+          negativeOffset += width;
+        }
+        const style = { left: `${left}%`, width: `${width}%`, background: pillar.hue };
         return <span key={pillar.key} className="pillar-segment" style={style} title={`${pillar.label}: ${fmt(pillar.contribution)}`} />;
       })}
     </div>
@@ -152,6 +166,7 @@ export function PillarHeatmap({ rows, onSelectTicker }: { rows: SnapshotRow[]; o
         <div className="chart-heading-meta">
           <span>{rows.length} instruments | sorted by S</span>
           <PillarLegend />
+          <span className="composition-axis-copy">bearish left | bullish right</span>
         </div>
       </div>
       <div className="composition-header">

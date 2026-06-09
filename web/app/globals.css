@@ -228,6 +228,55 @@ main {
   background: #f4f1ec;
 }
 
+.c-position-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 16px;
+  border-bottom: 1px solid #f0ebe3;
+}
+
+.c-position-row div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.c-position-row strong,
+.c-position-row span,
+.c-position-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.c-position-row span,
+.c-position-row small,
+.c-rail-empty {
+  color: #6a625a;
+}
+
+.c-position-row em {
+  flex: 0 0 auto;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.c-position-row em.good {
+  color: #1f7a4a;
+}
+
+.c-position-row em.bad {
+  color: #b13a1f;
+}
+
+.c-rail-empty {
+  margin: 0;
+  padding: 14px 16px 16px;
+  line-height: 1.45;
+}
+
 .c-rail-card button i {
   width: 8px;
   height: 8px;
@@ -922,6 +971,12 @@ select:focus-visible {
   font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.chart-heading-meta .composition-axis-copy {
+  color: #6a625a;
+  font-size: 0.68rem;
+  text-transform: lowercase;
 }
 
 .chart-heading h3 {

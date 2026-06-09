@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { DashboardSnapshotPayload, SnapshotDecision, SnapshotRow } from "../lib/api";
+import type { DashboardSnapshotPayload, SnapshotDecision, SnapshotPosition, SnapshotRow } from "../lib/api";
 import { FlowRiver, MomentumBars, PillarHeatmap, RrgChart, WaterfallChart } from "./chart-primitives";
 
 type ScreenId = "overview" | "deepdive" | "rotation";
@@ -31,6 +31,16 @@ function StatusPill({ status }: { status: string }) {
 function fmt(value: number | null | undefined, digits = 2) {
   if (value === null || value === undefined || Number.isNaN(value)) return "n/a";
   return value.toFixed(digits);
+}
+
+function pct(value: number | null | undefined, digits = 1) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "n/a";
+  return `${value >= 0 ? "+" : ""}${(value * 100).toFixed(digits)}%`;
+}
+
+function money(value: number | null | undefined) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "n/a";
+  return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
 function valueForSort(row: SnapshotRow, key: SortKey): string | number {
@@ -452,6 +462,7 @@ function COverviewScreen({
   setActiveScreen: (screen: ScreenId) => void;
 }) {
   const actions = snapshot.screens.overview?.actions ?? [];
+  const positions = snapshot.screens.overview?.positions ?? [];
   const bullish = snapshot.rows.filter((row) => row.state === "STAGE_2_BULLISH").slice(0, 8);
   return (
     <section className="c-screen" aria-label="Display C heatmap overview">
@@ -481,6 +492,18 @@ function COverviewScreen({
             {!actions.length ? <p>No saved decisions in the latest run.</p> : null}
           </div>
           <div className="c-rail-card">
+            <div className="c-sec-head">
+              <strong>Your positions</strong>
+              <span>{positions.length ? `${positions.length} saved` : "not connected"}</span>
+            </div>
+            {positions.slice(0, 6).map((position) => (
+              <PositionRailRow key={`${position.source_name}-${position.ticker}`} position={position} />
+            ))}
+            {!positions.length ? (
+              <p className="c-rail-empty">No saved local portfolio is available yet. Save a portfolio in the Streamlit analyzer and this rail will summarize its holdings.</p>
+            ) : null}
+          </div>
+          <div className="c-rail-card">
             <div className="c-sec-head"><strong>Bullish cohort</strong><span>{bullish.length} rows</span></div>
             {bullish.map((row) => (
               <button
@@ -505,6 +528,20 @@ function COverviewScreen({
         </aside>
       </div>
     </section>
+  );
+}
+
+function PositionRailRow({ position }: { position: SnapshotPosition }) {
+  const tone = (position.unrealized_pct ?? 0) >= 0 ? "good" : "bad";
+  return (
+    <div className="c-position-row">
+      <div>
+        <strong>{position.ticker}</strong>
+        <span>{position.identity}</span>
+        <small>{position.shares ? `${fmt(position.shares, 0)} sh` : "shares n/a"} | cost {money(position.cost)}</small>
+      </div>
+      <em className={tone}>{pct(position.unrealized_pct)}</em>
+    </div>
   );
 }
 

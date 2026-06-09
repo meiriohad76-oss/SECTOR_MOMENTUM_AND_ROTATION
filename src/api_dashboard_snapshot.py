@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .run_journal import DEFAULT_JOURNAL_PATH, list_runs, load_run_details
+from .saved_inputs import DEFAULT_SAVED_INPUTS_PATH, load_saved_inputs
 from .ticker_identity import ticker_display_name
 
 
@@ -103,9 +104,42 @@ def _top_rows(rows: list[dict[str, Any]], reverse: bool = True, limit: int = 8) 
     return sorted(rows, key=lambda row: float(row.get("s_score", 0.0)), reverse=reverse)[:limit]
 
 
+def _position_payloads(path: str | Path | None = DEFAULT_SAVED_INPUTS_PATH, limit: int = 8) -> list[dict[str, Any]]:
+    portfolios = [item for item in load_saved_inputs(path) if item.kind == "portfolio" and item.holdings]
+    if not portfolios:
+        return []
+    latest = max(portfolios, key=lambda item: item.updated_at or "")
+    rows: list[dict[str, Any]] = []
+    for holding in latest.holdings[:limit]:
+        shares = _float_or_none(holding.shares)
+        cost_basis = _float_or_none(holding.cost_basis)
+        market_value = _float_or_none(holding.market_value)
+        cost = shares * cost_basis if shares is not None and cost_basis is not None else None
+        pnl_pct = None
+        if cost is not None and cost > 0 and market_value is not None:
+            pnl_pct = (market_value - cost) / cost
+        rows.append(
+            {
+                "ticker": holding.ticker.upper(),
+                "identity": ticker_display_name(holding.ticker.upper()),
+                "shares": shares,
+                "cost_basis": cost_basis,
+                "market_value": market_value,
+                "cost": cost,
+                "unrealized_pct": pnl_pct,
+                "account": holding.account or "",
+                "notes": holding.notes or "",
+                "source_name": latest.name,
+                "updated_at": latest.updated_at,
+            }
+        )
+    return rows
+
+
 def build_latest_dashboard_snapshot_payload(
     *,
     journal_path: str | Path = DEFAULT_JOURNAL_PATH,
+    saved_inputs_path: str | Path | None = DEFAULT_SAVED_INPUTS_PATH,
     focus_ticker: str | None = None,
     generated_at: str | None = None,
 ) -> dict[str, Any]:
@@ -126,7 +160,7 @@ def build_latest_dashboard_snapshot_payload(
             "rows": [],
             "decisions": [],
             "focus": None,
-            "screens": {"overview": {}, "deepdive": {}, "rotation": {}},
+            "screens": {"overview": {"positions": []}, "deepdive": {}, "rotation": {}},
         }
 
     details = load_run_details(journal_path, str(runs[0]["run_id"]))
@@ -147,6 +181,8 @@ def build_latest_dashboard_snapshot_payload(
     risks = _top_rows(rows, reverse=False, limit=8)
     sectors = [row for row in rows if row.get("asset_class") == "US Sectors"] or rows
 
+    positions = _position_payloads(saved_inputs_path)
+
     return {
         "api_version": "v1",
         "generated_at": generated_at or _utc_iso(),
@@ -163,7 +199,12 @@ def build_latest_dashboard_snapshot_payload(
         "decisions": decisions,
         "focus": focus,
         "screens": {
-            "overview": {"leaders": leaders, "risks": risks, "actions": decisions[:12]},
+            "overview": {
+                "leaders": leaders,
+                "risks": risks,
+                "actions": decisions[:12],
+                "positions": positions,
+            },
             "deepdive": {"focus": focus, "peer_rows": rows[:12]},
             "rotation": {
                 "sectors": sectors,
