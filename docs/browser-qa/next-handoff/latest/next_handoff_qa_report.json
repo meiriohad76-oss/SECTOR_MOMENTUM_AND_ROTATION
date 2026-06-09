@@ -1,12 +1,12 @@
 {
-  "generated_at_utc": "2026-06-09T15:37:42Z",
+  "generated_at_utc": "2026-06-09T17:29:32Z",
   "reference_profile": "Momentum v2 Display C handoff: C1/C2/C3",
   "screens": [
     {
-      "capture": ".tmp\\next_handoff_qa_live\\next-overview.png",
+      "capture": "docs\\browser-qa\\next-handoff\\latest\\next-overview.png",
       "capture_size": [
         1440,
-        3461
+        2824
       ],
       "error": "",
       "missing_text": [],
@@ -23,15 +23,15 @@
         "State changes",
         "Bullish cohort"
       ],
-      "rms": 53.7962,
+      "rms": 57.0365,
       "screen": "overview",
-      "similarity": 0.789
+      "similarity": 0.7763
     },
     {
-      "capture": ".tmp\\next_handoff_qa_live\\next-deepdive.png",
+      "capture": "docs\\browser-qa\\next-handoff\\latest\\next-deepdive.png",
       "capture_size": [
         1440,
-        2128
+        2021
       ],
       "error": "",
       "missing_text": [],
@@ -48,15 +48,15 @@
         "FOCUS",
         "State machine"
       ],
-      "rms": 41.2063,
+      "rms": 41.1559,
       "screen": "deepdive",
-      "similarity": 0.8384
+      "similarity": 0.8386
     },
     {
-      "capture": ".tmp\\next_handoff_qa_live\\next-rotation.png",
+      "capture": "docs\\browser-qa\\next-handoff\\latest\\next-rotation.png",
       "capture_size": [
         1440,
-        2041
+        2029
       ],
       "error": "",
       "missing_text": [],
@@ -73,9 +73,9 @@
         "The flow river",
         "Flow internals"
       ],
-      "rms": 38.224,
+      "rms": 38.3546,
       "screen": "rotation",
-      "similarity": 0.8501
+      "similarity": 0.8496
     }
   ],
   "url": "http://127.0.0.1:3100/?presentation=c&qa=shots"

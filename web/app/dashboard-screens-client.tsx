@@ -1052,13 +1052,18 @@ function CDeepDiveScreen({
             <strong>Next escalation to EXIT:</strong> watch price below the 30-week average, Mansfield RS below 0, CMF below -0.10, or a turn into Lagging. Nearest live readings: Mansfield {fmt(payloadNumber(focus, "mansfield_rs"), 2)}, CMF {fmt(focus.cmf21, 2)}, RRG {focus.quadrant}.
           </div>
         </div>
-        <div className="c-gate-card">
-          <div className="c-sec-head"><strong>Plain-English read</strong><span>latest saved run</span></div>
-          <p>{focus.display_label} currently has S {fmt(focus.s_score)} and F {fmt(focus.f_score)}. A positive S means the pillar stack leans bullish; a negative F means flow is acting as a drag before price/trend may fully react.</p>
-        </div>
-        <TickerRelativeStrengthPanel row={focus} />
-        <TickerFlowChartPanels row={focus} />
       </div>
+      <details className="c-advanced-evidence">
+        <summary>More evidence</summary>
+        <div className="c-support-grid c-support-grid-advanced">
+          <div className="c-gate-card">
+            <div className="c-sec-head"><strong>Plain-English read</strong><span>latest saved run</span></div>
+            <p>{focus.display_label} currently has S {fmt(focus.s_score)} and F {fmt(focus.f_score)}. A positive S means the pillar stack leans bullish; a negative F means flow is acting as a drag before price/trend may fully react.</p>
+          </div>
+          <TickerRelativeStrengthPanel row={focus} />
+          <TickerFlowChartPanels row={focus} />
+        </div>
+      </details>
     </section>
   );
 }

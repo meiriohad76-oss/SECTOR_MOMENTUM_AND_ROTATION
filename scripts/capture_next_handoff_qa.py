@@ -119,6 +119,18 @@ def _capture(url: str, output_dir: Path, screens: list[str], timeout_ms: int) ->
         page = browser.new_page(viewport={"width": 1440, "height": 1800}, device_scale_factor=1)
         page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
         page.locator("main").first.wait_for(timeout=timeout_ms)
+        page.add_style_tag(
+            content="""
+            nextjs-portal,
+            [data-nextjs-toast],
+            [data-nextjs-dialog-overlay],
+            [data-nextjs-dev-tools-button],
+            [data-next-badge-root] {
+              display: none !important;
+              visibility: hidden !important;
+            }
+            """
+        )
         for screen in screens:
             button_name = NEXT_SCREEN_BUTTONS[screen]
             screenshot_path = output_dir / f"next-{screen}.png"

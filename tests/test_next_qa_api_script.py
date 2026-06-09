@@ -68,7 +68,7 @@ def test_next_qa_api_compacts_snapshot_payload_for_browser_transport():
 
     compact = serve_next_qa_api._compact_snapshot_payload(payload)
 
-    assert compact["rows"][0]["payload"] == {"above_30wma": True, "stage": 2}
+    assert compact["rows"][0]["payload"] == {}
     assert compact["decisions"][0]["payload"] == {}
     assert compact["rows"][0]["pillar_scores"] == {"mom_12_1": 1.0, "rs_ratio": 101}
     assert compact["focus"]["pillar_scores"] == {"cmf21": 0.1}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 import subprocess
 import sys
 
@@ -43,9 +44,15 @@ def test_next_handoff_qa_cli_exposes_similarity_gate_and_next_url():
     assert qa.parse_args([]).url == "http://127.0.0.1:3000/?presentation=c"
 
 
-def test_next_handoff_qa_is_not_imported_by_production_app():
-    from pathlib import Path
+def test_next_handoff_qa_hides_development_overlay_before_capture():
+    source = Path("scripts/capture_next_handoff_qa.py").read_text(encoding="utf-8")
 
+    assert "page.add_style_tag(" in source
+    assert "nextjs-portal" in source
+    assert "[data-next-badge-root]" in source
+
+
+def test_next_handoff_qa_is_not_imported_by_production_app():
     root = Path(__file__).resolve().parent.parent
     app_source = (root / "app.py").read_text(encoding="utf-8")
     page_source = (root / "web" / "app" / "page.tsx").read_text(encoding="utf-8")

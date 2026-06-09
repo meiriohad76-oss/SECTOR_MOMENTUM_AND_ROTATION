@@ -49,7 +49,7 @@ PAYLOAD_KEYS_FOR_NEXT_QA = {
 def _compact_snapshot_payload(payload: dict) -> dict:
     """Keep the QA payload strict and small while preserving the Next UI contract."""
 
-    def compact_row(row: dict) -> dict:
+    def compact_row(row: dict, *, include_payload: bool = False) -> dict:
         compact = dict(row)
         pillars = compact.get("pillar_scores")
         if isinstance(pillars, dict):
@@ -58,8 +58,8 @@ def _compact_snapshot_payload(payload: dict) -> dict:
                 for key in sorted(PILLAR_KEYS_FOR_NEXT_QA)
                 if key in pillars
             }
-        row_payload = compact.get("payload")
-        if isinstance(row_payload, dict):
+        row_payload = compact.get("payload") if include_payload else {}
+        if include_payload and isinstance(row_payload, dict):
             compact["payload"] = {
                 key: row_payload.get(key)
                 for key in sorted(PAYLOAD_KEYS_FOR_NEXT_QA)
@@ -77,24 +77,24 @@ def _compact_snapshot_payload(payload: dict) -> dict:
 
     compact = dict(payload)
     compact["rows"] = compact_rows(payload.get("rows"), limit=90)
-    compact["focus"] = compact_row(dict(payload["focus"])) if isinstance(payload.get("focus"), dict) else None
+    compact["focus"] = compact_row(dict(payload["focus"]), include_payload=True) if isinstance(payload.get("focus"), dict) else None
     compact["decisions"] = [
         {**dict(row), "payload": {}}
         for row in payload.get("decisions", [])
         if isinstance(row, dict)
-    ]
+    ][:12]
     screens = dict(payload.get("screens", {}) or {})
     overview = dict(screens.get("overview", {}) or {})
-    overview["leaders"] = compact_rows(overview.get("leaders"), limit=8)
-    overview["risks"] = compact_rows(overview.get("risks"), limit=8)
-    overview["actions"] = compact["decisions"][:12]
+    overview["leaders"] = compact_rows(overview.get("leaders"), limit=1)
+    overview["risks"] = compact_rows(overview.get("risks"), limit=1)
+    overview["actions"] = compact["decisions"][:8]
     deepdive = dict(screens.get("deepdive", {}) or {})
     deepdive["focus"] = compact["focus"]
-    deepdive["peer_rows"] = compact_rows(deepdive.get("peer_rows"), limit=12)
+    deepdive["peer_rows"] = []
     rotation = dict(screens.get("rotation", {}) or {})
-    rotation["sectors"] = compact_rows(rotation.get("sectors"), limit=40)
-    rotation["leaders"] = compact_rows(rotation.get("leaders"), limit=8)
-    rotation["laggards"] = compact_rows(rotation.get("laggards"), limit=8)
+    rotation["sectors"] = compact_rows(rotation.get("sectors"), limit=20)
+    rotation["leaders"] = []
+    rotation["laggards"] = []
     compact["screens"] = {"overview": overview, "deepdive": deepdive, "rotation": rotation}
     return compact
 
