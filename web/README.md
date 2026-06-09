@@ -26,3 +26,17 @@ The current shell calls:
 
 It does not fetch market providers directly and it does not replace the
 Streamlit production route yet.
+
+On this Windows host, npm registry access may need a one-command TLS workaround:
+
+```bash
+npm install --strict-ssl=false
+```
+
+The committed lockfile keeps the resolved dependency tree stable. The current
+QA gate is:
+
+```bash
+npm audit --omit=dev --audit-level=moderate
+npm run build
+```

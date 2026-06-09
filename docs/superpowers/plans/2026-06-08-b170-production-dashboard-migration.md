@@ -45,5 +45,5 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - The optional API server can be enabled after installing dependencies.
 - The refresh runner is explicit opt-in from the API (`run_now: true`) and remains queue-only by default.
 - Data/provider-health endpoints are read-only and do not call live providers.
-- The initial Next.js shell lives under `web/` and is guarded by static tests; Node install/build and browser screenshot QA remain future gates.
+- The initial Next.js shell lives under `web/`, is guarded by static tests, has a committed lockfile, and passes `npm audit --omit=dev --audit-level=moderate` plus `npm run build`; browser screenshot QA remains a future gate.
 - The backlog records the migration as started, not complete.
