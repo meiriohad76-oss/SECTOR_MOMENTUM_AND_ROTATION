@@ -30,6 +30,7 @@ def test_next_handoff_qa_profiles_cover_a_b_and_c_references():
         "rotation": "B3-editorial-rotation.png",
     }
     assert qa.QA_PROFILES["a"]["default_url"] == "http://127.0.0.1:3000/?presentation=a"
+    assert qa.QA_PROFILES["b"]["default_url"] == "http://127.0.0.1:3000/?presentation=b"
     assert qa.QA_PROFILES["c"]["default_url"] == "http://127.0.0.1:3000/?presentation=c"
 
 

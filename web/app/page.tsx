@@ -180,10 +180,10 @@ export default async function DashboardShell({
   const persistedLanes = laneRows(primary).filter((lane) => !lane.lane_id.startsWith("provider_"));
   const providerLanes = laneRows(primary).filter((lane) => lane.lane_id.startsWith("provider_"));
 
-  if (presentation === "a" || presentation === "c") {
+  if (presentation === "a" || presentation === "b" || presentation === "c") {
     return (
       <main className="handoff-main">
-        <DashboardScreensClient snapshot={snapshot} presentation={presentation === "a" ? "handoff-a" : "handoff-c"} />
+        <DashboardScreensClient snapshot={snapshot} presentation={presentation === "a" ? "handoff-a" : presentation === "b" ? "handoff-b" : "handoff-c"} />
       </main>
     );
   }

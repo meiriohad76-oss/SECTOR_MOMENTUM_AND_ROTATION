@@ -1,13 +1,13 @@
 {
-  "generated_at_utc": "2026-06-09T17:58:00Z",
+  "generated_at_utc": "2026-06-09T18:24:29Z",
   "profile": "b",
-  "reference_profile": "Momentum v2 Display B handoff: B1/B2/B3 baseline",
+  "reference_profile": "Momentum v2 Display B handoff: B1/B2/B3",
   "screens": [
     {
       "capture": "docs\\browser-qa\\next-handoff\\latest\\next-b-overview.png",
       "capture_size": [
         1440,
-        5625
+        2306
       ],
       "error": "",
       "missing_text": [],
@@ -20,19 +20,19 @@
         1923
       ],
       "required_text": [
-        "A | Overview",
-        "LEADERS",
-        "RISK QUEUE"
+        "The Sentiment Brief",
+        "BY THE NUMBERS",
+        "This week's transitions"
       ],
-      "rms": 184.0092,
+      "rms": 40.1059,
       "screen": "overview",
-      "similarity": 0.2784
+      "similarity": 0.8427
     },
     {
       "capture": "docs\\browser-qa\\next-handoff\\latest\\next-b-deepdive.png",
       "capture_size": [
         1440,
-        2830
+        2364
       ],
       "error": "",
       "missing_text": [],
@@ -45,19 +45,19 @@
         2571
       ],
       "required_text": [
-        "B | Deep Dive",
-        "Ticker focus",
-        "The composite, built pillar by pillar"
+        "The Sentiment Brief",
+        "The seven pillars, explained",
+        "What would escalate this state"
       ],
-      "rms": 197.8918,
+      "rms": 52.1406,
       "screen": "deepdive",
-      "similarity": 0.224
+      "similarity": 0.7955
     },
     {
       "capture": "docs\\browser-qa\\next-handoff\\latest\\next-b-rotation.png",
       "capture_size": [
         1440,
-        3605
+        2196
       ],
       "error": "",
       "missing_text": [],
@@ -70,14 +70,14 @@
         1797
       ],
       "required_text": [
-        "C | Rotation",
-        "Relative Rotation Graph",
-        "The flow river"
+        "The Sentiment Brief",
+        "Where the money is going",
+        "Where the flow went"
       ],
-      "rms": 191.7827,
+      "rms": 83.2425,
       "screen": "rotation",
-      "similarity": 0.2479
+      "similarity": 0.6736
     }
   ],
-  "url": "http://127.0.0.1:3100/?qa=shots"
+  "url": "http://127.0.0.1:3100/?presentation=b&qa=shots"
 }

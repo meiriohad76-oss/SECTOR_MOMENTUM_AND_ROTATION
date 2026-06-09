@@ -18,7 +18,7 @@ import { FlowRiver, MomentumBars, PillarDetailGrid, PillarHeatmap, PillarStackBa
 type ScreenId = "overview" | "deepdive" | "rotation";
 type SortKey = "ticker" | "state" | "quadrant" | "s_score" | "f_score" | "rs_ratio" | "rs_momentum" | "momentum_pct" | "cmf21";
 type SortDirection = "asc" | "desc";
-type PresentationMode = "default" | "handoff-a" | "handoff-c";
+type PresentationMode = "default" | "handoff-a" | "handoff-b" | "handoff-c";
 
 const SCREENS: { id: ScreenId; label: string; title: string }[] = [
   { id: "overview", label: "A", title: "Overview" },
@@ -1880,6 +1880,308 @@ function HandoffAScreens({
   );
 }
 
+function BMasthead({
+  activeScreen,
+  setActiveScreen,
+  compact = false,
+}: {
+  activeScreen: ScreenId;
+  setActiveScreen: (screen: ScreenId) => void;
+  compact?: boolean;
+}) {
+  return (
+    <header className={compact ? "b-masthead compact" : "b-masthead"}>
+      <strong>The Sentiment Brief</strong>
+      <span>{compact ? activeScreen === "deepdive" ? "DEEP-DIVE" : "THE ROTATION MAP" : "EVENING EDITION"}</span>
+      <nav aria-label="Display B screen selector">
+        {SCREENS.map((screen) => (
+          <button
+            type="button"
+            key={screen.id}
+            className={activeScreen === screen.id ? "active" : ""}
+            onClick={() => setActiveScreen(screen.id)}
+            aria-pressed={activeScreen === screen.id}
+          >
+            {screen.title}
+          </button>
+        ))}
+      </nav>
+    </header>
+  );
+}
+
+function BNumberRow({ label, value, note, tone = "neutral" }: { label: string; value: string; note: string; tone?: "good" | "bad" | "warn" | "neutral" }) {
+  return (
+    <div className="b-number-row">
+      <span>{label}</span>
+      <strong className={tone}>{value}</strong>
+      <em>{note}</em>
+    </div>
+  );
+}
+
+function BSectionRule({ title, sub }: { title: string; sub?: string }) {
+  return (
+    <div className="b-section-rule">
+      <h2>{title}</h2>
+      {sub ? <p>{sub}</p> : null}
+    </div>
+  );
+}
+
+function BOverviewScreen({
+  snapshot,
+  onSelectTicker,
+  setActiveScreen,
+}: {
+  snapshot: DashboardSnapshotPayload;
+  onSelectTicker: (ticker: string) => void;
+  setActiveScreen: (screen: ScreenId) => void;
+}) {
+  const leaders = snapshot.screens.overview?.leaders ?? [];
+  const risks = snapshot.screens.overview?.risks ?? [];
+  const actions = snapshot.screens.overview?.actions ?? [];
+  const positions = snapshot.screens.overview?.positions ?? [];
+  const exits = snapshot.summary.state_counts.EXIT ?? 0;
+  const bears = snapshot.summary.state_counts.BEARISH_STAGE_4 ?? 0;
+  const warnings = snapshot.summary.state_counts.WARNING ?? 0;
+  const bullish = snapshot.summary.state_counts.STAGE_2_BULLISH ?? 0;
+  const lead = leaders[0]?.display_label || leaders[0]?.ticker || "the leading cohort";
+  const risk = risks[0]?.display_label || risks[0]?.ticker || "the risk queue";
+  const stories = actions.length ? actions.slice(0, 3) : risks.slice(0, 3).map((row) => ({
+    ticker: row.ticker,
+    identity: row.identity,
+    action: row.state,
+    rationale: fieldNarrative(row),
+    decision_type: "state",
+    payload: {},
+  } as SnapshotDecision));
+  return (
+    <section className="b-screen b-overview">
+      <div className="b-tape"><strong>LIVE</strong><span>{snapshot.run?.provider || "provider"} snapshot</span><span>{snapshot.generated_at}</span><span>{snapshot.summary.universe_count} instruments</span></div>
+      <div className="b-headline-grid">
+        <div>
+          <span className="b-kicker">Today's read | model brief</span>
+          <h1>{lead} is leading.<br /><em>{risk} needs attention.</em></h1>
+          <p>The editorial view translates the same seven-pillar methodology into plain-language market notes. Counts, tickers, and actions come from the latest persisted run journal, not from handoff fixtures.</p>
+          <small>BY THE MODEL | {snapshot.summary.universe_count} INSTRUMENTS | 7 PILLARS | POSTED {snapshot.run?.started_at_utc || snapshot.generated_at}</small>
+        </div>
+        <aside className="b-numbers">
+          <h3>By the numbers</h3>
+          <BNumberRow label="Exits / bear rows" value={String(exits + bears)} note={`${exits} exit | ${bears} bear`} tone="bad" />
+          <BNumberRow label="Active warnings" value={String(warnings)} note="state-machine caution" tone="warn" />
+          <BNumberRow label="Bullish cohort" value={String(bullish)} note="Stage 2 bullish" tone="good" />
+          <BNumberRow label="Leading quadrant" value={String(snapshot.summary.quadrant_counts.Leading ?? 0)} note="RRG leadership" tone="good" />
+          <BNumberRow label="Weakening quadrant" value={String(snapshot.summary.quadrant_counts.Weakening ?? 0)} note="rotation risk" tone="warn" />
+          <BNumberRow label="Provider" value={snapshot.run?.provider || "n/a"} note="latest run" />
+        </aside>
+      </div>
+      <div className="b-main-grid">
+        <main>
+          <BSectionRule title="This week's transitions" sub="The state machine decisions below are written as short stories. Click any story to open the editorial deep dive for that ticker." />
+          {stories.map((decision) => {
+            const row = rowByTicker(snapshot.rows, decision.ticker);
+            return (
+              <article className="b-story" key={`${decision.ticker}-${decision.action}`}>
+                <button type="button" onClick={() => {
+                  onSelectTicker(decision.ticker);
+                  setActiveScreen("deepdive");
+                }}>
+                  <span>{decision.ticker} | {decision.identity || row?.identity || "instrument"}</span>
+                  <h3>{decision.ticker}: {decision.action.replaceAll("_", " ").toLowerCase()}.</h3>
+                </button>
+                <p>{decision.rationale || (row ? fieldNarrative(row) : "Latest saved decision has no additional rationale.")}</p>
+                {row ? <em>S {fmt(row.s_score)} / F {fmt(row.f_score)} / RRG {row.quadrant}</em> : null}
+              </article>
+            );
+          })}
+        </main>
+        <aside className="b-side">
+          <BSectionRule title="Your positions" />
+          <div className="b-position-box">
+            {positions.slice(0, 7).map((position) => {
+              const row = rowByTicker(snapshot.rows, position.ticker);
+              return (
+                <button type="button" key={`${position.source_name}-${position.ticker}`} onClick={() => {
+                  onSelectTicker(position.ticker);
+                  setActiveScreen("deepdive");
+                }}>
+                  <i className={stateToneForClass(row?.state || "")} />
+                  <strong>{position.ticker}</strong>
+                  <span>{position.identity}</span>
+                  <em>{row?.state.replaceAll("_", " ") || "not in universe"}</em>
+                </button>
+              );
+            })}
+            {!positions.length ? <p>No saved local portfolio is available yet.</p> : null}
+          </div>
+          <BSectionRule title="Bullish cohort" />
+          <div className="b-brief-list">
+            {leaders.slice(0, 8).map((row) => (
+              <button type="button" key={row.ticker} onClick={() => {
+                onSelectTicker(row.ticker);
+                setActiveScreen("deepdive");
+              }}>
+                <strong>{row.ticker}</strong><span>{row.identity}</span><em>{fmt(row.s_score)}</em>
+              </button>
+            ))}
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function BDeepDiveScreen({
+  snapshot,
+  selectedTicker,
+  onSelectTicker,
+}: {
+  snapshot: DashboardSnapshotPayload;
+  selectedTicker: string;
+  onSelectTicker: (ticker: string) => void;
+}) {
+  const focus = rowByTicker(snapshot.rows, selectedTicker) ?? snapshot.focus;
+  if (!focus) return <p className="b-empty">Run a dashboard refresh to persist a focus row.</p>;
+  const peers = snapshot.rows.filter((row) => row.asset_class === focus.asset_class).sort((a, b) => b.s_score - a.s_score);
+  const gates = gateRows(focus);
+  return (
+    <section className="b-screen b-article">
+      <header className="b-article-head">
+        <span className="b-kicker">{focus.asset_class} | {focus.state.replaceAll("_", " ")} | forward outlook</span>
+        <h1>{focus.ticker}: the model says<br /><em>{focus.s_score >= 0 ? "support is still present." : "risk is now visible."}</em></h1>
+        <p>{focus.identity}. {fieldNarrative(focus)} This article view keeps the same mechanical gates but explains them in novice-friendly prose.</p>
+        <small>BY THE MODEL | LAST SNAPSHOT {snapshot.run?.started_at_utc || snapshot.generated_at}</small>
+      </header>
+      <div className="b-pull-strip">
+        <div><strong className={focus.s_score >= 0 ? "good" : "bad"}>{fmt(focus.s_score)}</strong><span>COMPOSITE S</span></div>
+        <div><strong className={focus.f_score >= 0 ? "good" : "bad"}>{fmt(focus.f_score)}</strong><span>FLOW F</span></div>
+        <div><strong>{fmt(focus.momentum_pct, 2)}</strong><span>12-1 MOMENTUM</span></div>
+        <div><strong className="warn">{focus.quadrant}</strong><span>RRG QUAD</span></div>
+        <p>{focus.s_score >= 0 ? "The composite still leans supportive, but gates below determine whether it is actionable." : "The composite is warning that several pillars are no longer aligned."}</p>
+      </div>
+      <div className="b-article-grid">
+        <main>
+          <BSectionRule title="The seven pillars, explained" sub="Each paragraph below is generated from the latest saved pillar values." />
+          {numericPillars(focus).map(([key, value]) => (
+            <article className="b-pillar-para" key={key}>
+              <h3>{key.toUpperCase()}</h3>
+              <p>{value >= 0 ? "This pillar supports" : "This pillar subtracts from"} {focus.ticker}'s current composite. Latest saved contribution is <strong className={value >= 0 ? "good" : "bad"}>{fmt(value, 3)}</strong>. Positive values improve the setup; negative values are a warning that the pillar is no longer confirming.</p>
+            </article>
+          ))}
+          <BSectionRule title="What would escalate this state" sub="The same gate logic as the terminal view, styled as an editorial table." />
+          <div className="b-gate-table">
+            {gates.map((gate) => (
+              <div key={gate.label}>
+                <span>{gate.label}</span>
+                <strong className={gate.ok === true ? "good" : gate.ok === false ? "bad" : "warn"}>{gate.ok === true ? "Not tripped" : gate.ok === false ? "Tripped" : "Unknown"}</strong>
+                <em>{gate.detail}</em>
+              </div>
+            ))}
+          </div>
+        </main>
+        <aside className="b-article-side">
+          <section>
+            <h3>Weekly price vs 30wMA</h3>
+            <div className="b-mini-figure"><ACompositeBreakdown row={focus} /></div>
+            <p>Price, trend, and relative-strength gates are summarized in the same composite breakdown used by the engine.</p>
+          </section>
+          <section>
+            <h3>Related setups</h3>
+            {peers.slice(0, 7).map((row) => (
+              <button type="button" key={row.ticker} onClick={() => onSelectTicker(row.ticker)}>
+                <strong>{row.ticker}</strong><span>{row.identity}</span><em>{fmt(row.s_score)}</em>
+              </button>
+            ))}
+          </section>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function BRotationScreen({
+  snapshot,
+  selectedTicker,
+  onSelectTicker,
+  setActiveScreen,
+}: {
+  snapshot: DashboardSnapshotPayload;
+  selectedTicker: string;
+  onSelectTicker: (ticker: string) => void;
+  setActiveScreen: (screen: ScreenId) => void;
+}) {
+  const sectors = snapshot.screens.rotation?.sectors ?? snapshot.rows.filter((row) => row.asset_class === "US Sectors");
+  const rows = sectors.length ? sectors : snapshot.rows;
+  const leaders = [...snapshot.rows].sort((a, b) => (b.momentum_pct ?? 0) - (a.momentum_pct ?? 0)).slice(0, 12);
+  const laggards = [...snapshot.rows].sort((a, b) => (a.momentum_pct ?? 0) - (b.momentum_pct ?? 0)).slice(0, 12);
+  return (
+    <section className="b-screen b-map">
+      <header className="b-article-head compact">
+        <span className="b-kicker">The map | weekly | US sectors</span>
+        <h1>Where the money is going,<br /><em>and where it has been.</em></h1>
+        <p>The relative-rotation graph maps strength against rate of change. Read clockwise: leaders weaken, weakeners lag, laggards improve, improvers lead.</p>
+      </header>
+      <div className="b-map-grid">
+        <main>
+          <div className="b-figure-card">
+            <ARrgTerminal rows={rows} onSelectTicker={(ticker) => {
+              onSelectTicker(ticker);
+              setActiveScreen("deepdive");
+            }} />
+            <p>The current saved sector rotation set contains {rows.length} rows. Selected focus is {selectedTicker}.</p>
+          </div>
+          <BSectionRule title="Cross-sectional leaderboard" sub="12-1 momentum ranking, all instruments." />
+          <div className="b-leaderboards">
+            <div>{leaders.map((row) => <button type="button" key={row.ticker} onClick={() => onSelectTicker(row.ticker)}><strong>{row.ticker}</strong><span>{row.identity}</span><em>{fmt(row.momentum_pct, 2)}</em></button>)}</div>
+            <div>{laggards.map((row) => <button type="button" key={row.ticker} onClick={() => onSelectTicker(row.ticker)}><strong>{row.ticker}</strong><span>{row.identity}</span><em>{fmt(row.momentum_pct, 2)}</em></button>)}</div>
+          </div>
+        </main>
+        <aside className="b-side">
+          <section className="b-phase-box">
+            <h3>The phase</h3>
+            <div className="b-phase-row">{["EARLY", "MID", "LATE", "RECESS"].map((phase) => <span key={phase} className={String(snapshot.run?.metadata?.cycle_phase || "").toUpperCase() === phase ? "active" : ""}>{phase}</span>)}</div>
+            <p>Run provider: {snapshot.run?.provider || "unknown"}. Macro context is persisted from the run journal; this view does not fetch providers during render.</p>
+          </section>
+          <BSectionRule title="Where the flow went" />
+          <div className="b-flow-items">
+            {rows.slice().sort((a, b) => Math.abs(rowPressure(b)) - Math.abs(rowPressure(a))).slice(0, 5).map((row) => (
+              <article key={row.ticker}>
+                <h3>{row.ticker} | {row.identity}</h3>
+                <p>{flowNarrative(row)}</p>
+              </article>
+            ))}
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function HandoffBScreens({
+  snapshot,
+}: {
+  snapshot: DashboardSnapshotPayload;
+}) {
+  const [activeScreen, setActiveScreen] = useState<ScreenId>("overview");
+  const initialTicker = snapshot.focus?.ticker || snapshot.rows[0]?.ticker || "";
+  const [selectedTicker, setSelectedTicker] = useState(initialTicker);
+  return (
+    <div className="b-shell" data-presentation="handoff-b">
+      <BMasthead activeScreen={activeScreen} setActiveScreen={setActiveScreen} compact={activeScreen !== "overview"} />
+      {activeScreen === "overview" ? (
+        <BOverviewScreen snapshot={snapshot} onSelectTicker={setSelectedTicker} setActiveScreen={setActiveScreen} />
+      ) : null}
+      {activeScreen === "deepdive" ? (
+        <BDeepDiveScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} />
+      ) : null}
+      {activeScreen === "rotation" ? (
+        <BRotationScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} setActiveScreen={setActiveScreen} />
+      ) : null}
+    </div>
+  );
+}
+
 function HandoffCScreens({
   snapshot,
 }: {
@@ -1931,6 +2233,10 @@ export default function DashboardScreensClient({
 
   if (presentation === "handoff-a") {
     return <HandoffAScreens snapshot={snapshot} />;
+  }
+
+  if (presentation === "handoff-b") {
+    return <HandoffBScreens snapshot={snapshot} />;
   }
 
   if (presentation === "handoff-c") {

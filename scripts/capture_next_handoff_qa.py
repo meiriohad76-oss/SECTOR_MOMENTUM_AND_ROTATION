@@ -43,8 +43,8 @@ QA_PROFILES = {
         },
     },
     "b": {
-        "reference_profile": "Momentum v2 Display B handoff: B1/B2/B3 baseline",
-        "default_url": "http://127.0.0.1:3000/",
+        "reference_profile": "Momentum v2 Display B handoff: B1/B2/B3",
+        "default_url": "http://127.0.0.1:3000/?presentation=b",
         "capture_prefix": "next-b",
         "buttons": NEXT_SCREEN_BUTTONS,
         "reference_map": {
@@ -53,9 +53,9 @@ QA_PROFILES = {
             "rotation": "B3-editorial-rotation.png",
         },
         "required_text": {
-            "overview": ("A | Overview", "LEADERS", "RISK QUEUE"),
-            "deepdive": ("B | Deep Dive", "Ticker focus", "The composite, built pillar by pillar"),
-            "rotation": ("C | Rotation", "Relative Rotation Graph", "The flow river"),
+            "overview": ("The Sentiment Brief", "BY THE NUMBERS", "This week's transitions"),
+            "deepdive": ("The Sentiment Brief", "The seven pillars, explained", "What would escalate this state"),
+            "rotation": ("The Sentiment Brief", "Where the money is going", "Where the flow went"),
         },
     },
     "c": {

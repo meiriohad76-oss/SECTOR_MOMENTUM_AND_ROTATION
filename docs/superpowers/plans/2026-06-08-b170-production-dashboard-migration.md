@@ -73,6 +73,7 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
   - [x] Add repeatable Next screenshot QA against the A1/A2/A3, B1/B2/B3, and C1/C2/C3 handoff PNGs with current evidence in `docs/browser-qa/next-handoff/latest`.
   - [x] Add `?presentation=c` light Display C presentation mode so screenshot QA compares the candidate layout rather than the dark ops wrapper.
   - [x] Add `?presentation=a` terminal Display A presentation mode backed by the live snapshot, with BLUF/status tiles, 7-pillar heatmap, transition/position rail, terminal deep dive, and terminal rotation map.
+  - [x] Add `?presentation=b` editorial Display B presentation mode backed by the live snapshot, with brief overview, article deep dive, and narrated rotation/map column.
   - [ ] Match the handoff A/B/C layouts and chart primitives with browser screenshot evidence.
 - [ ] Replace Streamlit custom click/tooltip bridges with native React interactions.
   - [x] Native React interaction foundation exists in `web/app/dashboard-screens-client.tsx`.
@@ -82,7 +83,7 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
   - [x] `scripts/serve_next_qa_api.py` provides a QA-only read-only API fallback when FastAPI is not installed locally.
   - [x] Latest profile-C evidence targets `http://127.0.0.1:3100/?presentation=c`; required text/nonblank checks pass for C1/C2/C3 with current similarity 0.7763 overview, 0.8386 deep dive, and 0.8524 rotation while remaining below a pixel-parity release gate.
   - [x] Latest profile-A evidence targets `http://127.0.0.1:3100/?presentation=a`; required text/nonblank checks pass for A1/A2/A3 with current similarity 0.8394 overview, 0.8736 deep dive, and 0.8939 rotation while remaining below a pixel-parity release gate.
-  - [x] Baseline profile-B evidence now exists for B1/B2/B3 against the current live-data React route. Required text/nonblank checks pass, and the similarity numbers intentionally expose the remaining editorial visual gap: B profile 0.2784 overview, 0.2240 deep dive, 0.2479 rotation.
+  - [x] Latest profile-B evidence targets `http://127.0.0.1:3100/?presentation=b`; required text/nonblank checks pass for B1/B2/B3 with current similarity 0.8427 overview, 0.7955 deep dive, and 0.6736 rotation while remaining below a pixel-parity release gate.
   - [x] The screenshot QA helper now hides the Next development overlay before capture and compacts duplicate snapshot sections below the local transport limit while preserving the current real row universe.
   - [ ] Raise visual similarity through layout/pixel-parity tickets before using the similarity score as a release gate.
 - [x] Add Pi systemd/API deployment docs and Cloudflare route plan.
