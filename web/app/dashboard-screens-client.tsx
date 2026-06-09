@@ -124,6 +124,23 @@ function fieldNarrative(row: SnapshotRow): string {
   return `${row.display_label}: S ${fmt(row.s_score)}, F ${fmt(row.f_score)}, ${momentum}, ${flow}, RRG ${row.quadrant}.`;
 }
 
+function rowPressure(row: SnapshotRow): number {
+  return row.f_score + (row.cmf21 ?? 0) + row.s_score * 0.35;
+}
+
+function flowNarrative(row: SnapshotRow): string {
+  const cmf = row.cmf21 === null ? "CMF is unavailable" : `CMF ${fmt(row.cmf21, 2)}`;
+  const flow = `F ${fmt(row.f_score, 2)}`;
+  const score = `S ${fmt(row.s_score, 2)}`;
+  if (rowPressure(row) > 0.35) {
+    return `${flow}, ${cmf}, ${score}: flow is supporting the setup.`;
+  }
+  if (rowPressure(row) < -0.35) {
+    return `${flow}, ${cmf}, ${score}: flow is pressuring the setup.`;
+  }
+  return `${flow}, ${cmf}, ${score}: flow evidence is mixed.`;
+}
+
 function SnapshotCard({
   row,
   selected,
@@ -1358,6 +1375,12 @@ function CRotationScreen({
 }) {
   const sectors = snapshot.screens.rotation?.sectors ?? [];
   const rows = sectors.length ? sectors : snapshot.rows;
+  const sortedFlowRows = [...rows].sort((a, b) => Math.abs(rowPressure(b)) - Math.abs(rowPressure(a))).slice(0, 9);
+  const cyclePhase = String(snapshot.run?.metadata?.cycle_phase || "").toUpperCase();
+  const warningCount = snapshot.summary.state_counts.WARNING ?? 0;
+  const exitCount = snapshot.summary.state_counts.EXIT ?? 0;
+  const bullishCount = snapshot.summary.state_counts.STAGE_2_BULLISH ?? 0;
+  const leadingCount = snapshot.summary.quadrant_counts.Leading ?? 0;
   return (
     <section className="c-screen" aria-label="Display C rotation and flow">
       <header className="c-rotation-head">
@@ -1380,32 +1403,32 @@ function CRotationScreen({
           <div className="c-sec-head"><strong>Macro / business cycle</strong><span>run context</span></div>
           <div className="c-cycle-tabs">
             {["EARLY", "MID", "LATE", "RECESS"].map((phase) => (
-              <span key={phase} className={String(snapshot.run?.metadata?.cycle_phase || "").toUpperCase() === phase ? "selected" : ""}>{phase}</span>
+              <span key={phase} className={cyclePhase === phase ? "selected" : ""}>{phase}</span>
             ))}
           </div>
-          <p>Current run provider: {snapshot.run?.provider || "unknown"}. The macro lane is read from persisted health/run context in this migration shell; live FRED refresh remains behind the API refresh runner.</p>
           <div className="c-macro-tiles">
-            <div><span>Universe</span><strong>{snapshot.summary.universe_count}</strong></div>
-            <div><span>Bullish</span><strong>{snapshot.summary.state_counts.STAGE_2_BULLISH ?? 0}</strong></div>
-            <div><span>Warning</span><strong>{snapshot.summary.state_counts.WARNING ?? 0}</strong></div>
-            <div><span>Exit</span><strong>{snapshot.summary.state_counts.EXIT ?? 0}</strong></div>
+            <div><span>Universe</span><strong>{snapshot.summary.universe_count}</strong><small>{snapshot.run?.provider || "provider"} snapshot</small></div>
+            <div><span>Bullish</span><strong>{bullishCount}</strong><small>stage-2 rows</small></div>
+            <div><span>Leading</span><strong>{leadingCount}</strong><small>RRG quadrant</small></div>
+            <div><span>Warnings</span><strong>{warningCount + exitCount}</strong><small>{warningCount} warn | {exitCount} exit</small></div>
           </div>
+          <p>Persisted run-journal context only. This screen does not fetch FRED/Massive during render.</p>
         </div>
         <div className="c-flow-table">
           <div className="c-sec-head"><strong>Flow internals</strong><span>click row for deep dive</span></div>
           <table>
             <thead>
-              <tr><th>Ticker</th><th>Identity</th><th>Quadrant</th><th>S</th><th>F</th><th>CMF</th><th>Mom</th></tr>
+              <tr><th>Ticker</th><th>Identity</th><th>Read</th><th>S</th><th>F</th><th>CMF</th><th>Mom</th></tr>
             </thead>
             <tbody>
-              {rows.slice(0, 12).map((row) => (
+              {sortedFlowRows.map((row) => (
                 <tr key={row.ticker} className={row.ticker === selectedTicker ? "selected-row" : ""} onClick={() => {
                   onSelectTicker(row.ticker);
                   setActiveScreen("deepdive");
                 }}>
                   <td><strong>{row.ticker}</strong></td>
                   <td>{row.identity}</td>
-                  <td>{row.quadrant}</td>
+                  <td><span className="c-flow-read">{flowNarrative(row)}</span></td>
                   <td>{fmt(row.s_score)}</td>
                   <td>{fmt(row.f_score)}</td>
                   <td>{fmt(row.cmf21, 2)}</td>
