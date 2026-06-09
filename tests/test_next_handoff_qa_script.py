@@ -13,9 +13,23 @@ def test_next_handoff_qa_maps_current_next_screens_to_c_handoff_refs():
         "deepdive": "C2-pillarstack-waterfall.png",
         "rotation": "C3-pillarstack-rotation.png",
     }
-    assert qa.NEXT_SCREEN_BUTTONS["overview"] == "Heatmap"
-    assert qa.NEXT_SCREEN_BUTTONS["deepdive"] == "Deep dive"
+    assert qa.QA_PROFILES["c"]["buttons"]["overview"] == "Heatmap"
+    assert qa.QA_PROFILES["c"]["buttons"]["deepdive"] == "Deep dive"
     assert qa.NEXT_SCREEN_BUTTONS["rotation"] == "Rotation"
+
+
+def test_next_handoff_qa_profiles_cover_a_b_and_c_references():
+    assert qa.QA_PROFILES["a"]["reference_map"] == {
+        "overview": "A1-terminal-overview.png",
+        "deepdive": "A2-terminal-deepdive.png",
+        "rotation": "A3-terminal-rotation.png",
+    }
+    assert qa.QA_PROFILES["b"]["reference_map"] == {
+        "overview": "B1-editorial-brief.png",
+        "deepdive": "B2-editorial-article.png",
+        "rotation": "B3-editorial-rotation.png",
+    }
+    assert qa.QA_PROFILES["c"]["default_url"] == "http://127.0.0.1:3000/?presentation=c"
 
 
 def test_next_handoff_qa_required_text_covers_new_chart_primitives():
@@ -41,7 +55,10 @@ def test_next_handoff_qa_cli_exposes_similarity_gate_and_next_url():
     )
 
     assert "--min-similarity" in result.stdout
-    assert qa.parse_args([]).url == "http://127.0.0.1:3000/?presentation=c"
+    assert "--profile" in result.stdout
+    assert qa.parse_args([]).profile == "c"
+    assert qa.parse_args(["--profile", "a"]).profile == "a"
+    assert qa.parse_args([]).url is None
 
 
 def test_next_handoff_qa_hides_development_overlay_before_capture():

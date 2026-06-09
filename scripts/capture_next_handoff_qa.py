@@ -19,21 +19,69 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-NEXT_SCREEN_REFERENCE_MAP = {
-    "overview": "C1-pillarstack-heatmap.png",
-    "deepdive": "C2-pillarstack-waterfall.png",
-    "rotation": "C3-pillarstack-rotation.png",
-}
 NEXT_SCREEN_BUTTONS = {
-    "overview": "Heatmap",
-    "deepdive": "Deep dive",
+    "overview": "Overview",
+    "deepdive": "Deep Dive",
     "rotation": "Rotation",
 }
-NEXT_SCREEN_REQUIRED_TEXT = {
-    "overview": ("The composite, dissected", "State changes", "Bullish cohort"),
-    "deepdive": ("The composite, built pillar by pillar", "FOCUS", "State machine"),
-    "rotation": ("The rotation map", "The flow river", "Flow internals"),
+
+QA_PROFILES = {
+    "a": {
+        "reference_profile": "Momentum v2 Display A handoff: A1/A2/A3 baseline",
+        "default_url": "http://127.0.0.1:3000/",
+        "capture_prefix": "next-a",
+        "buttons": NEXT_SCREEN_BUTTONS,
+        "reference_map": {
+            "overview": "A1-terminal-overview.png",
+            "deepdive": "A2-terminal-deepdive.png",
+            "rotation": "A3-terminal-rotation.png",
+        },
+        "required_text": {
+            "overview": ("A | Overview", "LEADERS", "RISK QUEUE"),
+            "deepdive": ("B | Deep Dive", "Ticker focus", "The composite, built pillar by pillar"),
+            "rotation": ("C | Rotation", "Relative Rotation Graph", "The flow river"),
+        },
+    },
+    "b": {
+        "reference_profile": "Momentum v2 Display B handoff: B1/B2/B3 baseline",
+        "default_url": "http://127.0.0.1:3000/",
+        "capture_prefix": "next-b",
+        "buttons": NEXT_SCREEN_BUTTONS,
+        "reference_map": {
+            "overview": "B1-editorial-brief.png",
+            "deepdive": "B2-editorial-article.png",
+            "rotation": "B3-editorial-rotation.png",
+        },
+        "required_text": {
+            "overview": ("A | Overview", "LEADERS", "RISK QUEUE"),
+            "deepdive": ("B | Deep Dive", "Ticker focus", "The composite, built pillar by pillar"),
+            "rotation": ("C | Rotation", "Relative Rotation Graph", "The flow river"),
+        },
+    },
+    "c": {
+        "reference_profile": "Momentum v2 Display C handoff: C1/C2/C3",
+        "default_url": "http://127.0.0.1:3000/?presentation=c",
+        "capture_prefix": "next",
+        "buttons": {
+            "overview": "Heatmap",
+            "deepdive": "Deep dive",
+            "rotation": "Rotation",
+        },
+        "reference_map": {
+            "overview": "C1-pillarstack-heatmap.png",
+            "deepdive": "C2-pillarstack-waterfall.png",
+            "rotation": "C3-pillarstack-rotation.png",
+        },
+        "required_text": {
+            "overview": ("The composite, dissected", "State changes", "Bullish cohort"),
+            "deepdive": ("The composite, built pillar by pillar", "FOCUS", "State machine"),
+            "rotation": ("The rotation map", "The flow river", "Flow internals"),
+        },
+    },
 }
+
+NEXT_SCREEN_REFERENCE_MAP = QA_PROFILES["c"]["reference_map"]
+NEXT_SCREEN_REQUIRED_TEXT = QA_PROFILES["c"]["required_text"]
 
 
 def _reference_dir() -> Path:
@@ -81,12 +129,23 @@ def _missing_text(body_text: str, required: tuple[str, ...]) -> list[str]:
 
 
 def _click_screen_button(page, label: str, timeout_ms: int) -> None:
+    fallback_timeout = min(timeout_ms, 1_500)
     try:
-        page.get_by_role("button", name=label, exact=True).click(timeout=timeout_ms)
+        page.get_by_role("button", name=label, exact=True).click(timeout=fallback_timeout)
         return
     except Exception:
         pass
-    page.get_by_text(label, exact=True).click(timeout=timeout_ms)
+    try:
+        page.locator("button[aria-pressed]").filter(has_text=label).first.click(timeout=fallback_timeout)
+        return
+    except Exception:
+        pass
+    try:
+        page.get_by_text(label, exact=True).click(timeout=fallback_timeout)
+        return
+    except Exception:
+        pass
+    page.locator("button").filter(has_text=label).first.click(timeout=timeout_ms)
 
 
 def _wait_for_any_text(page, required: tuple[str, ...], timeout_ms: int) -> None:
@@ -103,7 +162,14 @@ def _wait_for_any_text(page, required: tuple[str, ...], timeout_ms: int) -> None
     )
 
 
-def _capture(url: str, output_dir: Path, screens: list[str], timeout_ms: int) -> list[dict[str, object]]:
+def _capture(
+    url: str,
+    output_dir: Path,
+    screens: list[str],
+    timeout_ms: int,
+    *,
+    profile: dict[str, object],
+) -> list[dict[str, object]]:
     try:
         from playwright.sync_api import sync_playwright
     except ImportError as exc:  # pragma: no cover - environment dependent
@@ -113,6 +179,9 @@ def _capture(url: str, output_dir: Path, screens: list[str], timeout_ms: int) ->
         ) from exc
 
     output_dir.mkdir(parents=True, exist_ok=True)
+    buttons = profile["buttons"]
+    required_text = profile["required_text"]
+    capture_prefix = str(profile["capture_prefix"])
     rows: list[dict[str, object]] = []
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
@@ -132,17 +201,18 @@ def _capture(url: str, output_dir: Path, screens: list[str], timeout_ms: int) ->
             """
         )
         for screen in screens:
-            button_name = NEXT_SCREEN_BUTTONS[screen]
-            screenshot_path = output_dir / f"next-{screen}.png"
+            button_name = buttons[screen]
+            screen_required_text = required_text[screen]
+            screenshot_path = output_dir / f"{capture_prefix}-{screen}.png"
             error = ""
             try:
                 if screen != "overview":
                     _click_screen_button(page, button_name, timeout_ms)
-                _wait_for_any_text(page, NEXT_SCREEN_REQUIRED_TEXT[screen], timeout_ms)
+                _wait_for_any_text(page, screen_required_text, timeout_ms)
                 page.wait_for_timeout(600)
                 body_text = page.evaluate("() => document.body ? document.body.innerText : ''")
                 page.screenshot(path=str(screenshot_path), full_page=True, timeout=timeout_ms)
-                missing = _missing_text(body_text, NEXT_SCREEN_REQUIRED_TEXT[screen])
+                missing = _missing_text(body_text, screen_required_text)
                 nonblank = _image_nonblank(screenshot_path)
             except Exception as exc:
                 body_text = page.evaluate("() => document.body ? document.body.innerText : ''")
@@ -152,13 +222,13 @@ def _capture(url: str, output_dir: Path, screens: list[str], timeout_ms: int) ->
                 except Exception:
                     screenshot_path.write_bytes(b"")
                     nonblank = False
-                missing = _missing_text(body_text, NEXT_SCREEN_REQUIRED_TEXT[screen])
+                missing = _missing_text(body_text, screen_required_text)
                 error = f"{type(exc).__name__}: {exc}"
             rows.append(
                 {
                     "screen": screen,
                     "capture": str(screenshot_path),
-                    "required_text": list(NEXT_SCREEN_REQUIRED_TEXT[screen]),
+                    "required_text": list(screen_required_text),
                     "missing_text": missing,
                     "nonblank": nonblank,
                     "error": error,
@@ -168,11 +238,12 @@ def _capture(url: str, output_dir: Path, screens: list[str], timeout_ms: int) ->
     return rows
 
 
-def _compare(rows: list[dict[str, object]], reference_dir: Path) -> list[dict[str, object]]:
+def _compare(rows: list[dict[str, object]], reference_dir: Path, *, profile: dict[str, object]) -> list[dict[str, object]]:
+    reference_map = profile["reference_map"]
     compared: list[dict[str, object]] = []
     for row in rows:
         screen = str(row["screen"])
-        reference = reference_dir / NEXT_SCREEN_REFERENCE_MAP[screen]
+        reference = reference_dir / reference_map[screen]
         entry = dict(row)
         entry["reference"] = str(reference)
         entry["reference_exists"] = reference.exists()
@@ -183,21 +254,24 @@ def _compare(rows: list[dict[str, object]], reference_dir: Path) -> list[dict[st
     return compared
 
 
-def _write_report(output_dir: Path, report: list[dict[str, object]], *, url: str) -> Path:
+def _write_report(output_dir: Path, report: list[dict[str, object]], *, url: str, profile_name: str, profile: dict[str, object]) -> Path:
     payload = {
         "generated_at_utc": _utc_stamp(),
+        "profile": profile_name,
         "url": url,
-        "reference_profile": "Momentum v2 Display C handoff: C1/C2/C3",
+        "reference_profile": profile["reference_profile"],
         "screens": report,
     }
-    path = output_dir / "next_handoff_qa_report.json"
+    suffix = "" if profile_name == "c" else f"_{profile_name}"
+    path = output_dir / f"next_handoff_qa_report{suffix}.json"
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--url", default="http://127.0.0.1:3000/?presentation=c")
+    parser.add_argument("--profile", choices=sorted(QA_PROFILES), default="c")
+    parser.add_argument("--url", default=None, help="Override the profile default URL.")
     parser.add_argument("--output-dir", default=str(ROOT / ".tmp" / "next_handoff_qa"))
     parser.add_argument("--reference-dir", default=str(_reference_dir()))
     parser.add_argument("--screen", action="append", choices=sorted(NEXT_SCREEN_REFERENCE_MAP), help="Repeatable; defaults to all")
@@ -208,11 +282,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    profile = QA_PROFILES[args.profile]
+    url = args.url or profile["default_url"]
     screens = args.screen or ["overview", "deepdive", "rotation"]
     output_dir = Path(args.output_dir)
-    rows = _capture(args.url, output_dir, screens, args.timeout_ms)
-    report = _compare(rows, Path(args.reference_dir))
-    report_path = _write_report(output_dir, report, url=args.url)
+    rows = _capture(str(url), output_dir, screens, args.timeout_ms, profile=profile)
+    report = _compare(rows, Path(args.reference_dir), profile=profile)
+    report_path = _write_report(output_dir, report, url=str(url), profile_name=args.profile, profile=profile)
     print(json.dumps({"screens": len(report), "report": str(report_path)}, indent=2))
     failures = [row for row in report if not row.get("ok")]
     if args.min_similarity is not None:

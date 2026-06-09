@@ -1,0 +1,83 @@
+{
+  "generated_at_utc": "2026-06-09T17:57:52Z",
+  "profile": "a",
+  "reference_profile": "Momentum v2 Display A handoff: A1/A2/A3 baseline",
+  "screens": [
+    {
+      "capture": "docs\\browser-qa\\next-handoff\\latest\\next-a-overview.png",
+      "capture_size": [
+        1440,
+        5625
+      ],
+      "error": "",
+      "missing_text": [],
+      "nonblank": true,
+      "ok": true,
+      "reference": "C:\\Users\\meiri\\momentum and flow\\momentum v2\\design_handoff_momentum_v2\\media\\screens\\A1-terminal-overview.png",
+      "reference_exists": true,
+      "reference_size": [
+        1440,
+        2625
+      ],
+      "required_text": [
+        "A | Overview",
+        "LEADERS",
+        "RISK QUEUE"
+      ],
+      "rms": 116.6642,
+      "screen": "overview",
+      "similarity": 0.5425
+    },
+    {
+      "capture": "docs\\browser-qa\\next-handoff\\latest\\next-a-deepdive.png",
+      "capture_size": [
+        1440,
+        2830
+      ],
+      "error": "",
+      "missing_text": [],
+      "nonblank": true,
+      "ok": true,
+      "reference": "C:\\Users\\meiri\\momentum and flow\\momentum v2\\design_handoff_momentum_v2\\media\\screens\\A2-terminal-deepdive.png",
+      "reference_exists": true,
+      "reference_size": [
+        1440,
+        1458
+      ],
+      "required_text": [
+        "B | Deep Dive",
+        "Ticker focus",
+        "The composite, built pillar by pillar"
+      ],
+      "rms": 77.5104,
+      "screen": "deepdive",
+      "similarity": 0.696
+    },
+    {
+      "capture": "docs\\browser-qa\\next-handoff\\latest\\next-a-rotation.png",
+      "capture_size": [
+        1440,
+        3605
+      ],
+      "error": "",
+      "missing_text": [],
+      "nonblank": true,
+      "ok": true,
+      "reference": "C:\\Users\\meiri\\momentum and flow\\momentum v2\\design_handoff_momentum_v2\\media\\screens\\A3-terminal-rotation.png",
+      "reference_exists": true,
+      "reference_size": [
+        1440,
+        1397
+      ],
+      "required_text": [
+        "C | Rotation",
+        "Relative Rotation Graph",
+        "The flow river"
+      ],
+      "rms": 100.8906,
+      "screen": "rotation",
+      "similarity": 0.6044
+    }
+  ],
+  "url": "http://127.0.0.1:3100/?qa=shots"
+}
