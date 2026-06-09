@@ -155,8 +155,80 @@ Before retiring Streamlit, verify and document all gates:
 - data parity: the React route uses the same Massive/FRED/run-journal data and
   agrees with Streamlit on key values.
 - visual parity: browser screenshot QA against the A/B/C handoff is accepted.
+- operational parity: candidate API/Next services are healthy beside Streamlit.
 - rollback: `sentimentdashboard.ahaddashboards.uk` can be routed back to
   `http://localhost:8501` and `sector-dashboard` stays installed/enabled.
+
+#### B-170 Streamlit retirement readiness checklist
+
+Do not move `sentimentdashboard.ahaddashboards.uk` from Streamlit to Next.js
+until this checklist is captured in a dated handoff or release note:
+
+1. **Feature parity evidence**
+   - React route can open overview, deep dive, rotation, portfolio analysis,
+     saved portfolios, refresh status, data health, provider health, and
+     collapsed Backtest Lab without console errors.
+   - Ticker selection works from cards, rows, quadrant tables, portfolio rows,
+     and A/B/C presentation routes.
+   - Required proof: browser QA log or screenshots for
+     `/?presentation=a`, `/?presentation=b`, `/?presentation=c`, and the
+     default shell.
+
+2. **Data parity evidence**
+   - Streamlit and Next.js read the same latest run journal and cached provider
+     data. Compare at minimum `generated_at`, row count, selected ticker,
+     `S_score`, `F_score`, state, quadrant, CMF, momentum, provider-health
+     status, and data-health freshness.
+   - Required proof:
+
+     ```bash
+     curl -s http://127.0.0.1:8000/api/v1/dashboard-snapshot >/tmp/next-snapshot.json
+     curl -s http://127.0.0.1:8000/api/v1/data-health >/tmp/next-data-health.json
+     curl -s http://127.0.0.1:8000/api/v1/provider-health >/tmp/next-provider-health.json
+     ```
+
+     Attach the comparison output or release note summary. Do not use live
+     provider calls during render-time parity checks.
+
+3. **Visual parity evidence**
+   - A/B/C screenshot QA passes required text and nonblank checks.
+   - Similarity scores are accepted by the product owner, or explicit visual
+     exceptions are documented with screenshots and rationale.
+   - Required proof:
+
+     ```bash
+     python scripts/capture_next_handoff_qa.py --profile a --url 'http://127.0.0.1:3000/?presentation=a&qa=shots' --output-dir docs/browser-qa/next-handoff/release
+     python scripts/capture_next_handoff_qa.py --profile b --url 'http://127.0.0.1:3000/?presentation=b&qa=shots' --output-dir docs/browser-qa/next-handoff/release
+     python scripts/capture_next_handoff_qa.py --profile c --url 'http://127.0.0.1:3000/?presentation=c&qa=shots' --output-dir docs/browser-qa/next-handoff/release
+     ```
+
+4. **Operational parity evidence**
+   - `sector-api`, `sector-next`, and `sector-dashboard` are all active before
+     route cutover.
+   - The candidate route and Streamlit route both return HTTP 200.
+   - Required proof:
+
+     ```bash
+     systemctl is-active sector-api sector-next sector-dashboard
+     curl -s -o /dev/null -w 'next=%{http_code}\n' http://127.0.0.1:3000/?presentation=c
+     curl -s -o /dev/null -w 'streamlit=%{http_code}\n' http://127.0.0.1:8501/?ticker=XLK
+     ```
+
+5. **Rollback evidence**
+   - Keep `sector-dashboard.service` installed, enabled, and tested for at
+     least one release after cutover.
+   - Document the exact Cloudflare ingress rollback line:
+     `sentimentdashboard.ahaddashboards.uk -> http://localhost:8501`.
+   - Required rollback command set:
+
+     ```bash
+     sudo systemctl restart cloudflared
+     systemctl is-active sector-dashboard
+     curl -s -o /dev/null -w 'streamlit=%{http_code}\n' http://127.0.0.1:8501/?ticker=XLK
+     ```
+
+If any item is missing, keep Streamlit as production and keep the Next route on
+the candidate hostname.
 
 ### Optional public methodology landing service
 

@@ -123,6 +123,11 @@ The rollback path is to leave or restore the production hostname on
 `http://localhost:8501`, disable the candidate hostname, and stop only
 `sector-next`/`sector-api` if needed.
 
+Before any cutover, complete the B-170 Streamlit retirement readiness checklist
+in [`DEPLOY_RASPBERRY_PI.md`](DEPLOY_RASPBERRY_PI.md). A route change without
+feature parity, data parity, visual parity, operational parity, and documented
+rollback evidence is not considered a production deployment.
+
 ## 6. Test the tunnel manually
 
 ```bash

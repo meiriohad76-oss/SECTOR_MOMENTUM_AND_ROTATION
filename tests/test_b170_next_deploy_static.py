@@ -41,6 +41,7 @@ def test_b170_pi_deploy_docs_cover_candidate_install_and_smoke_without_streamlit
 
     for marker in (
         "Optional B-170 API and Next.js candidate services",
+        "B-170 Streamlit retirement readiness checklist",
         "sector-api.service",
         "sector-next.service",
         "npm --prefix web ci",
@@ -52,7 +53,27 @@ def test_b170_pi_deploy_docs_cover_candidate_install_and_smoke_without_streamlit
         "feature parity",
         "data parity",
         "visual parity",
+        "operational parity",
         "rollback",
+    ):
+        assert marker in docs
+
+
+def test_b170_streamlit_retirement_checklist_requires_evidence_before_cutover():
+    docs = (ROOT / "docs" / "DEPLOY_RASPBERRY_PI.md").read_text(encoding="utf-8")
+
+    for marker in (
+        "Do not move `sentimentdashboard.ahaddashboards.uk` from Streamlit to Next.js",
+        "Feature parity evidence",
+        "Data parity evidence",
+        "Visual parity evidence",
+        "Operational parity evidence",
+        "Rollback evidence",
+        "curl -s http://127.0.0.1:8000/api/v1/dashboard-snapshot",
+        "python scripts/capture_next_handoff_qa.py --profile a",
+        "systemctl is-active sector-api sector-next sector-dashboard",
+        "sentimentdashboard.ahaddashboards.uk -> http://localhost:8501",
+        "If any item is missing, keep Streamlit as production",
     ):
         assert marker in docs
 
@@ -68,6 +89,8 @@ def test_b170_cloudflare_docs_keep_streamlit_live_and_define_candidate_route_pla
         "Do not expose the FastAPI service directly unless you add a separate Access",
         "policy, CORS policy, rate limits, and explicit API threat model.",
         "rollback path",
+        "B-170 Streamlit retirement readiness checklist",
+        "feature parity, data parity, visual parity, operational parity",
     ):
         assert marker in docs
 
