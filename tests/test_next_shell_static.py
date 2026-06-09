@@ -33,6 +33,7 @@ def test_next_shell_fetches_real_api_health_and_data_health_paths():
     assert 'fetchDashboardApi<DashboardHealthPayload>("/api/v1/health")' in api_source
     assert 'fetchDashboardApi<DashboardHealthPayload>("/api/v1/data-health")' in api_source
     assert 'fetchDashboardApi<DashboardSnapshotPayload>(`/api/v1/dashboard-snapshot${query}`)' in api_source
+    assert 'fetchDashboardApi<BacktestArtifactsPayload>("/api/v1/backtest-artifacts")' in api_source
     assert 'postDashboardApi<PortfolioAnalysisPayload>("/api/v1/portfolio/analyze", payload)' in api_source
     assert 'cache: "no-store"' in api_source
     assert "fetchDashboardSnapshot()" in page_source
@@ -41,6 +42,7 @@ def test_next_shell_fetches_real_api_health_and_data_health_paths():
     assert "export const revalidate = 0;" in page_source
     assert "fetch(" not in page_source
     assert 'fetchDashboardSnapshot(ticker?: string)' in api_source
+    assert "fetchBacktestArtifacts()" in api_source
     assert "analyzePortfolio(payload: PortfolioAnalysisRequest)" in api_source
     assert 'fetch("' not in client_source
 

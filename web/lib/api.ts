@@ -165,6 +165,36 @@ export type PortfolioAnalysisPayload = {
   rows: PortfolioAnalysisRow[];
 };
 
+export type BacktestArtifactRow = {
+  id: string;
+  label: string;
+  path: string;
+  exists: boolean;
+  status: string;
+  bytes: number;
+  modified_at: string;
+  sha256: string;
+  expected_sha256: string;
+};
+
+export type BacktestArtifactsPayload = {
+  api_version: string;
+  generated_at: string;
+  status: "ready" | "missing" | "unverified" | string;
+  message: string;
+  artifacts: BacktestArtifactRow[];
+  report: {
+    text: string;
+    methodology_text: string;
+  };
+  equity: {
+    row_count: number;
+    columns: string[];
+    rows: Record<string, number | string | boolean | null>[];
+  };
+  metadata: Record<string, unknown>;
+};
+
 export type PortfolioAnalysisRequest = {
   ticker?: string;
   csv?: string;
@@ -239,6 +269,10 @@ export async function fetchDataHealth() {
 export async function fetchDashboardSnapshot(ticker?: string) {
   const query = ticker ? `?ticker=${encodeURIComponent(ticker)}` : "";
   return fetchDashboardApi<DashboardSnapshotPayload>(`/api/v1/dashboard-snapshot${query}`);
+}
+
+export async function fetchBacktestArtifacts() {
+  return fetchDashboardApi<BacktestArtifactsPayload>("/api/v1/backtest-artifacts");
 }
 
 export async function analyzePortfolio(payload: PortfolioAnalysisRequest) {

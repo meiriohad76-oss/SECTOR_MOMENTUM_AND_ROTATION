@@ -15,12 +15,15 @@ def test_api_server_is_optional_fastapi_boundary_not_streamlit_import():
     assert "except ModuleNotFoundError" in source
     assert "payload: dict[str, Any] | None = Body(default=None)" in source
     assert "HTTPException" in source
+    assert "from .api_backtest_artifacts import build_backtest_artifacts_payload" in source
     assert "from .api_refresh import create_refresh_job, get_refresh_job, list_refresh_events, queued_refresh_response" in source
     assert "from .api_refresh_runner import run_refresh_job" in source
     assert "from .api_data_health import build_provider_data_health_payload" in source
     assert "from .api_dashboard_snapshot import build_latest_dashboard_snapshot_payload" in source
     assert "from .api_portfolio import build_portfolio_analysis_payload" in source
     assert "from .api_status import build_persisted_status_payload" in source
+    assert "backtest_artifacts_provider: BacktestArtifactsProvider | None = None" in source
+    assert "backtest_reader = backtest_artifacts_provider or build_backtest_artifacts_payload" in source
     assert "return build_persisted_status_payload()" in source
     assert "return build_provider_data_health_payload()" in source
     assert 'app.get("/api/v1/health")' in source
@@ -28,6 +31,8 @@ def test_api_server_is_optional_fastapi_boundary_not_streamlit_import():
     assert 'app.get("/api/v1/data-health")' in source
     assert 'app.get("/api/v1/provider-health")' in source
     assert 'app.get("/api/v1/dashboard-snapshot")' in source
+    assert 'app.get("/api/v1/backtest-artifacts")' in source
+    assert "return backtest_reader()" in source
     assert 'app.post("/api/v1/portfolio/analyze")' in source
     assert 'app.post("/api/v1/refresh", status_code=202)' in source
     assert 'app.get("/api/v1/refresh/{job_id}")' in source

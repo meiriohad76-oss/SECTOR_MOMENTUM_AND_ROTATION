@@ -171,3 +171,27 @@ def test_portfolio_analyze_endpoint_uses_injected_snapshot_provider():
     assert payload["rows"][0]["ticker"] == "XLK"
     assert payload["rows"][0]["state"] == "STAGE_2_BULLISH"
     assert calls == [{}]
+
+
+def test_backtest_artifacts_endpoint_uses_injected_provider():
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from src.api_server import create_app
+
+    payload = {
+        "api_version": "v1",
+        "status": "ready",
+        "artifacts": [{"id": "report", "status": "verified"}],
+        "equity": {"row_count": 1, "rows": [{"date": "2026-01-01", "methodology": 1.0}]},
+    }
+    app = create_app(
+        status_provider=lambda: {"ok": True},
+        backtest_artifacts_provider=lambda: payload,
+    )
+    client = TestClient(app)
+
+    response = client.get("/api/v1/backtest-artifacts")
+
+    assert response.status_code == 200
+    assert response.json() == payload

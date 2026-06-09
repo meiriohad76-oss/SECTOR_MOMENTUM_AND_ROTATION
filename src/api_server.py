@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from .api_backtest_artifacts import build_backtest_artifacts_payload
 from .api_refresh import create_refresh_job, get_refresh_job, list_refresh_events, queued_refresh_response
 from .api_refresh_runner import run_refresh_job
 from .api_data_health import build_provider_data_health_payload
@@ -29,6 +30,7 @@ StatusProvider = Callable[[], dict[str, Any]]
 DataHealthProvider = Callable[[], dict[str, Any]]
 SnapshotProvider = Callable[..., dict[str, Any]]
 RefreshRunner = Callable[..., dict[str, Any]]
+BacktestArtifactsProvider = Callable[[], dict[str, Any]]
 
 
 def default_status_provider() -> dict[str, Any]:
@@ -51,6 +53,7 @@ def create_app(
     refresh_runner: RefreshRunner | None = None,
     data_health_provider: DataHealthProvider | None = None,
     snapshot_provider: SnapshotProvider | None = None,
+    backtest_artifacts_provider: BacktestArtifactsProvider | None = None,
 ):
     """Create the optional FastAPI app without making FastAPI mandatory at import time."""
     try:
@@ -61,6 +64,7 @@ def create_app(
     provider = status_provider or default_status_provider
     data_provider = data_health_provider or default_data_health_provider
     snapshot_reader = snapshot_provider or default_snapshot_provider
+    backtest_reader = backtest_artifacts_provider or build_backtest_artifacts_payload
     runner = refresh_runner or run_refresh_job
     app = FastAPI(
         title="Sector Momentum Dashboard API",
@@ -100,6 +104,10 @@ def create_app(
     @app.get("/api/v1/dashboard-snapshot")
     def dashboard_snapshot(ticker: str | None = None) -> dict[str, Any]:
         return snapshot_reader(focus_ticker=ticker)
+
+    @app.get("/api/v1/backtest-artifacts")
+    def backtest_artifacts() -> dict[str, Any]:
+        return backtest_reader()
 
     @app.post("/api/v1/portfolio/analyze")
     def portfolio_analyze(payload: dict[str, Any] | None = Body(default=None)) -> dict[str, Any]:
