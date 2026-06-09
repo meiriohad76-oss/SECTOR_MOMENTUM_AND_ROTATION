@@ -225,6 +225,70 @@ td small,
   gap: 20px;
 }
 
+.screen-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.screen-tabs button,
+.sort-controls button,
+.peer-strip button,
+.interactive-card,
+.quadrant-box {
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.screen-tabs button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 58px;
+  padding: 12px 14px;
+}
+
+.screen-tabs button strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: #061016;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.screen-tabs button span {
+  color: var(--soft);
+  font-weight: 700;
+}
+
+.screen-tabs button.selected,
+.interactive-card.selected,
+.quadrant-box.selected,
+.peer-strip button.selected {
+  border-color: var(--accent);
+  background: rgba(110, 198, 255, 0.14);
+  box-shadow: 0 0 0 1px rgba(110, 198, 255, 0.35) inset;
+}
+
+.screen-tabs button:focus-visible,
+.sort-controls button:focus-visible,
+.peer-strip button:focus-visible,
+.interactive-card:focus-visible,
+.quadrant-box:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .snapshot-columns {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -243,12 +307,10 @@ td small,
 .action-row {
   display: grid;
   gap: 10px;
+  width: 100%;
   min-height: 88px;
   margin-bottom: 10px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid var(--line);
-  border-radius: 8px;
 }
 
 .snapshot-card {
@@ -307,12 +369,34 @@ td small,
   gap: 10px;
 }
 
+.sort-controls,
+.ticker-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.sort-controls select,
+.ticker-select select {
+  max-width: min(52vw, 340px);
+  padding: 8px 10px;
+  color: var(--text);
+  background: #0d1319;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.sort-controls button,
+.peer-strip button {
+  padding: 8px 10px;
+}
+
 .pillar-list div,
 .quadrant-box {
   padding: 10px;
-  background: rgba(255, 255, 255, 0.035);
-  border: 1px solid var(--line);
-  border-radius: 8px;
 }
 
 .pillar-list span,
@@ -335,11 +419,55 @@ td small,
   padding: 16px;
 }
 
+.quadrant-box {
+  min-height: 150px;
+}
+
 .quadrant-box ul {
   margin: 10px 0 0;
   padding-left: 16px;
   color: var(--soft);
   line-height: 1.55;
+}
+
+.rotation-detail {
+  margin: 0 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.rotation-detail h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.rotation-detail tbody tr {
+  cursor: pointer;
+}
+
+.rotation-detail tbody tr:hover,
+.selected-row {
+  background: rgba(110, 198, 255, 0.12);
+}
+
+.peer-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.padded {
+  padding: 16px;
+}
+
+.interactive-card:hover,
+.quadrant-box:hover,
+.peer-strip button:hover,
+.screen-tabs button:hover,
+.sort-controls button:hover {
+  border-color: var(--accent);
 }
 
 @media (max-width: 980px) {
@@ -350,7 +478,8 @@ td small,
 
   .snapshot-columns,
   .deep-grid,
-  .rotation-grid {
+  .rotation-grid,
+  .screen-tabs {
     grid-template-columns: 1fr;
   }
 
