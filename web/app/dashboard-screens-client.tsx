@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { DashboardSnapshotPayload, SnapshotDecision, SnapshotPosition, SnapshotRow } from "../lib/api";
-import { FlowRiver, MomentumBars, PillarHeatmap, RrgChart, WaterfallChart } from "./chart-primitives";
+import { FlowRiver, MomentumBars, PillarDetailGrid, PillarHeatmap, RrgChart, WaterfallChart } from "./chart-primitives";
 
 type ScreenId = "overview" | "deepdive" | "rotation";
 type SortKey = "ticker" | "state" | "quadrant" | "s_score" | "f_score" | "rs_ratio" | "rs_momentum" | "momentum_pct" | "cmf21";
@@ -41,6 +41,34 @@ function pct(value: number | null | undefined, digits = 1) {
 function money(value: number | null | undefined) {
   if (value === null || value === undefined || Number.isNaN(value)) return "n/a";
   return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
+
+function payloadNumber(row: SnapshotRow, key: string): number | null {
+  const value = row.payload[key] ?? row.pillar_scores[key];
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function payloadBool(row: SnapshotRow, key: string): boolean | null {
+  const value = row.payload[key] ?? row.pillar_scores[key];
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value > 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "y"].includes(normalized)) return true;
+    if (["false", "0", "no", "n"].includes(normalized)) return false;
+  }
+  return null;
+}
+
+function passText(value: boolean | null) {
+  if (value === true) return "pass";
+  if (value === false) return "fail";
+  return "n/a";
 }
 
 function valueForSort(row: SnapshotRow, key: SortKey): string | number {
@@ -557,22 +585,19 @@ function CDeepDiveScreen({
   const focus = rowByTicker(snapshot.rows, selectedTicker) ?? snapshot.focus;
   if (!focus) return <p className="c-empty">Run a dashboard refresh to persist a focus row.</p>;
   const rank = [...snapshot.rows].sort((a, b) => b.s_score - a.s_score).findIndex((row) => row.ticker === focus.ticker) + 1;
-  const gates = [
-    ["RRG quadrant", focus.quadrant],
-    ["Momentum", fmt(focus.momentum_pct, 2)],
-    ["CMF flow", fmt(focus.cmf21, 2)],
-    ["RS ratio", fmt(focus.rs_ratio, 1)],
-    ["RS momentum", fmt(focus.rs_momentum, 1)],
-    ["State", focus.state.replaceAll("_", " ")],
-  ];
+  const gates = gateRows(focus);
+  const failedGates = gates.filter((gate) => gate.ok === false).length;
   return (
     <section className="c-screen" aria-label="Display C ticker deep dive">
       <header className="c-deep-header">
         <div>
           <div className="c-breadcrumb">Momentum / Heatmap / <strong>{focus.ticker}</strong></div>
-          <h1>{focus.ticker}</h1>
-          <p>{focus.asset_class} | {focus.identity}</p>
-          <strong>{focus.state.replaceAll("_", " ")}: {fieldNarrative(focus)} The waterfall below shows how each pillar contributes to the current composite.</strong>
+          <div className="c-deep-title-row">
+            <h1>{focus.ticker}</h1>
+            <span className={`light-state-pill ${stateToneForClass(focus.state)}`}>{focus.state.replaceAll("_", " ")}</span>
+            <p>{focus.asset_class} | {focus.identity}</p>
+          </div>
+          <strong>{focus.state.replaceAll("_", " ")}: {fieldNarrative(focus)} The waterfall below makes the signed pillar math visible: which signals did the work, which dragged, and where the composite finished.</strong>
         </div>
         <label className="c-focus-select">
           Focus
@@ -591,15 +616,21 @@ function CDeepDiveScreen({
         <div><span>RRG</span><strong>{focus.quadrant}</strong></div>
       </div>
       <WaterfallChart row={focus} />
+      <PillarDetailGrid row={focus} />
       <div className="c-support-grid">
+        <PriceEvidencePanel row={focus} />
         <div className="c-gate-card">
-          <div className="c-sec-head"><strong>State machine</strong><span>current gates</span></div>
-          {gates.map(([label, value]) => (
-            <div className="c-gate-row" key={label}>
-              <span>{label}</span>
-              <strong>{value}</strong>
+          <div className="c-sec-head"><strong>State machine</strong><span>{failedGates} tripped</span></div>
+          {gates.map((gate) => (
+            <div className="c-gate-row" key={gate.label}>
+              <i className={gate.ok === true ? "ok" : gate.ok === false ? "fail" : "neutral"}>{gate.ok === true ? "✓" : gate.ok === false ? "×" : "·"}</i>
+              <span>{gate.label}</span>
+              <strong>{gate.detail}</strong>
             </div>
           ))}
+          <div className="c-escalation-callout">
+            <strong>Next escalation to EXIT:</strong> watch price below the 30-week average, Mansfield RS below 0, CMF below -0.10, or a turn into Lagging. Nearest live readings: Mansfield {fmt(payloadNumber(focus, "mansfield_rs"), 2)}, CMF {fmt(focus.cmf21, 2)}, RRG {focus.quadrant}.
+          </div>
         </div>
         <div className="c-gate-card">
           <div className="c-sec-head"><strong>Plain-English read</strong><span>latest saved run</span></div>
@@ -607,6 +638,54 @@ function CDeepDiveScreen({
         </div>
       </div>
     </section>
+  );
+}
+
+function stateToneForClass(state: string) {
+  const normalized = state.toLowerCase();
+  if (normalized.includes("bullish")) return "good";
+  if (normalized.includes("warn")) return "warn";
+  if (normalized.includes("exit") || normalized.includes("bear")) return "bad";
+  return "hold";
+}
+
+function gateRows(row: SnapshotRow) {
+  const above30 = payloadBool(row, "above_30wma");
+  const slope = payloadBool(row, "ma_slope_pos");
+  const antonacci = payloadBool(row, "antonacci");
+  const obvDivergence = payloadBool(row, "obv_divergence");
+  const mansfield = payloadNumber(row, "mansfield_rs");
+  const breadth = payloadNumber(row, "breadth_50d");
+  const etfFlow = payloadNumber(row, "etf_flow_5d_pct");
+  return [
+    { label: "RRG quadrant", ok: !["Lagging", "Weakening"].includes(row.quadrant), detail: row.quadrant },
+    { label: "Breadth >= 50%", ok: breadth === null ? null : breadth >= 0.5, detail: breadth === null ? "n/a" : pct(breadth, 0) },
+    { label: "CMF stayed > 0", ok: row.cmf21 === null ? null : row.cmf21 > 0, detail: fmt(row.cmf21, 2) },
+    { label: "No OBV divergence", ok: obvDivergence === null ? null : !obvDivergence, detail: obvDivergence === null ? "n/a" : obvDivergence ? "active" : "clear" },
+    { label: "ETF flow non-negative", ok: etfFlow === null ? null : etfFlow >= 0, detail: etfFlow === null ? "n/a" : pct(etfFlow, 2) },
+    { label: "Price > 30wMA", ok: above30, detail: passText(above30) },
+    { label: "MA slope positive", ok: slope, detail: passText(slope) },
+    { label: "Mansfield RS > 0", ok: mansfield === null ? null : mansfield > 0, detail: fmt(mansfield, 2) },
+    { label: "Antonacci > T-bill", ok: antonacci, detail: passText(antonacci) },
+  ];
+}
+
+function PriceEvidencePanel({ row }: { row: SnapshotRow }) {
+  const stage = payloadNumber(row, "stage");
+  const above30 = payloadBool(row, "above_30wma");
+  const slope = payloadBool(row, "ma_slope_pos");
+  const faber = payloadBool(row, "faber");
+  return (
+    <div className="c-gate-card c-price-evidence">
+      <div className="c-sec-head"><strong>Price + 30wMA</strong><span>Weinstein evidence</span></div>
+      <div className="c-price-evidence-grid">
+        <div><span>Stage</span><strong>{stage === null ? "n/a" : fmt(stage, 0)}</strong></div>
+        <div><span>Price above 30wMA</span><strong>{passText(above30)}</strong></div>
+        <div><span>MA slope</span><strong>{passText(slope)}</strong></div>
+        <div><span>Faber 10mo</span><strong>{passText(faber)}</strong></div>
+      </div>
+      <p>This panel uses the saved methodology gate fields in the latest run journal. A full price-line chart will require OHLCV arrays in the API snapshot; until then, this avoids drawing fixture price data.</p>
+    </div>
   );
 }
 

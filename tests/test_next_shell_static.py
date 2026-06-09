@@ -120,7 +120,7 @@ def test_next_shell_chart_primitives_are_snapshot_driven():
     chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
     css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
 
-    for component in ("PillarHeatmap", "WaterfallChart", "RrgChart", "MomentumBars", "FlowRiver"):
+    for component in ("PillarHeatmap", "WaterfallChart", "PillarDetailGrid", "RrgChart", "MomentumBars", "FlowRiver"):
         assert component in chart_source
         assert component in client_source
     assert "pillarContributions(row: SnapshotRow)" in chart_source
@@ -131,6 +131,10 @@ def test_next_shell_chart_primitives_are_snapshot_driven():
     assert "y(100)" in chart_source
     assert ".sort((a, b) => (b.momentum_pct ?? 0) - (a.momentum_pct ?? 0))" in chart_source
     assert "Data-derived map from current weakest flow/score rows into strongest flow/score rows." in chart_source
+    assert "Jegadeesh & Titman 1993" in chart_source
+    assert "weights sum to 1.00" in chart_source
+    assert "Price + 30wMA" in client_source
+    assert "No OBV divergence" in client_source
     assert ".pillar-stack" in css_source
     assert ".waterfall-chart" in css_source
     assert ".rrg-chart" in css_source

@@ -49,14 +49,14 @@ def test_next_qa_api_compacts_snapshot_payload_for_browser_transport():
             {
                 "ticker": "XLK",
                 "pillar_scores": {"mom_12_1": 1.0, "rs_ratio": 101, "large_blob": "x" * 100},
-                "payload": {"raw": "x" * 1000},
+                "payload": {"above_30wma": True, "raw": "x" * 1000, "stage": 2},
             }
         ]
         * 40,
         "focus": {
             "ticker": "XLK",
             "pillar_scores": {"cmf21": 0.1, "ignored": 9},
-            "payload": {"raw": "x"},
+            "payload": {"raw": "x", "stage": 2},
         },
         "decisions": [{"ticker": "XLK", "payload": {"raw": "x"}}],
         "screens": {
@@ -68,10 +68,11 @@ def test_next_qa_api_compacts_snapshot_payload_for_browser_transport():
 
     compact = serve_next_qa_api._compact_snapshot_payload(payload)
 
-    assert compact["rows"][0]["payload"] == {}
+    assert compact["rows"][0]["payload"] == {"above_30wma": True, "stage": 2}
     assert compact["decisions"][0]["payload"] == {}
     assert compact["rows"][0]["pillar_scores"] == {"mom_12_1": 1.0, "rs_ratio": 101}
     assert compact["focus"]["pillar_scores"] == {"cmf21": 0.1}
+    assert compact["focus"]["payload"] == {"stage": 2}
     assert len(compact["rows"]) == 40
 
 

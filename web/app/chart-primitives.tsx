@@ -7,9 +7,12 @@ type PillarKey = "mom_12_1" | "mansfield_rs" | "rs_ratio" | "rs_momentum" | "bre
 type PillarDef = {
   key: PillarKey;
   code: string;
+  fullName: string;
   label: string;
   hue: string;
+  weight: number;
   reading: string;
+  evidence: string;
 };
 
 type PillarContribution = PillarDef & {
@@ -18,13 +21,13 @@ type PillarContribution = PillarDef & {
 };
 
 const PILLARS: PillarDef[] = [
-  { key: "mom_12_1", code: "MOM", label: "Momentum", hue: "#4f8cff", reading: "12-1 price momentum contribution" },
-  { key: "mansfield_rs", code: "MANS", label: "Mansfield RS", hue: "#20a47b", reading: "relative strength against the benchmark" },
-  { key: "rs_ratio", code: "RS-R", label: "RS ratio", hue: "#8f6ee8", reading: "RRG relative-strength ratio" },
-  { key: "rs_momentum", code: "RS-M", label: "RS momentum", hue: "#d18b25", reading: "RRG relative-strength momentum" },
-  { key: "breadth_50d", code: "FILT", label: "Trend filter", hue: "#61727f", reading: "market breadth and trend filter" },
-  { key: "cycle_tilt", code: "CYC", label: "Cycle tilt", hue: "#8e6b4e", reading: "business-cycle adjustment" },
-  { key: "cmf21", code: "FLOW", label: "Flow", hue: "#b34a6b", reading: "money-flow pressure" },
+  { key: "mom_12_1", code: "MOM", fullName: "12-1 Momentum", label: "Momentum", hue: "#4f8cff", weight: 0.22, reading: "12-1 price momentum contribution", evidence: "Jegadeesh & Titman 1993" },
+  { key: "mansfield_rs", code: "MANS", fullName: "Mansfield RS", label: "Mansfield RS", hue: "#20a47b", weight: 0.12, reading: "relative strength against the benchmark", evidence: "Weinstein 1988" },
+  { key: "rs_ratio", code: "RS-R", fullName: "RRG RS-Ratio", label: "RS ratio", hue: "#8f6ee8", weight: 0.15, reading: "RRG relative-strength ratio", evidence: "de Kempenaer 2004" },
+  { key: "rs_momentum", code: "RS-M", fullName: "RRG RS-Momentum", label: "RS momentum", hue: "#d18b25", weight: 0.08, reading: "RRG relative-strength momentum", evidence: "classic rotation signal" },
+  { key: "breadth_50d", code: "FILT", fullName: "Binary Filters", label: "Trend filter", hue: "#61727f", weight: 0.12, reading: "market breadth and trend filter", evidence: "Faber + Stage2 + Antonacci" },
+  { key: "cycle_tilt", code: "CYC", fullName: "Business-Cycle Tilt", label: "Cycle tilt", hue: "#8e6b4e", weight: 0.08, reading: "business-cycle adjustment", evidence: "Stovall 1996 / Fidelity" },
+  { key: "cmf21", code: "FLOW", fullName: "Institutional Flow", label: "Flow", hue: "#b34a6b", weight: 0.23, reading: "money-flow pressure", evidence: "Chaikin / Granville / Chordia-Swaminathan" },
 ];
 
 const CLASS_ORDER = [
@@ -101,7 +104,7 @@ export function PillarLegend() {
       {PILLARS.map((pillar) => (
         <span key={pillar.key}>
           <i style={{ background: pillar.hue }} />
-          {pillar.code}
+          {pillar.code} <small>{Math.round(pillar.weight * 100)}%</small>
         </span>
       ))}
     </div>
@@ -110,6 +113,16 @@ export function PillarLegend() {
 
 function LightStatePill({ state }: { state: string }) {
   return <span className={`light-state-pill ${stateTone(state)}`}>{stateLabel(state)}</span>;
+}
+
+function pillarReading(row: SnapshotRow, pillar: PillarContribution): string {
+  if (pillar.key === "mom_12_1") return `${row.ticker} momentum input is ${fmt(pillar.raw, 2)}; this pillar contributes ${fmt(pillar.contribution, 2)} to S.`;
+  if (pillar.key === "mansfield_rs") return `Relative strength input is ${fmt(pillar.raw, 2)}; positive values support Stage 2 evidence, negative values weaken it.`;
+  if (pillar.key === "rs_ratio") return `RRG ratio is ${fmt(row.rs_ratio, 1)}; above 100 means relative strength is ahead of the benchmark.`;
+  if (pillar.key === "rs_momentum") return `RRG momentum is ${fmt(row.rs_momentum, 1)} and quadrant is ${row.quadrant}; this captures acceleration or fading leadership.`;
+  if (pillar.key === "breadth_50d") return `Trend-filter input is ${fmt(pillar.raw, 2)}; higher readings mean more confirmation from breadth and trend gates.`;
+  if (pillar.key === "cycle_tilt") return `Cycle tilt input is ${fmt(pillar.raw, 2)}; macro context adjusts how much the setup is favored.`;
+  return `CMF flow is ${fmt(row.cmf21, 2)} and F-score is ${fmt(row.f_score, 2)}; flow can confirm or veto price strength.`;
 }
 
 export function PillarStackBar({ row }: { row: SnapshotRow }) {
@@ -206,61 +219,87 @@ export function WaterfallChart({ row }: { row: SnapshotRow }) {
     acc.push((acc.at(-1) ?? 0) + pillar.contribution);
     return acc;
   }, [0]);
-  const minY = Math.min(-1, ...cumulatives, row.s_score);
-  const maxY = Math.max(1, ...cumulatives, row.s_score);
-  const width = 860;
-  const height = 260;
-  const left = 42;
-  const top = 20;
-  const plotW = width - 70;
-  const plotH = height - 62;
+  const minY = Math.min(...cumulatives, row.s_score, -0.05) - 0.1;
+  const maxY = Math.max(...cumulatives, row.s_score, 0.05) + 0.1;
+  const width = 1280;
+  const height = 280;
+  const left = 64;
+  const right = 64;
+  const top = 30;
+  const bottom = 70;
+  const plotW = width - left - right;
+  const plotH = height - top - bottom;
   const y = (value: number) => top + (maxY - value) / (maxY - minY || 1) * plotH;
   const zeroY = y(0);
-  const stepW = plotW / (contributions.length + 1);
+  const stepW = plotW / (contributions.length + 2);
+  const colW = stepW * 0.7;
 
   return (
     <div className="chart-card light-card" aria-label={`${row.ticker} composite waterfall`}>
       <div className="chart-heading">
         <div>
           <h3>The composite, built pillar by pillar</h3>
-          <p>Start at zero, add each pillar contribution, and end at the current S-score.</p>
+          <p>Start at zero. Add each pillar contribution. End at the composite. The chart below makes the math visible: which pillars did the work, which dragged.</p>
         </div>
         <strong>S {fmt(row.s_score)}</strong>
       </div>
       <svg className="waterfall-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${row.display_label} waterfall to S score ${fmt(row.s_score)}`}>
-        <line x1={left} x2={width - 18} y1={zeroY} y2={zeroY} className="axis-line" />
-        <text x={8} y={y(maxY) + 4}>{fmt(maxY)}</text>
-        <text x={8} y={zeroY + 4}>0</text>
-        <text x={8} y={y(minY) + 4}>{fmt(minY)}</text>
+        <line x1={left} x2={width - right + 12} y1={zeroY} y2={zeroY} className="axis-line" />
+        <text x={20} y={y(maxY) + 4}>{fmt(maxY)}</text>
+        <text x={20} y={zeroY + 4}>0.00</text>
+        <text x={20} y={y(minY) + 4}>{fmt(minY)}</text>
+        <text x={left - 8} y={height - 34} textAnchor="end">0.00</text>
+        <text x={left - 8} y={height - 18} textAnchor="end" className="waterfall-weight">START</text>
         {contributions.map((pillar, index) => {
           const previous = cumulatives[index];
           const next = cumulatives[index + 1];
-          const x = left + index * stepW + 18;
+          const x = left + stepW * (index + 1);
           const barY = Math.min(y(previous), y(next));
           const barH = Math.max(3, Math.abs(y(previous) - y(next)));
-          const connectorX = x + stepW * 0.72;
+          const connectorX = x + colW;
+          const nextX = index === contributions.length - 1 ? left + stepW * 8 : left + stepW * (index + 2);
+          const labelY = pillar.contribution >= 0 ? barY - 8 : barY + barH + 14;
           return (
             <g key={pillar.key}>
-              <rect x={x} y={barY} width={stepW * 0.55} height={barH} fill={pillar.hue} opacity={pillar.contribution >= 0 ? 0.9 : 0.68} />
-              <line x1={connectorX} x2={connectorX + stepW * 0.28} y1={y(next)} y2={y(next)} className="connector-line" />
-              <text x={x} y={barY - 5}>{fmt(pillar.contribution, 2)}</text>
-              <text x={x} y={height - 20}>{pillar.code}</text>
+              <rect x={x} y={barY} width={colW} height={barH} fill={pillar.hue} opacity={pillar.contribution >= 0 ? 0.95 : 0.55} />
+              <line x1={connectorX} x2={nextX} y1={y(next)} y2={y(next)} className="connector-line" />
+              <text x={x + colW / 2} y={labelY} textAnchor="middle" className={pillar.contribution >= 0 ? "waterfall-positive" : "waterfall-negative"}>{fmt(pillar.contribution, 2)}</text>
+              <text x={x + colW / 2} y={height - 34} textAnchor="middle">{pillar.code}</text>
+              <text x={x + colW / 2} y={height - 18} textAnchor="middle" className="waterfall-weight">w {Math.round(pillar.weight * 100)}%</text>
             </g>
           );
         })}
-        <rect x={left + contributions.length * stepW + 18} y={Math.min(zeroY, y(row.s_score))} width={stepW * 0.6} height={Math.max(3, Math.abs(zeroY - y(row.s_score)))} className="total-bar" />
-        <text x={left + contributions.length * stepW + 18} y={Math.min(zeroY, y(row.s_score)) - 6}>S {fmt(row.s_score)}</text>
+        <rect x={left + stepW * 8} y={Math.min(zeroY, y(row.s_score))} width={colW} height={Math.max(3, Math.abs(zeroY - y(row.s_score)))} className="total-bar" />
+        <text x={left + stepW * 8 + colW / 2} y={Math.min(zeroY, y(row.s_score)) - 8} textAnchor="middle">S {fmt(row.s_score)}</text>
+        <text x={left + stepW * 8 + colW / 2} y={height - 34} textAnchor="middle">COMPOSITE</text>
+        <text x={left + stepW * 8 + colW / 2} y={height - 18} textAnchor="middle" className="waterfall-weight">S</text>
       </svg>
+    </div>
+  );
+}
+
+export function PillarDetailGrid({ row }: { row: SnapshotRow }) {
+  const contributions = pillarContributions(row);
+  return (
+    <section className="chart-card light-card c-pillar-detail" aria-label={`${row.ticker} seven pillar detail`}>
+      <div className="c-sec-head">
+        <strong>The seven pillars</strong>
+        <span>weights sum to 1.00</span>
+      </div>
       <div className="pillar-card-grid">
         {contributions.map((pillar) => (
           <div key={pillar.key} className="pillar-card" style={{ borderColor: pillar.hue }}>
-            <span>{pillar.code}</span>
-            <strong>{fmt(pillar.contribution)}</strong>
-            <p>{pillar.label}: {pillar.reading}; current input {fmt(pillar.raw, 2)}.</p>
+            <i style={{ background: pillar.hue }} />
+            <div>
+              <span>{pillar.fullName} <small>w {Math.round(pillar.weight * 100)}%</small></span>
+              <p>{pillarReading(row, pillar)}</p>
+              <em>{pillar.evidence}</em>
+            </div>
+            <strong className={pillar.contribution >= 0 ? "good" : "bad"}>{fmt(pillar.contribution)}</strong>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 

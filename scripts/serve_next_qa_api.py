@@ -34,6 +34,17 @@ PILLAR_KEYS_FOR_NEXT_QA = {
     "rs_ratio",
 }
 
+PAYLOAD_KEYS_FOR_NEXT_QA = {
+    "above_30wma",
+    "antonacci",
+    "etf_flow_5d_pct",
+    "faber",
+    "ma_slope_pos",
+    "obv_divergence",
+    "rank_in_class",
+    "stage",
+}
+
 
 def _compact_snapshot_payload(payload: dict) -> dict:
     """Keep the QA payload strict and small while preserving the Next UI contract."""
@@ -47,7 +58,15 @@ def _compact_snapshot_payload(payload: dict) -> dict:
                 for key in sorted(PILLAR_KEYS_FOR_NEXT_QA)
                 if key in pillars
             }
-        compact["payload"] = {}
+        row_payload = compact.get("payload")
+        if isinstance(row_payload, dict):
+            compact["payload"] = {
+                key: row_payload.get(key)
+                for key in sorted(PAYLOAD_KEYS_FOR_NEXT_QA)
+                if key in row_payload
+            }
+        else:
+            compact["payload"] = {}
         return compact
 
     def compact_rows(rows: object, limit: int | None = None) -> list[dict]:
