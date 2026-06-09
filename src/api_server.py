@@ -16,6 +16,7 @@ from .api_data_health import build_provider_data_health_payload
 from .api_dashboard_snapshot import build_latest_dashboard_snapshot_payload
 from .api_portfolio import build_portfolio_analysis_payload
 from .api_status import build_persisted_status_payload
+from .api_ticker_chart import build_ticker_chart_payload
 
 try:
     from fastapi import BackgroundTasks, Body
@@ -31,6 +32,7 @@ DataHealthProvider = Callable[[], dict[str, Any]]
 SnapshotProvider = Callable[..., dict[str, Any]]
 RefreshRunner = Callable[..., dict[str, Any]]
 BacktestArtifactsProvider = Callable[[], dict[str, Any]]
+TickerChartProvider = Callable[..., dict[str, Any]]
 
 
 def default_status_provider() -> dict[str, Any]:
@@ -54,6 +56,7 @@ def create_app(
     data_health_provider: DataHealthProvider | None = None,
     snapshot_provider: SnapshotProvider | None = None,
     backtest_artifacts_provider: BacktestArtifactsProvider | None = None,
+    ticker_chart_provider: TickerChartProvider | None = None,
 ):
     """Create the optional FastAPI app without making FastAPI mandatory at import time."""
     try:
@@ -65,6 +68,7 @@ def create_app(
     data_provider = data_health_provider or default_data_health_provider
     snapshot_reader = snapshot_provider or default_snapshot_provider
     backtest_reader = backtest_artifacts_provider or build_backtest_artifacts_payload
+    ticker_chart_reader = ticker_chart_provider or build_ticker_chart_payload
     runner = refresh_runner or run_refresh_job
     app = FastAPI(
         title="Sector Momentum Dashboard API",
@@ -108,6 +112,10 @@ def create_app(
     @app.get("/api/v1/backtest-artifacts")
     def backtest_artifacts() -> dict[str, Any]:
         return backtest_reader()
+
+    @app.get("/api/v1/ticker-chart")
+    def ticker_chart(ticker: str, period: str = "3y") -> dict[str, Any]:
+        return ticker_chart_reader(ticker=ticker, period=period)
 
     @app.post("/api/v1/portfolio/analyze")
     def portfolio_analyze(payload: dict[str, Any] | None = Body(default=None)) -> dict[str, Any]:

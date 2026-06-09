@@ -195,6 +195,37 @@ export type BacktestArtifactsPayload = {
   metadata: Record<string, unknown>;
 };
 
+export type TickerChartPoint = {
+  date: string;
+  close: number | null;
+  ma30w: number | null;
+};
+
+export type TickerChartPayload = {
+  api_version: string;
+  generated_at: string;
+  status: "ready" | "empty" | string;
+  message: string;
+  ticker: string;
+  identity: string;
+  period: string;
+  source: {
+    mode: string;
+    provider: string;
+    updated_at: string;
+    row_count: number;
+    weekly_row_count: number;
+  };
+  latest: {
+    date: string;
+    close: number | null;
+    ma30w: number | null;
+    above_30wma: boolean | null;
+    ma30w_slope: number | null;
+  };
+  series: TickerChartPoint[];
+};
+
 export type PortfolioAnalysisRequest = {
   ticker?: string;
   csv?: string;
@@ -273,6 +304,11 @@ export async function fetchDashboardSnapshot(ticker?: string) {
 
 export async function fetchBacktestArtifacts() {
   return fetchDashboardApi<BacktestArtifactsPayload>("/api/v1/backtest-artifacts");
+}
+
+export async function fetchTickerChart(ticker: string, period = "3y") {
+  const query = `?ticker=${encodeURIComponent(ticker)}&period=${encodeURIComponent(period)}`;
+  return fetchDashboardApi<TickerChartPayload>(`/api/v1/ticker-chart${query}`);
 }
 
 export async function analyzePortfolio(payload: PortfolioAnalysisRequest) {

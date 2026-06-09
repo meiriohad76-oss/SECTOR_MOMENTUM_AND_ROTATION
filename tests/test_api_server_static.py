@@ -22,8 +22,11 @@ def test_api_server_is_optional_fastapi_boundary_not_streamlit_import():
     assert "from .api_dashboard_snapshot import build_latest_dashboard_snapshot_payload" in source
     assert "from .api_portfolio import build_portfolio_analysis_payload" in source
     assert "from .api_status import build_persisted_status_payload" in source
+    assert "from .api_ticker_chart import build_ticker_chart_payload" in source
     assert "backtest_artifacts_provider: BacktestArtifactsProvider | None = None" in source
+    assert "ticker_chart_provider: TickerChartProvider | None = None" in source
     assert "backtest_reader = backtest_artifacts_provider or build_backtest_artifacts_payload" in source
+    assert "ticker_chart_reader = ticker_chart_provider or build_ticker_chart_payload" in source
     assert "return build_persisted_status_payload()" in source
     assert "return build_provider_data_health_payload()" in source
     assert 'app.get("/api/v1/health")' in source
@@ -32,7 +35,9 @@ def test_api_server_is_optional_fastapi_boundary_not_streamlit_import():
     assert 'app.get("/api/v1/provider-health")' in source
     assert 'app.get("/api/v1/dashboard-snapshot")' in source
     assert 'app.get("/api/v1/backtest-artifacts")' in source
+    assert 'app.get("/api/v1/ticker-chart")' in source
     assert "return backtest_reader()" in source
+    assert "return ticker_chart_reader(ticker=ticker, period=period)" in source
     assert 'app.post("/api/v1/portfolio/analyze")' in source
     assert 'app.post("/api/v1/refresh", status_code=202)' in source
     assert 'app.get("/api/v1/refresh/{job_id}")' in source

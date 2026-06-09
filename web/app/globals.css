@@ -505,6 +505,87 @@ main {
   font-size: 1.2rem;
 }
 
+.c-price-chart-panel {
+  overflow: hidden;
+}
+
+.c-price-chart-panel > .c-price-evidence {
+  margin: 12px 16px 16px;
+  box-shadow: none;
+}
+
+.price-chart-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 16px 16px 0;
+}
+
+.price-chart-kpis div {
+  min-width: 0;
+  padding: 10px;
+  background: #f4f1ec;
+  border-radius: 6px;
+}
+
+.price-chart-kpis span {
+  display: block;
+  color: #6a625a;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.price-chart-kpis strong {
+  display: block;
+  margin-top: 5px;
+  color: #12324a;
+  font-size: 1rem;
+}
+
+.price-chart-kpis strong.good {
+  color: #1f7a4a;
+}
+
+.price-chart-kpis strong.warn {
+  color: #a8721a;
+}
+
+.price-chart-kpis strong.bad {
+  color: #b13a1f;
+}
+
+.ticker-price-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 12px 16px 4px;
+}
+
+.ticker-price-chart text {
+  fill: #6a625a;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ticker-price-chart .price-line,
+.ticker-price-chart .ma-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ticker-price-chart .price-line {
+  stroke: #12324a;
+  stroke-width: 3;
+}
+
+.ticker-price-chart .ma-line {
+  stroke: #d18b25;
+  stroke-width: 2;
+  stroke-dasharray: 7 5;
+}
+
 .c-flow-table {
   margin-top: 20px;
 }
@@ -1771,7 +1852,8 @@ select:focus-visible {
   .c-support-grid,
   .c-rotation-grid,
   .c-lower-grid,
-  .c-stat-deck {
+  .c-stat-deck,
+  .price-chart-kpis {
     grid-template-columns: 1fr;
   }
 }

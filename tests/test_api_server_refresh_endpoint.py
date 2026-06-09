@@ -195,3 +195,35 @@ def test_backtest_artifacts_endpoint_uses_injected_provider():
 
     assert response.status_code == 200
     assert response.json() == payload
+
+
+def test_ticker_chart_endpoint_uses_injected_provider():
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from src.api_server import create_app
+
+    calls = []
+
+    def chart_provider(**kwargs):
+        calls.append(kwargs)
+        return {
+            "api_version": "v1",
+            "status": "ready",
+            "ticker": kwargs["ticker"],
+            "period": kwargs["period"],
+            "series": [{"date": "2026-01-02", "close": 100.0, "ma30w": 98.0}],
+        }
+
+    app = create_app(
+        status_provider=lambda: {"ok": True},
+        ticker_chart_provider=chart_provider,
+    )
+    client = TestClient(app)
+
+    response = client.get("/api/v1/ticker-chart?ticker=XLK&period=1y")
+
+    assert response.status_code == 200
+    assert response.json()["ticker"] == "XLK"
+    assert response.json()["period"] == "1y"
+    assert calls == [{"ticker": "XLK", "period": "1y"}]

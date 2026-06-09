@@ -48,6 +48,10 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
   - consumes the server-fetched `GET /api/v1/backtest-artifacts` payload
   - shows artifact verification status, report preview, and an equity-curve preview from API rows
   - stays collapsed by default so research/backtest context does not crowd the main dashboard
+- [x] Add read-only ticker chart API and C2 price panel:
+  - `GET /api/v1/ticker-chart?ticker=...&period=3y`
+  - reads only cached OHLCV rows, computes weekly close and 30-week moving average, and fails closed if cache data is unavailable
+  - React C2 deep dive fetches the selected ticker chart asynchronously and falls back to saved gate evidence without drawing fixture prices
 - [x] Build a React/Next.js shell that consumes `/api/v1/health` and `/api/v1/data-health`.
 - [ ] Port A/B/C overview, deep-dive, and rotation screens from the handoff artifacts.
   - [x] Add read-only `/api/v1/dashboard-snapshot` over the latest run-journal scores and decisions.
@@ -76,6 +80,6 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - The refresh runner is explicit opt-in from the API (`run_now: true`) and remains queue-only by default.
 - Data/provider-health endpoints are read-only and do not call live providers.
 - The initial Next.js shell lives under `web/`, is guarded by static tests, has a committed lockfile, and passes `npm audit --omit=dev --audit-level=moderate` plus `npm run build`; Next handoff screenshot QA is repeatable and recorded under `docs/browser-qa/next-handoff/latest`.
-- The first A/B/C React sections are backed by persisted run-journal data through `/api/v1/dashboard-snapshot`; native interaction controls, API-fed chart primitives, an API-backed portfolio analyzer, a read-only/collapsed Backtest Lab artifact panel, and screenshot evidence are implemented in the React shell; handoff visual parity remains a future gate.
+- The first A/B/C React sections are backed by persisted run-journal data through `/api/v1/dashboard-snapshot`; native interaction controls, API-fed chart primitives, async cached ticker chart data, an API-backed portfolio analyzer, a read-only/collapsed Backtest Lab artifact panel, and screenshot evidence are implemented in the React shell; handoff visual parity remains a future gate.
 - Candidate Pi units and route docs exist for `sector-api` on `127.0.0.1:8000` and `sector-next` on `127.0.0.1:3000`, while Streamlit remains the production route.
 - The backlog records the migration as started, not complete.

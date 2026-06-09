@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { analyzePortfolio } from "../lib/api";
+import { useEffect, useMemo, useState } from "react";
+import { analyzePortfolio, fetchTickerChart } from "../lib/api";
 import type {
   BacktestArtifactsPayload,
   DashboardSnapshotPayload,
@@ -10,6 +10,7 @@ import type {
   SnapshotDecision,
   SnapshotPosition,
   SnapshotRow,
+  TickerChartPayload,
 } from "../lib/api";
 import { FlowRiver, MomentumBars, PillarDetailGrid, PillarHeatmap, RrgChart, WaterfallChart } from "./chart-primitives";
 
@@ -83,6 +84,12 @@ function passText(value: boolean | null) {
   if (value === true) return "pass";
   if (value === false) return "fail";
   return "n/a";
+}
+
+function toneForBool(value: boolean | null) {
+  if (value === true) return "good";
+  if (value === false) return "bad";
+  return "warn";
 }
 
 function valueForSort(row: SnapshotRow, key: SortKey): string | number {
@@ -904,7 +911,7 @@ function CDeepDiveScreen({
       <WaterfallChart row={focus} />
       <PillarDetailGrid row={focus} />
       <div className="c-support-grid">
-        <PriceEvidencePanel row={focus} />
+        <TickerPriceChartPanel row={focus} />
         <div className="c-gate-card">
           <div className="c-sec-head"><strong>State machine</strong><span>{failedGates} tripped</span></div>
           {gates.map((gate) => (
@@ -970,7 +977,71 @@ function PriceEvidencePanel({ row }: { row: SnapshotRow }) {
         <div><span>MA slope</span><strong>{passText(slope)}</strong></div>
         <div><span>Faber 10mo</span><strong>{passText(faber)}</strong></div>
       </div>
-      <p>This panel uses the saved methodology gate fields in the latest run journal. A full price-line chart will require OHLCV arrays in the API snapshot; until then, this avoids drawing fixture price data.</p>
+      <p>This panel uses the saved methodology gate fields in the latest run journal when cached OHLCV chart rows are unavailable. It does not draw synthetic price lines.</p>
+    </div>
+  );
+}
+
+function TickerPriceChartPanel({ row }: { row: SnapshotRow }) {
+  const [payload, setPayload] = useState<TickerChartPayload | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchTickerChart(row.ticker, "3y").then((response) => {
+      if (cancelled) return;
+      if (!response.ok || !response.data) {
+        setPayload(null);
+        return;
+      }
+      setPayload(response.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [row.ticker]);
+
+  const series = payload?.series.filter((point) => typeof point.close === "number" && typeof point.ma30w === "number") ?? [];
+  const width = 760;
+  const height = 220;
+  const pad = 28;
+  const values = series
+    .flatMap((point) => [point.close, point.ma30w])
+    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  const min = values.length ? Math.min(...values) : 0;
+  const max = values.length ? Math.max(...values) : 1;
+  const span = Math.max(max - min, 0.000001);
+  const x = (index: number) => pad + (series.length <= 1 ? 0 : index / (series.length - 1) * (width - pad * 2));
+  const y = (value: number) => pad + (max - value) / span * (height - pad * 2);
+  const closePoints = series.map((point, index) => `${x(index).toFixed(1)},${y(point.close as number).toFixed(1)}`).join(" ");
+  const maPoints = series.map((point, index) => `${x(index).toFixed(1)},${y(point.ma30w as number).toFixed(1)}`).join(" ");
+
+  if (payload?.status !== "ready" || !series.length) {
+    return <PriceEvidencePanel row={row} />;
+  }
+
+  return (
+    <div className="c-gate-card c-price-chart-panel">
+      <div className="c-sec-head">
+        <strong>Price + 30wMA</strong>
+        <span>{payload.source.mode} | {payload.source.provider || "unknown"}</span>
+      </div>
+      <div className="price-chart-kpis">
+        <div><span>Latest close</span><strong>{fmt(payload.latest.close, 2)}</strong></div>
+        <div><span>30wMA</span><strong>{fmt(payload.latest.ma30w, 2)}</strong></div>
+        <div><span>Above 30wMA</span><strong className={toneForBool(payload.latest.above_30wma)}>{passText(payload.latest.above_30wma)}</strong></div>
+        <div><span>30wMA slope</span><strong className={toneForBool(payload.latest.ma30w_slope === null ? null : payload.latest.ma30w_slope >= 0)}>{fmt(payload.latest.ma30w_slope, 2)}</strong></div>
+      </div>
+      <svg className="ticker-price-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${row.display_label} weekly price and 30 week moving average`}>
+        <line x1={pad} x2={width - pad} y1={height - pad} y2={height - pad} className="axis-line" />
+        <polyline points={maPoints} className="ma-line" />
+        <polyline points={closePoints} className="price-line" />
+        <text x={pad} y={20}>Weekly close</text>
+        <text x={width - pad} y={20} textAnchor="end">30wMA</text>
+      </svg>
+      <p>
+        {payload.ticker} latest cached weekly close is {fmt(payload.latest.close, 2)} versus a 30-week average of {fmt(payload.latest.ma30w, 2)}.
+        Source is {payload.source.mode} {payload.source.provider || "unknown"} data updated {payload.source.updated_at || "unknown"}.
+      </p>
     </div>
   );
 }

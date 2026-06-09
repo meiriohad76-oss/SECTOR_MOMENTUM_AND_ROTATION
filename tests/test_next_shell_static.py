@@ -34,6 +34,7 @@ def test_next_shell_fetches_real_api_health_and_data_health_paths():
     assert 'fetchDashboardApi<DashboardHealthPayload>("/api/v1/data-health")' in api_source
     assert 'fetchDashboardApi<DashboardSnapshotPayload>(`/api/v1/dashboard-snapshot${query}`)' in api_source
     assert 'fetchDashboardApi<BacktestArtifactsPayload>("/api/v1/backtest-artifacts")' in api_source
+    assert 'fetchDashboardApi<TickerChartPayload>(`/api/v1/ticker-chart${query}`)' in api_source
     assert 'postDashboardApi<PortfolioAnalysisPayload>("/api/v1/portfolio/analyze", payload)' in api_source
     assert 'cache: "no-store"' in api_source
     assert "fetchDashboardSnapshot()" in page_source
@@ -44,6 +45,7 @@ def test_next_shell_fetches_real_api_health_and_data_health_paths():
     assert "fetch(" not in page_source
     assert 'fetchDashboardSnapshot(ticker?: string)' in api_source
     assert "fetchBacktestArtifacts()" in api_source
+    assert "fetchTickerChart(ticker: string, period = \"3y\")" in api_source
     assert "analyzePortfolio(payload: PortfolioAnalysisRequest)" in api_source
     assert 'fetch("' not in client_source
 
@@ -208,6 +210,39 @@ def test_next_shell_chart_primitives_are_snapshot_driven():
     assert ".waterfall-chart" in css_source
     assert ".rrg-chart" in css_source
     assert ".flow-river" in css_source
+
+
+def test_next_shell_deep_dive_fetches_cached_ticker_chart_without_fixture_data():
+    api_source = (WEB / "lib" / "api.ts").read_text(encoding="utf-8")
+    client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
+    css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    for marker in (
+        "TickerChartPayload",
+        "TickerChartPoint",
+        "/api/v1/ticker-chart",
+    ):
+        assert marker in api_source
+    for marker in (
+        "TickerPriceChartPanel",
+        "fetchTickerChart(row.ticker, \"3y\")",
+        "payload?.series.filter",
+        "Weekly close",
+        "30wMA",
+        "Source is",
+        "<TickerPriceChartPanel row={focus} />",
+    ):
+        assert marker in client_source
+    for marker in (
+        ".c-price-chart-panel",
+        ".price-chart-kpis",
+        ".ticker-price-chart",
+        ".ticker-price-chart .price-line",
+        ".ticker-price-chart .ma-line",
+    ):
+        assert marker in css_source
+    for forbidden in ("sample close", "demo price", "fixture price"):
+        assert forbidden not in client_source
 
 
 def test_next_shell_chart_primitives_do_not_embed_handoff_fixture_tickers():
