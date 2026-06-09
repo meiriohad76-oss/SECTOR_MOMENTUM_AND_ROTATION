@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { DashboardSnapshotPayload, SnapshotDecision, SnapshotRow } from "../lib/api";
+import { FlowRiver, MomentumBars, PillarHeatmap, RrgChart, WaterfallChart } from "./chart-primitives";
 
 type ScreenId = "overview" | "deepdive" | "rotation";
 type SortKey = "ticker" | "state" | "quadrant" | "s_score" | "f_score" | "rs_ratio" | "rs_momentum" | "momentum_pct" | "cmf21";
@@ -186,6 +187,9 @@ function OverviewScreen({
           {!actions.length ? <p className="subtle">No BLUF decisions in the latest journal snapshot.</p> : null}
         </div>
       </div>
+      <div className="screen-chart-row">
+        <PillarHeatmap rows={snapshot.rows} onSelectTicker={onSelectTicker} />
+      </div>
     </section>
   );
 }
@@ -247,6 +251,9 @@ function DeepDiveScreen({
                 {row.ticker}
               </button>
             ))}
+          </div>
+          <div className="deep-chart-row">
+            <WaterfallChart row={focus} />
           </div>
         </div>
       ) : (
@@ -310,6 +317,13 @@ function RotationScreen({
             </ul>
           </button>
         ))}
+      </div>
+      <div className="rotation-chart-grid">
+        <RrgChart rows={sectors} onSelectTicker={onSelectTicker} />
+        <MomentumBars rows={sectors} onSelectTicker={onSelectTicker} />
+      </div>
+      <div className="screen-chart-row">
+        <FlowRiver rows={sectors} />
       </div>
       <div className="rotation-detail" aria-label="Selected quadrant instrument list">
         <div className="section-heading compact">

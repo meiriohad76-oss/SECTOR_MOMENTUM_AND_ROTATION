@@ -93,6 +93,35 @@ def test_next_shell_has_native_react_interactions_for_abc_screens():
     assert ".rotation-detail tbody tr" in css_source
 
 
+def test_next_shell_chart_primitives_are_snapshot_driven():
+    client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
+    chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
+    css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    for component in ("PillarHeatmap", "WaterfallChart", "RrgChart", "MomentumBars", "FlowRiver"):
+        assert component in chart_source
+        assert component in client_source
+    assert "pillarContributions(row: SnapshotRow)" in chart_source
+    assert "row.s_score / rawSum" in chart_source
+    assert "x(100)" in chart_source
+    assert "y(100)" in chart_source
+    assert ".sort((a, b) => (b.momentum_pct ?? 0) - (a.momentum_pct ?? 0))" in chart_source
+    assert "Data-derived map from current weakest flow/score rows into strongest flow/score rows." in chart_source
+    assert ".pillar-stack" in css_source
+    assert ".waterfall-chart" in css_source
+    assert ".rrg-chart" in css_source
+    assert ".flow-river" in css_source
+
+
+def test_next_shell_chart_primitives_do_not_embed_handoff_fixture_tickers():
+    chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
+
+    for forbidden in ("XLK", "XLY", "XLF", "XLU", "XLP", "KRE", "Semis lost leadership", "$3.4B"):
+        assert forbidden not in chart_source
+    assert "SnapshotRow" in chart_source
+    assert ".filter((row)" in chart_source
+
+
 def test_next_shell_gitignore_excludes_node_and_next_artifacts():
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
 

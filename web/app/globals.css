@@ -458,6 +458,287 @@ select:focus-visible {
   grid-column: 1 / -1;
 }
 
+.screen-chart-row,
+.deep-chart-row {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 0 16px 16px;
+}
+
+.deep-chart-row {
+  padding: 0;
+}
+
+.rotation-chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 14px;
+  padding: 0 16px 16px;
+}
+
+.chart-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.light-card {
+  color: #1a1714;
+  background: #fbfaf8;
+  border-color: #e6e1d8;
+}
+
+.chart-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #e6e1d8;
+}
+
+.chart-heading h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.chart-heading p {
+  margin: 0;
+  color: #5d554d;
+  line-height: 1.45;
+}
+
+.chart-heading strong {
+  color: #12324a;
+  white-space: nowrap;
+}
+
+.pillar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 240px;
+}
+
+.pillar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #312c27;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.pillar-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.composition-header,
+.composition-row {
+  display: grid;
+  grid-template-columns: 66px minmax(220px, 1fr) minmax(130px, 0.38fr) 64px 70px;
+  gap: 10px;
+  align-items: center;
+}
+
+.composition-header {
+  padding: 10px 18px;
+  color: #6a625a;
+  background: #f4f1ec;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.composition-group {
+  border-top: 1px solid #e6e1d8;
+}
+
+.composition-class {
+  padding: 10px 18px 4px;
+  color: #6a625a;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.composition-row {
+  width: 100%;
+  padding: 8px 18px;
+  color: #1a1714;
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.composition-row:hover {
+  background: #f4f1ec;
+}
+
+.pillar-stack {
+  position: relative;
+  height: 18px;
+  background: #ede7dd;
+  border: 1px solid #d8d0c4;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.pillar-midline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: rgba(26, 23, 20, 0.42);
+  z-index: 2;
+}
+
+.pillar-segment {
+  position: absolute;
+  top: 3px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.waterfall-chart,
+.rrg-chart,
+.flow-river {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 10px 16px 16px;
+}
+
+.axis-line {
+  stroke: #6a625a;
+  stroke-width: 1;
+}
+
+.connector-line {
+  stroke: #bcb2a6;
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.total-bar {
+  fill: #12324a;
+}
+
+.waterfall-chart text,
+.rrg-chart text,
+.flow-river text {
+  fill: #312c27;
+  font-size: 11px;
+}
+
+.plot-bg {
+  fill: #f4f1ec;
+  stroke: #e1d8cd;
+}
+
+.rrg-point {
+  cursor: pointer;
+}
+
+.rrg-point:hover text {
+  font-weight: 800;
+}
+
+.pillar-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 18px 18px;
+}
+
+.pillar-card {
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid;
+  border-left-width: 5px;
+  border-radius: 8px;
+}
+
+.pillar-card span {
+  color: #6a625a;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.pillar-card strong {
+  display: block;
+  margin-top: 4px;
+  color: #1a1714;
+}
+
+.pillar-card p {
+  margin: 4px 0 0;
+  color: #5d554d;
+  line-height: 1.4;
+}
+
+.momentum-bars {
+  padding-bottom: 12px;
+}
+
+.momentum-row {
+  display: grid;
+  grid-template-columns: 54px minmax(130px, 1fr) 64px;
+  gap: 10px;
+  align-items: center;
+  width: calc(100% - 28px);
+  margin: 8px 14px;
+  padding: 6px 8px;
+  color: #1a1714;
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.momentum-row:hover {
+  background: #f4f1ec;
+}
+
+.momentum-track {
+  position: relative;
+  height: 14px;
+  background: #ede7dd;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.momentum-track::before {
+  position: absolute;
+  inset: 0 auto 0 50%;
+  width: 1px;
+  content: "";
+  background: rgba(26, 23, 20, 0.42);
+}
+
+.momentum-track i {
+  position: absolute;
+  top: 3px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.momentum-track i.positive {
+  background: #20a47b;
+}
+
+.momentum-track i.negative {
+  background: #c74b4b;
+}
+
 .padded {
   padding: 16px;
 }
@@ -479,7 +760,9 @@ select:focus-visible {
   .snapshot-columns,
   .deep-grid,
   .rotation-grid,
-  .screen-tabs {
+  .screen-tabs,
+  .rotation-chart-grid,
+  .pillar-card-grid {
     grid-template-columns: 1fr;
   }
 

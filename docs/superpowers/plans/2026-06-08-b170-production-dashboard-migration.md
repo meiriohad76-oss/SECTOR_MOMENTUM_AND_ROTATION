@@ -36,6 +36,7 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
   - [x] Add read-only `/api/v1/dashboard-snapshot` over the latest run-journal scores and decisions.
   - [x] Render first-pass journal-backed A/B/C React sections in the Next shell.
   - [x] Add native React A/B/C screen selection, row/card click selection, ticker focus selection, overview sorting, and rotation quadrant filtering in the Next shell.
+  - [x] Add API-fed SVG chart primitives for pillar-stack heatmap rows, ticker waterfall, RRG, momentum bars, and data-derived flow river.
   - [ ] Match the handoff A/B/C layouts and chart primitives with browser screenshot evidence.
 - [ ] Replace Streamlit custom click/tooltip bridges with native React interactions.
   - [x] Native React interaction foundation exists in `web/app/dashboard-screens-client.tsx`.
@@ -52,5 +53,5 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - The refresh runner is explicit opt-in from the API (`run_now: true`) and remains queue-only by default.
 - Data/provider-health endpoints are read-only and do not call live providers.
 - The initial Next.js shell lives under `web/`, is guarded by static tests, has a committed lockfile, and passes `npm audit --omit=dev --audit-level=moderate` plus `npm run build`; browser screenshot QA remains a future gate.
-- The first A/B/C React sections are backed by persisted run-journal data through `/api/v1/dashboard-snapshot`; native interaction controls are implemented in the React shell; handoff visual parity remains a future gate.
+- The first A/B/C React sections are backed by persisted run-journal data through `/api/v1/dashboard-snapshot`; native interaction controls and API-fed chart primitives are implemented in the React shell; handoff visual parity remains a future gate.
 - The backlog records the migration as started, not complete.
