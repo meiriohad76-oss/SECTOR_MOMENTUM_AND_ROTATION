@@ -31,7 +31,7 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
   - `GET /api/v1/refresh/{job_id}/events`
 - [x] Persist refresh progress events in a small local SQLite store for browser reconnects.
 - [x] Wire the refresh job runner to the real Massive/FRED/dashboard refresh sequence.
-- [ ] Build a React/Next.js shell that consumes `/api/v1/health`.
+- [x] Build a React/Next.js shell that consumes `/api/v1/health` and `/api/v1/data-health`.
 - [ ] Port A/B/C overview, deep-dive, and rotation screens from the handoff artifacts.
 - [ ] Replace Streamlit custom click/tooltip bridges with native React interactions.
 - [ ] Add Playwright screenshot QA against the design handoff PNG/HTML references.
@@ -45,4 +45,5 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - The optional API server can be enabled after installing dependencies.
 - The refresh runner is explicit opt-in from the API (`run_now: true`) and remains queue-only by default.
 - Data/provider-health endpoints are read-only and do not call live providers.
+- The initial Next.js shell lives under `web/` and is guarded by static tests; Node install/build and browser screenshot QA remain future gates.
 - The backlog records the migration as started, not complete.
