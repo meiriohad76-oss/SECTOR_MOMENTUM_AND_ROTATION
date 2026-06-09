@@ -51,6 +51,71 @@ export type DashboardHealthPayload = {
   };
 };
 
+export type SnapshotRow = {
+  ticker: string;
+  identity: string;
+  display_label: string;
+  asset_class: string;
+  state: string;
+  s_score: number;
+  f_score: number;
+  quadrant: string;
+  momentum_pct: number | null;
+  rs_ratio: number | null;
+  rs_momentum: number | null;
+  cmf21: number | null;
+  pillar_scores: Record<string, number | string | boolean | null>;
+  payload: Record<string, number | string | boolean | null>;
+};
+
+export type SnapshotDecision = {
+  decision_type: string;
+  ticker: string;
+  identity: string;
+  action: string;
+  rationale: string;
+  payload: Record<string, number | string | boolean | null>;
+};
+
+export type DashboardSnapshotPayload = {
+  api_version: string;
+  generated_at: string;
+  status: "ready" | "empty" | string;
+  message: string;
+  run: {
+    run_id: string;
+    started_at_utc: string;
+    provider: string;
+    universe_count: number;
+    metadata: Record<string, unknown>;
+  } | null;
+  summary: {
+    universe_count: number;
+    state_counts: Record<string, number>;
+    quadrant_counts: Record<string, number>;
+    decision_counts: Record<string, number>;
+  };
+  rows: SnapshotRow[];
+  decisions: SnapshotDecision[];
+  focus: SnapshotRow | null;
+  screens: {
+    overview?: {
+      leaders?: SnapshotRow[];
+      risks?: SnapshotRow[];
+      actions?: SnapshotDecision[];
+    };
+    deepdive?: {
+      focus?: SnapshotRow | null;
+      peer_rows?: SnapshotRow[];
+    };
+    rotation?: {
+      sectors?: SnapshotRow[];
+      leaders?: SnapshotRow[];
+      laggards?: SnapshotRow[];
+    };
+  };
+};
+
 export type ApiResult<T> = {
   ok: boolean;
   data: T | null;
@@ -91,4 +156,9 @@ export async function fetchHealth() {
 
 export async function fetchDataHealth() {
   return fetchDashboardApi<DashboardHealthPayload>("/api/v1/data-health");
+}
+
+export async function fetchDashboardSnapshot(ticker?: string) {
+  const query = ticker ? `?ticker=${encodeURIComponent(ticker)}` : "";
+  return fetchDashboardApi<DashboardSnapshotPayload>(`/api/v1/dashboard-snapshot${query}`);
 }

@@ -12,6 +12,7 @@ from typing import Any
 from .api_refresh import create_refresh_job, get_refresh_job, list_refresh_events, queued_refresh_response
 from .api_refresh_runner import run_refresh_job
 from .api_data_health import build_provider_data_health_payload
+from .api_dashboard_snapshot import build_latest_dashboard_snapshot_payload
 from .api_status import build_persisted_status_payload
 
 try:
@@ -25,6 +26,7 @@ except ModuleNotFoundError:  # pragma: no cover - create_app reports the missing
 
 StatusProvider = Callable[[], dict[str, Any]]
 DataHealthProvider = Callable[[], dict[str, Any]]
+SnapshotProvider = Callable[..., dict[str, Any]]
 RefreshRunner = Callable[..., dict[str, Any]]
 
 
@@ -38,10 +40,16 @@ def default_data_health_provider() -> dict[str, Any]:
     return build_provider_data_health_payload()
 
 
+def default_snapshot_provider(**kwargs: Any) -> dict[str, Any]:
+    """Return the latest persisted dashboard run snapshot."""
+    return build_latest_dashboard_snapshot_payload(**kwargs)
+
+
 def create_app(
     status_provider: StatusProvider | None = None,
     refresh_runner: RefreshRunner | None = None,
     data_health_provider: DataHealthProvider | None = None,
+    snapshot_provider: SnapshotProvider | None = None,
 ):
     """Create the optional FastAPI app without making FastAPI mandatory at import time."""
     try:
@@ -51,6 +59,7 @@ def create_app(
 
     provider = status_provider or default_status_provider
     data_provider = data_health_provider or default_data_health_provider
+    snapshot_reader = snapshot_provider or default_snapshot_provider
     runner = refresh_runner or run_refresh_job
     app = FastAPI(
         title="Sector Momentum Dashboard API",
@@ -86,6 +95,10 @@ def create_app(
             "provider_flow": payload.get("provider_flow", {}),
             "lanes": lanes,
         }
+
+    @app.get("/api/v1/dashboard-snapshot")
+    def dashboard_snapshot(ticker: str | None = None) -> dict[str, Any]:
+        return snapshot_reader(focus_ticker=ticker)
 
     @app.post("/api/v1/refresh", status_code=202)
     def create_refresh(

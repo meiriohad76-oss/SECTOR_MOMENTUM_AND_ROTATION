@@ -105,3 +105,28 @@ def test_data_health_and_provider_health_endpoints_use_injected_provider():
         "provider_flow_cache",
     ]
     assert provider_health.json()["provider_flow"] == {"provider_count": 2}
+
+
+def test_dashboard_snapshot_endpoint_uses_injected_provider_and_ticker_query():
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from src.api_server import create_app
+
+    calls = []
+
+    def snapshot_provider(**kwargs):
+        calls.append(kwargs)
+        return {"api_version": "v1", "status": "ready", "focus": {"ticker": kwargs.get("focus_ticker")}}
+
+    app = create_app(
+        status_provider=lambda: {"ok": True},
+        snapshot_provider=snapshot_provider,
+    )
+    client = TestClient(app)
+
+    response = client.get("/api/v1/dashboard-snapshot?ticker=XLK")
+
+    assert response.status_code == 200
+    assert response.json()["focus"] == {"ticker": "XLK"}
+    assert calls == [{"focus_ticker": "XLK"}]

@@ -33,6 +33,9 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - [x] Wire the refresh job runner to the real Massive/FRED/dashboard refresh sequence.
 - [x] Build a React/Next.js shell that consumes `/api/v1/health` and `/api/v1/data-health`.
 - [ ] Port A/B/C overview, deep-dive, and rotation screens from the handoff artifacts.
+  - [x] Add read-only `/api/v1/dashboard-snapshot` over the latest run-journal scores and decisions.
+  - [x] Render first-pass journal-backed A/B/C React sections in the Next shell.
+  - [ ] Match the handoff A/B/C layouts and chart primitives with browser screenshot evidence.
 - [ ] Replace Streamlit custom click/tooltip bridges with native React interactions.
 - [ ] Add Playwright screenshot QA against the design handoff PNG/HTML references.
 - [ ] Add Pi systemd/API deployment docs and Cloudflare route plan.
@@ -46,4 +49,5 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - The refresh runner is explicit opt-in from the API (`run_now: true`) and remains queue-only by default.
 - Data/provider-health endpoints are read-only and do not call live providers.
 - The initial Next.js shell lives under `web/`, is guarded by static tests, has a committed lockfile, and passes `npm audit --omit=dev --audit-level=moderate` plus `npm run build`; browser screenshot QA remains a future gate.
+- The first A/B/C React sections are backed by persisted run-journal data through `/api/v1/dashboard-snapshot`; handoff visual parity remains a future gate.
 - The backlog records the migration as started, not complete.

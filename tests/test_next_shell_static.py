@@ -31,8 +31,10 @@ def test_next_shell_fetches_real_api_health_and_data_health_paths():
     assert 'process.env.API_BASE_URL' in api_source
     assert 'fetchDashboardApi<DashboardHealthPayload>("/api/v1/health")' in api_source
     assert 'fetchDashboardApi<DashboardHealthPayload>("/api/v1/data-health")' in api_source
+    assert 'fetchDashboardApi<DashboardSnapshotPayload>(`/api/v1/dashboard-snapshot${query}`)' in api_source
     assert 'cache: "no-store"' in api_source
-    assert "await Promise.all([fetchHealth(), fetchDataHealth()])" in page_source
+    assert "fetchDashboardSnapshot()" in page_source
+    assert "await Promise.all([" in page_source
     assert "fetch(" not in page_source
 
 
@@ -43,6 +45,9 @@ def test_next_shell_renders_health_tables_and_provider_rail_without_fixture_mark
         "Persisted Data Health",
         "Provider Data Health",
         "Provider Flow",
+        "A | Overview",
+        "B | Deep Dive",
+        "C | Rotation",
         "API connection pending",
         "provider_flow_readiness",
         "provider_",
@@ -50,6 +55,16 @@ def test_next_shell_renders_health_tables_and_provider_rail_without_fixture_mark
         assert marker in page_source
     for forbidden in ("handoff", "mockup", "sample market", "XLK", "Technology sector"):
         assert forbidden not in page_source
+
+
+def test_next_shell_snapshot_sections_are_api_driven_not_hardcoded():
+    page_source = (WEB / "app" / "page.tsx").read_text(encoding="utf-8")
+
+    assert "SnapshotScreens" in page_source
+    assert "snapshot?.screens.overview?.leaders" in page_source
+    assert "snapshot?.screens.rotation?.sectors" in page_source
+    assert "focus?.pillar_scores" in page_source
+    assert "decision.rationale" in page_source
 
 
 def test_next_shell_gitignore_excludes_node_and_next_artifacts():
