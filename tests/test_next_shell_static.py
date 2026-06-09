@@ -36,6 +36,8 @@ def test_next_shell_fetches_real_api_health_and_data_health_paths():
     assert 'cache: "no-store"' in api_source
     assert "fetchDashboardSnapshot()" in page_source
     assert "await Promise.all([" in page_source
+    assert 'export const dynamic = "force-dynamic";' in page_source
+    assert "export const revalidate = 0;" in page_source
     assert "fetch(" not in page_source
     assert 'fetchDashboardSnapshot(ticker?: string)' in api_source
     assert 'fetch("' not in client_source

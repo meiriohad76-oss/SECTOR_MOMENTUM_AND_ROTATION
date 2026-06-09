@@ -46,7 +46,7 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - [x] Add Playwright screenshot QA against the design handoff PNG/HTML references.
   - [x] `scripts/capture_next_handoff_qa.py` captures Overview, Deep Dive, and Rotation against C1/C2/C3 references.
   - [x] `scripts/serve_next_qa_api.py` provides a QA-only read-only API fallback when FastAPI is not installed locally.
-  - [x] Latest evidence targets `http://127.0.0.1:3100/?presentation=c`; similarity scores improved to roughly 0.84-0.86 while remaining below a pixel-parity release gate.
+  - [x] Latest evidence targets `http://127.0.0.1:3100/?presentation=c`; required text/nonblank checks pass for C1/C2/C3 with current similarity around 0.79 overview, 0.84 deep dive, and 0.85 rotation while remaining below a pixel-parity release gate.
   - [ ] Raise visual similarity through layout/pixel-parity tickets before using the similarity score as a release gate.
 - [x] Add Pi systemd/API deployment docs and Cloudflare route plan.
 - [ ] Retire the Streamlit route only after feature parity, data parity, visual parity, and rollback path are documented.

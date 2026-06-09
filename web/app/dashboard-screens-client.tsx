@@ -405,8 +405,12 @@ function CTopBar({
             {item.label}
           </button>
         ))}
+        <button type="button" className="inactive" aria-disabled="true">Macro</button>
+        <button type="button" className="inactive" aria-disabled="true">Positions</button>
       </nav>
       <div className="c-live"><i /> {generatedAt || "latest snapshot"}</div>
+      <button type="button" className="c-icon-btn" title="Refresh candidate snapshot">R</button>
+      <button type="button" className="c-icon-btn" title="Display mode">C</button>
     </header>
   );
 }
@@ -414,10 +418,14 @@ function CTopBar({
 function CWeatherStrip({ snapshot }: { snapshot: DashboardSnapshotPayload }) {
   const warnings = (snapshot.summary.state_counts.WARNING ?? 0) + (snapshot.summary.state_counts.EXIT ?? 0);
   const bullish = snapshot.summary.state_counts.STAGE_2_BULLISH ?? 0;
+  const exits = snapshot.summary.state_counts.EXIT ?? 0;
   const leaders = snapshot.screens.overview?.leaders ?? [];
   const risks = snapshot.screens.overview?.risks ?? [];
   const leadText = leaders[0]?.identity || leaders[0]?.ticker || "Leadership";
   const riskText = risks[0]?.identity || risks[0]?.ticker || "risk queue";
+  const breadth = snapshot.summary.universe_count
+    ? Math.round((leaders.length / snapshot.summary.universe_count) * 100)
+    : 0;
   return (
     <section className="c-weather" aria-label="Display C weather strip">
       <div className="c-weather-lead">
@@ -426,9 +434,10 @@ function CWeatherStrip({ snapshot }: { snapshot: DashboardSnapshotPayload }) {
         <p>{warnings} warning/exit rows. {bullish} bullish rows. Universe size {snapshot.summary.universe_count}.</p>
       </div>
       <div><span>Regime</span><strong>{snapshot.run?.metadata?.phase ? String(snapshot.run.metadata.phase) : "Current"}</strong><p>{snapshot.run?.provider || "provider"} data</p></div>
+      <div><span>Cycle</span><strong>{snapshot.run?.metadata?.cycle_phase ? String(snapshot.run.metadata.cycle_phase) : "Live"}</strong><p>macro context</p></div>
       <div><span>Warnings</span><strong>{warnings}</strong><p>warning + exit</p></div>
-      <div><span>Breadth</span><strong>{leaders.length}</strong><p>leader rows</p></div>
-      <div><span>Universe</span><strong>{snapshot.summary.universe_count}</strong><p>{bullish} bullish</p></div>
+      <div><span>Breadth</span><strong>{breadth}%</strong><p>top leaders / universe</p></div>
+      <div><span>Universe</span><strong>{snapshot.summary.universe_count}</strong><p>{bullish} bullish | {exits} exit</p></div>
     </section>
   );
 }
@@ -476,6 +485,7 @@ function COverviewScreen({
             {bullish.map((row) => (
               <button
                 type="button"
+                className="c-cohort-row"
                 key={row.ticker}
                 onClick={() => {
                   onSelectTicker(row.ticker);
@@ -487,6 +497,10 @@ function COverviewScreen({
                 <em>{fmt(row.s_score)}</em>
               </button>
             ))}
+          </div>
+          <div className="c-rail-card">
+            <div className="c-sec-head"><strong>Run journal</strong><span>snapshot scope</span></div>
+            <p>Provider: {snapshot.run?.provider || "unknown"}. Rows: {snapshot.summary.universe_count}. Decisions: {snapshot.decisions.length}. This candidate screen is fed by the latest persisted run journal, not handoff fixture data.</p>
           </div>
         </aside>
       </div>
@@ -518,9 +532,10 @@ function CDeepDiveScreen({
     <section className="c-screen" aria-label="Display C ticker deep dive">
       <header className="c-deep-header">
         <div>
+          <div className="c-breadcrumb">Momentum / Heatmap / <strong>{focus.ticker}</strong></div>
           <h1>{focus.ticker}</h1>
           <p>{focus.asset_class} | {focus.identity}</p>
-          <strong>{fieldNarrative(focus)}</strong>
+          <strong>{focus.state.replaceAll("_", " ")}: {fieldNarrative(focus)} The waterfall below shows how each pillar contributes to the current composite.</strong>
         </div>
         <label className="c-focus-select">
           Focus
@@ -588,28 +603,46 @@ function CRotationScreen({
         }} />
       </div>
       <FlowRiver rows={rows} />
-      <div className="c-flow-table">
-        <div className="c-sec-head"><strong>Flow internals</strong><span>click row for deep dive</span></div>
-        <table>
-          <thead>
-            <tr><th>Ticker</th><th>Identity</th><th>Quadrant</th><th>S</th><th>F</th><th>CMF</th></tr>
-          </thead>
-          <tbody>
-            {rows.slice(0, 12).map((row) => (
-              <tr key={row.ticker} className={row.ticker === selectedTicker ? "selected-row" : ""} onClick={() => {
-                onSelectTicker(row.ticker);
-                setActiveScreen("deepdive");
-              }}>
-                <td><strong>{row.ticker}</strong></td>
-                <td>{row.identity}</td>
-                <td>{row.quadrant}</td>
-                <td>{fmt(row.s_score)}</td>
-                <td>{fmt(row.f_score)}</td>
-                <td>{fmt(row.cmf21, 2)}</td>
-              </tr>
+      <div className="c-lower-grid">
+        <div className="c-flow-table c-macro-panel">
+          <div className="c-sec-head"><strong>Macro / business cycle</strong><span>run context</span></div>
+          <div className="c-cycle-tabs">
+            {["EARLY", "MID", "LATE", "RECESS"].map((phase) => (
+              <span key={phase} className={String(snapshot.run?.metadata?.cycle_phase || "").toUpperCase() === phase ? "selected" : ""}>{phase}</span>
             ))}
-          </tbody>
-        </table>
+          </div>
+          <p>Current run provider: {snapshot.run?.provider || "unknown"}. The macro lane is read from persisted health/run context in this migration shell; live FRED refresh remains behind the API refresh runner.</p>
+          <div className="c-macro-tiles">
+            <div><span>Universe</span><strong>{snapshot.summary.universe_count}</strong></div>
+            <div><span>Bullish</span><strong>{snapshot.summary.state_counts.STAGE_2_BULLISH ?? 0}</strong></div>
+            <div><span>Warning</span><strong>{snapshot.summary.state_counts.WARNING ?? 0}</strong></div>
+            <div><span>Exit</span><strong>{snapshot.summary.state_counts.EXIT ?? 0}</strong></div>
+          </div>
+        </div>
+        <div className="c-flow-table">
+          <div className="c-sec-head"><strong>Flow internals</strong><span>click row for deep dive</span></div>
+          <table>
+            <thead>
+              <tr><th>Ticker</th><th>Identity</th><th>Quadrant</th><th>S</th><th>F</th><th>CMF</th><th>Mom</th></tr>
+            </thead>
+            <tbody>
+              {rows.slice(0, 12).map((row) => (
+                <tr key={row.ticker} className={row.ticker === selectedTicker ? "selected-row" : ""} onClick={() => {
+                  onSelectTicker(row.ticker);
+                  setActiveScreen("deepdive");
+                }}>
+                  <td><strong>{row.ticker}</strong></td>
+                  <td>{row.identity}</td>
+                  <td>{row.quadrant}</td>
+                  <td>{fmt(row.s_score)}</td>
+                  <td>{fmt(row.f_score)}</td>
+                  <td>{fmt(row.cmf21, 2)}</td>
+                  <td>{fmt(row.momentum_pct, 2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   );

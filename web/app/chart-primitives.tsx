@@ -27,6 +27,34 @@ const PILLARS: PillarDef[] = [
   { key: "cmf21", code: "FLOW", label: "Flow", hue: "#b34a6b", reading: "money-flow pressure" },
 ];
 
+const CLASS_ORDER = [
+  "US Sectors",
+  "US Industries",
+  "Countries",
+  "Factors",
+  "Themes",
+  "Crypto",
+  "Mega-Cap Stocks",
+  "Other",
+];
+
+function classRank(assetClass: string): number {
+  const index = CLASS_ORDER.indexOf(assetClass);
+  return index >= 0 ? index : CLASS_ORDER.length;
+}
+
+function stateLabel(state: string): string {
+  return state.replaceAll("_", " ");
+}
+
+function stateTone(state: string): "good" | "warn" | "bad" | "hold" {
+  const normalized = state.toLowerCase();
+  if (normalized.includes("bullish") || normalized === "buy") return "good";
+  if (normalized.includes("exit") || normalized.includes("bear")) return "bad";
+  if (normalized.includes("warn")) return "warn";
+  return "hold";
+}
+
 function numeric(value: number | string | boolean | null | undefined): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim()) {
@@ -80,6 +108,10 @@ export function PillarLegend() {
   );
 }
 
+function LightStatePill({ state }: { state: string }) {
+  return <span className={`light-state-pill ${stateTone(state)}`}>{stateLabel(state)}</span>;
+}
+
 export function PillarStackBar({ row }: { row: SnapshotRow }) {
   const contributions = pillarContributions(row);
   const maxAbs = Math.max(1, ...contributions.map((pillar) => Math.abs(pillar.contribution)));
@@ -105,15 +137,22 @@ export function PillarHeatmap({ rows, onSelectTicker }: { rows: SnapshotRow[]; o
     acc[key].push(row);
     return acc;
   }, {});
-  const classes = Object.keys(grouped).sort();
+  const classes = Object.keys(grouped).sort((a, b) => {
+    const rank = classRank(a) - classRank(b);
+    return rank || a.localeCompare(b);
+  });
+  const sortedRows = rows.slice().sort((a, b) => b.s_score - a.s_score);
   return (
     <section className="chart-card light-card" aria-label="Composite pillar-stack heatmap">
       <div className="chart-heading">
         <div>
           <h3>The composite, dissected</h3>
-          <p>Each row shows the same seven pillars that build the score. Left is bearish; right is bullish.</p>
+          <p>Each row IS the composite. Seven segments to the right of the midline are bullish contributions; segments to the left are bearish. Length encodes magnitude. Read the row to see why the score is what it is.</p>
         </div>
-        <PillarLegend />
+        <div className="chart-heading-meta">
+          <span>{rows.length} instruments | sorted by S</span>
+          <PillarLegend />
+        </div>
       </div>
       <div className="composition-header">
         <span>Ticker</span>
@@ -124,22 +163,24 @@ export function PillarHeatmap({ rows, onSelectTicker }: { rows: SnapshotRow[]; o
       </div>
       {classes.map((assetClass) => (
         <div key={assetClass} className="composition-group">
-          <div className="composition-class">{assetClass} | {grouped[assetClass].length}</div>
+          <div className="composition-class">
+            {assetClass} | {grouped[assetClass].length} | {grouped[assetClass].filter((row) => row.s_score > 0).length} positive S
+          </div>
           {grouped[assetClass]
             .slice()
             .sort((a, b) => b.s_score - a.s_score)
-            .slice(0, 10)
             .map((row) => (
               <button type="button" key={row.ticker} className="composition-row" onClick={() => onSelectTicker(row.ticker)}>
                 <strong>{row.ticker}</strong>
                 <PillarStackBar row={row} />
-                <span>{row.state.replaceAll("_", " ")}</span>
+                <LightStatePill state={row.state} />
                 <span>{fmt(row.s_score)}</span>
                 <span>{fmt(row.momentum_pct, 2)}</span>
               </button>
             ))}
         </div>
       ))}
+      {!sortedRows.length ? <p className="empty-chart-copy">No saved snapshot rows are available yet.</p> : null}
     </section>
   );
 }
@@ -234,6 +275,23 @@ export function RrgChart({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSele
   const plotH = height - 62;
   const x = (value: number) => left + (value - 70) / 60 * plotW;
   const y = (value: number) => top + (130 - value) / 60 * plotH;
+  const placedLabels: { x: number; y: number }[] = [];
+  const entries = rows.slice(0, 30).map((row, index) => {
+    const point = rrgPoint(row);
+    const pointX = x(point.x);
+    const pointY = y(point.y);
+    const anchor: "start" | "end" = point.x > 118 ? "end" : "start";
+    const labelX = anchor === "start" ? pointX + 10 : pointX - 10;
+    let labelY = clamp(pointY + 4 + ((index % 3) - 1) * 7, top + 22, top + plotH - 14);
+    for (let guard = 0; guard < 10; guard += 1) {
+      const overlaps = placedLabels.some((label) => Math.abs(label.x - labelX) < 46 && Math.abs(label.y - labelY) < 15);
+      if (!overlaps) break;
+      const direction = labelY < top + plotH / 2 ? 1 : -1;
+      labelY = clamp(labelY + direction * 15, top + 22, top + plotH - 14);
+    }
+    placedLabels.push({ x: labelX, y: labelY });
+    return { row, point, pointX, pointY, labelX, labelY, anchor };
+  });
   return (
     <div className="chart-card light-card" aria-label="Relative rotation graph">
       <div className="chart-heading">
@@ -250,8 +308,7 @@ export function RrgChart({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSele
         <text x={left + plotW - 88} y={top + 18}>Leading</text>
         <text x={left + 10} y={top + plotH - 10}>Lagging</text>
         <text x={left + plotW - 98} y={top + plotH - 10}>Weakening</text>
-        {rows.slice(0, 30).map((row) => {
-          const point = rrgPoint(row);
+        {entries.map(({ row, point, pointX, pointY, labelX, labelY, anchor }) => {
           const drift = clamp(row.s_score, -1.5, 1.5) * 2.5;
           const trail = [
             { x: point.x - 5 - drift, y: point.y - 3 + drift },
@@ -260,10 +317,16 @@ export function RrgChart({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSele
             point,
           ];
           return (
-            <g key={row.ticker} className="rrg-point" onClick={() => onSelectTicker(row.ticker)}>
+            <g
+              key={row.ticker}
+              className="rrg-point"
+              onClick={() => onSelectTicker(row.ticker)}
+              aria-label={`${row.display_label} ${row.quadrant} rotation point`}
+            >
               <polyline points={trail.map((p) => `${x(p.x)},${y(p.y)}`).join(" ")} fill="none" stroke={stateColor(row)} strokeOpacity="0.34" strokeWidth="2" />
-              <circle cx={x(point.x)} cy={y(point.y)} r="5" fill={stateColor(row)} />
-              <text x={x(point.x) + 8} y={y(point.y) + 4}>{row.ticker}</text>
+              <line x1={pointX} x2={labelX + (anchor === "start" ? -4 : 4)} y1={pointY} y2={labelY - 3} className="label-leader" />
+              <circle cx={pointX} cy={pointY} r="5" fill={stateColor(row)} />
+              <text className="rrg-label" x={labelX} y={labelY} textAnchor={anchor}>{row.ticker}</text>
             </g>
           );
         })}
@@ -319,37 +382,97 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
     .sort((a, b) => (b.f_score + (b.cmf21 ?? 0) + b.s_score) - (a.f_score + (a.cmf21 ?? 0) + a.s_score))
     .slice(0, 5);
   const pairCount = Math.min(outflows.length, inflows.length);
-  const width = 860;
-  const height = 250;
-  const maxMagnitude = Math.max(0.1, ...outflows.map((row) => Math.abs(row.f_score || row.cmf21 || row.s_score)));
+  const width = 1100;
+  const height = 260;
+  const leftX = 220;
+  const rightX = width - 280;
+  const top = 46;
+  const rowGap = 38;
+  const totalOut = outflows.reduce((total, row) => total + Math.max(0.05, Math.abs(row.f_score || row.cmf21 || row.s_score)), 0);
+  const totalIn = inflows.reduce((total, row) => total + Math.max(0.05, Math.abs(row.f_score || row.cmf21 || row.s_score)), 0);
+  const maxMagnitude = Math.max(
+    0.1,
+    ...outflows.map((row) => Math.abs(row.f_score || row.cmf21 || row.s_score)),
+    ...inflows.map((row) => Math.abs(row.f_score || row.cmf21 || row.s_score)),
+  );
   return (
     <div className="chart-card light-card" aria-label="Flow river">
       <div className="chart-heading">
         <div>
           <h3>The flow river</h3>
-          <p>Data-derived map from current weakest flow/score rows into strongest flow/score rows.</p>
+          <p>Data-derived map from current weakest flow/score rows into strongest flow/score rows. Strand width follows relative pressure magnitude.</p>
         </div>
         <strong>{pairCount} lanes</strong>
       </div>
       <svg className="flow-river" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Current flow river from weakening to strengthening instruments">
-        <text x="22" y="24">Net pressure</text>
-        <text x={width - 146} y="24">Net support</text>
+        <text x="22" y="20">NET OUTFLOWS</text>
+        <text x={width - 22} y="20" textAnchor="end">NET INFLOWS</text>
+        {outflows.flatMap((source, sourceIndex) => {
+          const sourceMagnitude = Math.max(0.05, Math.abs(source.f_score || source.cmf21 || source.s_score));
+          return inflows.map((target, targetIndex) => {
+            const targetMagnitude = Math.max(0.05, Math.abs(target.f_score || target.cmf21 || target.s_score));
+            const share = sourceMagnitude / Math.max(totalOut, 0.1) * targetMagnitude / Math.max(totalIn, 0.1);
+            const y1 = top + sourceIndex * rowGap + (targetIndex - 2) * 2.4;
+            const y2 = top + targetIndex * rowGap + (sourceIndex - 2) * 2.4;
+            const strokeWidth = Math.max(1.5, share * 130);
+            return (
+              <path
+                key={`${source.ticker}-${target.ticker}`}
+                d={`M ${leftX} ${y1} C ${leftX + 190} ${y1}, ${rightX - 190} ${y2}, ${rightX} ${y2}`}
+                fill="none"
+                stroke="#b34a4a"
+                strokeOpacity="0.16"
+                strokeWidth={strokeWidth}
+              />
+            );
+          });
+        })}
         {Array.from({ length: pairCount }).map((_, index) => {
           const source = outflows[index];
           const target = inflows[index];
-          const y1 = 52 + index * 38;
-          const y2 = 52 + index * 38;
-          const strokeWidth = 4 + Math.abs(source.f_score || source.cmf21 || source.s_score) / maxMagnitude * 14;
+          const y1 = top + index * rowGap;
+          const y2 = top + index * rowGap;
+          const strokeWidth = 4 + Math.abs(source.f_score || source.cmf21 || source.s_score) / maxMagnitude * 8;
           return (
-            <g key={`${source.ticker}-${target.ticker}`}>
-              <text x="22" y={y1 + 4}>{source.ticker} | {source.identity}</text>
-              <path d={`M 230 ${y1} C 370 ${y1}, 490 ${y2}, 630 ${y2}`} fill="none" stroke="#b34a6b" strokeOpacity="0.34" strokeWidth={strokeWidth} />
-              <text x="650" y={y2 + 4}>{target.ticker} | {target.identity}</text>
+            <path
+              key={`primary-${source.ticker}-${target.ticker}`}
+              d={`M ${leftX} ${y1} C ${leftX + 190} ${y1}, ${rightX - 190} ${y2}, ${rightX} ${y2}`}
+              fill="none"
+              stroke="#b34a6b"
+              strokeOpacity="0.34"
+              strokeWidth={strokeWidth}
+            />
+          );
+        })}
+        {outflows.map((row, index) => {
+          const y = top + index * rowGap;
+          const h = 12 + Math.abs(row.f_score || row.cmf21 || row.s_score) / maxMagnitude * 24;
+          return (
+            <g key={`out-${row.ticker}`}>
+              <rect x={leftX - 18} y={y - h / 2} width="12" height={h} fill="#b34a4a" />
+              <text x={leftX - 26} y={y - 2} textAnchor="end">{row.ticker} | {row.identity}</text>
+              <text x={leftX - 26} y={y + 13} textAnchor="end" className="flow-value">-{fmt(Math.max(0.05, Math.abs(row.f_score || row.cmf21 || row.s_score)), 2)}</text>
+            </g>
+          );
+        })}
+        {inflows.map((row, index) => {
+          const y = top + index * rowGap;
+          const h = 12 + Math.abs(row.f_score || row.cmf21 || row.s_score) / maxMagnitude * 24;
+          return (
+            <g key={`in-${row.ticker}`}>
+              <rect x={rightX + 6} y={y - h / 2} width="12" height={h} fill="#1f7a4a" />
+              <text x={rightX + 26} y={y - 2}>{row.ticker} | {row.identity}</text>
+              <text x={rightX + 26} y={y + 13} className="flow-value">+{fmt(Math.max(0.05, Math.abs(row.f_score || row.cmf21 || row.s_score)), 2)}</text>
             </g>
           );
         })}
         {!pairCount ? <text x="22" y="70">No opposing flow lanes are available in the latest snapshot.</text> : null}
       </svg>
+      {pairCount ? (
+        <p className="flow-caption">
+          Current saved snapshot shows pressure led by {outflows[0].display_label}; support is led by {inflows[0].display_label}. Use this as a rotation map, not a literal dollar-transfer ledger.
+        </p>
+      ) : null}
     </div>
   );
 }

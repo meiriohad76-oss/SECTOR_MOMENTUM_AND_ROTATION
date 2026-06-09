@@ -1,12 +1,12 @@
 {
-  "generated_at_utc": "2026-06-09T06:57:16Z",
+  "generated_at_utc": "2026-06-09T15:08:36Z",
   "reference_profile": "Momentum v2 Display C handoff: C1/C2/C3",
   "screens": [
     {
       "capture": ".tmp\\next_handoff_qa_live\\next-overview.png",
       "capture_size": [
         1440,
-        1800
+        3440
       ],
       "error": "",
       "missing_text": [],
@@ -23,9 +23,9 @@
         "State changes",
         "Bullish cohort"
       ],
-      "rms": 35.6758,
+      "rms": 52.8601,
       "screen": "overview",
-      "similarity": 0.8601
+      "similarity": 0.7927
     },
     {
       "capture": ".tmp\\next_handoff_qa_live\\next-deepdive.png",
@@ -48,15 +48,15 @@
         "FOCUS",
         "State machine"
       ],
-      "rms": 40.0728,
+      "rms": 40.4999,
       "screen": "deepdive",
-      "similarity": 0.8429
+      "similarity": 0.8412
     },
     {
       "capture": ".tmp\\next_handoff_qa_live\\next-rotation.png",
       "capture_size": [
         1440,
-        1978
+        2041
       ],
       "error": "",
       "missing_text": [],
@@ -73,10 +73,10 @@
         "The flow river",
         "Flow internals"
       ],
-      "rms": 36.1547,
+      "rms": 38.2243,
       "screen": "rotation",
-      "similarity": 0.8582
+      "similarity": 0.8501
     }
   ],
-  "url": "http://127.0.0.1:3100/?presentation=c"
+  "url": "http://127.0.0.1:3100/?presentation=c&qa=shots"
 }

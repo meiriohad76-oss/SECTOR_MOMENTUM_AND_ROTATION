@@ -7,6 +7,9 @@ import {
 } from "../lib/api";
 import DashboardScreensClient from "./dashboard-screens-client";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function statusClass(status: string) {
   const normalized = status.toLowerCase();
   if (normalized === "healthy" || normalized === "info") return "good";

@@ -57,7 +57,7 @@ def _compact_snapshot_payload(payload: dict) -> dict:
         return compacted[:limit] if limit is not None else compacted
 
     compact = dict(payload)
-    compact["rows"] = compact_rows(payload.get("rows"), limit=20)
+    compact["rows"] = compact_rows(payload.get("rows"), limit=90)
     compact["focus"] = compact_row(dict(payload["focus"])) if isinstance(payload.get("focus"), dict) else None
     compact["decisions"] = [
         {**dict(row), "payload": {}}
@@ -73,7 +73,7 @@ def _compact_snapshot_payload(payload: dict) -> dict:
     deepdive["focus"] = compact["focus"]
     deepdive["peer_rows"] = compact_rows(deepdive.get("peer_rows"), limit=12)
     rotation = dict(screens.get("rotation", {}) or {})
-    rotation["sectors"] = compact_rows(rotation.get("sectors"), limit=16)
+    rotation["sectors"] = compact_rows(rotation.get("sectors"), limit=40)
     rotation["leaders"] = compact_rows(rotation.get("leaders"), limit=8)
     rotation["laggards"] = compact_rows(rotation.get("laggards"), limit=8)
     compact["screens"] = {"overview": overview, "deepdive": deepdive, "rotation": rotation}

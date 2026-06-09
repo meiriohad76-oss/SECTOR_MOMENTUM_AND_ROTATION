@@ -72,7 +72,7 @@ def test_next_qa_api_compacts_snapshot_payload_for_browser_transport():
     assert compact["decisions"][0]["payload"] == {}
     assert compact["rows"][0]["pillar_scores"] == {"mom_12_1": 1.0, "rs_ratio": 101}
     assert compact["focus"]["pillar_scores"] == {"cmf21": 0.1}
-    assert len(compact["rows"]) == 20
+    assert len(compact["rows"]) == 40
 
 
 def test_next_qa_api_provider_health_filters_provider_lanes(monkeypatch):

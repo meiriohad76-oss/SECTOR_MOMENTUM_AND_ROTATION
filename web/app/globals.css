@@ -107,6 +107,11 @@ main {
   border-bottom-color: #12324a;
 }
 
+.c-tabs button.inactive {
+  color: #8f857a;
+  cursor: default;
+}
+
 .c-live {
   display: flex;
   align-items: center;
@@ -120,13 +125,26 @@ main {
   border-radius: 50%;
 }
 
+.c-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: #3d362f;
+  background: #f4f1ec;
+  border: 1px solid #e6e1d8;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
 .c-screen {
   padding: 24px 32px 32px;
 }
 
 .c-weather {
   display: grid;
-  grid-template-columns: 1.4fr repeat(4, minmax(0, 1fr));
+  grid-template-columns: 1.4fr repeat(5, minmax(0, 1fr));
   gap: 24px;
   margin-bottom: 20px;
   padding: 18px 24px;
@@ -201,6 +219,10 @@ main {
   cursor: pointer;
 }
 
+.c-rail-card button.c-cohort-row {
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+}
+
 .c-rail-card button:hover,
 .c-flow-table tbody tr:hover {
   background: #f4f1ec;
@@ -229,6 +251,7 @@ main {
 .c-rail-card p {
   padding: 16px;
   color: #6a625a;
+  line-height: 1.5;
 }
 
 .c-deep-header,
@@ -238,6 +261,12 @@ main {
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 18px;
+}
+
+.c-breadcrumb {
+  margin-bottom: 10px;
+  color: #7a7066;
+  font-size: 0.78rem;
 }
 
 .c-deep-header h1,
@@ -337,6 +366,13 @@ main {
   margin-top: 20px;
 }
 
+.c-lower-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  margin-top: 20px;
+}
+
 .c-flow-table table {
   min-width: 0;
 }
@@ -349,6 +385,56 @@ main {
 
 .c-flow-table th {
   color: #6a625a;
+}
+
+.c-cycle-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 16px;
+}
+
+.c-cycle-tabs span,
+.c-macro-tiles div {
+  padding: 12px 10px;
+  color: #6a625a;
+  text-align: center;
+  background: #f4f1ec;
+  border-radius: 6px;
+}
+
+.c-cycle-tabs span.selected {
+  color: #fff;
+  background: #1a1714;
+}
+
+.c-macro-panel p {
+  margin: 0;
+  padding: 0 16px 14px;
+  color: #5d554d;
+  line-height: 1.55;
+}
+
+.c-macro-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.c-macro-tiles span {
+  display: block;
+  color: #7a7066;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.c-macro-tiles strong {
+  display: block;
+  margin-top: 5px;
+  color: #12324a;
+  font-size: 1.1rem;
 }
 
 .c-empty {
@@ -824,6 +910,20 @@ select:focus-visible {
   border-bottom: 1px solid #e6e1d8;
 }
 
+.chart-heading-meta {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  min-width: 280px;
+}
+
+.chart-heading-meta > span {
+  color: #7a7066;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .chart-heading h3 {
   margin: 0 0 6px;
   font-size: 1rem;
@@ -867,7 +967,7 @@ select:focus-visible {
 .composition-header,
 .composition-row {
   display: grid;
-  grid-template-columns: 66px minmax(220px, 1fr) minmax(130px, 0.38fr) 64px 70px;
+  grid-template-columns: 66px minmax(260px, 1fr) minmax(110px, 0.3fr) 64px 70px;
   gap: 10px;
   align-items: center;
 }
@@ -894,7 +994,8 @@ select:focus-visible {
 
 .composition-row {
   width: 100%;
-  padding: 8px 18px;
+  min-height: 31px;
+  padding: 7px 18px;
   color: #1a1714;
   font: inherit;
   text-align: left;
@@ -905,6 +1006,37 @@ select:focus-visible {
 
 .composition-row:hover {
   background: #f4f1ec;
+}
+
+.light-state-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 74px;
+  padding: 3px 7px;
+  color: #fff;
+  border-radius: 4px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.light-state-pill.good {
+  background: #1f7a4a;
+}
+
+.light-state-pill.warn {
+  background: #a8721a;
+}
+
+.light-state-pill.bad {
+  background: #b13a1f;
+}
+
+.light-state-pill.hold {
+  background: #2e6fa3;
 }
 
 .pillar-stack {
@@ -962,6 +1094,36 @@ select:focus-visible {
 .flow-river text {
   fill: #312c27;
   font-size: 11px;
+}
+
+.rrg-chart .rrg-label {
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: #fbfaf8;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.rrg-chart .label-leader {
+  stroke: #8b8177;
+  stroke-width: 1;
+  stroke-opacity: 0.42;
+}
+
+.flow-river text.flow-value {
+  fill: #7a7066;
+  font-size: 10px;
+}
+
+.flow-caption {
+  margin: -4px 18px 18px;
+  color: #5d554d;
+  line-height: 1.5;
+}
+
+.empty-chart-copy {
+  padding: 18px;
+  color: #6a625a;
 }
 
 .plot-bg {
@@ -1095,6 +1257,15 @@ select:focus-visible {
 
   .summary-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .c-weather,
+  .c-overview-grid,
+  .c-support-grid,
+  .c-rotation-grid,
+  .c-lower-grid,
+  .c-stat-deck {
+    grid-template-columns: 1fr;
   }
 }
 
