@@ -13,6 +13,7 @@ from .api_refresh import create_refresh_job, get_refresh_job, list_refresh_event
 from .api_refresh_runner import run_refresh_job
 from .api_data_health import build_provider_data_health_payload
 from .api_dashboard_snapshot import build_latest_dashboard_snapshot_payload
+from .api_portfolio import build_portfolio_analysis_payload
 from .api_status import build_persisted_status_payload
 
 try:
@@ -99,6 +100,11 @@ def create_app(
     @app.get("/api/v1/dashboard-snapshot")
     def dashboard_snapshot(ticker: str | None = None) -> dict[str, Any]:
         return snapshot_reader(focus_ticker=ticker)
+
+    @app.post("/api/v1/portfolio/analyze")
+    def portfolio_analyze(payload: dict[str, Any] | None = Body(default=None)) -> dict[str, Any]:
+        snapshot = snapshot_reader()
+        return build_portfolio_analysis_payload(payload or {}, snapshot_payload=snapshot)
 
     @app.post("/api/v1/refresh", status_code=202)
     def create_refresh(

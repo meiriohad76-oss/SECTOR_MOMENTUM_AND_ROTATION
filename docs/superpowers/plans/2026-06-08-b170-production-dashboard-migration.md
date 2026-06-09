@@ -31,6 +31,10 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
   - `GET /api/v1/refresh/{job_id}/events`
 - [x] Persist refresh progress events in a small local SQLite store for browser reconnects.
 - [x] Wire the refresh job runner to the real Massive/FRED/dashboard refresh sequence.
+- [x] Add read-only portfolio analysis API endpoint:
+  - `POST /api/v1/portfolio/analyze`
+  - accepts single ticker, JSON holdings, CSV text, or base64 CSV/XLSX content
+  - maps holdings to the latest persisted dashboard snapshot without provider fetches, scoring recompute, broker calls, or state writes
 - [x] Build a React/Next.js shell that consumes `/api/v1/health` and `/api/v1/data-health`.
 - [ ] Port A/B/C overview, deep-dive, and rotation screens from the handoff artifacts.
   - [x] Add read-only `/api/v1/dashboard-snapshot` over the latest run-journal scores and decisions.

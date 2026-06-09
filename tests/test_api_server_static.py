@@ -19,6 +19,7 @@ def test_api_server_is_optional_fastapi_boundary_not_streamlit_import():
     assert "from .api_refresh_runner import run_refresh_job" in source
     assert "from .api_data_health import build_provider_data_health_payload" in source
     assert "from .api_dashboard_snapshot import build_latest_dashboard_snapshot_payload" in source
+    assert "from .api_portfolio import build_portfolio_analysis_payload" in source
     assert "from .api_status import build_persisted_status_payload" in source
     assert "return build_persisted_status_payload()" in source
     assert "return build_provider_data_health_payload()" in source
@@ -27,6 +28,7 @@ def test_api_server_is_optional_fastapi_boundary_not_streamlit_import():
     assert 'app.get("/api/v1/data-health")' in source
     assert 'app.get("/api/v1/provider-health")' in source
     assert 'app.get("/api/v1/dashboard-snapshot")' in source
+    assert 'app.post("/api/v1/portfolio/analyze")' in source
     assert 'app.post("/api/v1/refresh", status_code=202)' in source
     assert 'app.get("/api/v1/refresh/{job_id}")' in source
     assert 'app.get("/api/v1/refresh/{job_id}/events")' in source

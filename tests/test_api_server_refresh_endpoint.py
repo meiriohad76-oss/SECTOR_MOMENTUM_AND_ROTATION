@@ -130,3 +130,44 @@ def test_dashboard_snapshot_endpoint_uses_injected_provider_and_ticker_query():
     assert response.status_code == 200
     assert response.json()["focus"] == {"ticker": "XLK"}
     assert calls == [{"focus_ticker": "XLK"}]
+
+
+def test_portfolio_analyze_endpoint_uses_injected_snapshot_provider():
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from src.api_server import create_app
+
+    calls = []
+
+    def snapshot_provider(**kwargs):
+        calls.append(kwargs)
+        return {
+            "api_version": "v1",
+            "status": "ready",
+            "rows": [
+                {
+                    "ticker": "XLK",
+                    "asset_class": "US Sectors",
+                    "state": "STAGE_2_BULLISH",
+                    "s_score": 1.2,
+                    "f_score": 0.4,
+                    "payload": {"rank_in_class": 1, "selected": True, "veto": False},
+                }
+            ],
+        }
+
+    app = create_app(
+        status_provider=lambda: {"ok": True},
+        snapshot_provider=snapshot_provider,
+    )
+    client = TestClient(app)
+
+    response = client.post("/api/v1/portfolio/analyze", json={"ticker": "XLK"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert payload["rows"][0]["ticker"] == "XLK"
+    assert payload["rows"][0]["state"] == "STAGE_2_BULLISH"
+    assert calls == [{}]
