@@ -252,6 +252,36 @@ def test_next_shell_pillar_stack_has_native_value_specific_tooltips():
     assert "white-space: normal;" in css_source
 
 
+def test_next_shell_rrg_and_flow_have_native_value_specific_tooltips():
+    chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
+    css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    for marker in (
+        "function rrgTooltip(row: SnapshotRow): string",
+        "RS-ratio ${ratio}",
+        "RS-momentum ${momentum}",
+        "S ${fmt(row.s_score)} and F ${fmt(row.f_score)}",
+        "const tooltip = rrgTooltip(row);",
+        "role=\"button\"",
+        "tabIndex={0}",
+        "onKeyDown={(event) =>",
+        "<title>{tooltip}</title>",
+        "data-tooltip={tooltip}",
+    ):
+        assert marker in chart_source
+    for marker in (
+        "function flowMagnitude(row: SnapshotRow): number",
+        "function flowTooltip(row: SnapshotRow, side: \"outflow\" | \"inflow\"): string",
+        "F-score ${fmt(row.f_score)}; CMF(21) ${fmt(row.cmf21, 2)}; S ${fmt(row.s_score)}",
+        "function flowLaneTooltip(source: SnapshotRow, target: SnapshotRow, width: number): string",
+        "<title>{flowLaneTooltip(source, target, strokeWidth)}</title>",
+        "aria-label={tooltip} data-tooltip={tooltip}",
+    ):
+        assert marker in chart_source
+    assert ".rrg-point:focus-visible circle" in css_source
+    assert "stroke-width: 3px;" in css_source
+
+
 def test_next_shell_deep_dive_fetches_cached_ticker_chart_without_fixture_data():
     api_source = (WEB / "lib" / "api.ts").read_text(encoding="utf-8")
     client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")

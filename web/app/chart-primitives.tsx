@@ -347,6 +347,14 @@ function stateColor(row: SnapshotRow) {
   return "#4f8cff";
 }
 
+function rrgTooltip(row: SnapshotRow): string {
+  const ratio = fmt(row.rs_ratio, 1);
+  const momentum = fmt(row.rs_momentum, 1);
+  const ratioReading = (row.rs_ratio ?? 100) >= 100 ? "relative strength is above the benchmark" : "relative strength is below the benchmark";
+  const momentumReading = (row.rs_momentum ?? 100) >= 100 ? "rotation momentum is improving" : "rotation momentum is fading";
+  return `${row.display_label}: ${row.quadrant} quadrant. RS-ratio ${ratio} means ${ratioReading}; RS-momentum ${momentum} means ${momentumReading}. S ${fmt(row.s_score)} and F ${fmt(row.f_score)} summarize composite and flow support.`;
+}
+
 export function RrgChart({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSelectTicker: (ticker: string) => void }) {
   const width = 680;
   const height = 420;
@@ -397,13 +405,24 @@ export function RrgChart({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSele
             { x: point.x - 1, y: point.y - 1 },
             point,
           ];
+          const tooltip = rrgTooltip(row);
           return (
             <g
               key={row.ticker}
               className="rrg-point"
               onClick={() => onSelectTicker(row.ticker)}
-              aria-label={`${row.display_label} ${row.quadrant} rotation point`}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelectTicker(row.ticker);
+                }
+              }}
+              aria-label={tooltip}
+              data-tooltip={tooltip}
             >
+              <title>{tooltip}</title>
               <polyline points={trail.map((p) => `${x(p.x)},${y(p.y)}`).join(" ")} fill="none" stroke={stateColor(row)} strokeOpacity="0.34" strokeWidth="2" />
               <line x1={pointX} x2={labelX + (anchor === "start" ? -4 : 4)} y1={pointY} y2={labelY - 3} className="label-leader" />
               <circle cx={pointX} cy={pointY} r="5" fill={stateColor(row)} />
@@ -451,6 +470,19 @@ export function MomentumBars({ rows, onSelectTicker }: { rows: SnapshotRow[]; on
   );
 }
 
+function flowMagnitude(row: SnapshotRow): number {
+  return Math.max(0.05, Math.abs(row.f_score || row.cmf21 || row.s_score));
+}
+
+function flowTooltip(row: SnapshotRow, side: "outflow" | "inflow"): string {
+  const direction = side === "inflow" ? "supporting inflow" : "weakening outflow";
+  return `${row.display_label}: ${direction}. F-score ${fmt(row.f_score)}; CMF(21) ${fmt(row.cmf21, 2)}; S ${fmt(row.s_score)}. Higher magnitude means this row is exerting more pressure in the current flow river.`;
+}
+
+function flowLaneTooltip(source: SnapshotRow, target: SnapshotRow, width: number): string {
+  return `Flow-river lane from ${source.display_label} to ${target.display_label}: relative lane width ${fmt(width, 1)} is derived from current saved F/CMF/S pressure. This is a rotation-pressure map, not a literal cash-transfer ledger.`;
+}
+
 export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
   const outflows = rows
     .filter((row) => (row.f_score < 0 || (row.cmf21 ?? 0) < 0 || row.s_score < 0))
@@ -469,12 +501,12 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
   const rightX = width - 280;
   const top = 46;
   const rowGap = 38;
-  const totalOut = outflows.reduce((total, row) => total + Math.max(0.05, Math.abs(row.f_score || row.cmf21 || row.s_score)), 0);
-  const totalIn = inflows.reduce((total, row) => total + Math.max(0.05, Math.abs(row.f_score || row.cmf21 || row.s_score)), 0);
+  const totalOut = outflows.reduce((total, row) => total + flowMagnitude(row), 0);
+  const totalIn = inflows.reduce((total, row) => total + flowMagnitude(row), 0);
   const maxMagnitude = Math.max(
     0.1,
-    ...outflows.map((row) => Math.abs(row.f_score || row.cmf21 || row.s_score)),
-    ...inflows.map((row) => Math.abs(row.f_score || row.cmf21 || row.s_score)),
+    ...outflows.map(flowMagnitude),
+    ...inflows.map(flowMagnitude),
   );
   return (
     <div className="chart-card light-card" aria-label="Flow river">
@@ -489,9 +521,9 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
         <text x="22" y="20">NET OUTFLOWS</text>
         <text x={width - 22} y="20" textAnchor="end">NET INFLOWS</text>
         {outflows.flatMap((source, sourceIndex) => {
-          const sourceMagnitude = Math.max(0.05, Math.abs(source.f_score || source.cmf21 || source.s_score));
+          const sourceMagnitude = flowMagnitude(source);
           return inflows.map((target, targetIndex) => {
-            const targetMagnitude = Math.max(0.05, Math.abs(target.f_score || target.cmf21 || target.s_score));
+            const targetMagnitude = flowMagnitude(target);
             const share = sourceMagnitude / Math.max(totalOut, 0.1) * targetMagnitude / Math.max(totalIn, 0.1);
             const y1 = top + sourceIndex * rowGap + (targetIndex - 2) * 2.4;
             const y2 = top + targetIndex * rowGap + (sourceIndex - 2) * 2.4;
@@ -504,7 +536,9 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
                 stroke="#b34a4a"
                 strokeOpacity="0.16"
                 strokeWidth={strokeWidth}
-              />
+              >
+                <title>{flowLaneTooltip(source, target, strokeWidth)}</title>
+              </path>
             );
           });
         })}
@@ -513,7 +547,7 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
           const target = inflows[index];
           const y1 = top + index * rowGap;
           const y2 = top + index * rowGap;
-          const strokeWidth = 4 + Math.abs(source.f_score || source.cmf21 || source.s_score) / maxMagnitude * 8;
+          const strokeWidth = 4 + flowMagnitude(source) / maxMagnitude * 8;
           return (
             <path
               key={`primary-${source.ticker}-${target.ticker}`}
@@ -522,28 +556,34 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
               stroke="#b34a6b"
               strokeOpacity="0.34"
               strokeWidth={strokeWidth}
-            />
+            >
+              <title>{flowLaneTooltip(source, target, strokeWidth)}</title>
+            </path>
           );
         })}
         {outflows.map((row, index) => {
           const y = top + index * rowGap;
-          const h = 12 + Math.abs(row.f_score || row.cmf21 || row.s_score) / maxMagnitude * 24;
+          const h = 12 + flowMagnitude(row) / maxMagnitude * 24;
+          const tooltip = flowTooltip(row, "outflow");
           return (
-            <g key={`out-${row.ticker}`}>
+            <g key={`out-${row.ticker}`} aria-label={tooltip} data-tooltip={tooltip}>
+              <title>{tooltip}</title>
               <rect x={leftX - 18} y={y - h / 2} width="12" height={h} fill="#b34a4a" />
               <text x={leftX - 26} y={y - 2} textAnchor="end">{row.ticker} | {row.identity}</text>
-              <text x={leftX - 26} y={y + 13} textAnchor="end" className="flow-value">-{fmt(Math.max(0.05, Math.abs(row.f_score || row.cmf21 || row.s_score)), 2)}</text>
+              <text x={leftX - 26} y={y + 13} textAnchor="end" className="flow-value">-{fmt(flowMagnitude(row), 2)}</text>
             </g>
           );
         })}
         {inflows.map((row, index) => {
           const y = top + index * rowGap;
-          const h = 12 + Math.abs(row.f_score || row.cmf21 || row.s_score) / maxMagnitude * 24;
+          const h = 12 + flowMagnitude(row) / maxMagnitude * 24;
+          const tooltip = flowTooltip(row, "inflow");
           return (
-            <g key={`in-${row.ticker}`}>
+            <g key={`in-${row.ticker}`} aria-label={tooltip} data-tooltip={tooltip}>
+              <title>{tooltip}</title>
               <rect x={rightX + 6} y={y - h / 2} width="12" height={h} fill="#1f7a4a" />
               <text x={rightX + 26} y={y - 2}>{row.ticker} | {row.identity}</text>
-              <text x={rightX + 26} y={y + 13} className="flow-value">+{fmt(Math.max(0.05, Math.abs(row.f_score || row.cmf21 || row.s_score)), 2)}</text>
+              <text x={rightX + 26} y={y + 13} className="flow-value">+{fmt(flowMagnitude(row), 2)}</text>
             </g>
           );
         })}
