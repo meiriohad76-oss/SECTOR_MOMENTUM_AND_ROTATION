@@ -38,6 +38,7 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
   - [x] Add native React A/B/C screen selection, row/card click selection, ticker focus selection, overview sorting, and rotation quadrant filtering in the Next shell.
   - [x] Add API-fed SVG chart primitives for pillar-stack heatmap rows, ticker waterfall, RRG, momentum bars, and data-derived flow river.
   - [x] Add repeatable Next screenshot QA against the C1/C2/C3 handoff PNGs with current evidence in `docs/browser-qa/next-handoff/latest`.
+  - [x] Add `?presentation=c` light Display C presentation mode so screenshot QA compares the candidate layout rather than the dark ops wrapper.
   - [ ] Match the handoff A/B/C layouts and chart primitives with browser screenshot evidence.
 - [ ] Replace Streamlit custom click/tooltip bridges with native React interactions.
   - [x] Native React interaction foundation exists in `web/app/dashboard-screens-client.tsx`.
@@ -45,6 +46,7 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - [x] Add Playwright screenshot QA against the design handoff PNG/HTML references.
   - [x] `scripts/capture_next_handoff_qa.py` captures Overview, Deep Dive, and Rotation against C1/C2/C3 references.
   - [x] `scripts/serve_next_qa_api.py` provides a QA-only read-only API fallback when FastAPI is not installed locally.
+  - [x] Latest evidence targets `http://127.0.0.1:3100/?presentation=c`; similarity scores improved to roughly 0.84-0.86 while remaining below a pixel-parity release gate.
   - [ ] Raise visual similarity through layout/pixel-parity tickets before using the similarity score as a release gate.
 - [ ] Add Pi systemd/API deployment docs and Cloudflare route plan.
 - [ ] Retire the Streamlit route only after feature parity, data parity, visual parity, and rollback path are documented.

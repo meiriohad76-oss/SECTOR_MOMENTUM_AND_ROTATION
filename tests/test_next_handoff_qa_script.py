@@ -12,9 +12,9 @@ def test_next_handoff_qa_maps_current_next_screens_to_c_handoff_refs():
         "deepdive": "C2-pillarstack-waterfall.png",
         "rotation": "C3-pillarstack-rotation.png",
     }
-    assert qa.NEXT_SCREEN_BUTTONS["overview"] == "A Overview"
-    assert qa.NEXT_SCREEN_BUTTONS["deepdive"] == "B Deep Dive"
-    assert qa.NEXT_SCREEN_BUTTONS["rotation"] == "C Rotation"
+    assert qa.NEXT_SCREEN_BUTTONS["overview"] == "Heatmap"
+    assert qa.NEXT_SCREEN_BUTTONS["deepdive"] == "Deep dive"
+    assert qa.NEXT_SCREEN_BUTTONS["rotation"] == "Rotation"
 
 
 def test_next_handoff_qa_required_text_covers_new_chart_primitives():
@@ -22,7 +22,7 @@ def test_next_handoff_qa_required_text_covers_new_chart_primitives():
 
     assert "The composite, dissected" in required["overview"]
     assert "The composite, built pillar by pillar" in required["deepdive"]
-    assert "Relative Rotation Graph" in required["rotation"]
+    assert "The rotation map" in required["rotation"]
     assert "The flow river" in required["rotation"]
 
 
@@ -40,7 +40,7 @@ def test_next_handoff_qa_cli_exposes_similarity_gate_and_next_url():
     )
 
     assert "--min-similarity" in result.stdout
-    assert qa.parse_args([]).url == "http://127.0.0.1:3000"
+    assert qa.parse_args([]).url == "http://127.0.0.1:3000/?presentation=c"
 
 
 def test_next_handoff_qa_is_not_imported_by_production_app():

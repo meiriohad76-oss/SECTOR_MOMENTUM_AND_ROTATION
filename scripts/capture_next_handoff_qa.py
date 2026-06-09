@@ -25,14 +25,14 @@ NEXT_SCREEN_REFERENCE_MAP = {
     "rotation": "C3-pillarstack-rotation.png",
 }
 NEXT_SCREEN_BUTTONS = {
-    "overview": "A Overview",
-    "deepdive": "B Deep Dive",
-    "rotation": "C Rotation",
+    "overview": "Heatmap",
+    "deepdive": "Deep dive",
+    "rotation": "Rotation",
 }
 NEXT_SCREEN_REQUIRED_TEXT = {
-    "overview": ("The composite, dissected", "LEADERS", "RISK QUEUE"),
-    "deepdive": ("The composite, built pillar by pillar", "Ticker focus", "Start at zero"),
-    "rotation": ("Relative Rotation Graph", "The flow river", "Click a row to use it as the deep-dive focus"),
+    "overview": ("The composite, dissected", "State changes", "Bullish cohort"),
+    "deepdive": ("The composite, built pillar by pillar", "FOCUS", "State machine"),
+    "rotation": ("The rotation map", "The flow river", "Flow internals"),
 }
 
 
@@ -185,7 +185,7 @@ def _write_report(output_dir: Path, report: list[dict[str, object]], *, url: str
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--url", default="http://127.0.0.1:3000")
+    parser.add_argument("--url", default="http://127.0.0.1:3000/?presentation=c")
     parser.add_argument("--output-dir", default=str(ROOT / ".tmp" / "next_handoff_qa"))
     parser.add_argument("--reference-dir", default=str(_reference_dir()))
     parser.add_argument("--screen", action="append", choices=sorted(NEXT_SCREEN_REFERENCE_MAP), help="Repeatable; defaults to all")

@@ -1,12 +1,12 @@
 {
-  "generated_at_utc": "2026-06-09T06:40:09Z",
+  "generated_at_utc": "2026-06-09T06:57:16Z",
   "reference_profile": "Momentum v2 Display C handoff: C1/C2/C3",
   "screens": [
     {
       "capture": ".tmp\\next_handoff_qa_live\\next-overview.png",
       "capture_size": [
         1440,
-        3380
+        1800
       ],
       "error": "",
       "missing_text": [],
@@ -20,18 +20,18 @@
       ],
       "required_text": [
         "The composite, dissected",
-        "LEADERS",
-        "RISK QUEUE"
+        "State changes",
+        "Bullish cohort"
       ],
-      "rms": 206.0219,
+      "rms": 35.6758,
       "screen": "overview",
-      "similarity": 0.1921
+      "similarity": 0.8601
     },
     {
       "capture": ".tmp\\next_handoff_qa_live\\next-deepdive.png",
       "capture_size": [
         1440,
-        3012
+        1800
       ],
       "error": "",
       "missing_text": [],
@@ -45,18 +45,18 @@
       ],
       "required_text": [
         "The composite, built pillar by pillar",
-        "Ticker focus",
-        "Start at zero"
+        "FOCUS",
+        "State machine"
       ],
-      "rms": 199.3559,
+      "rms": 40.0728,
       "screen": "deepdive",
-      "similarity": 0.2182
+      "similarity": 0.8429
     },
     {
       "capture": ".tmp\\next_handoff_qa_live\\next-rotation.png",
       "capture_size": [
         1440,
-        3199
+        1978
       ],
       "error": "",
       "missing_text": [],
@@ -69,14 +69,14 @@
         1790
       ],
       "required_text": [
-        "Relative Rotation Graph",
+        "The rotation map",
         "The flow river",
-        "Click a row to use it as the deep-dive focus"
+        "Flow internals"
       ],
-      "rms": 196.1457,
+      "rms": 36.1547,
       "screen": "rotation",
-      "similarity": 0.2308
+      "similarity": 0.8582
     }
   ],
-  "url": "http://127.0.0.1:3100"
+  "url": "http://127.0.0.1:3100/?presentation=c"
 }

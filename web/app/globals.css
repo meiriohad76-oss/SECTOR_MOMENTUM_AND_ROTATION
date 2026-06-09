@@ -29,6 +29,333 @@ main {
   min-height: 100vh;
 }
 
+.handoff-main {
+  background: #fbfaf8;
+  color: #1a1714;
+}
+
+.c-shell {
+  width: min(100%, 1440px);
+  min-height: 100vh;
+  margin: 0 auto;
+  color: #1a1714;
+  background: #fbfaf8;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.c-topbar {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  min-height: 60px;
+  padding: 16px 32px;
+  border-bottom: 1px solid #e6e1d8;
+}
+
+.c-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.c-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: #fbfaf8;
+  background: #12324a;
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.c-brand strong {
+  font-size: 0.95rem;
+}
+
+.c-brand span:last-child,
+.c-live,
+.c-weather span,
+.c-sec-head span {
+  color: #6a625a;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.c-tabs {
+  display: flex;
+  gap: 18px;
+  margin-left: auto;
+}
+
+.c-tabs button {
+  padding: 4px 0;
+  color: #6a625a;
+  font: inherit;
+  font-weight: 800;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.c-tabs button.selected {
+  color: #12324a;
+  border-bottom-color: #12324a;
+}
+
+.c-live {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.c-live i {
+  width: 8px;
+  height: 8px;
+  background: #20a47b;
+  border-radius: 50%;
+}
+
+.c-screen {
+  padding: 24px 32px 32px;
+}
+
+.c-weather {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  margin-bottom: 20px;
+  padding: 18px 24px;
+  background: #fff;
+  border: 1px solid #e6e1d8;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(34, 25, 14, 0.05);
+}
+
+.c-weather strong {
+  display: block;
+  margin-top: 6px;
+  color: #1a1714;
+  font-size: 1.35rem;
+  line-height: 1.15;
+}
+
+.c-weather > div:not(.c-weather-lead) strong {
+  font-size: 1.2rem;
+}
+
+.c-weather p {
+  margin: 6px 0 0;
+  color: #6a625a;
+  line-height: 1.4;
+}
+
+.c-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+}
+
+.c-right-rail {
+  display: grid;
+  align-content: start;
+  gap: 20px;
+}
+
+.c-rail-card,
+.c-gate-card,
+.c-flow-table {
+  background: #fff;
+  border: 1px solid #e6e1d8;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(34, 25, 14, 0.05);
+  overflow: hidden;
+}
+
+.c-sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e6e1d8;
+}
+
+.c-rail-card button {
+  display: grid;
+  grid-template-columns: 8px 48px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 16px;
+  color: #1a1714;
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #f0ebe3;
+  cursor: pointer;
+}
+
+.c-rail-card button:hover,
+.c-flow-table tbody tr:hover {
+  background: #f4f1ec;
+}
+
+.c-rail-card button i {
+  width: 8px;
+  height: 8px;
+  background: #d18b25;
+  border-radius: 50%;
+}
+
+.c-rail-card button span {
+  color: #6a625a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.c-rail-card button em {
+  color: #12324a;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.c-rail-card p {
+  padding: 16px;
+  color: #6a625a;
+}
+
+.c-deep-header,
+.c-rotation-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.c-deep-header h1,
+.c-rotation-head h1 {
+  margin: 0 0 8px;
+  color: #1a1714;
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.c-deep-header p,
+.c-deep-header strong,
+.c-rotation-head p {
+  display: block;
+  max-width: 850px;
+  margin: 0;
+  color: #3d362f;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.c-focus-select {
+  display: grid;
+  gap: 6px;
+  min-width: 320px;
+  color: #6a625a;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.c-focus-select select {
+  padding: 10px 12px;
+  color: #1a1714;
+  background: #fff;
+  border: 1px solid #e6e1d8;
+  border-radius: 8px;
+}
+
+.c-stat-deck {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.c-stat-deck div {
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #e6e1d8;
+  border-radius: 8px;
+}
+
+.c-stat-deck span {
+  display: block;
+  color: #6a625a;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.c-stat-deck strong {
+  display: block;
+  margin-top: 6px;
+  color: #12324a;
+  font-size: 1.2rem;
+}
+
+.c-support-grid,
+.c-rotation-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.c-gate-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 16px;
+  border-bottom: 1px solid #f0ebe3;
+}
+
+.c-gate-row span,
+.c-gate-card p {
+  color: #5d554d;
+}
+
+.c-gate-card p {
+  margin: 0;
+  padding: 16px;
+  line-height: 1.55;
+}
+
+.c-flow-table {
+  margin-top: 20px;
+}
+
+.c-flow-table table {
+  min-width: 0;
+}
+
+.c-flow-table th,
+.c-flow-table td {
+  color: #1a1714;
+  border-bottom-color: #f0ebe3;
+}
+
+.c-flow-table th {
+  color: #6a625a;
+}
+
+.c-empty {
+  padding: 32px;
+  color: #6a625a;
+}
+
 .hero-band {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);

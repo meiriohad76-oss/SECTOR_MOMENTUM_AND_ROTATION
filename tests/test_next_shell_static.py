@@ -58,7 +58,7 @@ def test_next_shell_renders_health_tables_and_provider_rail_without_fixture_mark
         "provider_",
     ):
         assert marker in combined
-    for forbidden in ("handoff", "mockup", "sample market", "XLK", "Technology sector"):
+    for forbidden in ("mockup", "sample market", "XLK", "Technology sector"):
         assert forbidden not in combined
 
 
@@ -91,6 +91,25 @@ def test_next_shell_has_native_react_interactions_for_abc_screens():
     assert ".screen-tabs" in css_source
     assert ".interactive-card" in css_source
     assert ".rotation-detail tbody tr" in css_source
+
+
+def test_next_shell_has_handoff_c_presentation_mode_for_visual_parity():
+    page_source = (WEB / "app" / "page.tsx").read_text(encoding="utf-8")
+    client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
+    css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    assert 'presentation === "c"' in page_source
+    assert 'presentation="handoff-c"' in page_source
+    assert 'type PresentationMode = "default" | "handoff-c"' in client_source
+    assert "HandoffCScreens" in client_source
+    assert "COverviewScreen" in client_source
+    assert "CDeepDiveScreen" in client_source
+    assert "CRotationScreen" in client_source
+    assert 'data-presentation="handoff-c"' in client_source
+    assert ".handoff-main" in css_source
+    assert ".c-shell" in css_source
+    assert ".c-weather" in css_source
+    assert ".c-overview-grid" in css_source
 
 
 def test_next_shell_chart_primitives_are_snapshot_driven():

@@ -7,6 +7,7 @@ import { FlowRiver, MomentumBars, PillarHeatmap, RrgChart, WaterfallChart } from
 type ScreenId = "overview" | "deepdive" | "rotation";
 type SortKey = "ticker" | "state" | "quadrant" | "s_score" | "f_score" | "rs_ratio" | "rs_momentum" | "momentum_pct" | "cmf21";
 type SortDirection = "asc" | "desc";
+type PresentationMode = "default" | "handoff-c";
 
 const SCREENS: { id: ScreenId; label: string; title: string }[] = [
   { id: "overview", label: "A", title: "Overview" },
@@ -372,7 +373,279 @@ function RotationScreen({
   );
 }
 
-export default function DashboardScreensClient({ snapshot }: { snapshot: DashboardSnapshotPayload | null }) {
+function CTopBar({
+  activeScreen,
+  setActiveScreen,
+  generatedAt,
+}: {
+  activeScreen: ScreenId;
+  setActiveScreen: (screen: ScreenId) => void;
+  generatedAt: string;
+}) {
+  const labels: { id: ScreenId; label: string }[] = [
+    { id: "overview", label: "Heatmap" },
+    { id: "rotation", label: "Rotation" },
+    { id: "deepdive", label: "Deep dive" },
+  ];
+  return (
+    <header className="c-topbar">
+      <div className="c-brand">
+        <span className="c-logo">M</span>
+        <strong>Momentum</strong>
+        <span>v2</span>
+      </div>
+      <nav className="c-tabs" aria-label="Display C screen selector">
+        {labels.map((item) => (
+          <button
+            type="button"
+            key={item.id}
+            className={activeScreen === item.id ? "selected" : ""}
+            onClick={() => setActiveScreen(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+      <div className="c-live"><i /> {generatedAt || "latest snapshot"}</div>
+    </header>
+  );
+}
+
+function CWeatherStrip({ snapshot }: { snapshot: DashboardSnapshotPayload }) {
+  const warnings = (snapshot.summary.state_counts.WARNING ?? 0) + (snapshot.summary.state_counts.EXIT ?? 0);
+  const bullish = snapshot.summary.state_counts.STAGE_2_BULLISH ?? 0;
+  const leaders = snapshot.screens.overview?.leaders ?? [];
+  const risks = snapshot.screens.overview?.risks ?? [];
+  const leadText = leaders[0]?.identity || leaders[0]?.ticker || "Leadership";
+  const riskText = risks[0]?.identity || risks[0]?.ticker || "risk queue";
+  return (
+    <section className="c-weather" aria-label="Display C weather strip">
+      <div className="c-weather-lead">
+        <span>TODAY | SAVED DASHBOARD RUN</span>
+        <strong>{leadText} leading while {riskText} carries the weakest composite pressure.</strong>
+        <p>{warnings} warning/exit rows. {bullish} bullish rows. Universe size {snapshot.summary.universe_count}.</p>
+      </div>
+      <div><span>Regime</span><strong>{snapshot.run?.metadata?.phase ? String(snapshot.run.metadata.phase) : "Current"}</strong><p>{snapshot.run?.provider || "provider"} data</p></div>
+      <div><span>Warnings</span><strong>{warnings}</strong><p>warning + exit</p></div>
+      <div><span>Breadth</span><strong>{leaders.length}</strong><p>leader rows</p></div>
+      <div><span>Universe</span><strong>{snapshot.summary.universe_count}</strong><p>{bullish} bullish</p></div>
+    </section>
+  );
+}
+
+function COverviewScreen({
+  snapshot,
+  onSelectTicker,
+  setActiveScreen,
+}: {
+  snapshot: DashboardSnapshotPayload;
+  onSelectTicker: (ticker: string) => void;
+  setActiveScreen: (screen: ScreenId) => void;
+}) {
+  const actions = snapshot.screens.overview?.actions ?? [];
+  const bullish = snapshot.rows.filter((row) => row.state === "STAGE_2_BULLISH").slice(0, 8);
+  return (
+    <section className="c-screen" aria-label="Display C heatmap overview">
+      <CWeatherStrip snapshot={snapshot} />
+      <div className="c-overview-grid">
+        <PillarHeatmap rows={snapshot.rows} onSelectTicker={(ticker) => {
+          onSelectTicker(ticker);
+          setActiveScreen("deepdive");
+        }} />
+        <aside className="c-right-rail">
+          <div className="c-rail-card">
+            <div className="c-sec-head"><strong>State changes</strong><span>latest actions</span></div>
+            {actions.slice(0, 8).map((decision) => (
+              <button
+                type="button"
+                key={`${decision.action}-${decision.ticker}`}
+                onClick={() => {
+                  onSelectTicker(decision.ticker);
+                  setActiveScreen("deepdive");
+                }}
+              >
+                <i />
+                <strong>{decision.ticker}</strong>
+                <span>{decision.action}</span>
+              </button>
+            ))}
+            {!actions.length ? <p>No saved decisions in the latest run.</p> : null}
+          </div>
+          <div className="c-rail-card">
+            <div className="c-sec-head"><strong>Bullish cohort</strong><span>{bullish.length} rows</span></div>
+            {bullish.map((row) => (
+              <button
+                type="button"
+                key={row.ticker}
+                onClick={() => {
+                  onSelectTicker(row.ticker);
+                  setActiveScreen("deepdive");
+                }}
+              >
+                <strong>{row.ticker}</strong>
+                <span>{row.identity}</span>
+                <em>{fmt(row.s_score)}</em>
+              </button>
+            ))}
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function CDeepDiveScreen({
+  snapshot,
+  selectedTicker,
+  onSelectTicker,
+}: {
+  snapshot: DashboardSnapshotPayload;
+  selectedTicker: string;
+  onSelectTicker: (ticker: string) => void;
+}) {
+  const focus = rowByTicker(snapshot.rows, selectedTicker) ?? snapshot.focus;
+  if (!focus) return <p className="c-empty">Run a dashboard refresh to persist a focus row.</p>;
+  const rank = [...snapshot.rows].sort((a, b) => b.s_score - a.s_score).findIndex((row) => row.ticker === focus.ticker) + 1;
+  const gates = [
+    ["RRG quadrant", focus.quadrant],
+    ["Momentum", fmt(focus.momentum_pct, 2)],
+    ["CMF flow", fmt(focus.cmf21, 2)],
+    ["RS ratio", fmt(focus.rs_ratio, 1)],
+    ["RS momentum", fmt(focus.rs_momentum, 1)],
+    ["State", focus.state.replaceAll("_", " ")],
+  ];
+  return (
+    <section className="c-screen" aria-label="Display C ticker deep dive">
+      <header className="c-deep-header">
+        <div>
+          <h1>{focus.ticker}</h1>
+          <p>{focus.asset_class} | {focus.identity}</p>
+          <strong>{fieldNarrative(focus)}</strong>
+        </div>
+        <label className="c-focus-select">
+          Focus
+          <select value={focus.ticker} onChange={(event) => onSelectTicker(event.target.value)}>
+            {snapshot.rows.map((row) => (
+              <option value={row.ticker} key={row.ticker}>{row.display_label}</option>
+            ))}
+          </select>
+        </label>
+      </header>
+      <div className="c-stat-deck">
+        <div><span>S-score</span><strong>{fmt(focus.s_score)}</strong></div>
+        <div><span>F-score</span><strong>{fmt(focus.f_score)}</strong></div>
+        <div><span>Momentum</span><strong>{fmt(focus.momentum_pct, 2)}</strong></div>
+        <div><span>Rank</span><strong>{rank} / {snapshot.rows.length}</strong></div>
+        <div><span>RRG</span><strong>{focus.quadrant}</strong></div>
+      </div>
+      <WaterfallChart row={focus} />
+      <div className="c-support-grid">
+        <div className="c-gate-card">
+          <div className="c-sec-head"><strong>State machine</strong><span>current gates</span></div>
+          {gates.map(([label, value]) => (
+            <div className="c-gate-row" key={label}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
+        </div>
+        <div className="c-gate-card">
+          <div className="c-sec-head"><strong>Plain-English read</strong><span>latest saved run</span></div>
+          <p>{focus.display_label} currently has S {fmt(focus.s_score)} and F {fmt(focus.f_score)}. A positive S means the pillar stack leans bullish; a negative F means flow is acting as a drag before price/trend may fully react.</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CRotationScreen({
+  snapshot,
+  selectedTicker,
+  onSelectTicker,
+  setActiveScreen,
+}: {
+  snapshot: DashboardSnapshotPayload;
+  selectedTicker: string;
+  onSelectTicker: (ticker: string) => void;
+  setActiveScreen: (screen: ScreenId) => void;
+}) {
+  const sectors = snapshot.screens.rotation?.sectors ?? [];
+  const rows = sectors.length ? sectors : snapshot.rows;
+  return (
+    <section className="c-screen" aria-label="Display C rotation and flow">
+      <header className="c-rotation-head">
+        <h1>The rotation map</h1>
+        <p>Where leadership is, where it is weakening, and which rows show the strongest flow support or pressure.</p>
+      </header>
+      <div className="c-rotation-grid">
+        <RrgChart rows={rows} onSelectTicker={(ticker) => {
+          onSelectTicker(ticker);
+          setActiveScreen("deepdive");
+        }} />
+        <MomentumBars rows={rows} onSelectTicker={(ticker) => {
+          onSelectTicker(ticker);
+          setActiveScreen("deepdive");
+        }} />
+      </div>
+      <FlowRiver rows={rows} />
+      <div className="c-flow-table">
+        <div className="c-sec-head"><strong>Flow internals</strong><span>click row for deep dive</span></div>
+        <table>
+          <thead>
+            <tr><th>Ticker</th><th>Identity</th><th>Quadrant</th><th>S</th><th>F</th><th>CMF</th></tr>
+          </thead>
+          <tbody>
+            {rows.slice(0, 12).map((row) => (
+              <tr key={row.ticker} className={row.ticker === selectedTicker ? "selected-row" : ""} onClick={() => {
+                onSelectTicker(row.ticker);
+                setActiveScreen("deepdive");
+              }}>
+                <td><strong>{row.ticker}</strong></td>
+                <td>{row.identity}</td>
+                <td>{row.quadrant}</td>
+                <td>{fmt(row.s_score)}</td>
+                <td>{fmt(row.f_score)}</td>
+                <td>{fmt(row.cmf21, 2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function HandoffCScreens({
+  snapshot,
+}: {
+  snapshot: DashboardSnapshotPayload;
+}) {
+  const [activeScreen, setActiveScreen] = useState<ScreenId>("overview");
+  const initialTicker = snapshot.focus?.ticker || snapshot.rows[0]?.ticker || "";
+  const [selectedTicker, setSelectedTicker] = useState(initialTicker);
+  return (
+    <div className="c-shell" data-presentation="handoff-c">
+      <CTopBar activeScreen={activeScreen} setActiveScreen={setActiveScreen} generatedAt={snapshot.generated_at} />
+      {activeScreen === "overview" ? (
+        <COverviewScreen snapshot={snapshot} onSelectTicker={setSelectedTicker} setActiveScreen={setActiveScreen} />
+      ) : null}
+      {activeScreen === "deepdive" ? (
+        <CDeepDiveScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} />
+      ) : null}
+      {activeScreen === "rotation" ? (
+        <CRotationScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} setActiveScreen={setActiveScreen} />
+      ) : null}
+    </div>
+  );
+}
+
+export default function DashboardScreensClient({
+  snapshot,
+  presentation = "default",
+}: {
+  snapshot: DashboardSnapshotPayload | null;
+  presentation?: PresentationMode;
+}) {
   const [activeScreen, setActiveScreen] = useState<ScreenId>("overview");
   const initialTicker = snapshot?.focus?.ticker || snapshot?.rows[0]?.ticker || "";
   const [selectedTicker, setSelectedTicker] = useState(initialTicker);
@@ -387,6 +660,10 @@ export default function DashboardScreensClient({ snapshot }: { snapshot: Dashboa
         <p className="subtle padded">{snapshot?.message || "Run a dashboard refresh to create a journal-backed snapshot."}</p>
       </section>
     );
+  }
+
+  if (presentation === "handoff-c") {
+    return <HandoffCScreens snapshot={snapshot} />;
   }
 
   return (

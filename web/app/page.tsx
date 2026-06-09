@@ -148,7 +148,19 @@ function ApiWarning({
   );
 }
 
-export default async function DashboardShell() {
+type SearchParamsValue = string | string[] | undefined;
+
+function firstParam(value: SearchParamsValue): string {
+  return Array.isArray(value) ? value[0] || "" : value || "";
+}
+
+export default async function DashboardShell({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, SearchParamsValue>>;
+}) {
+  const params = searchParams ? await searchParams : {};
+  const presentation = firstParam(params.presentation);
   const [healthResult, dataHealthResult, snapshotResult] = await Promise.all([
     fetchHealth(),
     fetchDataHealth(),
@@ -158,6 +170,14 @@ export default async function DashboardShell() {
   const snapshot = snapshotResult.data;
   const persistedLanes = laneRows(primary).filter((lane) => !lane.lane_id.startsWith("provider_"));
   const providerLanes = laneRows(primary).filter((lane) => lane.lane_id.startsWith("provider_"));
+
+  if (presentation === "c") {
+    return (
+      <main className="handoff-main">
+        <DashboardScreensClient snapshot={snapshot} presentation="handoff-c" />
+      </main>
+    );
+  }
 
   return (
     <main>
