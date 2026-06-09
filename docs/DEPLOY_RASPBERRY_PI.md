@@ -230,6 +230,16 @@ until this checklist is captured in a dated handoff or release note:
 If any item is missing, keep Streamlit as production and keep the Next route on
 the candidate hostname.
 
+You can collect the local API/Next/Streamlit and screenshot-QA evidence with:
+
+```bash
+./.venv/bin/python scripts/check_b170_retirement_readiness.py --json
+```
+
+This checker is read-only and fail-closed. It does not call Massive, FRED, FINRA,
+or any other provider; it inspects local API responses, the local Next route, the
+local Streamlit rollback route, and committed screenshot-QA reports.
+
 ### Optional public methodology landing service
 
 B-152 ships a static public landing page under `public/`. To serve it from the same Pi, install `systemd/methodology-landing.service`, adjust the user/path, and bind it to localhost port 8500:

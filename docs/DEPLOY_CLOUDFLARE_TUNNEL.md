@@ -127,6 +127,9 @@ Before any cutover, complete the B-170 Streamlit retirement readiness checklist
 in [`DEPLOY_RASPBERRY_PI.md`](DEPLOY_RASPBERRY_PI.md). A route change without
 feature parity, data parity, visual parity, operational parity, and documented
 rollback evidence is not considered a production deployment.
+Capture the local evidence with
+`./.venv/bin/python scripts/check_b170_retirement_readiness.py --json` before
+editing Cloudflare ingress.
 
 ## 6. Test the tunnel manually
 

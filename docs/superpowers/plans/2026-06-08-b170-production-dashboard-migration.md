@@ -87,6 +87,7 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
   - [x] The screenshot QA helper now hides the Next development overlay before capture and compacts duplicate snapshot sections below the local transport limit while preserving the current real row universe.
   - [ ] Raise visual similarity through layout/pixel-parity tickets before using the similarity score as a release gate.
 - [x] Add Pi systemd/API deployment docs and Cloudflare route plan.
+- [x] Add read-only `scripts/check_b170_retirement_readiness.py` evidence checker for feature, data, visual, operational, and rollback gates.
 - [ ] Retire the Streamlit route only after feature parity, data parity, visual parity, and rollback path are documented.
 
 ## Definition Of Done For This Slice
@@ -99,4 +100,5 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - The initial Next.js shell lives under `web/`, is guarded by static tests, has a committed lockfile, and passes `npm audit --omit=dev --audit-level=moderate` plus `npm run build`; Next handoff screenshot QA is repeatable for A/B/C profiles and recorded under `docs/browser-qa/next-handoff/latest`.
 - The first A/B/C React sections are backed by persisted run-journal data through `/api/v1/dashboard-snapshot`; native interaction controls, API-fed chart primitives, async cached ticker chart data for price/trend, flow, relative strength, and momentum, an API-backed portfolio analyzer with explicit saved-portfolio persistence, a read-only/collapsed Backtest Lab artifact panel, and screenshot evidence are implemented in the React shell; handoff visual parity remains a future gate.
 - Candidate Pi units and route docs exist for `sector-api` on `127.0.0.1:8000` and `sector-next` on `127.0.0.1:3000`, while Streamlit remains the production route.
+- `scripts/check_b170_retirement_readiness.py` can collect local fail-closed evidence across API health, dashboard snapshot, provider/data health, Next HTTP status, Streamlit rollback status, and screenshot-QA reports without provider calls.
 - The backlog records the migration as started, not complete.
