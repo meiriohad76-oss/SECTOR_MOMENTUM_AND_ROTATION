@@ -21,13 +21,13 @@ type PillarContribution = PillarDef & {
 };
 
 const PILLARS: PillarDef[] = [
-  { key: "mom_12_1", code: "MOM", fullName: "12-1 Momentum", label: "Momentum", hue: "#4f8cff", weight: 0.22, reading: "12-1 price momentum contribution", evidence: "Jegadeesh & Titman 1993" },
-  { key: "mansfield_rs", code: "MANS", fullName: "Mansfield RS", label: "Mansfield RS", hue: "#20a47b", weight: 0.12, reading: "relative strength against the benchmark", evidence: "Weinstein 1988" },
-  { key: "rs_ratio", code: "RS-R", fullName: "RRG RS-Ratio", label: "RS ratio", hue: "#8f6ee8", weight: 0.15, reading: "RRG relative-strength ratio", evidence: "de Kempenaer 2004" },
-  { key: "rs_momentum", code: "RS-M", fullName: "RRG RS-Momentum", label: "RS momentum", hue: "#d18b25", weight: 0.08, reading: "RRG relative-strength momentum", evidence: "classic rotation signal" },
-  { key: "breadth_50d", code: "FILT", fullName: "Binary Filters", label: "Trend filter", hue: "#61727f", weight: 0.12, reading: "market breadth and trend filter", evidence: "Faber + Stage2 + Antonacci" },
-  { key: "cycle_tilt", code: "CYC", fullName: "Business-Cycle Tilt", label: "Cycle tilt", hue: "#8e6b4e", weight: 0.08, reading: "business-cycle adjustment", evidence: "Stovall 1996 / Fidelity" },
-  { key: "cmf21", code: "FLOW", fullName: "Institutional Flow", label: "Flow", hue: "#b34a6b", weight: 0.23, reading: "money-flow pressure", evidence: "Chaikin / Granville / Chordia-Swaminathan" },
+  { key: "mom_12_1", code: "MOM", fullName: "12-1 Momentum", label: "Momentum", hue: "#2e6fa3", weight: 0.22, reading: "12-1 price momentum contribution", evidence: "Jegadeesh & Titman 1993" },
+  { key: "mansfield_rs", code: "MANS", fullName: "Mansfield RS", label: "Mansfield RS", hue: "#5d8ec0", weight: 0.12, reading: "relative strength against the benchmark", evidence: "Weinstein 1988" },
+  { key: "rs_ratio", code: "RS-R", fullName: "RRG RS-Ratio", label: "RS ratio", hue: "#3f8862", weight: 0.15, reading: "RRG relative-strength ratio", evidence: "de Kempenaer 2004" },
+  { key: "rs_momentum", code: "RS-M", fullName: "RRG RS-Momentum", label: "RS momentum", hue: "#6da884", weight: 0.08, reading: "RRG relative-strength momentum", evidence: "classic rotation signal" },
+  { key: "breadth_50d", code: "FILT", fullName: "Binary Filters", label: "Trend filter", hue: "#9d7838", weight: 0.12, reading: "market breadth and trend filter", evidence: "Faber + Stage2 + Antonacci" },
+  { key: "cycle_tilt", code: "CYC", fullName: "Business-Cycle Tilt", label: "Cycle tilt", hue: "#a85a3a", weight: 0.08, reading: "business-cycle adjustment", evidence: "Stovall 1996 / Fidelity" },
+  { key: "cmf21", code: "FLOW", fullName: "Institutional Flow", label: "Flow", hue: "#7a3a5d", weight: 0.23, reading: "money-flow pressure", evidence: "Chaikin / Granville / Chordia-Swaminathan" },
 ];
 
 const CLASS_ORDER = [
@@ -198,13 +198,13 @@ export function PillarHeatmap({
   const sortedRows = rows.slice().sort((a, b) => b.s_score - a.s_score);
   return (
     <section className="chart-card light-card pillar-heatmap-card" aria-label="Composite pillar-stack heatmap" title={sourceNote}>
-      <div className="chart-heading">
+      <div className="chart-heading c-heatmap-heading">
         <div>
           <h3>The composite, dissected</h3>
+          <span>{rows.length} instruments | sorted by S</span>
           <p>Each row IS the composite. Seven segments to the right of the midline are bullish contributions; segments to the left are bearish. Length encodes magnitude. Read the row to see why the score is what it is.</p>
         </div>
         <div className="chart-heading-meta">
-          <span>{rows.length} instruments | sorted by S</span>
           <PillarLegend />
           <span className="composition-axis-copy">bearish left | bullish right</span>
         </div>

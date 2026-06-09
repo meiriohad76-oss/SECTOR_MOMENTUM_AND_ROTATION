@@ -252,6 +252,31 @@ def test_next_shell_pillar_stack_has_native_value_specific_tooltips():
     assert "white-space: normal;" in css_source
 
 
+def test_next_shell_c1_heatmap_uses_handoff_pillar_palette_and_layout():
+    chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
+    css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    for hue in ("#2e6fa3", "#5d8ec0", "#3f8862", "#6da884", "#9d7838", "#a85a3a", "#7a3a5d"):
+        assert hue in chart_source
+    for marker in (
+        'className="chart-heading c-heatmap-heading"',
+        "{rows.length} instruments | sorted by S",
+        "PillarLegend",
+        "composition-axis-copy",
+    ):
+        assert marker in chart_source
+    for marker in (
+        ".pillar-heatmap-card",
+        "padding: 22px 28px;",
+        "background: #fff;",
+        ".c-heatmap-heading h3",
+        "grid-template-columns: 52px minmax(260px, 1fr) 78px 60px 64px;",
+        "font-family: ui-monospace, SFMono-Regular, Consolas, monospace;",
+        "border-bottom: 1px solid #e6e1d8;",
+    ):
+        assert marker in css_source
+
+
 def test_next_shell_rrg_and_flow_have_native_value_specific_tooltips():
     chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
     css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
