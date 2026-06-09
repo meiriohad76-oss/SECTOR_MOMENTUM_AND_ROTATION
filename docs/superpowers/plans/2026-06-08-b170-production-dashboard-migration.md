@@ -35,6 +35,11 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
   - `POST /api/v1/portfolio/analyze`
   - accepts single ticker, JSON holdings, CSV text, or base64 CSV/XLSX content
   - maps holdings to the latest persisted dashboard snapshot without provider fetches, scoring recompute, broker calls, or state writes
+- [x] Add React portfolio analyzer client:
+  - single ticker input
+  - pasted CSV holdings
+  - uploaded CSV/XLS/XLSX encoded client-side and sent to the API
+  - displays exposure, missing tickers, and per-holding methodology rows from the API response
 - [x] Build a React/Next.js shell that consumes `/api/v1/health` and `/api/v1/data-health`.
 - [ ] Port A/B/C overview, deep-dive, and rotation screens from the handoff artifacts.
   - [x] Add read-only `/api/v1/dashboard-snapshot` over the latest run-journal scores and decisions.
@@ -63,6 +68,6 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - The refresh runner is explicit opt-in from the API (`run_now: true`) and remains queue-only by default.
 - Data/provider-health endpoints are read-only and do not call live providers.
 - The initial Next.js shell lives under `web/`, is guarded by static tests, has a committed lockfile, and passes `npm audit --omit=dev --audit-level=moderate` plus `npm run build`; Next handoff screenshot QA is repeatable and recorded under `docs/browser-qa/next-handoff/latest`.
-- The first A/B/C React sections are backed by persisted run-journal data through `/api/v1/dashboard-snapshot`; native interaction controls, API-fed chart primitives, and screenshot evidence are implemented in the React shell; handoff visual parity remains a future gate.
+- The first A/B/C React sections are backed by persisted run-journal data through `/api/v1/dashboard-snapshot`; native interaction controls, API-fed chart primitives, an API-backed portfolio analyzer, and screenshot evidence are implemented in the React shell; handoff visual parity remains a future gate.
 - Candidate Pi units and route docs exist for `sector-api` on `127.0.0.1:8000` and `sector-next` on `127.0.0.1:3000`, while Streamlit remains the production route.
 - The backlog records the migration as started, not complete.

@@ -1,7 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { DashboardSnapshotPayload, SnapshotDecision, SnapshotPosition, SnapshotRow } from "../lib/api";
+import { analyzePortfolio } from "../lib/api";
+import type {
+  DashboardSnapshotPayload,
+  PortfolioAnalysisPayload,
+  PortfolioAnalysisRequest,
+  SnapshotDecision,
+  SnapshotPosition,
+  SnapshotRow,
+} from "../lib/api";
 import { FlowRiver, MomentumBars, PillarDetailGrid, PillarHeatmap, RrgChart, WaterfallChart } from "./chart-primitives";
 
 type ScreenId = "overview" | "deepdive" | "rotation";
@@ -41,6 +49,11 @@ function pct(value: number | null | undefined, digits = 1) {
 function money(value: number | null | undefined) {
   if (value === null || value === undefined || Number.isNaN(value)) return "n/a";
   return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+}
+
+function weightPct(value: number | null | undefined) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "n/a";
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 function payloadNumber(row: SnapshotRow, key: string): number | null {
@@ -229,6 +242,194 @@ function OverviewScreen({
       <div className="screen-chart-row">
         <PillarHeatmap rows={snapshot.rows} onSelectTicker={onSelectTicker} />
       </div>
+    </section>
+  );
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      resolve(result.includes(",") ? result.split(",").pop() || "" : result);
+    };
+    reader.onerror = () => reject(reader.error || new Error("File could not be read."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function exposureEntries(values: Record<string, number>) {
+  return Object.entries(values).sort((a, b) => b[1] - a[1]);
+}
+
+function PortfolioAnalyzerPanel({ onSelectTicker }: { onSelectTicker: (ticker: string) => void }) {
+  const [ticker, setTicker] = useState("");
+  const [csvText, setCsvText] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [fileContentBase64, setFileContentBase64] = useState("");
+  const [mode, setMode] = useState<"ticker" | "csv" | "file">("ticker");
+  const [result, setResult] = useState<PortfolioAnalysisPayload | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function submit() {
+    setError("");
+    setLoading(true);
+    const request: PortfolioAnalysisRequest = {};
+    if (mode === "file") {
+      request.file_name = fileName;
+      request.content_base64 = fileContentBase64;
+    } else if (mode === "csv") {
+      request.csv = csvText;
+    } else {
+      request.ticker = ticker;
+    }
+    const response = await analyzePortfolio(request);
+    setLoading(false);
+    if (!response.ok || !response.data) {
+      setResult(null);
+      setError(response.error || "Portfolio analysis failed.");
+      return;
+    }
+    setResult(response.data);
+    if (response.data.status === "invalid") {
+      setError(response.data.input.errors.map((item) => item.message).join(" ") || response.data.message);
+    }
+  }
+
+  return (
+    <section className="portfolio-api-panel" aria-label="Portfolio analysis API">
+      <div className="section-heading">
+        <div>
+          <h2>Analyze Ticker Or Portfolio</h2>
+          <span>API-backed methodology snapshot</span>
+        </div>
+        <div className="portfolio-mode-tabs" role="tablist" aria-label="Portfolio analysis input type">
+          {(["ticker", "csv", "file"] as const).map((item) => (
+            <button
+              type="button"
+              key={item}
+              className={mode === item ? "selected" : ""}
+              onClick={() => setMode(item)}
+              aria-pressed={mode === item}
+            >
+              {item === "ticker" ? "Ticker" : item.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="portfolio-input-grid">
+        {mode === "ticker" ? (
+          <label>
+            Ticker
+            <input
+              value={ticker}
+              onChange={(event) => setTicker(event.target.value.toUpperCase())}
+              placeholder="Enter ticker"
+              aria-label="Ticker to analyze"
+            />
+          </label>
+        ) : null}
+        {mode === "csv" ? (
+          <label className="portfolio-csv-input">
+            CSV Holdings
+            <textarea
+              value={csvText}
+              onChange={(event) => setCsvText(event.target.value)}
+              placeholder="Ticker,Weight"
+              aria-label="CSV holdings"
+            />
+          </label>
+        ) : null}
+        {mode === "file" ? (
+          <label>
+            CSV / Excel File
+            <input
+              type="file"
+              accept=".csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                if (!file) {
+                  setFileName("");
+                  setFileContentBase64("");
+                  return;
+                }
+                setFileName(file.name);
+                setFileContentBase64(await readFileAsBase64(file));
+              }}
+            />
+          </label>
+        ) : null}
+        <button type="button" className="portfolio-submit" onClick={submit} disabled={loading}>
+          {loading ? "Analyzing..." : "Analyze"}
+        </button>
+      </div>
+      {error ? <p className="portfolio-error" role="status">{error}</p> : null}
+      {result ? (
+        <div className="portfolio-results">
+          <div className="portfolio-summary-row">
+            <div><span>Status</span><strong>{result.status}</strong></div>
+            <div><span>Holdings</span><strong>{result.input.holding_count}</strong></div>
+            <div><span>Rows</span><strong>{result.summary.row_count}</strong></div>
+            <div><span>Missing</span><strong>{result.summary.missing_tickers.length}</strong></div>
+          </div>
+          <div className="portfolio-exposure-grid">
+            <div>
+              <h3>State Exposure</h3>
+              {exposureEntries(result.summary.state_exposure).map(([state, value]) => (
+                <p key={state}><span>{state}</span><strong>{weightPct(value)}</strong></p>
+              ))}
+            </div>
+            <div>
+              <h3>Class Exposure</h3>
+              {exposureEntries(result.summary.class_exposure).map(([assetClass, value]) => (
+                <p key={assetClass}><span>{assetClass}</span><strong>{weightPct(value)}</strong></p>
+              ))}
+            </div>
+          </div>
+          <div className="table-scroll portfolio-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ticker</th>
+                  <th>Weight</th>
+                  <th>State</th>
+                  <th>S</th>
+                  <th>F</th>
+                  <th>Class</th>
+                  <th>Rank</th>
+                  <th>Methodology</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.rows.map((row) => (
+                  <tr
+                    key={row.ticker}
+                    className={row.missing ? "missing-row" : ""}
+                    onClick={() => {
+                      if (!row.missing) onSelectTicker(row.ticker);
+                    }}
+                  >
+                    <td><strong>{row.ticker}</strong></td>
+                    <td>{weightPct(row.analysis_weight)}</td>
+                    <td>{row.missing ? "missing" : row.state}</td>
+                    <td>{fmt(row.s_score)}</td>
+                    <td>{fmt(row.f_score)}</td>
+                    <td>{row.asset_class || "n/a"}</td>
+                    <td>{row.rank_in_class ?? "n/a"}</td>
+                    <td>
+                      {row.missing
+                        ? row.missing_reason || "Ticker was not in the latest saved methodology universe."
+                        : `${row.selected ? "Selected" : "Not selected"}; ${row.veto ? "veto active" : "no veto"} in the latest saved snapshot.`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="portfolio-footnote">{result.message}</p>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -817,6 +1018,7 @@ export default function DashboardScreensClient({
 
   return (
     <div className="screen-stack">
+      <PortfolioAnalyzerPanel onSelectTicker={setSelectedTicker} />
       <nav className="screen-tabs" aria-label="Dashboard display selector">
         {SCREENS.map((screen) => (
           <button

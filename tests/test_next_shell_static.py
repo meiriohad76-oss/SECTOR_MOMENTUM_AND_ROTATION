@@ -33,6 +33,7 @@ def test_next_shell_fetches_real_api_health_and_data_health_paths():
     assert 'fetchDashboardApi<DashboardHealthPayload>("/api/v1/health")' in api_source
     assert 'fetchDashboardApi<DashboardHealthPayload>("/api/v1/data-health")' in api_source
     assert 'fetchDashboardApi<DashboardSnapshotPayload>(`/api/v1/dashboard-snapshot${query}`)' in api_source
+    assert 'postDashboardApi<PortfolioAnalysisPayload>("/api/v1/portfolio/analyze", payload)' in api_source
     assert 'cache: "no-store"' in api_source
     assert "fetchDashboardSnapshot()" in page_source
     assert "await Promise.all([" in page_source
@@ -40,6 +41,7 @@ def test_next_shell_fetches_real_api_health_and_data_health_paths():
     assert "export const revalidate = 0;" in page_source
     assert "fetch(" not in page_source
     assert 'fetchDashboardSnapshot(ticker?: string)' in api_source
+    assert "analyzePortfolio(payload: PortfolioAnalysisRequest)" in api_source
     assert 'fetch("' not in client_source
 
 
@@ -74,6 +76,40 @@ def test_next_shell_snapshot_sections_are_api_driven_not_hardcoded():
     assert "snapshot.screens.rotation?.sectors" in client_source
     assert "focus?.pillar_scores" in client_source
     assert "decision.rationale" in client_source
+
+
+def test_next_shell_has_api_backed_portfolio_analyzer_without_fixture_data():
+    api_source = (WEB / "lib" / "api.ts").read_text(encoding="utf-8")
+    client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
+    css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    for marker in (
+        "PortfolioAnalysisPayload",
+        "PortfolioAnalysisRequest",
+        "postDashboardApi<T>",
+        "/api/v1/portfolio/analyze",
+    ):
+        assert marker in api_source
+    for marker in (
+        "PortfolioAnalyzerPanel",
+        "Analyze Ticker Or Portfolio",
+        "readFileAsBase64",
+        "setMode",
+        "analyzePortfolio(request)",
+        "CSV Holdings",
+        "CSV / Excel File",
+        "onSelectTicker(row.ticker)",
+    ):
+        assert marker in client_source
+    for marker in (
+        ".portfolio-api-panel",
+        ".portfolio-mode-tabs",
+        ".portfolio-input-grid",
+        ".portfolio-table-wrap",
+    ):
+        assert marker in css_source
+    for forbidden in ("sample holding", "demo portfolio", "Technology sector"):
+        assert forbidden not in client_source
 
 
 def test_next_shell_has_native_react_interactions_for_abc_screens():

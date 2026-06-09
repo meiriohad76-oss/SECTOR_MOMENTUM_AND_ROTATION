@@ -131,6 +131,48 @@ export type DashboardSnapshotPayload = {
   };
 };
 
+export type PortfolioAnalysisRow = {
+  ticker: string;
+  analysis_weight: number | null;
+  input_weight: number | null;
+  market_value: number | null;
+  state: string;
+  asset_class: string;
+  s_score: number | null;
+  f_score: number | null;
+  rank_in_class: number | null;
+  selected: boolean | null;
+  veto: boolean | null;
+  missing: boolean;
+  missing_reason: string;
+};
+
+export type PortfolioAnalysisPayload = {
+  api_version: string;
+  status: "ready" | "invalid" | string;
+  message: string;
+  input: {
+    holding_count: number;
+    errors: { message: string; row_number: number | null; column: string | null }[];
+  };
+  summary: {
+    row_count: number;
+    missing_tickers: string[];
+    state_exposure: Record<string, number>;
+    class_exposure: Record<string, number>;
+    action_tickers: Record<string, string[]>;
+  };
+  rows: PortfolioAnalysisRow[];
+};
+
+export type PortfolioAnalysisRequest = {
+  ticker?: string;
+  csv?: string;
+  file_name?: string;
+  content_base64?: string;
+  holdings?: Record<string, unknown>[];
+};
+
 export type ApiResult<T> = {
   ok: boolean;
   data: T | null;
@@ -165,6 +207,27 @@ export async function fetchDashboardApi<T>(path: string): Promise<ApiResult<T>> 
   }
 }
 
+export async function postDashboardApi<T>(path: string, payload: unknown): Promise<ApiResult<T>> {
+  try {
+    const response = await fetch(endpoint(path), {
+      method: "POST",
+      cache: "no-store",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      return { ok: false, data: null, error: `HTTP ${response.status}` };
+    }
+    return { ok: true, data: (await response.json()) as T, error: "" };
+  } catch (error) {
+    return {
+      ok: false,
+      data: null,
+      error: error instanceof Error ? error.name : "FetchError"
+    };
+  }
+}
+
 export async function fetchHealth() {
   return fetchDashboardApi<DashboardHealthPayload>("/api/v1/health");
 }
@@ -176,4 +239,8 @@ export async function fetchDataHealth() {
 export async function fetchDashboardSnapshot(ticker?: string) {
   const query = ticker ? `?ticker=${encodeURIComponent(ticker)}` : "";
   return fetchDashboardApi<DashboardSnapshotPayload>(`/api/v1/dashboard-snapshot${query}`);
+}
+
+export async function analyzePortfolio(payload: PortfolioAnalysisRequest) {
+  return postDashboardApi<PortfolioAnalysisPayload>("/api/v1/portfolio/analyze", payload);
 }

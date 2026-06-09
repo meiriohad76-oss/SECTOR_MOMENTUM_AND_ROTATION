@@ -781,6 +781,170 @@ td small,
   gap: 20px;
 }
 
+.portfolio-api-panel {
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.portfolio-mode-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.portfolio-mode-tabs button,
+.portfolio-submit {
+  padding: 8px 12px;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.portfolio-mode-tabs button.selected,
+.portfolio-submit {
+  color: #061016;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.portfolio-submit:disabled {
+  cursor: progress;
+  opacity: 0.68;
+}
+
+.portfolio-input-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 14px;
+  align-items: end;
+  padding: 16px 18px;
+}
+
+.portfolio-input-grid label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.portfolio-input-grid input,
+.portfolio-input-grid textarea {
+  width: 100%;
+  padding: 10px 12px;
+  color: var(--text);
+  background: #0d1319;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.portfolio-input-grid textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.portfolio-csv-input {
+  grid-column: 1 / -1;
+}
+
+.portfolio-error {
+  margin: 0 18px 16px;
+  padding: 11px 12px;
+  color: #171200;
+  background: var(--warn);
+  border-radius: 8px;
+}
+
+.portfolio-results {
+  display: grid;
+  gap: 14px;
+  padding: 0 18px 18px;
+}
+
+.portfolio-summary-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.portfolio-summary-row div,
+.portfolio-exposure-grid > div {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.portfolio-summary-row span,
+.portfolio-exposure-grid span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.portfolio-summary-row strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--soft);
+  font-size: 1.1rem;
+}
+
+.portfolio-exposure-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.portfolio-exposure-grid h3 {
+  margin: 0 0 10px;
+  color: var(--soft);
+  font-size: 0.86rem;
+}
+
+.portfolio-exposure-grid p {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+}
+
+.portfolio-exposure-grid strong {
+  color: var(--text);
+}
+
+.portfolio-table-wrap table {
+  min-width: 960px;
+}
+
+.portfolio-table-wrap tbody tr {
+  cursor: pointer;
+}
+
+.portfolio-table-wrap tbody tr:hover {
+  background: rgba(110, 198, 255, 0.12);
+}
+
+.portfolio-table-wrap tbody tr.missing-row {
+  cursor: default;
+  opacity: 0.78;
+}
+
+.portfolio-footnote {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .screen-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1451,6 +1615,9 @@ select:focus-visible {
   .deep-grid,
   .rotation-grid,
   .screen-tabs,
+  .portfolio-input-grid,
+  .portfolio-summary-row,
+  .portfolio-exposure-grid,
   .rotation-chart-grid,
   .pillar-card-grid {
     grid-template-columns: 1fr;
