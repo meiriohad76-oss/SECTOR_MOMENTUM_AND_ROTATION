@@ -77,6 +77,7 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
   - [ ] Match the handoff A/B/C layouts and chart primitives with browser screenshot evidence.
 - [ ] Replace Streamlit custom click/tooltip bridges with native React interactions.
   - [x] Native React interaction foundation exists in `web/app/dashboard-screens-client.tsx`.
+  - [x] Native React value-specific pillar-stack tooltips exist in `web/app/chart-primitives.tsx` with viewport-bounded CSS in `web/app/globals.css`.
   - [ ] Keep Streamlit bridge in production until the React route reaches feature, data, visual, and rollback parity.
 - [x] Add Playwright screenshot QA against the design handoff PNG/HTML references.
   - [x] `scripts/capture_next_handoff_qa.py` captures Overview, Deep Dive, and Rotation against C1/C2/C3 references.

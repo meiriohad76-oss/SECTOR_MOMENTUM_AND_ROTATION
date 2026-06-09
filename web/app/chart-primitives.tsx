@@ -125,6 +125,11 @@ function pillarReading(row: SnapshotRow, pillar: PillarContribution): string {
   return `CMF flow is ${fmt(row.cmf21, 2)} and F-score is ${fmt(row.f_score, 2)}; flow can confirm or veto price strength.`;
 }
 
+function pillarTooltip(row: SnapshotRow, pillar: PillarContribution): string {
+  const sign = pillar.contribution >= 0 ? "bullish support" : "bearish drag";
+  return `${pillar.code} ${pillar.fullName} for ${row.ticker}: ${pillarReading(row, pillar)} Weight ${Math.round(pillar.weight * 100)}%; normalized input ${fmt(pillar.raw, 2)}; contribution ${fmt(pillar.contribution, 2)} (${sign}).`;
+}
+
 export function PillarStackBar({ row }: { row: SnapshotRow }) {
   const contributions = pillarContributions(row);
   const positiveTotal = contributions
@@ -153,7 +158,19 @@ export function PillarStackBar({ row }: { row: SnapshotRow }) {
           negativeOffset += width;
         }
         const style = { left: `${left}%`, width: `${width}%`, background: pillar.hue };
-        return <span key={pillar.key} className="pillar-segment" style={style} title={`${pillar.label}: ${fmt(pillar.contribution)}`} />;
+        const tooltip = pillarTooltip(row, pillar);
+        return (
+          <span
+            key={pillar.key}
+            className="pillar-segment"
+            style={style}
+            title={tooltip}
+            data-tooltip={tooltip}
+            data-pillar-code={pillar.code}
+            role="img"
+            aria-label={tooltip}
+          />
+        );
       })}
     </div>
   );
@@ -180,7 +197,7 @@ export function PillarHeatmap({
   });
   const sortedRows = rows.slice().sort((a, b) => b.s_score - a.s_score);
   return (
-    <section className="chart-card light-card" aria-label="Composite pillar-stack heatmap" title={sourceNote}>
+    <section className="chart-card light-card pillar-heatmap-card" aria-label="Composite pillar-stack heatmap" title={sourceNote}>
       <div className="chart-heading">
         <div>
           <h3>The composite, dissected</h3>

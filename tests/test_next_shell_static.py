@@ -230,6 +230,28 @@ def test_next_shell_chart_primitives_are_snapshot_driven():
     assert ".flow-river" in css_source
 
 
+def test_next_shell_pillar_stack_has_native_value_specific_tooltips():
+    chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
+    css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    assert "function pillarTooltip(row: SnapshotRow, pillar: PillarContribution): string" in chart_source
+    assert "pillarReading(row, pillar)" in chart_source
+    assert "Weight ${Math.round(pillar.weight * 100)}%" in chart_source
+    assert "normalized input ${fmt(pillar.raw, 2)}" in chart_source
+    assert "contribution ${fmt(pillar.contribution, 2)}" in chart_source
+    assert "data-tooltip={tooltip}" in chart_source
+    assert "data-pillar-code={pillar.code}" in chart_source
+    assert "aria-label={tooltip}" in chart_source
+    assert "title={tooltip}" in chart_source
+    assert 'title={`${pillar.label}: ${fmt(pillar.contribution)}`}' not in chart_source
+    assert ".pillar-heatmap-card" in css_source
+    assert ".pillar-segment[data-tooltip]::after" in css_source
+    assert "width: min(360px, calc(100vw - 48px));" in css_source
+    assert "max-width: calc(100vw - 48px);" in css_source
+    assert "overflow-wrap: break-word;" in css_source
+    assert "white-space: normal;" in css_source
+
+
 def test_next_shell_deep_dive_fetches_cached_ticker_chart_without_fixture_data():
     api_source = (WEB / "lib" / "api.ts").read_text(encoding="utf-8")
     client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
