@@ -37,11 +37,15 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
   - [x] Render first-pass journal-backed A/B/C React sections in the Next shell.
   - [x] Add native React A/B/C screen selection, row/card click selection, ticker focus selection, overview sorting, and rotation quadrant filtering in the Next shell.
   - [x] Add API-fed SVG chart primitives for pillar-stack heatmap rows, ticker waterfall, RRG, momentum bars, and data-derived flow river.
+  - [x] Add repeatable Next screenshot QA against the C1/C2/C3 handoff PNGs with current evidence in `docs/browser-qa/next-handoff/latest`.
   - [ ] Match the handoff A/B/C layouts and chart primitives with browser screenshot evidence.
 - [ ] Replace Streamlit custom click/tooltip bridges with native React interactions.
   - [x] Native React interaction foundation exists in `web/app/dashboard-screens-client.tsx`.
   - [ ] Keep Streamlit bridge in production until the React route reaches feature, data, visual, and rollback parity.
-- [ ] Add Playwright screenshot QA against the design handoff PNG/HTML references.
+- [x] Add Playwright screenshot QA against the design handoff PNG/HTML references.
+  - [x] `scripts/capture_next_handoff_qa.py` captures Overview, Deep Dive, and Rotation against C1/C2/C3 references.
+  - [x] `scripts/serve_next_qa_api.py` provides a QA-only read-only API fallback when FastAPI is not installed locally.
+  - [ ] Raise visual similarity through layout/pixel-parity tickets before using the similarity score as a release gate.
 - [ ] Add Pi systemd/API deployment docs and Cloudflare route plan.
 - [ ] Retire the Streamlit route only after feature parity, data parity, visual parity, and rollback path are documented.
 
@@ -52,6 +56,6 @@ Start by extracting pure response contracts and optional API boundaries. Do not 
 - The optional API server can be enabled after installing dependencies.
 - The refresh runner is explicit opt-in from the API (`run_now: true`) and remains queue-only by default.
 - Data/provider-health endpoints are read-only and do not call live providers.
-- The initial Next.js shell lives under `web/`, is guarded by static tests, has a committed lockfile, and passes `npm audit --omit=dev --audit-level=moderate` plus `npm run build`; browser screenshot QA remains a future gate.
-- The first A/B/C React sections are backed by persisted run-journal data through `/api/v1/dashboard-snapshot`; native interaction controls and API-fed chart primitives are implemented in the React shell; handoff visual parity remains a future gate.
+- The initial Next.js shell lives under `web/`, is guarded by static tests, has a committed lockfile, and passes `npm audit --omit=dev --audit-level=moderate` plus `npm run build`; Next handoff screenshot QA is repeatable and recorded under `docs/browser-qa/next-handoff/latest`.
+- The first A/B/C React sections are backed by persisted run-journal data through `/api/v1/dashboard-snapshot`; native interaction controls, API-fed chart primitives, and screenshot evidence are implemented in the React shell; handoff visual parity remains a future gate.
 - The backlog records the migration as started, not complete.

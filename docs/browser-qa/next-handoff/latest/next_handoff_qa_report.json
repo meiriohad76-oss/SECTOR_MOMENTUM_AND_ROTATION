@@ -1,0 +1,82 @@
+{
+  "generated_at_utc": "2026-06-09T06:40:09Z",
+  "reference_profile": "Momentum v2 Display C handoff: C1/C2/C3",
+  "screens": [
+    {
+      "capture": ".tmp\\next_handoff_qa_live\\next-overview.png",
+      "capture_size": [
+        1440,
+        3380
+      ],
+      "error": "",
+      "missing_text": [],
+      "nonblank": true,
+      "ok": true,
+      "reference": "C:\\Users\\meiri\\momentum and flow\\momentum v2\\design_handoff_momentum_v2\\media\\screens\\C1-pillarstack-heatmap.png",
+      "reference_exists": true,
+      "reference_size": [
+        1440,
+        2911
+      ],
+      "required_text": [
+        "The composite, dissected",
+        "LEADERS",
+        "RISK QUEUE"
+      ],
+      "rms": 206.0219,
+      "screen": "overview",
+      "similarity": 0.1921
+    },
+    {
+      "capture": ".tmp\\next_handoff_qa_live\\next-deepdive.png",
+      "capture_size": [
+        1440,
+        3012
+      ],
+      "error": "",
+      "missing_text": [],
+      "nonblank": true,
+      "ok": true,
+      "reference": "C:\\Users\\meiri\\momentum and flow\\momentum v2\\design_handoff_momentum_v2\\media\\screens\\C2-pillarstack-waterfall.png",
+      "reference_exists": true,
+      "reference_size": [
+        1440,
+        1526
+      ],
+      "required_text": [
+        "The composite, built pillar by pillar",
+        "Ticker focus",
+        "Start at zero"
+      ],
+      "rms": 199.3559,
+      "screen": "deepdive",
+      "similarity": 0.2182
+    },
+    {
+      "capture": ".tmp\\next_handoff_qa_live\\next-rotation.png",
+      "capture_size": [
+        1440,
+        3199
+      ],
+      "error": "",
+      "missing_text": [],
+      "nonblank": true,
+      "ok": true,
+      "reference": "C:\\Users\\meiri\\momentum and flow\\momentum v2\\design_handoff_momentum_v2\\media\\screens\\C3-pillarstack-rotation.png",
+      "reference_exists": true,
+      "reference_size": [
+        1440,
+        1790
+      ],
+      "required_text": [
+        "Relative Rotation Graph",
+        "The flow river",
+        "Click a row to use it as the deep-dive focus"
+      ],
+      "rms": 196.1457,
+      "screen": "rotation",
+      "similarity": 0.2308
+    }
+  ],
+  "url": "http://127.0.0.1:3100"
+}
