@@ -37,6 +37,7 @@ def test_next_shell_fetches_real_api_health_and_data_health_paths():
     assert 'postDashboardApi<PortfolioAnalysisPayload>("/api/v1/portfolio/analyze", payload)' in api_source
     assert 'cache: "no-store"' in api_source
     assert "fetchDashboardSnapshot()" in page_source
+    assert "fetchBacktestArtifacts()" in page_source
     assert "await Promise.all([" in page_source
     assert 'export const dynamic = "force-dynamic";' in page_source
     assert "export const revalidate = 0;" in page_source
@@ -111,6 +112,36 @@ def test_next_shell_has_api_backed_portfolio_analyzer_without_fixture_data():
     ):
         assert marker in css_source
     for forbidden in ("sample holding", "demo portfolio", "Technology sector"):
+        assert forbidden not in client_source
+
+
+def test_next_shell_has_collapsed_backtest_artifact_panel_from_api():
+    page_source = (WEB / "app" / "page.tsx").read_text(encoding="utf-8")
+    client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
+    css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    assert "fetchBacktestArtifacts" in page_source
+    assert "backtestResult.data" in page_source
+    assert "backtestError={backtestResult.error}" in page_source
+    assert "backtestArtifacts={backtestArtifacts}" in page_source
+    for marker in (
+        "BacktestArtifactPanel",
+        "BacktestArtifactsPayload",
+        '<details className="backtest-artifact-panel">',
+        "payload?.equity.rows",
+        "payload.artifacts.map",
+        "payload?.report.text",
+        "This panel reads manual backtest artifacts only.",
+    ):
+        assert marker in client_source
+    for marker in (
+        ".backtest-artifact-panel",
+        ".backtest-status-grid",
+        ".backtest-mini-chart",
+        ".backtest-report-preview",
+    ):
+        assert marker in css_source
+    for forbidden in ("sample equity", "demo backtest", "1.23"):
         assert forbidden not in client_source
 
 

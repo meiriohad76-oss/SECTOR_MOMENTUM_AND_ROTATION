@@ -1,7 +1,9 @@
 import {
+  fetchBacktestArtifacts,
   fetchDashboardSnapshot,
   fetchDataHealth,
   fetchHealth,
+  type BacktestArtifactsPayload,
   type DashboardHealthPayload,
   type HealthLane,
 } from "../lib/api";
@@ -134,18 +136,20 @@ function ProviderRail({ payload }: { payload: DashboardHealthPayload | null }) {
 function ApiWarning({
   healthError,
   dataHealthError,
-  snapshotError
+  snapshotError,
+  backtestError
 }: {
   healthError: string;
   dataHealthError: string;
   snapshotError: string;
+  backtestError: string;
 }) {
-  if (!healthError && !dataHealthError && !snapshotError) return null;
+  if (!healthError && !dataHealthError && !snapshotError && !backtestError) return null;
   return (
     <section className="api-warning" role="status">
       <strong>API connection pending</strong>
       <span>
-        Health: {healthError || "ok"} | Data health: {dataHealthError || "ok"} | Snapshot: {snapshotError || "ok"}
+        Health: {healthError || "ok"} | Data health: {dataHealthError || "ok"} | Snapshot: {snapshotError || "ok"} | Backtest: {backtestError || "ok"}
       </span>
     </section>
   );
@@ -164,13 +168,15 @@ export default async function DashboardShell({
 }) {
   const params = searchParams ? await searchParams : {};
   const presentation = firstParam(params.presentation);
-  const [healthResult, dataHealthResult, snapshotResult] = await Promise.all([
+  const [healthResult, dataHealthResult, snapshotResult, backtestResult] = await Promise.all([
     fetchHealth(),
     fetchDataHealth(),
-    fetchDashboardSnapshot()
+    fetchDashboardSnapshot(),
+    fetchBacktestArtifacts()
   ]);
   const primary = dataHealthResult.data || healthResult.data;
   const snapshot = snapshotResult.data;
+  const backtestArtifacts: BacktestArtifactsPayload | null = backtestResult.data;
   const persistedLanes = laneRows(primary).filter((lane) => !lane.lane_id.startsWith("provider_"));
   const providerLanes = laneRows(primary).filter((lane) => lane.lane_id.startsWith("provider_"));
 
@@ -189,10 +195,11 @@ export default async function DashboardShell({
         healthError={healthResult.error}
         dataHealthError={dataHealthResult.error}
         snapshotError={snapshotResult.error}
+        backtestError={backtestResult.error}
       />
       <div className="dashboard-grid">
         <div className="main-stack">
-          <DashboardScreensClient snapshot={snapshot} />
+          <DashboardScreensClient snapshot={snapshot} backtestArtifacts={backtestArtifacts} />
           <HealthTable title="Persisted Data Health" lanes={persistedLanes} />
           <HealthTable title="Provider Data Health" lanes={providerLanes} />
         </div>

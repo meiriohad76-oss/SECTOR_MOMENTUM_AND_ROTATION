@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { analyzePortfolio } from "../lib/api";
 import type {
+  BacktestArtifactsPayload,
   DashboardSnapshotPayload,
   PortfolioAnalysisPayload,
   PortfolioAnalysisRequest,
@@ -260,6 +261,90 @@ function readFileAsBase64(file: File): Promise<string> {
 
 function exposureEntries(values: Record<string, number>) {
   return Object.entries(values).sort((a, b) => b[1] - a[1]);
+}
+
+function BacktestArtifactPanel({ payload }: { payload: BacktestArtifactsPayload | null }) {
+  const rows = payload?.equity.rows ?? [];
+  const columns = payload?.equity.columns ?? [];
+  const reportText = payload?.report.text || "";
+  const reportPreview = reportText.split(/\r?\n/).filter(Boolean).slice(0, 8);
+  const numericColumns = columns.filter((column) =>
+    rows.some((row) => typeof row[column] === "number" && Number.isFinite(row[column] as number))
+  );
+  const primaryColumn = numericColumns.find((column) => column.toLowerCase().includes("method")) ?? numericColumns[0] ?? "";
+  const sampledRows = rows.length > 60
+    ? rows.filter((_, index) => index % Math.ceil(rows.length / 60) === 0).slice(0, 60)
+    : rows;
+  const values = sampledRows
+    .map((row) => (typeof row[primaryColumn] === "number" ? row[primaryColumn] as number : null))
+    .filter((value): value is number => value !== null && Number.isFinite(value));
+  const min = values.length ? Math.min(...values) : 0;
+  const max = values.length ? Math.max(...values) : 1;
+  const span = Math.max(max - min, 0.000001);
+  const points = values.map((value, index) => {
+    const x = values.length <= 1 ? 4 : 4 + (index / (values.length - 1)) * 292;
+    const y = 72 - ((value - min) / span) * 56;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+
+  return (
+    <details className="backtest-artifact-panel">
+      <summary>
+        <span>Backtest Lab</span>
+        <strong>{payload?.status || "unavailable"}</strong>
+        <em>{payload?.equity.row_count ?? 0} equity rows</em>
+      </summary>
+      {!payload ? (
+        <p className="subtle padded">Backtest artifact API data is not available yet.</p>
+      ) : (
+        <div className="backtest-artifact-body">
+          <div className="backtest-status-grid">
+            {payload.artifacts.map((artifact) => (
+              <div key={artifact.id}>
+                <span>{artifact.label}</span>
+                <strong className={statusClass(artifact.status)}>{artifact.status}</strong>
+                <small>{artifact.path} | {artifact.bytes.toLocaleString()} bytes</small>
+              </div>
+            ))}
+          </div>
+          <div className="backtest-chart-grid">
+            <div className="backtest-mini-chart">
+              <div className="section-heading compact">
+                <h3>Equity Artifact</h3>
+                <span>{primaryColumn || "no numeric series"}</span>
+              </div>
+              {points ? (
+                <svg viewBox="0 0 300 86" role="img" aria-label="Backtest equity artifact preview">
+                  <path d="M4 72H296" />
+                  <polyline points={points} />
+                </svg>
+              ) : (
+                <p className="subtle padded">No numeric equity series is available in the artifact payload.</p>
+              )}
+            </div>
+            <div className="backtest-report-preview">
+              <div className="section-heading compact">
+                <h3>Report Preview</h3>
+                <span>{payload.message}</span>
+              </div>
+              {reportPreview.length ? (
+                <ul>
+                  {reportPreview.map((line, index) => (
+                    <li key={`${index}-${line}`}>{line.replace(/^#+\s*/, "")}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="subtle padded">No report text is available in the artifact payload.</p>
+              )}
+            </div>
+          </div>
+          <p className="portfolio-footnote">
+            This panel reads manual backtest artifacts only. It does not run backtests, calibration, provider downloads, or live scoring.
+          </p>
+        </div>
+      )}
+    </details>
+  );
 }
 
 function PortfolioAnalyzerPanel({ onSelectTicker }: { onSelectTicker: (ticker: string) => void }) {
@@ -991,9 +1076,11 @@ function HandoffCScreens({
 
 export default function DashboardScreensClient({
   snapshot,
+  backtestArtifacts = null,
   presentation = "default",
 }: {
   snapshot: DashboardSnapshotPayload | null;
+  backtestArtifacts?: BacktestArtifactsPayload | null;
   presentation?: PresentationMode;
 }) {
   const [activeScreen, setActiveScreen] = useState<ScreenId>("overview");
@@ -1042,6 +1129,7 @@ export default function DashboardScreensClient({
       {activeScreen === "rotation" ? (
         <RotationScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} />
       ) : null}
+      <BacktestArtifactPanel payload={backtestArtifacts} />
     </div>
   );
 }
