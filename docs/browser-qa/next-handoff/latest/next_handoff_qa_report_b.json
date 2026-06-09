@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-09T18:24:29Z",
+  "generated_at_utc": "2026-06-09T18:33:39Z",
   "profile": "b",
   "reference_profile": "Momentum v2 Display B handoff: B1/B2/B3",
   "screens": [
@@ -24,7 +24,7 @@
         "BY THE NUMBERS",
         "This week's transitions"
       ],
-      "rms": 40.1059,
+      "rms": 40.1057,
       "screen": "overview",
       "similarity": 0.8427
     },
@@ -74,9 +74,9 @@
         "Where the money is going",
         "Where the flow went"
       ],
-      "rms": 83.2425,
+      "rms": 39.4188,
       "screen": "rotation",
-      "similarity": 0.6736
+      "similarity": 0.8454
     }
   ],
   "url": "http://127.0.0.1:3100/?presentation=b&qa=shots"

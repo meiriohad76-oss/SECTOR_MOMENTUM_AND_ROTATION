@@ -1371,26 +1371,127 @@ main {
   border: 1px solid #c9bfae;
 }
 
-.b-figure-card .a-panel {
-  margin: 0;
-  color: #e8e8e8;
-  background: #111;
-}
-
 .b-figure-card > p {
   margin: 0;
   padding: 14px 18px;
 }
 
+.b-figure-card > p strong {
+  color: #1c1815;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.b-rrg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #fffbf3;
+}
+
+.b-rrg .quad.leading,
+.b-rrg .quad.improving {
+  fill: #2e7d5b;
+  opacity: 0.06;
+}
+
+.b-rrg .quad.weakening {
+  fill: #b08326;
+  opacity: 0.06;
+}
+
+.b-rrg .quad.lagging {
+  fill: #a23a1f;
+  opacity: 0.05;
+}
+
+.b-rrg .grid {
+  stroke: #e1d8c9;
+  stroke-width: 1;
+  opacity: 0.65;
+}
+
+.b-rrg .axis {
+  stroke: #3d342e;
+  stroke-width: 1.2;
+}
+
+.b-rrg .rotation-arc {
+  fill: none;
+  stroke: #b08326;
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+}
+
+.b-rrg text {
+  fill: #6e6258;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.b-rrg .annotation {
+  fill: #b08326;
+}
+
+.b-rrg-point {
+  cursor: pointer;
+}
+
+.b-rrg-point line {
+  stroke-width: 2;
+  stroke-opacity: 0.38;
+}
+
+.b-rrg-point .good {
+  fill: #2e7d5b;
+  stroke: #2e7d5b;
+}
+
+.b-rrg-point .warn {
+  fill: #b08326;
+  stroke: #b08326;
+}
+
+.b-rrg-point .bad {
+  fill: #a23a1f;
+  stroke: #a23a1f;
+}
+
+.b-rrg-point .hold {
+  fill: #597d9a;
+  stroke: #597d9a;
+}
+
+.b-rrg-point text {
+  fill: #1c1815;
+  paint-order: stroke;
+  stroke: #fffbf3;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
 .b-leaderboards {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 28px;
-  margin-top: 16px;
+  gap: 24px;
+  margin-top: 14px;
+}
+
+.b-leaderboard h3 {
+  margin: 0 0 6px;
+  color: #a23a1f;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.b-leaderboard button {
+  padding: 7px 0;
 }
 
 .b-phase-box {
-  padding: 18px 22px;
+  padding: 16px 20px;
 }
 
 .b-phase-row {
@@ -1417,11 +1518,11 @@ main {
 
 .b-flow-items {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .b-flow-items article {
-  padding: 14px 0;
+  padding: 10px 0;
   border-bottom: 1px solid #e1d8c9;
 }
 

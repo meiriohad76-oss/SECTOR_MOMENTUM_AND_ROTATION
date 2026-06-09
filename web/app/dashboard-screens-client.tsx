@@ -1682,6 +1682,67 @@ function AMomentumTerminal({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSe
   );
 }
 
+function BRrgEditorial({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSelectTicker: (ticker: string) => void }) {
+  const width = 700;
+  const height = 580;
+  const pad = 56;
+  const x = (value: number | null) => pad + (Math.max(80, Math.min(120, value ?? 100)) - 80) / 40 * (width - pad * 2);
+  const y = (value: number | null) => height - pad - (Math.max(80, Math.min(120, value ?? 100)) - 80) / 40 * (height - pad * 2);
+  return (
+    <svg className="b-rrg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Editorial relative rotation graph">
+      <rect className="quad leading" x={x(100)} y={pad} width={x(120) - x(100)} height={y(100) - pad} />
+      <rect className="quad weakening" x={x(100)} y={y(100)} width={x(120) - x(100)} height={height - pad - y(100)} />
+      <rect className="quad lagging" x={pad} y={y(100)} width={x(100) - pad} height={height - pad - y(100)} />
+      <rect className="quad improving" x={pad} y={pad} width={x(100) - pad} height={y(100) - pad} />
+      {[85, 90, 95, 105, 110, 115].map((value) => (
+        <g key={value}>
+          <line x1={x(value)} x2={x(value)} y1={pad} y2={height - pad} className="grid" />
+          <line x1={pad} x2={width - pad} y1={y(value)} y2={y(value)} className="grid" />
+        </g>
+      ))}
+      <line x1={x(100)} x2={x(100)} y1={pad} y2={height - pad} className="axis" />
+      <line x1={pad} x2={width - pad} y1={y(100)} y2={y(100)} className="axis" />
+      <path className="rotation-arc" d={`M ${x(91)} ${y(113)} C ${x(104)} ${y(117)}, ${x(113)} ${y(106)}, ${x(109)} ${y(92)}`} />
+      <text x={x(91)} y={y(114) - 8} className="annotation">this month's rotation</text>
+      <text x={pad + 10} y={pad + 18}>IMPROVING</text>
+      <text x={width - pad - 78} y={pad + 18}>LEADING</text>
+      <text x={pad + 10} y={height - pad - 10}>LAGGING</text>
+      <text x={width - pad - 94} y={height - pad - 10}>WEAKENING</text>
+      {rows.slice(0, 18).map((row, index) => {
+        const px = x(row.rs_ratio);
+        const py = y(row.rs_momentum);
+        const trailX = px - 18 + (index % 3) * 7;
+        const trailY = py + 12 - (index % 2) * 20;
+        const labelAnchor = px > width - 150 ? "end" : "start";
+        const labelX = labelAnchor === "end" ? px - 9 : px + 9;
+        return (
+          <g key={row.ticker} className="b-rrg-point" onClick={() => onSelectTicker(row.ticker)}>
+            <line x1={trailX} x2={px} y1={trailY} y2={py} className={stateToneForClass(row.state)} />
+            <circle cx={trailX} cy={trailY} r="2.5" className={stateToneForClass(row.state)} />
+            <circle cx={px} cy={py} r="6" className={stateToneForClass(row.state)} />
+            <text x={labelX} y={py - 9} textAnchor={labelAnchor}>{row.ticker}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function BLeaderboard({ title, rows, onSelectTicker }: { title: string; rows: SnapshotRow[]; onSelectTicker: (ticker: string) => void }) {
+  return (
+    <div className="b-leaderboard">
+      <h3>{title}</h3>
+      {rows.map((row) => (
+        <button type="button" key={row.ticker} onClick={() => onSelectTicker(row.ticker)}>
+          <strong>{row.ticker}</strong>
+          <span>{row.identity}</span>
+          <em className={(row.momentum_pct ?? 0) >= 0 ? "good" : "bad"}>{fmt(row.momentum_pct, 2)}</em>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function AOverviewScreen({
   snapshot,
   onSelectTicker,
@@ -2113,8 +2174,10 @@ function BRotationScreen({
 }) {
   const sectors = snapshot.screens.rotation?.sectors ?? snapshot.rows.filter((row) => row.asset_class === "US Sectors");
   const rows = sectors.length ? sectors : snapshot.rows;
-  const leaders = [...snapshot.rows].sort((a, b) => (b.momentum_pct ?? 0) - (a.momentum_pct ?? 0)).slice(0, 12);
-  const laggards = [...snapshot.rows].sort((a, b) => (a.momentum_pct ?? 0) - (b.momentum_pct ?? 0)).slice(0, 12);
+  const leaders = [...snapshot.rows].sort((a, b) => (b.momentum_pct ?? 0) - (a.momentum_pct ?? 0)).slice(0, 10);
+  const laggards = [...snapshot.rows].sort((a, b) => (a.momentum_pct ?? 0) - (b.momentum_pct ?? 0)).slice(0, 10);
+  const leadingNames = rows.filter((row) => row.quadrant === "Leading").slice(0, 3).map((row) => row.ticker).join(", ") || "leadership";
+  const weakeningNames = rows.filter((row) => row.quadrant === "Weakening").slice(0, 3).map((row) => row.ticker).join(", ") || "weakening rows";
   return (
     <section className="b-screen b-map">
       <header className="b-article-head compact">
@@ -2125,16 +2188,16 @@ function BRotationScreen({
       <div className="b-map-grid">
         <main>
           <div className="b-figure-card">
-            <ARrgTerminal rows={rows} onSelectTicker={(ticker) => {
+            <BRrgEditorial rows={rows} onSelectTicker={(ticker) => {
               onSelectTicker(ticker);
               setActiveScreen("deepdive");
             }} />
-            <p>The current saved sector rotation set contains {rows.length} rows. Selected focus is {selectedTicker}.</p>
+            <p><strong>The story of this run.</strong> {leadingNames} remain in or near leadership while {weakeningNames} show the weaker side of the clockwise rotation. The selected focus is {selectedTicker}.</p>
           </div>
           <BSectionRule title="Cross-sectional leaderboard" sub="12-1 momentum ranking, all instruments." />
           <div className="b-leaderboards">
-            <div>{leaders.map((row) => <button type="button" key={row.ticker} onClick={() => onSelectTicker(row.ticker)}><strong>{row.ticker}</strong><span>{row.identity}</span><em>{fmt(row.momentum_pct, 2)}</em></button>)}</div>
-            <div>{laggards.map((row) => <button type="button" key={row.ticker} onClick={() => onSelectTicker(row.ticker)}><strong>{row.ticker}</strong><span>{row.identity}</span><em>{fmt(row.momentum_pct, 2)}</em></button>)}</div>
+            <BLeaderboard title="LEADERS" rows={leaders} onSelectTicker={onSelectTicker} />
+            <BLeaderboard title="LAGGARDS" rows={laggards} onSelectTicker={onSelectTicker} />
           </div>
         </main>
         <aside className="b-side">
@@ -2145,7 +2208,7 @@ function BRotationScreen({
           </section>
           <BSectionRule title="Where the flow went" />
           <div className="b-flow-items">
-            {rows.slice().sort((a, b) => Math.abs(rowPressure(b)) - Math.abs(rowPressure(a))).slice(0, 5).map((row) => (
+            {rows.slice().sort((a, b) => Math.abs(rowPressure(b)) - Math.abs(rowPressure(a))).slice(0, 4).map((row) => (
               <article key={row.ticker}>
                 <h3>{row.ticker} | {row.identity}</h3>
                 <p>{flowNarrative(row)}</p>
