@@ -27,8 +27,8 @@ NEXT_SCREEN_BUTTONS = {
 
 QA_PROFILES = {
     "a": {
-        "reference_profile": "Momentum v2 Display A handoff: A1/A2/A3 baseline",
-        "default_url": "http://127.0.0.1:3000/",
+        "reference_profile": "Momentum v2 Display A handoff: A1/A2/A3",
+        "default_url": "http://127.0.0.1:3000/?presentation=a",
         "capture_prefix": "next-a",
         "buttons": NEXT_SCREEN_BUTTONS,
         "reference_map": {
@@ -37,9 +37,9 @@ QA_PROFILES = {
             "rotation": "A3-terminal-rotation.png",
         },
         "required_text": {
-            "overview": ("A | Overview", "LEADERS", "RISK QUEUE"),
-            "deepdive": ("B | Deep Dive", "Ticker focus", "The composite, built pillar by pillar"),
-            "rotation": ("C | Rotation", "Relative Rotation Graph", "The flow river"),
+            "overview": ("SENTIMENT BOARD", "7-PILLAR HEATMAP", "TRANSITIONS"),
+            "deepdive": ("DEEP DIVE", "COMPOSITE FORWARD-OUTLOOK", "STATE GATES"),
+            "rotation": ("ROTATION MAP", "INSTITUTIONAL FLOW DETAIL", "MACRO | BUSINESS CYCLE"),
         },
     },
     "b": {

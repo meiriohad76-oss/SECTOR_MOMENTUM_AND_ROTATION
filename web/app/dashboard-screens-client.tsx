@@ -13,12 +13,12 @@ import type {
   SnapshotRow,
   TickerChartPayload,
 } from "../lib/api";
-import { FlowRiver, MomentumBars, PillarDetailGrid, PillarHeatmap, RrgChart, WaterfallChart } from "./chart-primitives";
+import { FlowRiver, MomentumBars, PillarDetailGrid, PillarHeatmap, PillarStackBar, RrgChart, WaterfallChart } from "./chart-primitives";
 
 type ScreenId = "overview" | "deepdive" | "rotation";
 type SortKey = "ticker" | "state" | "quadrant" | "s_score" | "f_score" | "rs_ratio" | "rs_momentum" | "momentum_pct" | "cmf21";
 type SortDirection = "asc" | "desc";
-type PresentationMode = "default" | "handoff-c";
+type PresentationMode = "default" | "handoff-a" | "handoff-c";
 
 const SCREENS: { id: ScreenId; label: string; title: string }[] = [
   { id: "overview", label: "A", title: "Overview" },
@@ -1443,6 +1443,443 @@ function CRotationScreen({
   );
 }
 
+function ATopBar({
+  activeScreen,
+  setActiveScreen,
+  generatedAt,
+}: {
+  activeScreen: ScreenId;
+  setActiveScreen: (screen: ScreenId) => void;
+  generatedAt: string;
+}) {
+  return (
+    <header className="a-topbar">
+      <div className="a-brand"><i /> <strong>SENTIMENT BOARD</strong><span>v2 / momentum</span></div>
+      <nav className="a-tabs" aria-label="Display A screen selector">
+        {SCREENS.map((screen) => (
+          <button
+            type="button"
+            key={screen.id}
+            className={activeScreen === screen.id ? "active" : ""}
+            onClick={() => setActiveScreen(screen.id)}
+            aria-pressed={activeScreen === screen.id}
+          >
+            {screen.title}
+          </button>
+        ))}
+      </nav>
+      <div className="a-live"><i /> LIVE | {generatedAt || "latest run"}</div>
+    </header>
+  );
+}
+
+function ABlufStrip({ snapshot }: { snapshot: DashboardSnapshotPayload }) {
+  const warnings = snapshot.summary.state_counts.WARNING ?? 0;
+  const exits = snapshot.summary.state_counts.EXIT ?? 0;
+  const bearish = snapshot.summary.state_counts.BEARISH_STAGE_4 ?? 0;
+  const buys = snapshot.summary.state_counts.STAGE_2_BULLISH ?? 0;
+  const leaders = snapshot.screens.overview?.leaders ?? [];
+  const risks = snapshot.screens.overview?.risks ?? [];
+  const lead = leaders[0]?.display_label || "leadership";
+  const risk = risks[0]?.display_label || "risk queue";
+  const breadth = snapshot.summary.universe_count
+    ? Math.round((buys / snapshot.summary.universe_count) * 100)
+    : 0;
+  return (
+    <section className="a-bluf">
+      <div className="a-bluf-meta">
+        <span>BLUF | SAVED DASHBOARD RUN</span>
+        <em>{snapshot.run?.started_at_utc || snapshot.generated_at}</em>
+        <em>PROVIDER {snapshot.run?.provider || "unknown"}</em>
+      </div>
+      <p>{lead} is carrying the strongest composite setup while {risk} sits at the weakest edge of the model. This terminal view is live-data backed: counts, rows, actions, and labels come from the latest persisted run journal.</p>
+      <div className="a-bluf-numbers">
+        <strong className="bad">{exits + bearish}<span>EXIT / BEAR</span></strong>
+        <strong className="warn">{warnings}<span>WARNINGS</span></strong>
+        <strong className="good">{buys}<span>BULLISH</span></strong>
+        <i />
+        <span>UNIVERSE {snapshot.summary.universe_count} | BREADTH {breadth}%</span>
+      </div>
+    </section>
+  );
+}
+
+function AStatusStrip({ snapshot }: { snapshot: DashboardSnapshotPayload }) {
+  const leading = snapshot.summary.quadrant_counts.Leading ?? 0;
+  const weakening = snapshot.summary.quadrant_counts.Weakening ?? 0;
+  const lagging = snapshot.summary.quadrant_counts.Lagging ?? 0;
+  const improving = snapshot.summary.quadrant_counts.Improving ?? 0;
+  const bullish = snapshot.summary.state_counts.STAGE_2_BULLISH ?? 0;
+  const warnings = snapshot.summary.state_counts.WARNING ?? 0;
+  return (
+    <section className="a-status-grid">
+      <div><span>RISK REGIME</span><strong>{warnings > bullish ? "CAUTION" : "RISK-ON"}</strong><p>{warnings} warning rows in the latest run</p></div>
+      <div><span>CYCLE PHASE</span><strong>{String(snapshot.run?.metadata?.cycle_phase || "LIVE").toUpperCase()}</strong><p>run-journal macro context</p></div>
+      <div><span>RRG MAP</span><strong>{leading}/{weakening}</strong><p>leading / weakening quadrants</p></div>
+      <div><span>BREADTH</span><strong>{improving}/{lagging}</strong><p>improving / lagging quadrants</p></div>
+    </section>
+  );
+}
+
+function ATerminalHeatmap({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSelectTicker: (ticker: string) => void }) {
+  const grouped = rows.reduce<Record<string, SnapshotRow[]>>((acc, row) => {
+    const key = row.asset_class || "Universe";
+    acc[key] = acc[key] || [];
+    acc[key].push(row);
+    return acc;
+  }, {});
+  const classNames = Object.keys(grouped).sort((a, b) => {
+    const order = ["US Sectors", "US Industries", "Countries", "Factors"];
+    const ai = order.indexOf(a);
+    const bi = order.indexOf(b);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || a.localeCompare(b);
+  });
+  return (
+    <section className="a-panel a-heatmap">
+      <div className="a-section-head"><strong>7-PILLAR HEATMAP</strong><span>composite = weighted live snapshot pillars</span><em>SORTED BY S WITHIN CLASS</em></div>
+      <div className="a-heatmap-head"><span>TKR</span><span>NOTE</span><span>STATE</span><span>7 PILLARS</span><span>S</span><span>F</span><span>MOM</span><span>RRG</span></div>
+      {classNames.map((assetClass) => {
+        const groupRows = grouped[assetClass].slice().sort((a, b) => b.s_score - a.s_score);
+        return (
+          <div key={assetClass} className="a-class-group">
+            <div className="a-class-row"><span>{assetClass.toUpperCase()}</span><i /><em>{groupRows.length} | {groupRows.filter((row) => row.s_score > 0).length} positive S</em></div>
+            {groupRows.map((row) => (
+              <button type="button" key={row.ticker} className="a-heatmap-row" onClick={() => onSelectTicker(row.ticker)}>
+                <strong className={row.s_score >= 0 ? "good" : "bad"}>{row.ticker}</strong>
+                <span>{row.identity || row.display_label}</span>
+                <em className={`a-state ${stateToneForClass(row.state)}`}>{row.state.replaceAll("_", " ")}</em>
+                <PillarStackBar row={row} />
+                <b className={row.s_score >= 0 ? "good" : "bad"}>{fmt(row.s_score)}</b>
+                <b className={row.f_score >= 0 ? "good" : "bad"}>{fmt(row.f_score)}</b>
+                <b className={(row.momentum_pct ?? 0) >= 0 ? "good" : "bad"}>{fmt(row.momentum_pct, 2)}</b>
+                <span>{row.quadrant}</span>
+              </button>
+            ))}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+function numericPillars(row: SnapshotRow): [string, number][] {
+  const entries = Object.entries(row.pillar_scores)
+    .filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]))
+    .slice(0, 7);
+  return entries.length ? entries : [
+    ["S", row.s_score],
+    ["F", row.f_score],
+    ["MOM", row.momentum_pct ?? 0],
+    ["RSR", ((row.rs_ratio ?? 100) - 100) / 100],
+    ["RSM", ((row.rs_momentum ?? 100) - 100) / 100],
+    ["CMF", row.cmf21 ?? 0],
+  ];
+}
+
+function ACompositeBreakdown({ row }: { row: SnapshotRow }) {
+  const pillars = numericPillars(row);
+  const max = Math.max(0.1, ...pillars.map(([, value]) => Math.abs(value)));
+  return (
+    <div className="a-breakdown" aria-label={`${row.ticker} terminal composite breakdown`}>
+      <div className="a-breakdown-axis"><span>bearish</span><i /><span>bullish</span></div>
+      {pillars.map(([key, value]) => {
+        const width = Math.max(4, Math.abs(value) / max * 48);
+        return (
+          <div className="a-breakdown-row" key={key}>
+            <span>{key.toUpperCase()}</span>
+            <b>
+              <i className={value >= 0 ? "good" : "bad"} style={value >= 0 ? { left: "50%", width: `${width}%` } : { left: `${50 - width}%`, width: `${width}%` }} />
+            </b>
+            <strong className={value >= 0 ? "good" : "bad"}>{fmt(value, 3)}</strong>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function APillarTerminalGrid({ row }: { row: SnapshotRow }) {
+  return (
+    <div className="a-pillar-grid" aria-label={`${row.ticker} terminal pillar detail`}>
+      {numericPillars(row).map(([key, value]) => (
+        <div key={key}>
+          <i className={value >= 0 ? "good" : "bad"} />
+          <span>{key.toUpperCase()}</span>
+          <p>{value >= 0 ? "supports" : "drags"} {row.ticker}'s composite score in the latest saved run.</p>
+          <strong className={value >= 0 ? "good" : "bad"}>{fmt(value, 3)}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function APeerRank({ rows, focusTicker, onSelectTicker }: { rows: SnapshotRow[]; focusTicker: string; onSelectTicker: (ticker: string) => void }) {
+  return (
+    <section className="a-panel">
+      <div className="a-section-head"><strong>PEERS | RANK BY S</strong><span>same asset class</span><em>{rows.length} ROWS</em></div>
+      {rows.slice(0, 14).map((row) => (
+        <button type="button" key={row.ticker} className={`a-peer-row ${row.ticker === focusTicker ? "selected" : ""}`} onClick={() => onSelectTicker(row.ticker)}>
+          <strong>{row.ticker}</strong><span>{row.identity}</span><em className={row.s_score >= 0 ? "good" : "bad"}>{fmt(row.s_score)}</em>
+        </button>
+      ))}
+    </section>
+  );
+}
+
+function ARrgTerminal({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSelectTicker: (ticker: string) => void }) {
+  const width = 760;
+  const height = 470;
+  const pad = 54;
+  const x = (value: number | null) => pad + (Math.max(70, Math.min(130, value ?? 100)) - 70) / 60 * (width - pad * 2);
+  const y = (value: number | null) => height - pad - (Math.max(70, Math.min(130, value ?? 100)) - 70) / 60 * (height - pad * 2);
+  return (
+    <section className="a-panel">
+      <div className="a-section-head"><strong>RELATIVE ROTATION GRAPH</strong><span>RS ratio x RS momentum</span><em>{rows.length} / {rows.length}</em></div>
+      <svg className="a-rrg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Display A terminal RRG">
+        <rect x={pad} y={pad} width={width - pad * 2} height={height - pad * 2} />
+        <line x1={x(100)} x2={x(100)} y1={pad} y2={height - pad} />
+        <line x1={pad} x2={width - pad} y1={y(100)} y2={y(100)} />
+        <text x={pad + 10} y={pad + 18}>IMPROVING</text>
+        <text x={width - pad - 78} y={pad + 18}>LEADING</text>
+        <text x={pad + 10} y={height - pad - 10}>LAGGING</text>
+        <text x={width - pad - 94} y={height - pad - 10}>WEAKENING</text>
+        {rows.slice(0, 28).map((row, index) => {
+          const px = x(row.rs_ratio);
+          const py = y(row.rs_momentum);
+          const tx = px - 16 + (index % 3) * 8;
+          const ty = py + 12 - (index % 2) * 24;
+          return (
+            <g key={row.ticker} onClick={() => onSelectTicker(row.ticker)} className="a-rrg-point">
+              <line x1={tx} x2={px} y1={ty} y2={py} />
+              <circle cx={px} cy={py} r="5" className={stateToneForClass(row.state)} />
+              <text x={tx} y={ty}>{row.ticker}</text>
+            </g>
+          );
+        })}
+      </svg>
+    </section>
+  );
+}
+
+function AMomentumTerminal({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSelectTicker: (ticker: string) => void }) {
+  const sorted = rows.slice().sort((a, b) => (b.momentum_pct ?? 0) - (a.momentum_pct ?? 0)).slice(0, 18);
+  const max = Math.max(0.1, ...sorted.map((row) => Math.abs(row.momentum_pct ?? 0)));
+  return (
+    <section className="a-panel">
+      <div className="a-section-head"><strong>12-1 CROSS-SECTIONAL MOMENTUM</strong><span>sorted descending</span><em>LOOKBACK 12M</em></div>
+      {sorted.map((row) => {
+        const value = row.momentum_pct ?? 0;
+        const width = Math.max(3, Math.abs(value) / max * 48);
+        return (
+          <button type="button" key={row.ticker} className="a-mom-row" onClick={() => onSelectTicker(row.ticker)}>
+            <strong>{row.ticker}</strong>
+            <span><i className={value >= 0 ? "good" : "bad"} style={value >= 0 ? { left: "50%", width: `${width}%` } : { left: `${50 - width}%`, width: `${width}%` }} /></span>
+            <em className={value >= 0 ? "good" : "bad"}>{fmt(value, 2)}</em>
+          </button>
+        );
+      })}
+    </section>
+  );
+}
+
+function AOverviewScreen({
+  snapshot,
+  onSelectTicker,
+  setActiveScreen,
+}: {
+  snapshot: DashboardSnapshotPayload;
+  onSelectTicker: (ticker: string) => void;
+  setActiveScreen: (screen: ScreenId) => void;
+}) {
+  const actions = snapshot.screens.overview?.actions ?? [];
+  const positions = snapshot.screens.overview?.positions ?? [];
+  const warningPositions = positions.filter((position) => {
+    const row = rowByTicker(snapshot.rows, position.ticker);
+    return row && ["WARNING", "EXIT", "BEARISH_STAGE_4"].includes(row.state);
+  });
+  return (
+    <section className="a-screen">
+      <ABlufStrip snapshot={snapshot} />
+      <AStatusStrip snapshot={snapshot} />
+      <div className="a-body-grid">
+        <ATerminalHeatmap rows={snapshot.rows} onSelectTicker={(ticker) => {
+          onSelectTicker(ticker);
+          setActiveScreen("deepdive");
+        }} />
+        <aside className="a-right-rail">
+          <section className="a-panel">
+            <div className="a-section-head"><strong>TRANSITIONS</strong><span>latest saved decisions</span><em>{actions.length} EVENTS</em></div>
+            {actions.slice(0, 9).map((decision) => (
+              <button type="button" className="a-transition-row" key={`${decision.ticker}-${decision.action}`} onClick={() => {
+                onSelectTicker(decision.ticker);
+                setActiveScreen("deepdive");
+              }}>
+                <i className={statusClass(decision.action)} />
+                <strong>{decision.ticker}</strong>
+                <span>{decision.action}</span>
+                <em>{decision.rationale || `state=${decision.action}`}</em>
+              </button>
+            ))}
+            {!actions.length ? <p className="a-empty">No saved decisions in the latest run.</p> : null}
+          </section>
+          <section className="a-panel">
+            <div className="a-section-head"><strong>WATCHLIST | MY POSITIONS</strong><span>saved local portfolio</span><em>{positions.length} HOLDINGS</em></div>
+            {positions.slice(0, 6).map((position) => {
+              const row = rowByTicker(snapshot.rows, position.ticker);
+              return (
+                <button type="button" className="a-position-row" key={`${position.source_name}-${position.ticker}`} onClick={() => {
+                  onSelectTicker(position.ticker);
+                  setActiveScreen("deepdive");
+                }}>
+                  <i className={stateToneForClass(row?.state || "")} />
+                  <strong>{position.ticker}</strong>
+                  <span>{position.identity}</span>
+                  <em>{row?.state.replaceAll("_", " ") || "not in universe"}</em>
+                </button>
+              );
+            })}
+            <p className="a-callout">{warningPositions.length ? `Action this week: ${warningPositions.map((position) => position.ticker).join(", ")} need review because they are in WARNING/EXIT gates.` : "No saved position is currently in a warning/exit state."}</p>
+          </section>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function ADeepDiveScreen({
+  snapshot,
+  selectedTicker,
+  onSelectTicker,
+}: {
+  snapshot: DashboardSnapshotPayload;
+  selectedTicker: string;
+  onSelectTicker: (ticker: string) => void;
+}) {
+  const focus = rowByTicker(snapshot.rows, selectedTicker) ?? snapshot.focus;
+  if (!focus) return <p className="a-empty">Run a dashboard refresh to persist a focus row.</p>;
+  const peers = snapshot.rows.filter((row) => row.asset_class === focus.asset_class).sort((a, b) => b.s_score - a.s_score);
+  const rank = peers.findIndex((row) => row.ticker === focus.ticker) + 1;
+  const gates = gateRows(focus);
+  return (
+    <section className="a-screen a-deep">
+      <header className="a-deep-head">
+        <div><span>DEEP DIVE / {focus.asset_class}</span><h1>{focus.ticker}</h1><p>{focus.identity}</p></div>
+        <em className={`a-state ${stateToneForClass(focus.state)}`}>{focus.state.replaceAll("_", " ")}</em>
+      </header>
+      <div className="a-lead-grid">
+        <section className="a-panel a-composite">
+          <div className="a-section-head"><strong>COMPOSITE FORWARD-OUTLOOK</strong><span>rank {rank || "n/a"} of {peers.length || snapshot.rows.length}</span><em>{focus.quadrant}</em></div>
+          <div className="a-big-score"><strong className={focus.s_score >= 0 ? "good" : "bad"}>{fmt(focus.s_score)}</strong><span>S-score</span><p>{fieldNarrative(focus)} The model combines momentum, trend, relative strength, macro tilt, and flow evidence from the latest saved run.</p></div>
+          <ACompositeBreakdown row={focus} />
+          <APillarTerminalGrid row={focus} />
+        </section>
+        <aside className="a-panel a-gates">
+          <div className="a-section-head"><strong>STATE GATES</strong><span>engine-derived checklist</span><em>{gates.filter((gate) => gate.ok === false).length} TRIPPED</em></div>
+          {gates.map((gate) => (
+            <div className="a-gate-row" key={gate.label}>
+              <i className={gate.ok === true ? "ok" : gate.ok === false ? "fail" : "neutral"}>{gate.ok === true ? "OK" : gate.ok === false ? "X" : "-"}</i>
+              <span>{gate.label}</span>
+              <strong>{gate.detail}</strong>
+            </div>
+          ))}
+          <p className="a-callout">Next escalation watches price below 30wMA, Mansfield RS below zero, CMF below -0.10, or RRG deterioration. Current readings: Mansfield {fmt(payloadNumber(focus, "mansfield_rs"), 2)}, CMF {fmt(focus.cmf21, 2)}, RRG {focus.quadrant}.</p>
+        </aside>
+      </div>
+      <div className="a-chart-grid">
+        <section className="a-panel">
+          <div className="a-section-head"><strong>WEEKLY PRICE vs 30-WEEK SMA</strong><span>Weinstein evidence</span><em>{passText(payloadBool(focus, "above_30wma")).toUpperCase()}</em></div>
+          <div className="a-evidence-grid">
+            <div><span>Stage</span><strong>{fmt(payloadNumber(focus, "stage"), 0)}</strong></div>
+            <div><span>Above 30wMA</span><strong>{passText(payloadBool(focus, "above_30wma"))}</strong></div>
+            <div><span>MA slope</span><strong>{passText(payloadBool(focus, "ma_slope_pos"))}</strong></div>
+            <div><span>Mansfield</span><strong>{fmt(payloadNumber(focus, "mansfield_rs"), 2)}</strong></div>
+          </div>
+          <p className="a-callout">Price and trend gates are read from the latest saved methodology snapshot. Cached chart routes remain available in the default and C deep dives.</p>
+        </section>
+        <APeerRank rows={peers} focusTicker={focus.ticker} onSelectTicker={onSelectTicker} />
+      </div>
+    </section>
+  );
+}
+
+function ARotationScreen({
+  snapshot,
+  selectedTicker,
+  onSelectTicker,
+  setActiveScreen,
+}: {
+  snapshot: DashboardSnapshotPayload;
+  selectedTicker: string;
+  onSelectTicker: (ticker: string) => void;
+  setActiveScreen: (screen: ScreenId) => void;
+}) {
+  const sectors = snapshot.screens.rotation?.sectors ?? snapshot.rows.filter((row) => row.asset_class === "US Sectors");
+  const rows = sectors.length ? sectors : snapshot.rows;
+  const flowRows = [...rows].sort((a, b) => Math.abs(rowPressure(b)) - Math.abs(rowPressure(a))).slice(0, 10);
+  return (
+    <section className="a-screen a-rotation">
+      <header className="a-rotation-head"><h1>ROTATION MAP</h1><span>{rows.length} rows | selected {selectedTicker}</span></header>
+      <div className="a-rotation-grid">
+        <ARrgTerminal rows={rows} onSelectTicker={(ticker) => {
+          onSelectTicker(ticker);
+          setActiveScreen("deepdive");
+        }} />
+        <AMomentumTerminal rows={rows} onSelectTicker={(ticker) => {
+          onSelectTicker(ticker);
+          setActiveScreen("deepdive");
+        }} />
+      </div>
+      <div className="a-lower-grid">
+        <section className="a-panel">
+          <div className="a-section-head"><strong>INSTITUTIONAL FLOW DETAIL | PILLAR 7</strong><span>CMF | F-score | composite pressure</span><em>LEADS PRICE 1-3 WK</em></div>
+          {flowRows.map((row) => (
+            <button type="button" className="a-flow-row" key={row.ticker} onClick={() => {
+              onSelectTicker(row.ticker);
+              setActiveScreen("deepdive");
+            }}>
+              <strong>{row.ticker}</strong><span>{row.identity}</span><em>{flowNarrative(row)}</em>
+            </button>
+          ))}
+        </section>
+        <section className="a-panel">
+          <div className="a-section-head"><strong>MACRO | BUSINESS CYCLE</strong><span>persisted run context</span><em>{String(snapshot.run?.metadata?.cycle_phase || "LIVE").toUpperCase()}</em></div>
+          <div className="a-macro-grid">
+            <div><span>Universe</span><strong>{snapshot.summary.universe_count}</strong></div>
+            <div><span>Leading</span><strong>{snapshot.summary.quadrant_counts.Leading ?? 0}</strong></div>
+            <div><span>Warnings</span><strong>{snapshot.summary.state_counts.WARNING ?? 0}</strong></div>
+            <div><span>Exit</span><strong>{snapshot.summary.state_counts.EXIT ?? 0}</strong></div>
+          </div>
+          <p className="a-callout">Macro context is persisted from the run journal. The rotation and flow rows on this screen are derived from current snapshot scores and gates, not static handoff fixtures.</p>
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function HandoffAScreens({
+  snapshot,
+}: {
+  snapshot: DashboardSnapshotPayload;
+}) {
+  const [activeScreen, setActiveScreen] = useState<ScreenId>("overview");
+  const initialTicker = snapshot.focus?.ticker || snapshot.rows[0]?.ticker || "";
+  const [selectedTicker, setSelectedTicker] = useState(initialTicker);
+  return (
+    <div className="a-shell" data-presentation="handoff-a">
+      <ATopBar activeScreen={activeScreen} setActiveScreen={setActiveScreen} generatedAt={snapshot.generated_at} />
+      {activeScreen === "overview" ? (
+        <AOverviewScreen snapshot={snapshot} onSelectTicker={setSelectedTicker} setActiveScreen={setActiveScreen} />
+      ) : null}
+      {activeScreen === "deepdive" ? (
+        <ADeepDiveScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} />
+      ) : null}
+      {activeScreen === "rotation" ? (
+        <ARotationScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} setActiveScreen={setActiveScreen} />
+      ) : null}
+    </div>
+  );
+}
+
 function HandoffCScreens({
   snapshot,
 }: {
@@ -1490,6 +1927,10 @@ export default function DashboardScreensClient({
         <p className="subtle padded">{snapshot?.message || "Run a dashboard refresh to create a journal-backed snapshot."}</p>
       </section>
     );
+  }
+
+  if (presentation === "handoff-a") {
+    return <HandoffAScreens snapshot={snapshot} />;
   }
 
   if (presentation === "handoff-c") {

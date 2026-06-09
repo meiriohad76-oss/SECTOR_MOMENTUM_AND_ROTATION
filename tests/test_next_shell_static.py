@@ -167,20 +167,29 @@ def test_next_shell_has_native_react_interactions_for_abc_screens():
     assert ".rotation-detail tbody tr" in css_source
 
 
-def test_next_shell_has_handoff_c_presentation_mode_for_visual_parity():
+def test_next_shell_has_handoff_presentation_modes_for_visual_parity():
     page_source = (WEB / "app" / "page.tsx").read_text(encoding="utf-8")
     client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
     css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
 
+    assert 'presentation === "a"' in page_source
     assert 'presentation === "c"' in page_source
-    assert 'presentation="handoff-c"' in page_source
-    assert 'type PresentationMode = "default" | "handoff-c"' in client_source
+    assert '"handoff-a" : "handoff-c"' in page_source
+    assert 'type PresentationMode = "default" | "handoff-a" | "handoff-c"' in client_source
+    assert "HandoffAScreens" in client_source
+    assert "AOverviewScreen" in client_source
+    assert "ADeepDiveScreen" in client_source
+    assert "ARotationScreen" in client_source
     assert "HandoffCScreens" in client_source
     assert "COverviewScreen" in client_source
     assert "CDeepDiveScreen" in client_source
     assert "CRotationScreen" in client_source
+    assert 'data-presentation="handoff-a"' in client_source
     assert 'data-presentation="handoff-c"' in client_source
     assert ".handoff-main" in css_source
+    assert ".a-shell" in css_source
+    assert ".a-bluf" in css_source
+    assert ".a-heatmap" in css_source
     assert ".c-shell" in css_source
     assert ".c-weather" in css_source
     assert ".c-overview-grid" in css_source

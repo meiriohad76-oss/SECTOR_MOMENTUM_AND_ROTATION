@@ -1,13 +1,13 @@
 {
-  "generated_at_utc": "2026-06-09T17:57:52Z",
+  "generated_at_utc": "2026-06-09T18:13:15Z",
   "profile": "a",
-  "reference_profile": "Momentum v2 Display A handoff: A1/A2/A3 baseline",
+  "reference_profile": "Momentum v2 Display A handoff: A1/A2/A3",
   "screens": [
     {
       "capture": "docs\\browser-qa\\next-handoff\\latest\\next-a-overview.png",
       "capture_size": [
         1440,
-        5625
+        3256
       ],
       "error": "",
       "missing_text": [],
@@ -20,19 +20,19 @@
         2625
       ],
       "required_text": [
-        "A | Overview",
-        "LEADERS",
-        "RISK QUEUE"
+        "SENTIMENT BOARD",
+        "7-PILLAR HEATMAP",
+        "TRANSITIONS"
       ],
-      "rms": 116.6642,
+      "rms": 40.9625,
       "screen": "overview",
-      "similarity": 0.5425
+      "similarity": 0.8394
     },
     {
       "capture": "docs\\browser-qa\\next-handoff\\latest\\next-a-deepdive.png",
       "capture_size": [
         1440,
-        2830
+        1800
       ],
       "error": "",
       "missing_text": [],
@@ -45,19 +45,19 @@
         1458
       ],
       "required_text": [
-        "B | Deep Dive",
-        "Ticker focus",
-        "The composite, built pillar by pillar"
+        "DEEP DIVE",
+        "COMPOSITE FORWARD-OUTLOOK",
+        "STATE GATES"
       ],
-      "rms": 77.5104,
+      "rms": 32.2444,
       "screen": "deepdive",
-      "similarity": 0.696
+      "similarity": 0.8736
     },
     {
       "capture": "docs\\browser-qa\\next-handoff\\latest\\next-a-rotation.png",
       "capture_size": [
         1440,
-        3605
+        1800
       ],
       "error": "",
       "missing_text": [],
@@ -70,14 +70,14 @@
         1397
       ],
       "required_text": [
-        "C | Rotation",
-        "Relative Rotation Graph",
-        "The flow river"
+        "ROTATION MAP",
+        "INSTITUTIONAL FLOW DETAIL",
+        "MACRO | BUSINESS CYCLE"
       ],
-      "rms": 100.8906,
+      "rms": 27.0646,
       "screen": "rotation",
-      "similarity": 0.6044
+      "similarity": 0.8939
     }
   ],
-  "url": "http://127.0.0.1:3100/?qa=shots"
+  "url": "http://127.0.0.1:3100/?presentation=a&qa=shots"
 }
