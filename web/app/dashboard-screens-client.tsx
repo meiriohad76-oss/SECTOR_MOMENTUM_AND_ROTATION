@@ -11,6 +11,7 @@ import type {
   SnapshotDecision,
   SnapshotPosition,
   SnapshotRow,
+  SnapshotTransition,
   TickerChartPayload,
 } from "../lib/api";
 import { FlowRiver, MomentumBars, PillarDetailGrid, PillarHeatmap, PillarStackBar, RrgChart, WaterfallChart } from "./chart-primitives";
@@ -37,6 +38,17 @@ function statusClass(status: string) {
 
 function StatusPill({ status }: { status: string }) {
   return <span className={`status-pill ${statusClass(status)}`}>{status || "unknown"}</span>;
+}
+
+function compactStateText(state: string): string {
+  const normalized = state.toUpperCase();
+  if (normalized.includes("STAGE_2") || normalized.includes("BULLISH") || normalized === "BUY") return "BULLISH";
+  if (normalized.includes("WARNING") || normalized.includes("WARN")) return "WARN";
+  if (normalized.includes("EXIT")) return "EXIT";
+  if (normalized.includes("BEAR")) return "BEAR";
+  if (normalized.includes("BASE")) return "BASE";
+  if (normalized.includes("HOLD")) return "HOLD";
+  return state.replaceAll("_", " ");
 }
 
 function fmt(value: number | null | undefined, digits = 2) {
@@ -934,6 +946,7 @@ function COverviewScreen({
   setActiveScreen: (screen: ScreenId) => void;
 }) {
   const actions = snapshot.screens.overview?.actions ?? [];
+  const transitions = snapshot.screens.overview?.transitions ?? [];
   const positions = snapshot.screens.overview?.positions ?? [];
   const bullish = snapshot.rows.filter((row) => row.state === "STAGE_2_BULLISH").slice(0, 8);
   return (
@@ -950,11 +963,25 @@ function COverviewScreen({
         />
         <aside className="c-right-rail">
           <div className="c-rail-card">
-            <div className="c-sec-head"><strong>State changes</strong><span>latest actions</span></div>
-            {actions.slice(0, 8).map((decision) => (
+            <div className="c-sec-head">
+              <strong>State changes</strong>
+              <span>{transitions.length ? `last ${Math.min(transitions.length, 8)} saved` : `${actions.length} actions`}</span>
+            </div>
+            {transitions.slice(0, 8).map((transition) => (
+              <TransitionRailRow
+                key={`${transition.ticker}-${transition.from}-${transition.to}-${transition.date}`}
+                transition={transition}
+                onSelect={(ticker) => {
+                  onSelectTicker(ticker);
+                  setActiveScreen("deepdive");
+                }}
+              />
+            ))}
+            {!transitions.length ? actions.slice(0, 8).map((decision) => (
               <button
                 type="button"
                 key={`${decision.action}-${decision.ticker}`}
+                className="c-decision-row"
                 onClick={() => {
                   onSelectTicker(decision.ticker);
                   setActiveScreen("deepdive");
@@ -964,8 +991,9 @@ function COverviewScreen({
                 <strong>{decision.ticker}</strong>
                 <span>{decision.action}</span>
               </button>
-            ))}
-            {!actions.length ? <p>No saved decisions in the latest run.</p> : null}
+            )) : null}
+            {!transitions.length && actions.length ? <p className="c-rail-empty">No saved transition rows were found in the snapshot; showing latest model actions instead.</p> : null}
+            {!transitions.length && !actions.length ? <p className="c-rail-empty">No saved transition rows or decisions are available in the latest run.</p> : null}
           </div>
           <div className="c-rail-card">
             <div className="c-sec-head">
@@ -1000,6 +1028,30 @@ function COverviewScreen({
         </aside>
       </div>
     </section>
+  );
+}
+
+function TransitionRailRow({
+  transition,
+  onSelect,
+}: {
+  transition: SnapshotTransition;
+  onSelect: (ticker: string) => void;
+}) {
+  const toLabel = compactStateText(transition.to);
+  const fromLabel = compactStateText(transition.from);
+  return (
+    <button
+      type="button"
+      className={`c-transition-row ${statusClass(transition.to)}`}
+      onClick={() => onSelect(transition.ticker)}
+      title={`${transition.ticker} transitioned ${transition.from} to ${transition.to} on ${transition.date || "unknown date"}`}
+    >
+      <i />
+      <strong>{transition.ticker}</strong>
+      <span><em>{fromLabel}</em> to {toLabel}</span>
+      <time>{transition.date || "undated"}</time>
+    </button>
   );
 }
 

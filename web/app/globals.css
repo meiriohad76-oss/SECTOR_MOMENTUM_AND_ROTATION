@@ -1907,6 +1907,18 @@ main {
   border-radius: 50%;
 }
 
+.c-rail-card button.good i {
+  background: #1f7a4a;
+}
+
+.c-rail-card button.bad i {
+  background: #b13a1f;
+}
+
+.c-rail-card button.warn i {
+  background: #a8721a;
+}
+
 .c-rail-card button span {
   color: #6a625a;
   overflow: hidden;
@@ -1918,6 +1930,14 @@ main {
   color: #12324a;
   font-style: normal;
   font-weight: 800;
+}
+
+.c-rail-card button time {
+  color: #a89e92;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.64rem;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .c-rail-card p {

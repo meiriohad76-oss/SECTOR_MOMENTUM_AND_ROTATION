@@ -77,6 +77,14 @@ export type SnapshotDecision = {
   payload: Record<string, number | string | boolean | null>;
 };
 
+export type SnapshotTransition = {
+  ticker: string;
+  identity: string;
+  from: string;
+  to: string;
+  date: string;
+};
+
 export type SnapshotPosition = {
   ticker: string;
   identity: string;
@@ -117,6 +125,7 @@ export type DashboardSnapshotPayload = {
       leaders?: SnapshotRow[];
       risks?: SnapshotRow[];
       actions?: SnapshotDecision[];
+      transitions?: SnapshotTransition[];
       positions?: SnapshotPosition[];
     };
     deepdive?: {

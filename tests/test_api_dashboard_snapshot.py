@@ -65,6 +65,7 @@ def test_latest_dashboard_snapshot_reads_scores_decisions_and_focus(tmp_path):
     payload = build_latest_dashboard_snapshot_payload(
         journal_path=journal_path,
         saved_inputs_path=tmp_path / "missing-saved-inputs.json",
+        transition_journal_path=tmp_path / "state_transitions.jsonl",
         focus_ticker="XLE",
         generated_at="2026-06-09T12:00:00+00:00",
     )
@@ -81,6 +82,61 @@ def test_latest_dashboard_snapshot_reads_scores_decisions_and_focus(tmp_path):
     assert [row["ticker"] for row in payload["screens"]["overview"]["leaders"][:2]] == ["XLK", "NVDA"]
     assert [row["ticker"] for row in payload["screens"]["rotation"]["sectors"]] == ["XLK", "XLE"]
     assert payload["screens"]["overview"]["positions"] == []
+    assert payload["screens"]["overview"]["transitions"] == []
+
+
+def test_latest_dashboard_snapshot_reads_transition_journal_for_overview(tmp_path):
+    journal_path = tmp_path / "runs.sqlite"
+    transition_journal = tmp_path / "state_transitions.jsonl"
+    append_run(
+        journal_path,
+        RunRecord(
+            run_id="run-1",
+            started_at_utc="2026-06-09T10:00:00Z",
+            provider="massive",
+            universe_count=1,
+            metadata={},
+        ),
+        scored_rows=[
+            ScoredSnapshotRecord(
+                ticker="XLK",
+                asset_class="US Sectors",
+                state="STAGE_2_BULLISH",
+                s_score=1.2,
+                f_score=0.4,
+                pillar_scores={"mom_12_1": 0.22},
+                payload={},
+            )
+        ],
+        decisions=[],
+    )
+    transition_journal.write_text(
+        "\n".join(
+            [
+                '{"ticker":"XLK","from":"WARNING","to":"STAGE_2_BULLISH","date":"2026-06-08"}',
+                '{"ticker":"XLE","from":"HOLD","to":"WARNING","date":"2026-06-09"}',
+                "not-json",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    payload = build_latest_dashboard_snapshot_payload(
+        journal_path=journal_path,
+        saved_inputs_path=tmp_path / "missing-saved-inputs.json",
+        transition_journal_path=transition_journal,
+        generated_at="2026-06-09T12:00:00+00:00",
+    )
+
+    transitions = payload["screens"]["overview"]["transitions"]
+    assert [row["ticker"] for row in transitions] == ["XLE", "XLK"]
+    assert transitions[0] == {
+        "ticker": "XLE",
+        "identity": "Energy sector",
+        "from": "HOLD",
+        "to": "WARNING",
+        "date": "2026-06-09",
+    }
 
 
 def test_latest_dashboard_snapshot_reads_saved_portfolio_positions(tmp_path):

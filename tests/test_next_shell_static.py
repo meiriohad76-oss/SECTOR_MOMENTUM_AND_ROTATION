@@ -312,7 +312,18 @@ def test_next_shell_c_weather_strip_uses_handoff_outer_band_and_inner_card():
 
 
 def test_next_shell_c1_right_rail_uses_handoff_padded_cards():
+    client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
     css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    for marker in (
+        "const transitions = snapshot.screens.overview?.transitions ?? [];",
+        "<TransitionRailRow",
+        "No saved transition rows were found in the snapshot; showing latest model actions instead.",
+        "function TransitionRailRow",
+        "transitioned ${transition.from} to ${transition.to}",
+        "<time>{transition.date || \"undated\"}</time>",
+    ):
+        assert marker in client_source
 
     for marker in (
         ".c-right-rail .c-rail-card",
@@ -321,6 +332,9 @@ def test_next_shell_c1_right_rail_uses_handoff_padded_cards():
         "grid-template-columns: 8px 44px minmax(0, 1fr) auto;",
         "grid-template-columns: 48px minmax(0, 1fr) auto;",
         "padding: 10px 0;",
+        ".c-rail-card button.good i",
+        ".c-rail-card button.bad i",
+        ".c-rail-card button time",
     ):
         assert marker in css_source
 

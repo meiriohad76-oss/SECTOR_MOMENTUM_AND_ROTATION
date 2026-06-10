@@ -3,12 +3,19 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime, timezone
+import json
+import os
 from pathlib import Path
 from typing import Any, Mapping
 
 from .run_journal import DEFAULT_JOURNAL_PATH, list_runs, load_run_details
 from .saved_inputs import DEFAULT_SAVED_INPUTS_PATH, load_saved_inputs
 from .ticker_identity import ticker_display_name
+
+ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_TRANSITION_JOURNAL_PATH = Path(
+    os.environ.get("STATE_TRANSITION_JOURNAL", ROOT / "data" / "state_transitions.jsonl")
+)
 
 
 def _utc_iso() -> str:
@@ -100,6 +107,43 @@ def _decision_payload(row: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _transition_payload(row: Mapping[str, Any]) -> dict[str, Any]:
+    ticker = _clean_text(row.get("ticker")).upper()
+    return {
+        "ticker": ticker,
+        "identity": ticker_display_name(ticker) if ticker else "",
+        "from": _clean_text(row.get("from"), "UNKNOWN"),
+        "to": _clean_text(row.get("to"), "UNKNOWN"),
+        "date": _clean_text(row.get("date")),
+    }
+
+
+def _transition_sort_key(row: Mapping[str, Any]) -> tuple[str, str]:
+    return (_clean_text(row.get("date")), _clean_text(row.get("ticker")).upper())
+
+
+def _transition_payloads(path: str | Path | None = DEFAULT_TRANSITION_JOURNAL_PATH, limit: int = 25) -> list[dict[str, Any]]:
+    if path is None:
+        return []
+    journal_path = Path(path)
+    if not journal_path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in journal_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, Mapping):
+            transition = _transition_payload(parsed)
+            if transition["ticker"]:
+                rows.append(transition)
+    rows.sort(key=_transition_sort_key, reverse=True)
+    return rows[:limit]
+
+
 def _top_rows(rows: list[dict[str, Any]], reverse: bool = True, limit: int = 8) -> list[dict[str, Any]]:
     return sorted(rows, key=lambda row: float(row.get("s_score", 0.0)), reverse=reverse)[:limit]
 
@@ -140,6 +184,7 @@ def build_latest_dashboard_snapshot_payload(
     *,
     journal_path: str | Path = DEFAULT_JOURNAL_PATH,
     saved_inputs_path: str | Path | None = DEFAULT_SAVED_INPUTS_PATH,
+    transition_journal_path: str | Path | None = DEFAULT_TRANSITION_JOURNAL_PATH,
     focus_ticker: str | None = None,
     generated_at: str | None = None,
 ) -> dict[str, Any]:
@@ -160,7 +205,7 @@ def build_latest_dashboard_snapshot_payload(
             "rows": [],
             "decisions": [],
             "focus": None,
-            "screens": {"overview": {"positions": []}, "deepdive": {}, "rotation": {}},
+            "screens": {"overview": {"positions": [], "transitions": []}, "deepdive": {}, "rotation": {}},
         }
 
     details = load_run_details(journal_path, str(runs[0]["run_id"]))
@@ -182,6 +227,7 @@ def build_latest_dashboard_snapshot_payload(
     sectors = [row for row in rows if row.get("asset_class") == "US Sectors"] or rows
 
     positions = _position_payloads(saved_inputs_path)
+    transitions = _transition_payloads(transition_journal_path)
 
     return {
         "api_version": "v1",
@@ -203,6 +249,7 @@ def build_latest_dashboard_snapshot_payload(
                 "leaders": leaders,
                 "risks": risks,
                 "actions": decisions[:12],
+                "transitions": transitions,
                 "positions": positions,
             },
             "deepdive": {"focus": focus, "peer_rows": rows[:12]},
