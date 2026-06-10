@@ -12,6 +12,8 @@ from src.momentum_v2 import (
     _c_momentum_bars,
     _flow_river_html,
     _momentum_rows,
+    _board_proxy_stats,
+    _board_story,
     _state_pill,
     _terminal_momentum_bars,
     build_view_rows,
@@ -82,6 +84,41 @@ def test_build_view_rows_uses_pullback_aware_state_label():
     assert xlk.pullback_risk is True
     assert "Stage 2, Pullback Risk" in html
     assert "pullback risk is active" in " ".join(xlk.reasons)
+
+
+def test_board_story_does_not_invent_flow_leader_when_flow_scores_are_flat():
+    rows = build_view_rows(_sample_scored(), phase="MID")
+    flat_rows = [
+        row.__class__(
+            **{
+                **row.__dict__,
+                "f_score": 0.0,
+            }
+        )
+        for row in rows
+    ]
+
+    headline, body = _board_story(flat_rows)
+
+    assert "Flow sponsorship is flat" in headline
+    assert "effectively tied" in body
+    assert "not naming a real flow leader" in body
+    assert "lost flow support" not in headline
+    assert "leads sponsorship" not in headline
+
+
+def test_board_proxy_stats_separates_warning_only_from_total_risk_states():
+    scored = _sample_scored()
+    scored.loc["XLK", "state"] = "STAGE_2_BULLISH"
+    scored.loc["XLF", "state"] = "WARNING"
+    scored.loc["XLE", "state"] = "EXIT"
+    rows = build_view_rows(scored, phase="MID")
+
+    stats = {label: value for label, value, _, _ in _board_proxy_stats(rows)}
+
+    assert stats["Exit/bearish states"] == "1"
+    assert stats["Warning states"] == "1"
+    assert stats["Total risk states"] == "2"
 
 
 def test_momentum_bar_and_flow_helpers_render_empty_universe_messages():

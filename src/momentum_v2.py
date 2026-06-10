@@ -1413,14 +1413,25 @@ def _board_story(rows: list[MomentumV2Row]) -> tuple[str, str]:
     strongest_flow = max(rows, key=lambda item: item.f_score)
     weakest_state = min(rows, key=lambda item: item.s_score)
     strongest_state = max(rows, key=lambda item: item.s_score)
-    headline = f"{weakest_flow.identity} lost flow support. {strongest_flow.identity} leads sponsorship."
-    body = (
-        f"The current run ranks {_row_name(strongest_state)} highest by composite S "
-        f"({_fmt(strongest_state.s_score)}) and {_row_name(weakest_state)} lowest "
-        f"({_fmt(weakest_state.s_score)}). Flow leadership is {_row_name(strongest_flow)} "
-        f"({_fmt(strongest_flow.f_score)}), while the largest flow drag is {_row_name(weakest_flow)} "
-        f"({_fmt(weakest_flow.f_score)})."
-    )
+    flow_spread = strongest_flow.f_score - weakest_flow.f_score
+    if abs(flow_spread) < 0.05:
+        headline = f"{strongest_state.identity} leads by composite score. Flow sponsorship is flat."
+        body = (
+            f"The current run ranks {_row_name(strongest_state)} highest by composite S "
+            f"({_fmt(strongest_state.s_score)}) and {_row_name(weakest_state)} lowest "
+            f"({_fmt(weakest_state.s_score)}). Flow scores are effectively tied "
+            f"(range {_fmt(weakest_flow.f_score)} to {_fmt(strongest_flow.f_score)}), so the model is not naming "
+            "a real flow leader or flow drag for this run."
+        )
+    else:
+        headline = f"{weakest_flow.identity} lost flow support. {strongest_flow.identity} leads sponsorship."
+        body = (
+            f"The current run ranks {_row_name(strongest_state)} highest by composite S "
+            f"({_fmt(strongest_state.s_score)}) and {_row_name(weakest_state)} lowest "
+            f"({_fmt(weakest_state.s_score)}). Flow leadership is {_row_name(strongest_flow)} "
+            f"({_fmt(strongest_flow.f_score)}), while the largest flow drag is {_row_name(weakest_flow)} "
+            f"({_fmt(weakest_flow.f_score)})."
+        )
     return headline, body
 
 
@@ -1429,6 +1440,7 @@ def _board_proxy_stats(rows: list[MomentumV2Row]) -> list[tuple[str, str, str, s
         return []
     risks = _risk_rows(rows)
     exits = [row for row in risks if row.state in {"EXIT", "BEARISH_STAGE_4"}]
+    warnings_only = [row for row in rows if row.state == "WARNING"]
     bullish = [row for row in rows if row.state == "STAGE_2_BULLISH"]
     breadth = sum(row.breadth_50d for row in rows) / max(len(rows), 1)
     avg_s = sum(row.s_score for row in rows) / max(len(rows), 1)
@@ -1437,7 +1449,8 @@ def _board_proxy_stats(rows: list[MomentumV2Row]) -> list[tuple[str, str, str, s
     cmf_negative = sum(1 for row in rows if row.cmf21 < 0)
     return [
         ("Exit/bearish states", str(len(exits)), "current scored universe", "mv2-neg" if exits else "mv2-pos"),
-        ("Warning states", str(len(risks)), "current scored universe", "mv2-neg" if risks else "mv2-pos"),
+        ("Warning states", str(len(warnings_only)), "current scored universe", "mv2-neg" if warnings_only else "mv2-pos"),
+        ("Total risk states", str(len(risks)), "warning + exit + bearish", "mv2-neg" if risks else "mv2-pos"),
         ("Bullish states", str(len(bullish)), "current scored universe", "mv2-pos" if bullish else ""),
         ("Average S", _fmt(avg_s), "composite board proxy", _tone_class(avg_s)),
         ("Average F", _fmt(avg_f), "provider-flow board proxy", _tone_class(avg_f)),
