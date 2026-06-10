@@ -277,6 +277,26 @@ def test_next_shell_c1_heatmap_uses_handoff_pillar_palette_and_layout():
         assert marker in css_source
 
 
+def test_next_shell_c_topbar_uses_handoff_logo_and_controls():
+    client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
+    css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    for marker in (
+        '<span className="c-logo" aria-hidden="true">',
+        'aria-label="Refresh candidate snapshot">↻</button>',
+        'aria-label="Display mode">☾</button>',
+    ):
+        assert marker in client_source
+    for marker in (
+        "grid-template-columns: repeat(4, 3.6px);",
+        ".c-logo span:nth-child(1)",
+        "height: 16px;",
+        ".c-brand > span:last-child",
+        "margin-right: auto;",
+    ):
+        assert marker in css_source
+
+
 def test_next_shell_rrg_and_flow_have_native_value_specific_tooltips():
     chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
     css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")

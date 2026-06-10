@@ -59,23 +59,45 @@ main {
 }
 
 .c-logo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(4, 3.6px);
+  align-items: end;
+  gap: 1px;
   width: 22px;
   height: 22px;
-  color: #fbfaf8;
-  background: #12324a;
-  border-radius: 50%;
-  font-size: 0.72rem;
-  font-weight: 800;
+}
+
+.c-logo span {
+  display: block;
+  width: 3.6px;
+  border-radius: 1px;
+}
+
+.c-logo span:nth-child(1) {
+  height: 9px;
+  background: #2e6fa3;
+}
+
+.c-logo span:nth-child(2) {
+  height: 12px;
+  background: #3f8862;
+}
+
+.c-logo span:nth-child(3) {
+  height: 16px;
+  background: #9d7838;
+}
+
+.c-logo span:nth-child(4) {
+  height: 7px;
+  background: #7a3a5d;
 }
 
 .c-brand strong {
   font-size: 0.95rem;
 }
 
-.c-brand span:last-child,
+.c-brand > span:last-child,
 .c-live,
 .c-weather span,
 .c-sec-head span {
@@ -89,6 +111,7 @@ main {
   display: flex;
   gap: 18px;
   margin-left: auto;
+  margin-right: auto;
 }
 
 .c-tabs button {

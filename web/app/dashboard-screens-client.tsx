@@ -865,7 +865,12 @@ function CTopBar({
   return (
     <header className="c-topbar">
       <div className="c-brand">
-        <span className="c-logo">M</span>
+        <span className="c-logo" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+        </span>
         <strong>Momentum</strong>
         <span>v2</span>
       </div>
@@ -884,8 +889,8 @@ function CTopBar({
         <button type="button" className="inactive" aria-disabled="true">Positions</button>
       </nav>
       <div className="c-live"><i /> {generatedAt || "latest snapshot"}</div>
-      <button type="button" className="c-icon-btn" title="Refresh candidate snapshot">R</button>
-      <button type="button" className="c-icon-btn" title="Display mode">C</button>
+      <button type="button" className="c-icon-btn" title="Refresh candidate snapshot" aria-label="Refresh candidate snapshot">↻</button>
+      <button type="button" className="c-icon-btn" title="Display mode" aria-label="Display mode">☾</button>
     </header>
   );
 }
