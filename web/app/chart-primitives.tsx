@@ -577,13 +577,19 @@ function flowMagnitude(row: SnapshotRow): number {
   return Math.max(0.05, Math.abs(row.f_score || row.cmf21 || row.s_score));
 }
 
+function flowLabel(row: SnapshotRow): string {
+  const identity = row.identity || row.asset_class || "instrument";
+  const compactIdentity = identity.length > 22 ? `${identity.slice(0, 20)}...` : identity;
+  return `${row.ticker} | ${compactIdentity}`;
+}
+
 function flowTooltip(row: SnapshotRow, side: "outflow" | "inflow"): string {
   const direction = side === "inflow" ? "supporting inflow" : "weakening outflow";
   return `${row.display_label}: ${direction}. F-score ${fmt(row.f_score)}; CMF(21) ${fmt(row.cmf21, 2)}; S ${fmt(row.s_score)}. Higher magnitude means this row is exerting more pressure in the current flow river.`;
 }
 
-function flowLaneTooltip(source: SnapshotRow, target: SnapshotRow, width: number): string {
-  return `Flow-river lane from ${source.display_label} to ${target.display_label}: relative lane width ${fmt(width, 1)} is derived from current saved F/CMF/S pressure. This is a rotation-pressure map, not a literal cash-transfer ledger.`;
+function flowLaneTooltip(source: SnapshotRow, target: SnapshotRow, width: number, pressure: number): string {
+  return `Flow-river lane from ${source.display_label} to ${target.display_label}: relative pressure ${fmt(pressure, 2)} and lane width ${fmt(width, 1)} are derived from current saved F/CMF/S pressure. This is a rotation-pressure map, not a literal cash-transfer ledger.`;
 }
 
 export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
@@ -606,6 +612,7 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
   const rowGap = 38;
   const totalOut = outflows.reduce((total, row) => total + flowMagnitude(row), 0);
   const totalIn = inflows.reduce((total, row) => total + flowMagnitude(row), 0);
+  const balancedPressure = Math.min(totalOut, totalIn);
   const maxMagnitude = Math.max(
     0.1,
     ...outflows.map(flowMagnitude),
@@ -618,9 +625,16 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
           <h3>The flow river</h3>
           <p>Data-derived map from current weakest flow/score rows into strongest flow/score rows. Strand width follows relative pressure magnitude.</p>
         </div>
-        <strong>{pairCount} lanes</strong>
+        <strong>{pairCount} lanes | {fmt(balancedPressure, 2)} pressure</strong>
       </div>
       <svg className="flow-river" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Current flow river from weakening to strengthening instruments">
+        <defs>
+          <linearGradient id="flowRiverGradient" x1="0%" x2="100%" y1="0%" y2="0%">
+            <stop offset="0%" stopColor="#b34a4a" stopOpacity="0.52" />
+            <stop offset="52%" stopColor="#cfa490" stopOpacity="0.24" />
+            <stop offset="100%" stopColor="#1f7a4a" stopOpacity="0.48" />
+          </linearGradient>
+        </defs>
         <text x="22" y="20">NET OUTFLOWS</text>
         <text x={width - 22} y="20" textAnchor="end">NET INFLOWS</text>
         {outflows.flatMap((source, sourceIndex) => {
@@ -631,16 +645,17 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
             const y1 = top + sourceIndex * rowGap + (targetIndex - 2) * 2.4;
             const y2 = top + targetIndex * rowGap + (sourceIndex - 2) * 2.4;
             const strokeWidth = Math.max(1.5, share * 130);
+            const pressure = share * balancedPressure;
             return (
               <path
                 key={`${source.ticker}-${target.ticker}`}
                 d={`M ${leftX} ${y1} C ${leftX + 190} ${y1}, ${rightX - 190} ${y2}, ${rightX} ${y2}`}
                 fill="none"
-                stroke="#b34a4a"
-                strokeOpacity="0.16"
+                stroke="url(#flowRiverGradient)"
+                strokeOpacity="0.2"
                 strokeWidth={strokeWidth}
               >
-                <title>{flowLaneTooltip(source, target, strokeWidth)}</title>
+                <title>{flowLaneTooltip(source, target, strokeWidth, pressure)}</title>
               </path>
             );
           });
@@ -651,16 +666,17 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
           const y1 = top + index * rowGap;
           const y2 = top + index * rowGap;
           const strokeWidth = 4 + flowMagnitude(source) / maxMagnitude * 8;
+          const pressure = Math.min(flowMagnitude(source), flowMagnitude(target));
           return (
             <path
               key={`primary-${source.ticker}-${target.ticker}`}
               d={`M ${leftX} ${y1} C ${leftX + 190} ${y1}, ${rightX - 190} ${y2}, ${rightX} ${y2}`}
               fill="none"
-              stroke="#b34a6b"
-              strokeOpacity="0.34"
+              stroke="url(#flowRiverGradient)"
+              strokeOpacity="0.48"
               strokeWidth={strokeWidth}
             >
-              <title>{flowLaneTooltip(source, target, strokeWidth)}</title>
+              <title>{flowLaneTooltip(source, target, strokeWidth, pressure)}</title>
             </path>
           );
         })}
@@ -671,8 +687,8 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
           return (
             <g key={`out-${row.ticker}`} aria-label={tooltip} data-tooltip={tooltip}>
               <title>{tooltip}</title>
-              <rect x={leftX - 18} y={y - h / 2} width="12" height={h} fill="#b34a4a" />
-              <text x={leftX - 26} y={y - 2} textAnchor="end">{row.ticker} | {row.identity}</text>
+              <rect className="flow-out-node" x={leftX - 18} y={y - h / 2} width="12" height={h} />
+              <text x={leftX - 26} y={y - 2} textAnchor="end">{flowLabel(row)}</text>
               <text x={leftX - 26} y={y + 13} textAnchor="end" className="flow-value">-{fmt(flowMagnitude(row), 2)}</text>
             </g>
           );
@@ -684,8 +700,8 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
           return (
             <g key={`in-${row.ticker}`} aria-label={tooltip} data-tooltip={tooltip}>
               <title>{tooltip}</title>
-              <rect x={rightX + 6} y={y - h / 2} width="12" height={h} fill="#1f7a4a" />
-              <text x={rightX + 26} y={y - 2}>{row.ticker} | {row.identity}</text>
+              <rect className="flow-in-node" x={rightX + 6} y={y - h / 2} width="12" height={h} />
+              <text x={rightX + 26} y={y - 2}>{flowLabel(row)}</text>
               <text x={rightX + 26} y={y + 13} className="flow-value">+{fmt(flowMagnitude(row), 2)}</text>
             </g>
           );
@@ -694,7 +710,7 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
       </svg>
       {pairCount ? (
         <p className="flow-caption">
-          Current saved snapshot shows pressure led by {outflows[0].display_label}; support is led by {inflows[0].display_label}. Use this as a rotation map, not a literal dollar-transfer ledger.
+          Current saved snapshot shows {fmt(balancedPressure, 2)} units of opposing rotation pressure: weakest support is led by {outflows[0].display_label}, while strongest sponsorship is led by {inflows[0].display_label}. Use this as a rotation map, not a literal dollar-transfer ledger.
         </p>
       ) : null}
     </div>

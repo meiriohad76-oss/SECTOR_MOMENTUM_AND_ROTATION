@@ -230,6 +230,36 @@ def test_next_shell_chart_primitives_are_snapshot_driven():
     assert ".flow-river" in css_source
 
 
+def test_next_shell_flow_river_uses_live_pressure_summary_not_fixture_lanes():
+    chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
+    css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    for marker in (
+        "function flowLabel(row: SnapshotRow): string",
+        "const balancedPressure = Math.min(totalOut, totalIn)",
+        "flowRiverGradient",
+        "relative pressure ${fmt(pressure, 2)}",
+        "weakest support is led by {outflows[0].display_label}",
+        "strongest sponsorship is led by {inflows[0].display_label}",
+    ):
+        assert marker in chart_source
+
+    for forbidden in (
+        "Tech/Semis",
+        "Gold miners",
+        "$3.4B",
+        "scenario fixtures",
+    ):
+        assert forbidden not in chart_source
+
+    for marker in (
+        ".flow-river .flow-out-node",
+        ".flow-river .flow-in-node",
+        ".flow-river [data-tooltip]",
+    ):
+        assert marker in css_source
+
+
 def test_next_shell_pillar_stack_has_native_value_specific_tooltips():
     chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
     css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
@@ -435,8 +465,8 @@ def test_next_shell_rrg_and_flow_have_native_value_specific_tooltips():
         "function flowMagnitude(row: SnapshotRow): number",
         "function flowTooltip(row: SnapshotRow, side: \"outflow\" | \"inflow\"): string",
         "F-score ${fmt(row.f_score)}; CMF(21) ${fmt(row.cmf21, 2)}; S ${fmt(row.s_score)}",
-        "function flowLaneTooltip(source: SnapshotRow, target: SnapshotRow, width: number): string",
-        "<title>{flowLaneTooltip(source, target, strokeWidth)}</title>",
+        "function flowLaneTooltip(source: SnapshotRow, target: SnapshotRow, width: number, pressure: number): string",
+        "<title>{flowLaneTooltip(source, target, strokeWidth, pressure)}</title>",
         "aria-label={tooltip} data-tooltip={tooltip}",
     ):
         assert marker in chart_source

@@ -3606,6 +3606,18 @@ select:focus-visible {
   font-size: 11px;
 }
 
+.flow-river .flow-out-node {
+  fill: #b34a4a;
+}
+
+.flow-river .flow-in-node {
+  fill: #1f7a4a;
+}
+
+.flow-river [data-tooltip] {
+  pointer-events: bounding-box;
+}
+
 .waterfall-chart .waterfall-positive {
   fill: #1f7a4a;
   font-weight: 800;

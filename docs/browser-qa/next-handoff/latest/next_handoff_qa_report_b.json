@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-06-09T19:20:01Z",
+  "generated_at_utc": "2026-06-10T15:31:07Z",
   "profile": "b",
   "reference_profile": "Momentum v2 Display B handoff: B1/B2/B3",
   "screens": [
@@ -24,7 +24,7 @@
         "BY THE NUMBERS",
         "This week's transitions"
       ],
-      "rms": 40.1068,
+      "rms": 40.1054,
       "screen": "overview",
       "similarity": 0.8427
     },
