@@ -99,6 +99,7 @@
         "breadth_50d_gte": 0.6,
         "cmf21_gt": 0.05,
         "etf_flow_5d_pct_gte": 0.0,
+        "return_5d_gt": -0.04,
         "rrg_quadrant_eq": "Leading",
         "stage_eq": 2
       },
@@ -107,6 +108,7 @@
         "cmf21_lt": 0.0,
         "dist_days_25_gte": 4,
         "obv_divergence_eq": true,
+        "return_5d_lte": -0.04,
         "rrg_quadrant_eq": "Weakening"
       }
     },

@@ -230,7 +230,7 @@ def test_ohlcv_health_separates_fred_macro_proxies_from_massive_market_freshness
     market_row = next(row for row in rows if row["source"] == "Market OHLCV")
 
     assert market_row["status"] == "healthy"
-    assert market_row["freshness"] == "Massive market latest today; FRED macro proxies latest 3d old / oldest 4d old"
+    assert market_row["freshness"] == "Massive market latest today"
     assert market_row["coverage"] == "oldest market 2026-06-08 (0d old); oldest overall 2026-06-04 (4d old)"
     assert "oldest market bar 2026-06-08 (0d old)" in market_row["detail"]
     assert "2 FRED macro proxy bars; oldest 2026-06-04 (4d old, cadence adjusted)" in market_row["detail"]

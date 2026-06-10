@@ -64,6 +64,7 @@ STATE_MACHINE_THRESHOLDS = {
         "cmf21_lt": 0.0,
         "obv_divergence_eq": True,
         "dist_days_25_gte": 4,
+        "return_5d_lte": -0.04,
     },
     "stage_2_bullish": {
         "stage_eq": 2,
@@ -71,6 +72,7 @@ STATE_MACHINE_THRESHOLDS = {
         "breadth_50d_gte": 0.60,
         "cmf21_gt": 0.05,
         "etf_flow_5d_pct_gte": 0.0,
+        "return_5d_gt": -0.04,
     },
     "hold": {"stage_eq": 2},
     "stage_1_basing": {"stage_eq": 1},
@@ -219,6 +221,7 @@ def decide_state(row: pd.Series) -> str:
     rrg_q = row.get("rrg_quadrant")
     breadth = _nullable_float(row.get("breadth_50d"))
     cmf = _nullable_float(row.get("cmf21"))
+    ret5 = _nullable_float(row.get("return_5d"))
     rvol = _nullable_float(row.get("rvol"))
     nf5d = _nullable_float(row.get("etf_flow_5d_pct"))
     blk = _nullable_float(row.get("block_up_ratio"))
@@ -251,6 +254,7 @@ def decide_state(row: pd.Series) -> str:
     if (rrg_q == warning["rrg_quadrant_eq"]) \
             or (breadth is not None and breadth < warning["breadth_50d_lt"]) \
             or (cmf is not None and cmf < warning["cmf21_lt"]) \
+            or (ret5 is not None and ret5 <= warning["return_5d_lte"]) \
             or (obv_div == warning["obv_divergence_eq"]) \
             or (dist is not None and dist >= warning["dist_days_25_gte"]):
         return "WARNING"
@@ -259,6 +263,7 @@ def decide_state(row: pd.Series) -> str:
     if (stage == bullish["stage_eq"]) and (rrg_q == bullish["rrg_quadrant_eq"]) \
             and (breadth is not None and breadth >= bullish["breadth_50d_gte"]) \
             and (cmf is not None and cmf > bullish["cmf21_gt"]) \
+            and (ret5 is None or ret5 > bullish["return_5d_gt"]) \
             and (not nf5d_live or (nf5d is not None and nf5d >= bullish["etf_flow_5d_pct_gte"])):
         return "STAGE_2_BULLISH"
 

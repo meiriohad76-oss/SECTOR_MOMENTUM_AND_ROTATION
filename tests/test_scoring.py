@@ -20,6 +20,7 @@ def _row(**overrides) -> pd.Series:
         "rrg_quadrant": "Leading",
         "breadth_50d": 0.70,
         "cmf21": 0.08,
+        "return_5d": 0.01,
         "rvol": 1.0,
         "etf_flow_5d_pct": 0.0,
         "block_up_ratio": 1.0,
@@ -79,6 +80,12 @@ def test_decide_state_returns_warning_for_weakening_quadrant():
 
 def test_decide_state_returns_strict_stage_two_bullish():
     assert scoring.decide_state(_row()) == "STAGE_2_BULLISH"
+
+
+def test_decide_state_blocks_clean_bullish_after_short_term_selloff():
+    row = _row(return_5d=-0.0467)
+
+    assert scoring.decide_state(row) == "WARNING"
 
 
 def test_decide_state_ignores_stubbed_provider_flow_for_exit_gates():

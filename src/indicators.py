@@ -19,6 +19,13 @@ def momentum_12_1(df):
     return float(p.iloc[-21] / p.iloc[-252] - 1.0)
 
 
+def return_5d(df):
+    p = close_price(df)
+    if len(p) < 6:
+        return None
+    return float(p.iloc[-1] / p.iloc[-6] - 1.0)
+
+
 def faber_signal(df):
     m = to_monthly(df)
     p = close_price(m)
@@ -139,6 +146,7 @@ def _eligible_indicator_items(ohlcv, bil_ticker):
 
 def _indicator_row(tkr, df, bench, bil):
     m121 = momentum_12_1(df)
+    ret5 = return_5d(df)
     fab = faber_signal(df)
     st = stage_analysis(df, bench)
     ant = antonacci_absolute(df, bil)
@@ -147,6 +155,7 @@ def _indicator_row(tkr, df, bench, bil):
     return {
         "ticker": tkr,
         "mom_12_1": m121,
+        "return_5d": ret5,
         "faber": fab,
         "stage": st.stage if st else None,
         "above_30wma": st.above_30wma if st else None,

@@ -214,10 +214,6 @@ def _ohlcv_health_row(
     provider_label = str(getattr(ohlcv_result, "provider", "market")).strip() or "market"
     if macro_proxy_dates and latest is not None:
         freshness = f"{provider_label.title()} market latest {format_age_label(latest, now)}"
-        if macro_latest is not None:
-            freshness += f"; FRED macro proxies latest {format_age_label(macro_latest, now)}"
-        if macro_oldest is not None and macro_oldest != macro_latest:
-            freshness += f" / oldest {format_age_label(macro_oldest, now)}"
     else:
         freshness = (
             f"latest {format_age_label(latest, now)}; oldest {format_age_label(oldest, now)}"
