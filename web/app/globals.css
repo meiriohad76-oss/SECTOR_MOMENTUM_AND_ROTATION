@@ -2013,6 +2013,25 @@ main {
   border-radius: 8px;
 }
 
+.c-rotation-head {
+  display: block;
+  max-width: 860px;
+  margin: 28px 0 22px;
+}
+
+.c-rotation-head h1 {
+  margin: 0 0 8px;
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.c-rotation-head p {
+  max-width: 860px;
+  color: #6a625a;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
 .c-stat-deck {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

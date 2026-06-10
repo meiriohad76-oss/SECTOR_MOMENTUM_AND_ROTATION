@@ -260,6 +260,39 @@ def test_next_shell_flow_river_uses_live_pressure_summary_not_fixture_lanes():
         assert marker in css_source
 
 
+def test_next_shell_c3_rotation_uses_handoff_metadata_without_static_rows():
+    client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
+    chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
+    css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    for marker in (
+        'title="Relative rotation | US Sectors"',
+        'subtitle="4-week trail"',
+        "meta={`${rows.length} rows`}",
+        'title="12-1 momentum"',
+        'meta="z-scored"',
+        "Where the money was, where it is, where it's heading.",
+    ):
+        assert marker in client_source
+
+    for marker in (
+        "title = \"Relative Rotation Graph\"",
+        "meta?: string;",
+        "{meta ? <strong>{meta}</strong> : null}",
+        "title = \"12-1 Momentum Rank\"",
+    ):
+        assert marker in chart_source
+
+    for marker in (
+        ".c-rotation-head {",
+        "max-width: 860px;",
+        "font-size: 2rem;",
+    ):
+        assert marker in css_source
+
+    assert "11 sectors" not in client_source
+
+
 def test_next_shell_pillar_stack_has_native_value_specific_tooltips():
     chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
     css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")

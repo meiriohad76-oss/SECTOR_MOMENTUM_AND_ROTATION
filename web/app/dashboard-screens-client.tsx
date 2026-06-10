@@ -1445,17 +1445,29 @@ function CRotationScreen({
     <section className="c-screen" aria-label="Display C rotation and flow">
       <header className="c-rotation-head">
         <h1>The rotation map</h1>
-        <p>Where leadership is, where it is weakening, and which rows show the strongest flow support or pressure.</p>
+        <p>Where the money was, where it is, where it's heading. The map shows current quadrant positions; the trails show the four-week path; the flow river shows which sectors are giving up share and which are taking it.</p>
       </header>
       <div className="c-rotation-grid">
-        <RrgChart rows={rows} onSelectTicker={(ticker) => {
-          onSelectTicker(ticker);
-          setActiveScreen("deepdive");
-        }} />
-        <MomentumBars rows={rows} onSelectTicker={(ticker) => {
-          onSelectTicker(ticker);
-          setActiveScreen("deepdive");
-        }} />
+        <RrgChart
+          rows={rows}
+          title="Relative rotation | US Sectors"
+          subtitle="4-week trail"
+          meta={`${rows.length} rows`}
+          onSelectTicker={(ticker) => {
+            onSelectTicker(ticker);
+            setActiveScreen("deepdive");
+          }}
+        />
+        <MomentumBars
+          rows={rows}
+          title="12-1 momentum"
+          subtitle="cross-sectional momentum ranking"
+          meta="z-scored"
+          onSelectTicker={(ticker) => {
+            onSelectTicker(ticker);
+            setActiveScreen("deepdive");
+          }}
+        />
       </div>
       <FlowRiver rows={rows} />
       <div className="c-lower-grid">

@@ -458,7 +458,19 @@ function rrgTooltip(row: SnapshotRow): string {
   return `${row.display_label}: ${row.quadrant} quadrant. RS-ratio ${ratio} means ${ratioReading}; RS-momentum ${momentum} means ${momentumReading}. S ${fmt(row.s_score)} and F ${fmt(row.f_score)} summarize composite and flow support.`;
 }
 
-export function RrgChart({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSelectTicker: (ticker: string) => void }) {
+export function RrgChart({
+  rows,
+  onSelectTicker,
+  title = "Relative Rotation Graph",
+  subtitle = "Quadrants are split at 100 RS-ratio and 100 RS-momentum. Trails show recent direction from saved signal values.",
+  meta,
+}: {
+  rows: SnapshotRow[];
+  onSelectTicker: (ticker: string) => void;
+  title?: string;
+  subtitle?: string;
+  meta?: string;
+}) {
   const width = 680;
   const height = 420;
   const left = 44;
@@ -488,9 +500,10 @@ export function RrgChart({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSele
     <div className="chart-card light-card" aria-label="Relative rotation graph">
       <div className="chart-heading">
         <div>
-          <h3>Relative Rotation Graph</h3>
-          <p>Quadrants are split at 100 RS-ratio and 100 RS-momentum. Trails show recent direction from saved signal values.</p>
+          <h3>{title}</h3>
+          <p>{subtitle}</p>
         </div>
+        {meta ? <strong>{meta}</strong> : null}
       </div>
       <svg className="rrg-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="RRG sector rotation chart">
         <rect x={left} y={top} width={plotW} height={plotH} rx={8} className="plot-bg" />
@@ -538,7 +551,19 @@ export function RrgChart({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSele
   );
 }
 
-export function MomentumBars({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSelectTicker: (ticker: string) => void }) {
+export function MomentumBars({
+  rows,
+  onSelectTicker,
+  title = "12-1 Momentum Rank",
+  subtitle = "Sorted by current saved momentum signal.",
+  meta,
+}: {
+  rows: SnapshotRow[];
+  onSelectTicker: (ticker: string) => void;
+  title?: string;
+  subtitle?: string;
+  meta?: string;
+}) {
   const sorted = rows
     .filter((row) => typeof row.momentum_pct === "number")
     .slice()
@@ -549,9 +574,10 @@ export function MomentumBars({ rows, onSelectTicker }: { rows: SnapshotRow[]; on
     <div className="chart-card light-card momentum-bars" aria-label="Cross-sectional momentum bars">
       <div className="chart-heading">
         <div>
-          <h3>12-1 Momentum Rank</h3>
-          <p>Sorted by current saved momentum signal.</p>
+          <h3>{title}</h3>
+          <p>{subtitle}</p>
         </div>
+        {meta ? <strong>{meta}</strong> : null}
       </div>
       {sorted.map((row) => {
         const value = row.momentum_pct ?? 0;
