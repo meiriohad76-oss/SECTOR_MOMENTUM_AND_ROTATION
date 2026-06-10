@@ -398,3 +398,58 @@ def test_state_storage_health_initializes_empty_journal_for_existing_snapshot(tm
     assert health["transition_journal_exists"] is True
     assert (tmp_path / "state_transitions.jsonl").exists()
     assert health["journal_transition_count"] == 0
+
+
+def test_reconcile_states_from_storage_overrides_stale_rendered_state(tmp_path, monkeypatch):
+    state_file = tmp_path / "state.json"
+    monkeypatch.setattr(scoring, "STATE_FILE", state_file)
+    monkeypatch.setattr(scoring, "STATE_TRANSITION_JOURNAL", None)
+    now = scoring.datetime.fromisoformat("2026-06-10T18:00:00+00:00")
+    monkeypatch.setattr(scoring, "_now_utc", lambda: now)
+    state_file.write_text(
+        json.dumps(
+            {
+                "updated": "2026-06-10T17:51:04+00:00",
+                "by_ticker": {"EWJ": {"state": "EXIT", "date": "2026-06-10"}},
+                "transitions": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    scored = pd.DataFrame(
+        {
+            "state": ["STAGE_2_BULLISH"],
+            "return_5d": [-0.0469],
+            "S_score": [0.8],
+        },
+        index=["EWJ"],
+    )
+
+    reconciled = scoring.reconcile_states_from_storage(scored)
+
+    assert reconciled.loc["EWJ", "state"] == "EXIT"
+    assert reconciled.loc["EWJ", "rendered_state_before_storage_reconcile"] == "STAGE_2_BULLISH"
+    assert bool(reconciled.loc["EWJ", "state_storage_reconciled"]) is True
+    assert reconciled.loc["EWJ", "state_storage_date"] == "2026-06-10"
+
+
+def test_reconcile_states_from_storage_ignores_stale_state_file(tmp_path, monkeypatch):
+    state_file = tmp_path / "state.json"
+    monkeypatch.setattr(scoring, "STATE_FILE", state_file)
+    now = scoring.datetime.fromisoformat("2026-06-10T18:00:00+00:00")
+    monkeypatch.setattr(scoring, "_now_utc", lambda: now)
+    state_file.write_text(
+        json.dumps(
+            {
+                "updated": "2026-06-01T17:51:04+00:00",
+                "by_ticker": {"EWJ": {"state": "EXIT", "date": "2026-06-01"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    scored = pd.DataFrame({"state": ["STAGE_2_BULLISH"]}, index=["EWJ"])
+
+    reconciled = scoring.reconcile_states_from_storage(scored)
+
+    assert reconciled.loc["EWJ", "state"] == "STAGE_2_BULLISH"
+    assert "state_storage_reconciled" not in reconciled.columns

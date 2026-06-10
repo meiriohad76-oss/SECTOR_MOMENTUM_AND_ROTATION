@@ -119,7 +119,13 @@ from src.saved_inputs import (
     save_portfolio,
     save_watchlist,
 )
-from src.scoring import compute_composite, apply_state_machine, recent_transitions, state_storage_health
+from src.scoring import (
+    apply_state_machine,
+    compute_composite,
+    recent_transitions,
+    reconcile_states_from_storage,
+    state_storage_health,
+)
 from src.structured_logging import configure_structured_logging, log_event
 from src.table_sort import (
     FULL_TABLE_SORT_DIRECTIONS,
@@ -430,16 +436,26 @@ def _state_tip_for_row(ticker: str, row) -> str:
     cmf = _display_value(row.get("cmf21"), signed=True, decimals=2)
     flow = _display_value(row.get("F_score"), signed=True, decimals=2)
     etf_flow = _display_value(row.get("etf_flow_5d_pct"), pct=True, signed=True, decimals=2)
+    return_5d = _display_value(row.get("return_5d"), pct=True, signed=True, decimals=2)
     momentum = _display_value(row.get("mom_12_1"), pct=True, signed=True, decimals=1)
     composite = _display_value(row.get("S_score"), signed=True, decimals=2)
     above_30wma = _display_value(row.get("above_30wma"))
     slope_up = _display_value(row.get("ma_slope_pos"))
     mansfield = _display_value(row.get("mansfield_rs"), signed=True, decimals=2)
+    reconciled_text = ""
+    if bool(row.get("state_storage_reconciled")):
+        before = str(row.get("rendered_state_before_storage_reconcile") or "previous render").replace("_", " ")
+        date = str(row.get("state_storage_date") or "latest production refresh")
+        reconciled_text = (
+            f" Production state reconciliation changed the displayed state from {before} "
+            f"to {state.replace('_', ' ')} using saved state dated {date}."
+        )
 
     readings = (
         f"Actual readings: Stage={stage}; S={composite}; Flow={flow}; MOM={momentum}; "
         f"RRG={rrg}; Breadth={breadth}; CMF={cmf}; ETF 5d flow={etf_flow}; "
-        f"price above 30wMA={above_30wma}; MA slope up={slope_up}; Mansfield RS={mansfield}."
+        f"5-session price return={return_5d}; price above 30wMA={above_30wma}; "
+        f"MA slope up={slope_up}; Mansfield RS={mansfield}.{reconciled_text}"
     )
 
     if state == "STAGE_2_BULLISH":
@@ -461,7 +477,7 @@ def _state_tip_for_row(ticker: str, row) -> str:
     if state == "WARNING":
         return (
             f"Why warning: {ticker} is showing early deterioration. "
-            "Common drivers are weakening rotation, softer breadth, negative CMF, or distribution pressure. "
+            "Common drivers are weakening rotation, softer breadth, negative CMF, distribution pressure, or a sharp 5-session price loss of -4.00% or worse. "
             f"{readings} "
             "What it means: tighten risk controls and avoid adding until the weak signals improve."
         )
@@ -469,6 +485,7 @@ def _state_tip_for_row(ticker: str, row) -> str:
     if state in {"EXIT", "BEARISH_STAGE_4"}:
         return (
             f"Why exit/bearish: {ticker} has broken important trend or flow gates. "
+            "A sharp recent selloff also blocks a clean bullish upgrade while the broader gates are reassessed. "
             f"{readings} "
             "What it means: downside or underperformance risk is elevated, so the dashboard prefers reducing or avoiding exposure."
         )
@@ -1192,6 +1209,7 @@ else:
     finally:
         loading_placeholder.empty()
 
+scored = reconcile_states_from_storage(scored)
 AVAILABLE_TICKERS = sorted(scored.index.tolist())
 initialize_drill_ticker(st.session_state, st.query_params, AVAILABLE_TICKERS)
 if _REUSED_COMPUTE_SNAPSHOT is False:

@@ -486,6 +486,58 @@ def recent_transitions(n: int = 25) -> list[dict]:
         return list(reversed(source_rows))[:n]
 
 
+def reconcile_states_from_storage(
+    scored_df: pd.DataFrame,
+    *,
+    max_age_seconds: int = 84 * 60 * 60,
+) -> pd.DataFrame:
+    """Use fresh persisted production state as the final display authority.
+
+    Streamlit may reuse an in-memory compute snapshot while a headless refresh
+    has already recomputed and saved newer states on disk. This guard prevents
+    the UI from showing an older state label after production refreshes.
+    """
+    if scored_df.empty:
+        return scored_df.copy()
+
+    with _STATE_LOCK:
+        payload = _state_payload()
+
+    parsed_state_updated = _parse_state_updated(payload.get("updated", ""))
+    if parsed_state_updated is None:
+        return scored_df.copy()
+
+    age_seconds = int((_now_utc() - parsed_state_updated).total_seconds())
+    if age_seconds < 0 or age_seconds > max_age_seconds:
+        return scored_df.copy()
+
+    by_ticker = dict(payload.get("by_ticker", {}) or {})
+    if not by_ticker:
+        return scored_df.copy()
+
+    df = scored_df.copy()
+    df["state_storage_reconciled"] = False
+    df["state_storage_updated"] = payload.get("updated", "")
+    df["state_storage_date"] = ""
+    if "rendered_state_before_storage_reconcile" not in df.columns:
+        df["rendered_state_before_storage_reconcile"] = ""
+
+    for ticker in df.index:
+        stored = by_ticker.get(str(ticker).upper()) or by_ticker.get(str(ticker))
+        if not isinstance(stored, Mapping):
+            continue
+        stored_state = str(stored.get("state") or "").strip()
+        if not stored_state:
+            continue
+        current_state = str(df.at[ticker, "state"]) if "state" in df.columns else ""
+        if current_state != stored_state:
+            df.at[ticker, "rendered_state_before_storage_reconcile"] = current_state
+            df.at[ticker, "state"] = stored_state
+            df.at[ticker, "state_storage_reconciled"] = True
+        df.at[ticker, "state_storage_date"] = str(stored.get("date") or "")
+    return df
+
+
 def state_storage_health() -> dict[str, object]:
     """Return observability for Pi/local state persistence."""
     with _STATE_LOCK:

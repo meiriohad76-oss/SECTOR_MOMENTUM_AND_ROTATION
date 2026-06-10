@@ -31,6 +31,9 @@ def test_stage_2_tooltip_copy_is_plain_english_and_value_driven():
     assert "Breadth={breadth}" in helper
     assert "CMF={cmf}" in helper
     assert "Flow={flow}" in helper
+    assert "5-session price return={return_5d}" in helper
+    assert "sharp 5-session price loss of -4.00% or worse" in helper
+    assert "Production state reconciliation changed the displayed state" in helper
 
 
 def test_tooltip_style_supports_longer_explanations():
