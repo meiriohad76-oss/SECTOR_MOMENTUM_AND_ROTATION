@@ -293,6 +293,23 @@ def test_next_shell_c3_rotation_uses_handoff_metadata_without_static_rows():
     assert "11 sectors" not in client_source
 
 
+def test_next_shell_b3_leaderboards_open_editorial_deep_dive():
+    client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
+
+    for marker in (
+        "function BLeaderboard({ title, rows, onSelectTicker }",
+        "const openDeepDive = (ticker: string) =>",
+        "onSelectTicker(ticker);",
+        "setActiveScreen(\"deepdive\")",
+        "<BLeaderboard title=\"LEADERS\" rows={leaders} onSelectTicker={openDeepDive} />",
+        "<BLeaderboard title=\"LAGGARDS\" rows={laggards} onSelectTicker={openDeepDive} />",
+    ):
+        assert marker in client_source
+
+    for forbidden in ("Tech/Semis", "Gold miners", "$3.4B"):
+        assert forbidden not in client_source
+
+
 def test_next_shell_pillar_stack_has_native_value_specific_tooltips():
     chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
     css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")

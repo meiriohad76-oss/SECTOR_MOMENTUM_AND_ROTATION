@@ -2352,6 +2352,10 @@ function BRotationScreen({
   const laggards = [...snapshot.rows].sort((a, b) => (a.momentum_pct ?? 0) - (b.momentum_pct ?? 0)).slice(0, 10);
   const leadingNames = rows.filter((row) => row.quadrant === "Leading").slice(0, 3).map((row) => row.ticker).join(", ") || "leadership";
   const weakeningNames = rows.filter((row) => row.quadrant === "Weakening").slice(0, 3).map((row) => row.ticker).join(", ") || "weakening rows";
+  const openDeepDive = (ticker: string) => {
+    onSelectTicker(ticker);
+    setActiveScreen("deepdive");
+  };
   return (
     <section className="b-screen b-map">
       <header className="b-article-head compact">
@@ -2370,8 +2374,8 @@ function BRotationScreen({
           </div>
           <BSectionRule title="Cross-sectional leaderboard" sub="12-1 momentum ranking, all instruments." />
           <div className="b-leaderboards">
-            <BLeaderboard title="LEADERS" rows={leaders} onSelectTicker={onSelectTicker} />
-            <BLeaderboard title="LAGGARDS" rows={laggards} onSelectTicker={onSelectTicker} />
+            <BLeaderboard title="LEADERS" rows={leaders} onSelectTicker={openDeepDive} />
+            <BLeaderboard title="LAGGARDS" rows={laggards} onSelectTicker={openDeepDive} />
           </div>
         </main>
         <aside className="b-side">
