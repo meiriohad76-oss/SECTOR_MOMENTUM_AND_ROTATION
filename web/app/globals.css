@@ -3256,26 +3256,6 @@ select:focus-visible {
   align-items: flex-start;
 }
 
-.chart-heading-meta {
-  display: grid;
-  justify-items: end;
-  gap: 8px;
-  min-width: 280px;
-}
-
-.chart-heading-meta > span {
-  color: #7a7066;
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.chart-heading-meta .composition-axis-copy {
-  color: #6a625a;
-  font-size: 0.68rem;
-  text-transform: lowercase;
-}
-
 .chart-heading h3 {
   margin: 0 0 6px;
   font-size: 1rem;
@@ -3309,6 +3289,27 @@ select:focus-visible {
   line-height: 1.55;
 }
 
+.c-pillar-legend-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 0 0 14px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #e6e1d8;
+}
+
+.c-pillar-legend-strip .composition-axis-copy {
+  margin-left: auto;
+  color: #6a625a;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+
 .chart-heading strong {
   color: #12324a;
   white-space: nowrap;
@@ -3319,7 +3320,7 @@ select:focus-visible {
   flex-wrap: wrap;
   gap: 14px;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   min-width: 240px;
 }
 
@@ -3375,10 +3376,10 @@ select:focus-visible {
 
 .composition-row {
   width: 100%;
-  min-height: 36px;
+  min-height: 37px;
   padding: 7px 0;
   color: #1a1714;
-  font: 700 0.82rem/1.05 Arial, Helvetica, sans-serif;
+  font: 700 0.78rem/1.05 ui-monospace, SFMono-Regular, Consolas, monospace;
   text-align: left;
   background: transparent;
   border: 0;

@@ -325,6 +325,51 @@ def test_next_shell_c1_right_rail_uses_handoff_padded_cards():
         assert marker in css_source
 
 
+def test_next_shell_c1_heatmap_uses_handoff_legend_strip():
+    chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
+    css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    for marker in (
+        'className="c-pillar-legend-strip"',
+        "Pillar contribution legend and axis",
+        "<span>TKR</span>",
+        "<span>COMPOSITION</span>",
+        "<span>STATE</span>",
+        "<span>MOM</span>",
+    ):
+        assert marker in chart_source
+
+    for marker in (
+        ".c-pillar-legend-strip",
+        "padding: 0 0 14px;",
+        "border-bottom: 1px solid #e6e1d8;",
+        ".c-pillar-legend-strip .composition-axis-copy",
+        "justify-content: flex-start;",
+    ):
+        assert marker in css_source
+
+
+def test_next_shell_c1_heatmap_uses_compact_state_and_shared_bar_domain():
+    chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
+
+    for marker in (
+        "function compactStateLabel",
+        'return "BULLISH"',
+        'return "WARN"',
+        'return "EXIT"',
+        "compactStateLabel(state)",
+        "function signedFmt",
+        "function momentumFmt",
+        "function pillarSideTotals",
+        "maxSide?: number",
+        "const heatmapMaxSide = Math.max",
+        "maxSide={heatmapMaxSide}",
+        "signedFmt(row.s_score)",
+        "momentumFmt(row.momentum_pct)",
+    ):
+        assert marker in chart_source
+
+
 def test_next_shell_rrg_and_flow_have_native_value_specific_tooltips():
     chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
     css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")

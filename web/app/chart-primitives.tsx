@@ -50,6 +50,17 @@ function stateLabel(state: string): string {
   return state.replaceAll("_", " ");
 }
 
+function compactStateLabel(state: string): string {
+  const normalized = state.toUpperCase();
+  if (normalized.includes("STAGE_2") || normalized.includes("BULLISH") || normalized === "BUY") return "BULLISH";
+  if (normalized.includes("WARNING") || normalized.includes("WARN")) return "WARN";
+  if (normalized.includes("EXIT")) return "EXIT";
+  if (normalized.includes("BEAR")) return "BEAR";
+  if (normalized.includes("BASE")) return "BASE";
+  if (normalized.includes("HOLD")) return "HOLD";
+  return stateLabel(state);
+}
+
 function stateTone(state: string): "good" | "warn" | "bad" | "hold" {
   const normalized = state.toLowerCase();
   if (normalized.includes("bullish") || normalized === "buy") return "good";
@@ -94,6 +105,17 @@ function fmt(value: number | null | undefined, digits = 2) {
   return value.toFixed(digits);
 }
 
+function signedFmt(value: number | null | undefined, digits = 2) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "n/a";
+  return `${value >= 0 ? "+" : ""}${value.toFixed(digits)}`;
+}
+
+function momentumFmt(value: number | null | undefined) {
+  if (value === null || value === undefined || Number.isNaN(value)) return "n/a";
+  const scaled = Math.abs(value) <= 1 ? value * 100 : value;
+  return `${scaled >= 0 ? "+" : ""}${scaled.toFixed(0)}%`;
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
@@ -112,7 +134,7 @@ export function PillarLegend() {
 }
 
 function LightStatePill({ state }: { state: string }) {
-  return <span className={`light-state-pill ${stateTone(state)}`}>{stateLabel(state)}</span>;
+  return <span className={`light-state-pill ${stateTone(state)}`}>{compactStateLabel(state)}</span>;
 }
 
 function pillarReading(row: SnapshotRow, pillar: PillarContribution): string {
@@ -130,7 +152,7 @@ function pillarTooltip(row: SnapshotRow, pillar: PillarContribution): string {
   return `${pillar.code} ${pillar.fullName} for ${row.ticker}: ${pillarReading(row, pillar)} Weight ${Math.round(pillar.weight * 100)}%; normalized input ${fmt(pillar.raw, 2)}; contribution ${fmt(pillar.contribution, 2)} (${sign}).`;
 }
 
-export function PillarStackBar({ row }: { row: SnapshotRow }) {
+function pillarSideTotals(row: SnapshotRow): { positiveTotal: number; negativeTotal: number } {
   const contributions = pillarContributions(row);
   const positiveTotal = contributions
     .filter((pillar) => pillar.contribution > 0)
@@ -138,7 +160,13 @@ export function PillarStackBar({ row }: { row: SnapshotRow }) {
   const negativeTotal = contributions
     .filter((pillar) => pillar.contribution < 0)
     .reduce((total, pillar) => total + Math.abs(pillar.contribution), 0);
-  const maxSide = Math.max(1, positiveTotal, negativeTotal);
+  return { positiveTotal, negativeTotal };
+}
+
+export function PillarStackBar({ row, maxSide: maxSideOverride }: { row: SnapshotRow; maxSide?: number }) {
+  const contributions = pillarContributions(row);
+  const { positiveTotal, negativeTotal } = pillarSideTotals(row);
+  const maxSide = Math.max(1, maxSideOverride ?? positiveTotal, maxSideOverride ?? negativeTotal);
   const midpoint = 50;
   let positiveOffset = 0;
   let negativeOffset = 0;
@@ -196,6 +224,13 @@ export function PillarHeatmap({
     return rank || a.localeCompare(b);
   });
   const sortedRows = rows.slice().sort((a, b) => b.s_score - a.s_score);
+  const heatmapMaxSide = Math.max(
+    1,
+    ...rows.flatMap((row) => {
+      const { positiveTotal, negativeTotal } = pillarSideTotals(row);
+      return [positiveTotal, negativeTotal];
+    }),
+  );
   return (
     <section className="chart-card light-card pillar-heatmap-card" aria-label="Composite pillar-stack heatmap" title={sourceNote}>
       <div className="chart-heading c-heatmap-heading">
@@ -204,17 +239,17 @@ export function PillarHeatmap({
           <span>{rows.length} instruments | sorted by S</span>
           <p>Each row IS the composite. Seven segments to the right of the midline are bullish contributions; segments to the left are bearish. Length encodes magnitude. Read the row to see why the score is what it is.</p>
         </div>
-        <div className="chart-heading-meta">
-          <PillarLegend />
-          <span className="composition-axis-copy">bearish left | bullish right</span>
-        </div>
+      </div>
+      <div className="c-pillar-legend-strip" aria-label="Pillar contribution legend and axis">
+        <PillarLegend />
+        <span className="composition-axis-copy">bearish left | bullish right</span>
       </div>
       <div className="composition-header">
-        <span>Ticker</span>
-        <span>Composition</span>
-        <span>State</span>
+        <span>TKR</span>
+        <span>COMPOSITION</span>
+        <span>STATE</span>
         <span>S</span>
-        <span>Mom</span>
+        <span>MOM</span>
       </div>
       {classes.map((assetClass) => (
         <div key={assetClass} className="composition-group">
@@ -227,10 +262,10 @@ export function PillarHeatmap({
             .map((row) => (
               <button type="button" key={row.ticker} className="composition-row" onClick={() => onSelectTicker(row.ticker)}>
                 <strong>{row.ticker}</strong>
-                <PillarStackBar row={row} />
+                <PillarStackBar row={row} maxSide={heatmapMaxSide} />
                 <LightStatePill state={row.state} />
-                <span>{fmt(row.s_score)}</span>
-                <span>{fmt(row.momentum_pct, 2)}</span>
+                <span>{signedFmt(row.s_score)}</span>
+                <span>{momentumFmt(row.momentum_pct)}</span>
               </button>
             ))}
         </div>
