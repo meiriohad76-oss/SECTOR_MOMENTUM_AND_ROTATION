@@ -65,6 +65,11 @@
       "replacement_score": -9.99,
       "threshold_z": -0.5
     },
+    "pullback_risk_modifier": {
+      "return_1d_lte": -0.01,
+      "return_2d_lte": -0.015,
+      "return_5d_lte": -0.035
+    },
     "rank_ascending": false,
     "rank_method": "min",
     "selection_top_n_by_class": {

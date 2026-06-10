@@ -106,7 +106,7 @@ def test_app_reuses_compute_snapshot_before_expensive_sections():
     assert '"data_refresh_request_at": st.session_state.get("data_refresh_requested_at")' in app_source
     assert '"data_refresh_completed_after_compute": True' in app_source
     assert "reconcile_states_from_storage" in app_source
-    assert app_source.index("scored = reconcile_states_from_storage(scored)") < app_source.index(
+    assert app_source.index("scored = annotate_state_display(reconcile_states_from_storage(scored))") < app_source.index(
         "AVAILABLE_TICKERS = sorted(scored.index.tolist())"
     )
 

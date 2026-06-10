@@ -26,6 +26,15 @@ def return_5d(df):
     return float(p.iloc[-1] / p.iloc[-6] - 1.0)
 
 
+def return_nd(df, sessions: int):
+    p = close_price(df)
+    if sessions < 1:
+        raise ValueError("sessions must be positive")
+    if len(p) < sessions + 1:
+        return None
+    return float(p.iloc[-1] / p.iloc[-1 - sessions] - 1.0)
+
+
 def faber_signal(df):
     m = to_monthly(df)
     p = close_price(m)
@@ -145,6 +154,8 @@ def _eligible_indicator_items(ohlcv, bil_ticker):
 
 
 def _indicator_row(tkr, df, bench, bil):
+    ret1 = return_nd(df, 1)
+    ret2 = return_nd(df, 2)
     m121 = momentum_12_1(df)
     ret5 = return_5d(df)
     fab = faber_signal(df)
@@ -155,6 +166,8 @@ def _indicator_row(tkr, df, bench, bil):
     return {
         "ticker": tkr,
         "mom_12_1": m121,
+        "return_1d": ret1,
+        "return_2d": ret2,
         "return_5d": ret5,
         "faber": fab,
         "stage": st.stage if st else None,

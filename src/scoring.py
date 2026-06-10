@@ -77,6 +77,11 @@ STATE_MACHINE_THRESHOLDS = {
     "hold": {"stage_eq": 2},
     "stage_1_basing": {"stage_eq": 1},
 }
+PULLBACK_RISK_THRESHOLDS = {
+    "return_1d_lte": -0.010,
+    "return_2d_lte": -0.015,
+    "return_5d_lte": -0.035,
+}
 
 
 def methodology_scoring_parameters() -> dict:
@@ -92,6 +97,7 @@ def methodology_scoring_parameters() -> dict:
             state: dict(thresholds)
             for state, thresholds in STATE_MACHINE_THRESHOLDS.items()
         },
+        "pullback_risk_modifier": dict(PULLBACK_RISK_THRESHOLDS),
     }
 
 
@@ -276,6 +282,57 @@ def decide_state(row: pd.Series) -> str:
         return "STAGE_1_BASING"
 
     return "HOLD"
+
+
+def pullback_risk_reason(row: Mapping[str, object]) -> str:
+    """Return a short reason when a bullish state has short-term pullback risk."""
+    state = str(row.get("state") or "")
+    if state != "STAGE_2_BULLISH":
+        return ""
+
+    checks = (
+        ("1-session return", "return_1d", PULLBACK_RISK_THRESHOLDS["return_1d_lte"]),
+        ("2-session return", "return_2d", PULLBACK_RISK_THRESHOLDS["return_2d_lte"]),
+        ("5-session return", "return_5d", PULLBACK_RISK_THRESHOLDS["return_5d_lte"]),
+    )
+    reasons: list[str] = []
+    for label, key, threshold in checks:
+        value = _nullable_float(row.get(key))
+        if value is not None and value <= threshold:
+            reasons.append(f"{label} {value:+.2%} is at/below {threshold:+.2%}")
+    return "; ".join(reasons)
+
+
+def has_pullback_risk(row: Mapping[str, object]) -> bool:
+    return bool(pullback_risk_reason(row))
+
+
+def state_display_label(row: Mapping[str, object]) -> str:
+    existing_label = row.get("state_display_label")
+    if existing_label is not None and not pd.isna(existing_label) and str(existing_label).strip():
+        return str(existing_label)
+    state = str(row.get("state") or "UNKNOWN")
+    if state == "STAGE_2_BULLISH" and has_pullback_risk(row):
+        return "Stage 2, Pullback Risk"
+    return state.replace("_", " ")
+
+
+def annotate_state_display(scored_df: pd.DataFrame) -> pd.DataFrame:
+    if scored_df.empty:
+        return scored_df.copy()
+    df = scored_df.copy()
+    reasons: list[str] = []
+    labels: list[str] = []
+    flags: list[bool] = []
+    for _, row in df.iterrows():
+        reason = pullback_risk_reason(row)
+        flags.append(bool(reason))
+        reasons.append(reason)
+        labels.append(state_display_label(row))
+    df["pullback_risk"] = flags
+    df["pullback_risk_reason"] = reasons
+    df["state_display_label"] = labels
+    return df
 
 
 def _now_utc() -> datetime:

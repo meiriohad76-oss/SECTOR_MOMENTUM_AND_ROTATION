@@ -120,6 +120,7 @@ from src.saved_inputs import (
     save_watchlist,
 )
 from src.scoring import (
+    annotate_state_display,
     apply_state_machine,
     compute_composite,
     recent_transitions,
@@ -358,6 +359,13 @@ def _display_value(value, *, signed: bool = False, pct: bool = False, decimals: 
     return str(value)
 
 
+def _row_state_label(row) -> str:
+    label = row.get("state_display_label") if hasattr(row, "get") else None
+    if label is not None and not pd.isna(label) and str(label).strip():
+        return str(label)
+    return str(row.get("state") or "UNKNOWN").replace("_", " ")
+
+
 def _valid_ratio_value(value):
     if value is None or pd.isna(value):
         return None
@@ -398,13 +406,14 @@ def _ticker_identity_subtext(ticker: str) -> str:
 def _metric_tip_for_row(ticker: str, row, metric: str) -> str:
     label = ticker_display_label(ticker)
     state = str(row.get("state") or "UNKNOWN").replace("_", " ")
+    state_label = _row_state_label(row)
     if metric == "S":
         score = _display_value(row.get("S_score"), signed=True, decimals=2)
         grade = _grade_letter(row.get("S_score"))
         rank = row.get("rank_in_class")
         rank_text = "n/a" if rank is None or pd.isna(rank) else str(int(rank))
         veto_text = "A flow veto is active, so ranking strength is capped." if bool(row.get("veto")) else "No hard flow veto is active."
-        return f"{label}: composite S-score is {score} ({grade}), rank {rank_text}. This is the cross-sectional ranking score, not the state label. {veto_text} Current state is {state}."
+        return f"{label}: composite S-score is {score} ({grade}), rank {rank_text}. This is the cross-sectional ranking score, not the state label. {veto_text} Current display state is {state_label}."
     if metric == "F":
         flow = _display_value(row.get("F_score"), signed=True, decimals=2)
         cmf = _display_value(row.get("cmf21"), signed=True, decimals=2)
@@ -450,15 +459,24 @@ def _state_tip_for_row(ticker: str, row) -> str:
             f" Production state reconciliation changed the displayed state from {before} "
             f"to {state.replace('_', ' ')} using saved state dated {date}."
         )
+    pullback_reason = str(row.get("pullback_risk_reason") or "")
+    pullback_text = f" Pullback-risk modifier is active: {pullback_reason}." if pullback_reason else ""
 
     readings = (
         f"Actual readings: Stage={stage}; S={composite}; Flow={flow}; MOM={momentum}; "
         f"RRG={rrg}; Breadth={breadth}; CMF={cmf}; ETF 5d flow={etf_flow}; "
         f"5-session price return={return_5d}; price above 30wMA={above_30wma}; "
-        f"MA slope up={slope_up}; Mansfield RS={mansfield}.{reconciled_text}"
+        f"MA slope up={slope_up}; Mansfield RS={mansfield}.{reconciled_text}{pullback_text}"
     )
 
     if state == "STAGE_2_BULLISH":
+        if pullback_reason:
+            return (
+                f"Why Stage 2 with pullback risk: {ticker} still passes the larger Stage 2 trend, rotation, breadth, and money-flow gates, "
+                "but short-term price action is deteriorating. "
+                f"{readings} "
+                "What it means: this is not a clean chase signal. Treat it as an intact Stage 2 setup that needs stabilization before adding."
+            )
         return (
             f"Why bullish Stage 2 now: {ticker} is in an advancing trend and the confirmation gates agree. "
             "In simple terms, price trend, relative strength, sector rotation, market breadth, and money flow are all pointing the same way. "
@@ -1209,7 +1227,7 @@ else:
     finally:
         loading_placeholder.empty()
 
-scored = reconcile_states_from_storage(scored)
+scored = annotate_state_display(reconcile_states_from_storage(scored))
 AVAILABLE_TICKERS = sorted(scored.index.tolist())
 initialize_drill_ticker(st.session_state, st.query_params, AVAILABLE_TICKERS)
 if _REUSED_COMPUTE_SNAPSHOT is False:
@@ -1539,7 +1557,7 @@ def render_ticker_analyzer():
     veto = "VETO" if bool(row.get("veto")) else "OK"
     stage = row.get("stage") or "n/a"
     quadrant = str(row.get("rrg_quadrant") or "n/a").upper()
-    state_label = state.replace("_", " ")
+    state_label = _row_state_label(row)
 
     _md(
         f"""
@@ -2067,7 +2085,7 @@ def _forecast_horizon_for_state(state: str) -> str:
 
 def _ticker_report_html(ticker: str, row) -> str:
     state = str(row.get("state") or "UNKNOWN")
-    state_label = state.replace("_", " ")
+    state_label = _row_state_label(row)
     class_name = str(row.get("class") or "UNKNOWN")
     ticker_label = ticker_display_label(ticker)
     forecast = _forecast_horizon_for_state(state)
@@ -2729,7 +2747,7 @@ def render_picks():
             state = str(row["state"])
             available = bool(row["available"])
             pill_class = state if available and state in STATE_TIPS else "HOLD"
-            pill_label = state.replace("_", " ") if available else "DATA PENDING"
+            pill_label = _row_state_label(row) if available else "DATA PENDING"
             state_tip = _state_tip_for_row(ticker, row) if available else "Awaiting defensive data."
             unavailable_class = "" if available else " unavailable"
             s_score = row["s_score"]
@@ -2814,7 +2832,7 @@ def render_picks():
               <div class="pick-ticker"><span class="pick-rank">#{pick_rank}</span>{tkr}<span class="ticker-name">{_esc(ticker_name)}</span></div>
               <div class="pick-class">{klass_lbl}</div>
             </div>
-            <span class="pill {state}" data-tip="{_esc(state_tip)}">{state.replace('_', ' ')}</span>
+            <span class="pill {state}" data-tip="{_esc(state_tip)}">{_esc(_row_state_label(p))}</span>
           </div>
           {spark}
           <div class="pick-metrics">
@@ -2969,7 +2987,7 @@ def render_drill():
     <section class="section" id="drill">
       <div class="section-head">
         <h2>Per-ticker drill-down <span class="count">{_esc(ticker_display_label(sel))} | {row['class']}</span></h2>
-        <div class="right">{state.replace('_', ' ')}</div>
+        <div class="right">{_esc(_row_state_label(row))}</div>
       </div>
       <div class="drill">
         <div class="drill-metrics">
@@ -2990,7 +3008,7 @@ def render_drill():
 
           <div class="tile">
             <div class="tile-label"><span class="tip-cue" data-tip="{_esc(INDICATOR_TIPS['tip_drill_state'])}">State</span></div>
-            <div class="tile-value" style="color:{color};font-size:1.1rem;">{state.replace('_', ' ')}</div>
+            <div class="tile-value" style="color:{color};font-size:1.1rem;">{_esc(_row_state_label(row))}</div>
             <div class="tile-sub">Stage {row.get('stage', '-')} | {(row.get('rrg_quadrant') or '-').upper()}</div>
             <div class="tile-help">State machine output. <b>STAGE 2 BULLISH</b> = strongest bullish evidence. <b>HOLD</b> = acceptable trend evidence. <b>WARNING</b> = deterioration evidence. <b>EXIT / BEARISH</b> = major risk gates failed. Hover the pill for the full gate definition.</div>
           </div>
@@ -3065,7 +3083,7 @@ def render_comparison_view():
               <div class="comparison-ticker">{_esc(row['ticker'])}<span class="ticker-name">{_esc(ticker_name)}</span></div>
               <div class="comparison-class">{_esc(row['class'])}</div>
             </div>
-            <span class="state">{_esc(state.replace('_', ' '))}</span>
+            <span class="state">{_esc(_row_state_label(row))}</span>
           </div>
           <div class="comparison-metrics">
             <div><span>S</span><b>{_esc(row['s_score'])}</b></div>
@@ -3179,7 +3197,7 @@ def render_full_table():
         <tr>
           <td class="t table-ticker">{_esc(tkr)}<small>{_esc(ticker_name)}</small>{preview_html}</td>
           <td style="color:var(--muted)">{r['class']}</td>
-          <td><span class="pill {state}" data-tip="{_esc(state_tip)}">{state.replace('_', ' ')}</span></td>
+          <td><span class="pill {state}" data-tip="{_esc(state_tip)}">{_esc(_row_state_label(r))}</span></td>
           {p_tds}
           <td class="num {'pos' if s >= 0 else 'neg'}">{s:+.2f}</td>
           <td class="num {'pos' if f >= 0 else 'neg'}">{f:+.2f}</td>

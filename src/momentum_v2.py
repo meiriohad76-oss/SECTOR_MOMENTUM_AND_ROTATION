@@ -13,7 +13,7 @@ import pandas as pd
 
 from .component_bridge import drill_bridge_attrs
 from .macro import cycle_tilt
-from .scoring import BINARY_FILTER_COUNT, COMPOSITE_WEIGHTS
+from .scoring import BINARY_FILTER_COUNT, COMPOSITE_WEIGHTS, state_display_label
 from .ticker_identity import ticker_display_name
 
 
@@ -119,6 +119,9 @@ class MomentumV2Row:
     ma_slope_pos: bool
     pillars: Mapping[str, float]
     reasons: tuple[str, ...]
+    state_label: str = ""
+    pullback_risk: bool = False
+    pullback_risk_reason: str = ""
 
     @property
     def display_label(self) -> str:
@@ -146,7 +149,11 @@ def _state_reason(row: pd.Series) -> tuple[str, ...]:
     reasons: list[str] = []
     state = str(row.get("state", ""))
     if state == "STAGE_2_BULLISH":
-        reasons.append("Stage 2 trend is confirmed and risk gates are supportive.")
+        if bool(row.get("pullback_risk")):
+            reason = str(row.get("pullback_risk_reason") or "short-term price action is deteriorating")
+            reasons.append(f"Stage 2 trend is intact, but pullback risk is active: {reason}.")
+        else:
+            reasons.append("Stage 2 trend is confirmed and risk gates are supportive.")
     if state == "WARNING":
         reasons.append("Warning state: at least one deterioration gate is active.")
     if state == "EXIT":
@@ -225,6 +232,9 @@ def build_view_rows(scored: pd.DataFrame, phase: str) -> list[MomentumV2Row]:
                 identity=identity,
                 asset_class=str(row.get("class", "")),
                 state=str(row.get("state", "HOLD")),
+                state_label=state_display_label(row),
+                pullback_risk=bool(row.get("pullback_risk", False)),
+                pullback_risk_reason=str(row.get("pullback_risk_reason") or ""),
                 s_score=_num(row.get("S_score")),
                 f_score=_num(row.get("F_score")),
                 momentum_pct=_num(row.get("mom_12_1")) * 100.0,
@@ -709,13 +719,18 @@ def _fmt(value: float, suffix: str = "", digits: int = 2) -> str:
     return f"{value:+.{digits}f}{suffix}"
 
 
-def _state_pill(state: str) -> str:
+def _state_pill(state: str, label: str | None = None) -> str:
     color = STATE_COLORS_LIGHT.get(state, "#777")
     text_color = STATE_TEXT_COLORS.get(state, "#ffffff")
+    display = label or STATE_LABELS.get(state, state)
     return (
         f'<span class="mv2-state" style="background:{color};color:{text_color}">'
-        f'{_esc(STATE_LABELS.get(state, state))}</span>'
+        f'{_esc(display)}</span>'
     )
+
+
+def _row_state_pill(row: MomentumV2Row) -> str:
+    return _state_pill(row.state, row.state_label)
 
 
 def _pillar_bar(row: MomentumV2Row) -> str:
@@ -821,7 +836,7 @@ def _terminal_row_html(row: MomentumV2Row) -> str:
     <div class="mv2-a-row mv2-a-click" {bridge_attrs} data-ticker="{_esc(row.ticker)}" title="{_esc(reason)}">
       <b class="{_tone_class(row.s_score)}">{_esc(row.ticker)}</b>
       <div class="note">{_esc(row.identity)}</div>
-      <div>{_state_pill(row.state)}</div>
+      <div>{_row_state_pill(row)}</div>
       <div>{_pillar_bars_svg(row)}</div>
       <div class="num {_tone_class(row.s_score)}">{_fmt(row.s_score)}</div>
       <div class="num {_tone_class(row.f_score)}">{_fmt(row.f_score)}</div>
@@ -873,7 +888,7 @@ def _row_html(row: MomentumV2Row) -> str:
     <div class="mv2-row" title="{_esc(reason)}">
       <div class="t">{_esc(row.ticker)}<small>{_esc(row.identity)}</small></div>
       {_pillar_bar(row)}
-      <div>{_state_pill(row.state)}</div>
+      <div>{_row_state_pill(row)}</div>
       <div class="mv2-num {s_class}">{_fmt(row.s_score)}</div>
       <div class="mv2-num {mom_class}">{_fmt(row.momentum_pct, '%', 1)}</div>
     </div>
@@ -950,7 +965,7 @@ def _c_composition_row(row: MomentumV2Row) -> str:
     <div class="mv2-c-row mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}">
       <b>{_esc(row.ticker)}</b>
       {_c_stack_bar(row)}
-      <div>{_state_pill(row.state)}</div>
+      <div>{_row_state_pill(row)}</div>
       <span class="mv2-num {_tone_class(row.s_score)}">{_fmt(row.s_score)}</span>
       <span class="mv2-num {_tone_class(row.momentum_pct)}">{_fmt(row.momentum_pct, '%', 0)}</span>
     </div>
@@ -981,7 +996,7 @@ def render_display_c(rows: list[MomentumV2Row], as_of: str) -> str:
         for pillar in PILLAR_ORDER
     )
     rail_changes = "".join(
-        f'<div class="mv2-c-rail-row mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}"><i style="background:{STATE_COLORS_LIGHT.get(row.state, "#777")}"></i><b>{_esc(row.ticker)}</b><span>{_esc(row.identity)} | state {_esc(STATE_LABELS.get(row.state, row.state))}</span><span>{_fmt(row.s_score)}</span></div>'
+        f'<div class="mv2-c-rail-row mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}"><i style="background:{STATE_COLORS_LIGHT.get(row.state, "#777")}"></i><b>{_esc(row.ticker)}</b><span>{_esc(row.identity)} | state {_esc(row.state_label)}</span><span>{_fmt(row.s_score)}</span></div>'
         for row in warnings[:8]
     )
     positions = "".join(
@@ -1086,7 +1101,7 @@ def render_display_a(
         <div class="mv2-a-transition mv2-a-click" {drill_bridge_attrs(row.ticker, label=row.identity)} data-ticker="{_esc(row.ticker)}">
           <i style="background:{STATE_COLORS_LIGHT.get(row.state, '#777')};box-shadow:0 0 6px {STATE_COLORS_LIGHT.get(row.state, '#777')}66"></i>
           <div class="mv2-a-id"><b>{_esc(row.ticker)}</b><small>{_esc(row.identity)}</small></div>
-          <span>state {_esc(STATE_LABELS.get(row.state, row.state))}</span>
+          <span>state {_esc(row.state_label)}</span>
           <span>{_fmt(row.s_score)}</span>
         </div>
         """
@@ -1098,7 +1113,7 @@ def render_display_a(
           <i style="background:{STATE_COLORS_LIGHT.get(row.state, '#777')}"></i>
           <div class="mv2-a-id"><b>{_esc(row.ticker)}</b><small>{_esc(row.identity)}</small></div>
           <span>S {_fmt(row.s_score)} | F {_fmt(row.f_score)}</span>
-          {_state_pill(row.state)}
+          {_row_state_pill(row)}
         </div>
         """
         for row in watchlist
@@ -1209,9 +1224,9 @@ def render_display_b(rows: list[MomentumV2Row], as_of: str) -> str:
         stories.append(
             f"""
             <article class="mv2-story mv2-a-click" {drill_bridge_attrs(item.ticker, label=item.identity)} data-ticker="{_esc(item.ticker)}">
-              <div><b>{_esc(item.ticker)}</b><br>{_state_pill(item.state)}</div>
+              <div><b>{_esc(item.ticker)}</b><br>{_row_state_pill(item)}</div>
               <div>
-                <h4>{_esc(item.identity)}: {_esc(item.state.replace("_", " ").title())}</h4>
+                <h4>{_esc(item.identity)}: {_esc(item.state_label)}</h4>
                 <p><strong>By the model.</strong> S is {_fmt(item.s_score)} and flow is {_fmt(item.f_score)}. {_esc(" ".join(item.reasons))}</p>
                 <p>Largest support is {_esc(pos)} {_fmt(pos_value, digits=3)}; largest drag is {_esc(neg)} {_fmt(neg_value, digits=3)}. The practical read is to respect the state label first, then check the nearest failed gate.</p>
               </div>
@@ -1224,11 +1239,11 @@ def render_display_b(rows: list[MomentumV2Row], as_of: str) -> str:
     )
     tape_items = [*leaders[:4], *risks[:4]]
     tape = "".join(
-        f'<span><b>{_esc(item.ticker)}</b> {_fmt(item.momentum_pct, "%", 1)} <i class="{_tone_class(item.s_score)}">{_esc(STATE_LABELS.get(item.state, item.state))}</i></span>'
+        f'<span><b>{_esc(item.ticker)}</b> {_fmt(item.momentum_pct, "%", 1)} <i class="{_tone_class(item.s_score)}">{_esc(item.state_label)}</i></span>'
         for item in tape_items
     )
     position_rows = "".join(
-        f'<div class="mv2-rail-item"><b>{_esc(item.ticker)} | {_esc(item.identity)}</b><span>{_esc(item.state.replace("_", " "))} | S {_fmt(item.s_score)} | F {_fmt(item.f_score)}</span></div>'
+        f'<div class="mv2-rail-item"><b>{_esc(item.ticker)} | {_esc(item.identity)}</b><span>{_esc(item.state_label)} | S {_fmt(item.s_score)} | F {_fmt(item.f_score)}</span></div>'
         for item in sorted(rows, key=lambda item: abs(item.s_score), reverse=True)[:6]
     )
     watch_rows = "".join(
@@ -1443,7 +1458,7 @@ def _deepdive_headline(row: MomentumV2Row) -> tuple[str, str, str]:
     price = "trend confirms" if trend_ok else "trend is mixed" if row.above_30wma else "trend broke"
     flow = "flow confirms" if flow_ok else "flow is warning"
     subtitle = (
-        f"{row.identity} is in {row.state.replace('_', ' ').title()} with S {_fmt(row.s_score)}, "
+        f"{row.identity} is in {row.state_label} with S {_fmt(row.s_score)}, "
         f"F {_fmt(row.f_score)}, momentum {_fmt(row.momentum_pct, '%', 1)}, and RRG {row.quadrant}. "
         f"The article explains the exact pillar balance and the nearest exit/escalation gates for this ticker."
     )
@@ -1460,7 +1475,7 @@ def _deepdive_interpretation(row: MomentumV2Row) -> tuple[str, str, str]:
         f"({_fmt(pos_value, digits=3)}), and the largest drag is {neg} ({_fmt(neg_value, digits=3)})."
     )
     second = (
-        f"The dashboard treats {row.ticker} as {row.state.replace('_', ' ').lower()}. "
+        f"The dashboard treats {row.ticker} as {row.state_label.lower()}. "
         f"Failed gates: {', '.join(failed) if failed else 'none'}. "
         f"{_next_escalation_text(row)}"
     )
@@ -1667,7 +1682,7 @@ def _peer_rank_html(rows: list[MomentumV2Row], focus: MomentumV2Row) -> tuple[st
     rank = next((idx + 1 for idx, row in enumerate(peers) if row.ticker == focus.ticker), 1)
     rendered = []
     for idx, row in enumerate(peers[:14], start=1):
-        state = STATE_LABELS.get(row.state, row.state)
+        state = row.state_label
         focus_class = " focus" if row.ticker == focus.ticker else ""
         rendered.append(
             f"""
@@ -1676,7 +1691,7 @@ def _peer_rank_html(rows: list[MomentumV2Row], focus: MomentumV2Row) -> tuple[st
               <b>{_esc(row.ticker)}</b>
               <span class="name">{_esc(row.identity)}</span>
               <span class="{_tone_class(row.s_score)}">{_fmt(row.s_score)}</span>
-              {_state_pill(row.state)}
+              {_row_state_pill(row)}
               <span style="display:none">{_esc(state)}</span>
             </div>
             """
@@ -1763,7 +1778,7 @@ def _deepdive_terminal_body(row: MomentumV2Row, rows: list[MomentumV2Row], as_of
     gate_rows = _gate_rows_for(row)
     failed_gates = [gate for gate in gate_rows if not gate[0]]
     peer_rows, rank, peer_count = _peer_rank_html(rows, row)
-    state_text = row.state.replace("_", " ")
+    state_text = row.state_label
     flow_phrase = "institutional money is supporting the move" if row.f_score >= 0 else "institutional money is exiting before price fully confirms it"
     narrative = (
         f"{row.ticker} is in {state_text}. Price-based evidence shows momentum at {_fmt(row.momentum_pct, '%', 1)} "
@@ -1780,7 +1795,7 @@ def _deepdive_terminal_body(row: MomentumV2Row, rows: list[MomentumV2Row], as_of
         <b style="color:#e8e8e8;font:900 14px/1 var(--font-mono)">{_esc(row.ticker)}</b>
         <span style="color:#7c7c7c;font:800 11px/1 var(--font-mono)">{_esc(row.asset_class)} | {_esc(row.identity.upper())}</span>
         <span style="flex:1"></span>
-        {_state_pill(row.state)}
+        {_row_state_pill(row)}
         <span style="color:#7c7c7c;font:800 11px/1 var(--font-mono)">model close proxy | mom {_fmt(row.momentum_pct, '%', 1)}</span>
       </div>
       {_tabs_html("deepdive")}
@@ -1794,7 +1809,7 @@ def _deepdive_terminal_body(row: MomentumV2Row, rows: list[MomentumV2Row], as_of
             {_terminal_pillar_detail_grid(row)}
           </div>
           <aside class="mv2-a2-gate-panel">
-            <h3>{_esc(STATE_LABELS.get(row.state, row.state))} | STATE GATES</h3>
+            <h3>{_esc(row.state_label)} | STATE GATES</h3>
             <p>State fires when any one deterioration gate is active. Currently triggered by <span style="color:#e6b450">{len(failed_gates)}</span> gates.</p>
             <div class="mv2-gates">{"".join(_gate_html(*gate) for gate in gate_rows)}</div>
             <div class="mv2-a2-callout"><strong style="color:#e6b450">Next state escalation:</strong> {_esc(_next_escalation_text(row))}</div>
@@ -1856,9 +1871,9 @@ def _deepdive_body(row: MomentumV2Row, display_name: str) -> str:
         <div>
           <div class="mv2-kicker">{_esc(display_name)} | Deep dive | {row.asset_class}</div>
           <h2 class="mv2-title">{_esc(row.display_label)}</h2>
-          <p class="mv2-subtitle"><b>{_esc(row.state.replace("_", " "))}</b>. {_esc(" ".join(row.reasons))}</p>
+          <p class="mv2-subtitle"><b>{_esc(row.state_label)}</b>. {_esc(" ".join(row.reasons))}</p>
         </div>
-        <div class="mv2-screen-note">Ticker-specific report<br>{_state_pill(row.state)}</div>
+        <div class="mv2-screen-note">Ticker-specific report<br>{_row_state_pill(row)}</div>
       </div>
       {_tabs_html("deepdive")}
       <div class="mv2-metric-deck">
@@ -1927,11 +1942,11 @@ def _deepdive_c_body(row: MomentumV2Row, rows: list[MomentumV2Row], as_of: str) 
           <div style="flex:1;min-width:320px">
             <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px">
               <h1 style="font:900 48px/1 var(--font-mono);margin:0;color:#1a1714">{_esc(row.ticker)}</h1>
-              {_state_pill(row.state)}
+              {_row_state_pill(row)}
               <span style="color:#7a7066;font:14px/1 var(--font-prose)">{_esc(row.asset_class)} | {_esc(row.identity)}</span>
             </div>
             <p style="max-width:820px;margin:0;color:#3d362f;font:20px/1.4 var(--font-prose)">
-              <strong style="color:#a8721a">{_esc(row.ticker)} is {_esc(row.state.replace('_', ' '))}.</strong>
+              <strong style="color:#a8721a">{_esc(row.ticker)} is {_esc(row.state_label)}.</strong>
               Start at zero, add each pillar's contribution, and end at S {_fmt(row.s_score)}. Flow is {_fmt(row.f_score)} and RRG is {_esc(row.quadrant)}.
             </p>
           </div>
@@ -2019,7 +2034,7 @@ def _universe_deepdive_body(rows: list[MomentumV2Row], display_name: str, as_of:
           <div class="mv2-panel">
             <h3>Top leaders</h3>
             <div class="mv2-rail-list">
-              {"".join(f'<div class="mv2-rail-item"><b>{_esc(item.display_label)} {_fmt(item.s_score)}</b><span>{_esc(item.state.replace("_", " "))} | {item.quadrant} | F {_fmt(item.f_score)}</span></div>' for item in leaders)}
+              {"".join(f'<div class="mv2-rail-item"><b>{_esc(item.display_label)} {_fmt(item.s_score)}</b><span>{_esc(item.state_label)} | {item.quadrant} | F {_fmt(item.f_score)}</span></div>' for item in leaders)}
             </div>
           </div>
           <div class="mv2-panel">
@@ -2372,7 +2387,7 @@ def _terminal_momentum_bars(rows: list[MomentumV2Row], limit: int = 14) -> str:
                 <div class="mv2-a3-track"><span class="mv2-a3-fill" style="{style}"></span></div>
               </div>
               <span class="{tone}">{_fmt(row.momentum_pct, '%', 1)}</span>
-              {_state_pill(row.state)}
+              {_row_state_pill(row)}
             </div>
             """
         )
@@ -2429,7 +2444,7 @@ def _terminal_flow_detail(rows: list[MomentumV2Row]) -> str:
               <span class="{_tone_class(row.cmf21)}">{_fmt(row.cmf21)}</span>
               <span class="{_tone_class(row.f_score)}">{_fmt(row.f_score)}</span>
               <span class="{_tone_class(row.breadth_50d - 0.5)}">{row.breadth_50d:.0%}</span>
-              {_state_pill(row.state)}
+              {_row_state_pill(row)}
             </div>
             """
         )
@@ -2607,7 +2622,7 @@ def _rotation_c_body(rows: list[MomentumV2Row], as_of: str) -> str:
           <span class="{_tone_class(row.cmf21)}">{_fmt(row.cmf21)}</span>
           <span class="{_tone_class(row.f_score)}">{_fmt(row.f_score)}</span>
           <span class="{_tone_class(row.pillars['FLOW'])}">{_fmt(row.pillars['FLOW'], digits=3)}</span>
-          {_state_pill(row.state)}
+          {_row_state_pill(row)}
         </div>
         """
         for row in sorted(rows, key=lambda item: item.f_score)[:10]
@@ -2805,7 +2820,7 @@ def _pillar_article_text(row: MomentumV2Row, pillar: str) -> str:
         ),
     }
     conclusion = (
-        f" Read this pillar together with state {row.state.replace('_', ' ')} and RRG {row.quadrant}; "
+        f" Read this pillar together with state {row.state_label} and RRG {row.quadrant}; "
         "the article view is designed to show which part of the evidence stack changed, not just the final label."
     )
     return base + details[pillar] + conclusion

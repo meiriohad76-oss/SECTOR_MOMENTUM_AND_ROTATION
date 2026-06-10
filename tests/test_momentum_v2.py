@@ -66,6 +66,24 @@ def test_build_view_rows_exposes_all_seven_pillars_and_identity():
     assert xlk.reasons
 
 
+def test_build_view_rows_uses_pullback_aware_state_label():
+    scored = _sample_scored()
+    scored.loc["XLK", "state"] = "STAGE_2_BULLISH"
+    scored.loc["XLK", "pullback_risk"] = True
+    scored.loc["XLK", "pullback_risk_reason"] = "5-session return -3.70% is at/below -3.50%"
+    scored.loc["XLK", "state_display_label"] = "Stage 2, Pullback Risk"
+
+    rows = build_view_rows(scored, phase="MID")
+    xlk = next(row for row in rows if row.ticker == "XLK")
+    html = render_display("C", rows, "2026-06-06 16:00 ET", screen="deepdive", focus_ticker="XLK")
+
+    assert xlk.state == "STAGE_2_BULLISH"
+    assert xlk.state_label == "Stage 2, Pullback Risk"
+    assert xlk.pullback_risk is True
+    assert "Stage 2, Pullback Risk" in html
+    assert "pullback risk is active" in " ".join(xlk.reasons)
+
+
 def test_momentum_bar_and_flow_helpers_render_empty_universe_messages():
     assert "No momentum rows available" in _momentum_rows([])
     assert "No momentum rows available" in _terminal_momentum_bars([])

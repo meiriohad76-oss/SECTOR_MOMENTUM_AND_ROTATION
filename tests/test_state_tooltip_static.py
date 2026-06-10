@@ -34,6 +34,18 @@ def test_stage_2_tooltip_copy_is_plain_english_and_value_driven():
     assert "5-session price return={return_5d}" in helper
     assert "sharp 5-session price loss of -4.00% or worse" in helper
     assert "Production state reconciliation changed the displayed state" in helper
+    assert "Why Stage 2 with pullback risk:" in helper
+    assert "Pullback-risk modifier is active" in helper
+
+
+def test_app_annotates_scored_frame_with_pullback_display_labels():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+
+    assert "annotate_state_display" in app_source
+    assert "scored = annotate_state_display(reconcile_states_from_storage(scored))" in app_source
+    assert "def _row_state_label(row)" in app_source
+    assert "_row_state_label(p)" in app_source
+    assert "_row_state_label(r)" in app_source
 
 
 def test_tooltip_style_supports_longer_explanations():

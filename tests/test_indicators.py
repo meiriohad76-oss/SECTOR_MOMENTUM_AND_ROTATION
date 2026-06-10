@@ -42,6 +42,7 @@ def test_indicator_helpers_return_none_for_short_history(ohlcv_frame_factory):
     short = ohlcv_frame_factory(days=40)
 
     assert indicators.momentum_12_1(short) is None
+    assert indicators.return_nd(short.iloc[:1], 1) is None
     assert indicators.return_5d(short.iloc[:5]) is None
     assert indicators.faber_signal(short) is None
     assert indicators.stage_analysis(short, short) is None
@@ -67,6 +68,8 @@ def test_compute_all_indicators_excludes_tbill_and_index_tickers(market_ohlcv):
     assert {"XLK", "XLF", "SOXX", "SPY"}.issubset(set(out.index))
     assert {
         "mom_12_1",
+        "return_1d",
+        "return_2d",
         "return_5d",
         "faber",
         "stage",
@@ -86,6 +89,14 @@ def test_return_5d_uses_latest_close_vs_five_sessions_ago(ohlcv_frame_factory):
     close = indicators.close_price(frame)
 
     assert indicators.return_5d(frame) == pytest.approx(close.iloc[-1] / close.iloc[-6] - 1.0)
+
+
+def test_return_nd_uses_latest_close_vs_requested_sessions_ago(ohlcv_frame_factory):
+    frame = ohlcv_frame_factory(days=12)
+    close = indicators.close_price(frame)
+
+    assert indicators.return_nd(frame, 1) == pytest.approx(close.iloc[-1] / close.iloc[-2] - 1.0)
+    assert indicators.return_nd(frame, 2) == pytest.approx(close.iloc[-1] / close.iloc[-3] - 1.0)
 
 
 def test_compute_all_indicators_parallelizes_eligible_tickers_by_default(market_ohlcv, monkeypatch):

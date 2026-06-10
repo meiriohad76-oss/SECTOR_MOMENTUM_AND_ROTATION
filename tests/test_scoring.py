@@ -88,6 +88,37 @@ def test_decide_state_blocks_clean_bullish_after_short_term_selloff():
     assert scoring.decide_state(row) == "WARNING"
 
 
+def test_pullback_risk_modifier_labels_stage_two_without_changing_raw_state():
+    veu_like = _row(state="STAGE_2_BULLISH", return_1d=-0.0109, return_2d=-0.0098, return_5d=-0.037)
+    ewc_like = _row(state="STAGE_2_BULLISH", return_1d=-0.0019, return_2d=-0.0024, return_5d=-0.0123)
+
+    assert scoring.decide_state(veu_like) == "STAGE_2_BULLISH"
+    assert scoring.has_pullback_risk(veu_like) is True
+    assert scoring.state_display_label(veu_like) == "Stage 2, Pullback Risk"
+    assert "5-session return -3.70%" in scoring.pullback_risk_reason(veu_like)
+    assert scoring.has_pullback_risk(ewc_like) is False
+    assert scoring.state_display_label(ewc_like) == "STAGE 2 BULLISH"
+
+
+def test_annotate_state_display_adds_pullback_columns():
+    frame = pd.DataFrame(
+        {
+            "state": ["STAGE_2_BULLISH", "STAGE_2_BULLISH"],
+            "return_1d": [-0.0109, -0.0019],
+            "return_2d": [-0.0098, -0.0024],
+            "return_5d": [-0.037, -0.0123],
+        },
+        index=["VEU", "EWC"],
+    )
+
+    annotated = scoring.annotate_state_display(frame)
+
+    assert bool(annotated.loc["VEU", "pullback_risk"]) is True
+    assert annotated.loc["VEU", "state_display_label"] == "Stage 2, Pullback Risk"
+    assert bool(annotated.loc["EWC", "pullback_risk"]) is False
+    assert annotated.loc["EWC", "state_display_label"] == "STAGE 2 BULLISH"
+
+
 def test_decide_state_ignores_stubbed_provider_flow_for_exit_gates():
     row = _row(
         etf_flow_5d_pct=-5.0,
