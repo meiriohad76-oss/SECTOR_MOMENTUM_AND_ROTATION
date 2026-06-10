@@ -162,6 +162,9 @@ def test_tooltips_are_viewport_safe():
     assert "position: fixed;" in bridge_source
     assert "max-width: calc(100vw - 32px);" in bridge_source
     assert "clamp(centered, margin, parentWindow.innerWidth - width - margin)" in bridge_source
-    assert "html.sector-js-tooltips [data-tip]::after" in css
+    assert "html.sector-js-tooltips [data-tip]::after" not in css
+    assert "[data-tip][data-tip-js-active]::after" in css
+    assert "activeNode.setAttribute('data-tip-js-active', '1')" in bridge_source
+    assert "activeNode.removeAttribute('data-tip-js-active')" in bridge_source
     assert "#sector-dashboard-tooltip" in css
     assert 'closest("[data-tip]")' in app_source

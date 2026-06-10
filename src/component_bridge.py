@@ -225,7 +225,11 @@ def viewport_tooltip_bridge_html() -> str:
     if (!text) {
       return;
     }
+    if (activeNode && activeNode !== target) {
+      activeNode.removeAttribute('data-tip-js-active');
+    }
     activeNode = target;
+    activeNode.setAttribute('data-tip-js-active', '1');
     tooltip.textContent = text;
     tooltip.classList.add('is-visible');
     positionTooltip(target);
@@ -238,6 +242,7 @@ def viewport_tooltip_bridge_html() -> str:
     if (event && event.relatedTarget && activeNode.contains(event.relatedTarget)) {
       return;
     }
+    activeNode.removeAttribute('data-tip-js-active');
     activeNode = null;
     tooltip.classList.remove('is-visible');
   }

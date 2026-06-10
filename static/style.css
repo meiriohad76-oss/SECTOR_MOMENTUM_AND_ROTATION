@@ -2185,8 +2185,8 @@ div[class*="st-key-comparison_tickers"] [data-testid="stWidgetLabel"] p {
   opacity: 1;
   visibility: visible;
 }
-html.sector-js-tooltips [data-tip]::after,
-html.sector-js-tooltips [data-tip]::before {
+[data-tip][data-tip-js-active]::after,
+[data-tip][data-tip-js-active]::before {
   content: none !important;
   display: none !important;
   opacity: 0 !important;
