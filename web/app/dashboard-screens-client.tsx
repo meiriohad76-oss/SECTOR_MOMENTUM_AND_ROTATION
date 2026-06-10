@@ -1788,7 +1788,21 @@ function BRrgEditorial({ rows, onSelectTicker }: { rows: SnapshotRow[]; onSelect
         const labelAnchor = px > width - 150 ? "end" : "start";
         const labelX = labelAnchor === "end" ? px - 9 : px + 9;
         return (
-          <g key={row.ticker} className="b-rrg-point" onClick={() => onSelectTicker(row.ticker)}>
+          <g
+            key={row.ticker}
+            className="b-rrg-point"
+            onClick={() => onSelectTicker(row.ticker)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onSelectTicker(row.ticker);
+              }
+            }}
+            aria-label={`Open ${row.ticker} editorial deep dive`}
+          >
+            <title>{`Open ${row.ticker} editorial deep dive`}</title>
             <line x1={trailX} x2={px} y1={trailY} y2={py} className={stateToneForClass(row.state)} />
             <circle cx={trailX} cy={trailY} r="2.5" className={stateToneForClass(row.state)} />
             <circle cx={px} cy={py} r="6" className={stateToneForClass(row.state)} />

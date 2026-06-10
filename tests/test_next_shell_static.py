@@ -310,6 +310,23 @@ def test_next_shell_b3_leaderboards_open_editorial_deep_dive():
         assert forbidden not in client_source
 
 
+def test_next_shell_b3_rrg_points_are_keyboard_drilldowns():
+    client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
+
+    for marker in (
+        "function BRrgEditorial({ rows, onSelectTicker }",
+        "className=\"b-rrg-point\"",
+        "role=\"button\"",
+        "tabIndex={0}",
+        "onKeyDown={(event) =>",
+        "event.key === \"Enter\" || event.key === \" \"",
+        "event.preventDefault();",
+        "aria-label={`Open ${row.ticker} editorial deep dive`}",
+        "<title>{`Open ${row.ticker} editorial deep dive`}</title>",
+    ):
+        assert marker in client_source
+
+
 def test_next_shell_pillar_stack_has_native_value_specific_tooltips():
     chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
     css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
