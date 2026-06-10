@@ -2717,7 +2717,9 @@ def render_alerts():
 
 
 def render_picks():
-    selected_picks = scored[scored["selected"]].sort_values(["S_score", "F_score", "mom_12_1"], ascending=[False, False, False])
+    selected_picks = scored[
+        scored["selected"] & (scored["state"] == "STAGE_2_BULLISH")
+    ].sort_values(["S_score", "F_score", "mom_12_1"], ascending=[False, False, False])
     if selected_picks.empty:
         basket_rows = defensive_basket_rows(scored)
         cards_html = ""

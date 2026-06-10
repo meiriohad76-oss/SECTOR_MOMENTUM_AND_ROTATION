@@ -24,6 +24,7 @@ def test_pick_metric_tooltips_are_value_specific_not_generic():
     helper = app_source[app_source.index("def _metric_tip_for_row(") : app_source.index("def _state_tip_for_row(")]
     picks = app_source[app_source.index("def render_picks():") : app_source.index("def render_rrg():")]
 
+    assert 'scored["selected"] & (scored["state"] == "STAGE_2_BULLISH")' in picks
     assert "composite S-score is {score}" in helper
     assert "flow F-score is {flow}" in helper
     assert "12-1 momentum is {mom}" in helper
