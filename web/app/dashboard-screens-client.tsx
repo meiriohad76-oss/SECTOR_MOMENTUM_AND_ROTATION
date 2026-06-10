@@ -908,16 +908,18 @@ function CWeatherStrip({ snapshot }: { snapshot: DashboardSnapshotPayload }) {
     : 0;
   return (
     <section className="c-weather" aria-label="Display C weather strip">
-      <div className="c-weather-lead">
-        <span>TODAY | SAVED DASHBOARD RUN</span>
-        <strong>{leadText} leading while {riskText} carries the weakest composite pressure.</strong>
-        <p>{warnings} warning/exit rows. {bullish} bullish rows. Universe size {snapshot.summary.universe_count}.</p>
+      <div className="c-weather-card">
+        <div className="c-weather-lead">
+          <span>TODAY | SAVED DASHBOARD RUN</span>
+          <strong>{leadText} leading while {riskText} carries the weakest composite pressure.</strong>
+          <p>{warnings} warning/exit rows. {bullish} bullish rows. Universe size {snapshot.summary.universe_count}.</p>
+        </div>
+        <div><span>Regime</span><strong>{snapshot.run?.metadata?.phase ? String(snapshot.run.metadata.phase) : "Current"}</strong><p>{snapshot.run?.provider || "provider"} data</p></div>
+        <div><span>Cycle</span><strong>{snapshot.run?.metadata?.cycle_phase ? String(snapshot.run.metadata.cycle_phase) : "Live"}</strong><p>macro context</p></div>
+        <div><span>Warnings</span><strong>{warnings}</strong><p>warning + exit</p></div>
+        <div><span>Breadth</span><strong>{breadth}%</strong><p>top leaders / universe</p></div>
+        <div><span>Universe</span><strong>{snapshot.summary.universe_count}</strong><p>{bullish} bullish | {exits} exit</p></div>
       </div>
-      <div><span>Regime</span><strong>{snapshot.run?.metadata?.phase ? String(snapshot.run.metadata.phase) : "Current"}</strong><p>{snapshot.run?.provider || "provider"} data</p></div>
-      <div><span>Cycle</span><strong>{snapshot.run?.metadata?.cycle_phase ? String(snapshot.run.metadata.cycle_phase) : "Live"}</strong><p>macro context</p></div>
-      <div><span>Warnings</span><strong>{warnings}</strong><p>warning + exit</p></div>
-      <div><span>Breadth</span><strong>{breadth}%</strong><p>top leaders / universe</p></div>
-      <div><span>Universe</span><strong>{snapshot.summary.universe_count}</strong><p>{bullish} bullish | {exits} exit</p></div>
     </section>
   );
 }
@@ -935,7 +937,7 @@ function COverviewScreen({
   const positions = snapshot.screens.overview?.positions ?? [];
   const bullish = snapshot.rows.filter((row) => row.state === "STAGE_2_BULLISH").slice(0, 8);
   return (
-    <section className="c-screen" aria-label="Display C heatmap overview">
+    <section className="c-screen c-overview-screen" aria-label="Display C heatmap overview">
       <CWeatherStrip snapshot={snapshot} />
       <div className="c-overview-grid">
         <PillarHeatmap

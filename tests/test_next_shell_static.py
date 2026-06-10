@@ -297,6 +297,20 @@ def test_next_shell_c_topbar_uses_handoff_logo_and_controls():
         assert marker in css_source
 
 
+def test_next_shell_c_weather_strip_uses_handoff_outer_band_and_inner_card():
+    client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
+    css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    assert 'className="c-screen c-overview-screen"' in client_source
+    assert 'className="c-weather-card"' in client_source
+    assert ".c-weather-card" in css_source
+    assert ".c-overview-screen" in css_source
+    assert "padding: 24px 0 20px;" in css_source
+    assert "grid-template-columns: 1.4fr repeat(5, minmax(0, 1fr));" in css_source
+    assert "padding: 18px 24px;" in css_source
+    assert ".c-weather-card > div:not(.c-weather-lead) strong" in css_source
+
+
 def test_next_shell_rrg_and_flow_have_native_value_specific_tooltips():
     chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
     css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")

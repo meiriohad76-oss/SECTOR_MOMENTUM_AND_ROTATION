@@ -1744,34 +1744,46 @@ main {
   padding: 22px 32px 32px;
 }
 
+.c-overview-screen {
+  padding-top: 0;
+}
+
 .c-weather {
+  padding: 24px 0 20px;
+}
+
+.c-weather-card {
   display: grid;
   grid-template-columns: 1.4fr repeat(5, minmax(0, 1fr));
   gap: 24px;
-  margin-bottom: 18px;
-  padding: 16px 24px;
+  padding: 18px 24px;
   background: #fff;
   border: 1px solid #e6e1d8;
   border-radius: 8px;
   box-shadow: 0 10px 24px rgba(34, 25, 14, 0.05);
 }
 
-.c-weather strong {
+.c-weather-card strong {
   display: block;
-  margin-top: 5px;
+  margin-top: 4px;
   color: #1a1714;
-  font-size: 1.26rem;
-  line-height: 1.15;
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
-.c-weather > div:not(.c-weather-lead) strong {
-  font-size: 1.2rem;
+.c-weather-card > div:not(.c-weather-lead) strong {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 1.375rem;
+  font-weight: 800;
+  letter-spacing: 0;
 }
 
-.c-weather p {
+.c-weather-card p {
   margin: 6px 0 0;
   color: #6a625a;
-  line-height: 1.4;
+  font-size: 0.75rem;
+  line-height: 1.35;
 }
 
 .c-overview-grid {
