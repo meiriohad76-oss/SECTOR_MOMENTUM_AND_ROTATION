@@ -41,6 +41,9 @@ const CLASS_ORDER = [
   "Other",
 ];
 
+const C1_VISIBLE_ROW_TARGET = 67;
+const C1_MIN_VISIBLE_ROWS_PER_CLASS = 3;
+
 function classRank(assetClass: string): number {
   const index = CLASS_ORDER.indexOf(assetClass);
   return index >= 0 ? index : CLASS_ORDER.length;
@@ -163,6 +166,44 @@ function pillarSideTotals(row: SnapshotRow): { positiveTotal: number; negativeTo
   return { positiveTotal, negativeTotal };
 }
 
+function c1VisibleRowCounts(grouped: Record<string, SnapshotRow[]>, classes: string[], target = C1_VISIBLE_ROW_TARGET): Record<string, number> {
+  const counts = Object.fromEntries(classes.map((assetClass) => [assetClass, grouped[assetClass]?.length ?? 0]));
+  const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+  if (total <= target) return counts;
+
+  const visibleCounts: Record<string, number> = {};
+  const activeClasses = classes.filter((assetClass) => counts[assetClass] > 0);
+  const minimum = Math.max(1, Math.min(C1_MIN_VISIBLE_ROWS_PER_CLASS, Math.floor(target / Math.max(1, activeClasses.length))));
+  let used = 0;
+  for (const assetClass of activeClasses) {
+    const visible = Math.min(counts[assetClass], minimum);
+    visibleCounts[assetClass] = visible;
+    used += visible;
+  }
+
+  let remaining = Math.max(0, target - used);
+  for (const assetClass of activeClasses) {
+    if (!remaining) break;
+    const count = counts[assetClass];
+    const available = count - (visibleCounts[assetClass] ?? 0);
+    if (available <= 0) continue;
+    const proportional = Math.floor((count / total) * remaining);
+    const extra = Math.min(available, Math.max(0, proportional));
+    visibleCounts[assetClass] = (visibleCounts[assetClass] ?? 0) + extra;
+    remaining -= extra;
+  }
+
+  while (remaining > 0) {
+    const candidate = activeClasses
+      .filter((assetClass) => (visibleCounts[assetClass] ?? 0) < counts[assetClass])
+      .sort((a, b) => counts[b] - (visibleCounts[b] ?? 0) - (counts[a] - (visibleCounts[a] ?? 0)))[0];
+    if (!candidate) break;
+    visibleCounts[candidate] = (visibleCounts[candidate] ?? 0) + 1;
+    remaining -= 1;
+  }
+  return visibleCounts;
+}
+
 export function PillarStackBar({ row, maxSide: maxSideOverride }: { row: SnapshotRow; maxSide?: number }) {
   const contributions = pillarContributions(row);
   const { positiveTotal, negativeTotal } = pillarSideTotals(row);
@@ -223,6 +264,7 @@ export function PillarHeatmap({
     const rank = classRank(a) - classRank(b);
     return rank || a.localeCompare(b);
   });
+  const visibleCounts = c1VisibleRowCounts(grouped, classes);
   const sortedRows = rows.slice().sort((a, b) => b.s_score - a.s_score);
   const heatmapMaxSide = Math.max(
     1,
@@ -252,26 +294,52 @@ export function PillarHeatmap({
         <span>MOM</span>
       </div>
       {classes.map((assetClass) => (
-        <div key={assetClass} className="composition-group">
-          <div className="composition-class">
-            {assetClass} | {grouped[assetClass].length} | {grouped[assetClass].filter((row) => row.s_score > 0).length} positive S
-          </div>
-          {grouped[assetClass]
-            .slice()
-            .sort((a, b) => b.s_score - a.s_score)
-            .map((row) => (
-              <button type="button" key={row.ticker} className="composition-row" onClick={() => onSelectTicker(row.ticker)}>
-                <strong>{row.ticker}</strong>
-                <PillarStackBar row={row} maxSide={heatmapMaxSide} />
-                <LightStatePill state={row.state} />
-                <span>{signedFmt(row.s_score)}</span>
-                <span>{momentumFmt(row.momentum_pct)}</span>
-              </button>
-            ))}
-        </div>
+        (() => {
+          const classRows = grouped[assetClass].slice().sort((a, b) => b.s_score - a.s_score);
+          const visible = classRows.slice(0, visibleCounts[assetClass] ?? classRows.length);
+          const overflow = classRows.slice(visible.length);
+          return (
+            <div key={assetClass} className="composition-group">
+              <div className="composition-class">
+                {assetClass} | {classRows.length} | {classRows.filter((row) => row.s_score > 0).length} positive S
+              </div>
+              {visible.map((row) => (
+                <CompositionRowButton key={row.ticker} row={row} maxSide={heatmapMaxSide} onSelectTicker={onSelectTicker} />
+              ))}
+              {overflow.length ? (
+                <details className="composition-overflow">
+                  <summary>{overflow.length} more live rows</summary>
+                  {overflow.map((row) => (
+                    <CompositionRowButton key={row.ticker} row={row} maxSide={heatmapMaxSide} onSelectTicker={onSelectTicker} />
+                  ))}
+                </details>
+              ) : null}
+            </div>
+          );
+        })()
       ))}
       {!sortedRows.length ? <p className="empty-chart-copy">No saved snapshot rows are available yet.</p> : null}
     </section>
+  );
+}
+
+function CompositionRowButton({
+  row,
+  maxSide,
+  onSelectTicker,
+}: {
+  row: SnapshotRow;
+  maxSide: number;
+  onSelectTicker: (ticker: string) => void;
+}) {
+  return (
+    <button type="button" key={row.ticker} className="composition-row" onClick={() => onSelectTicker(row.ticker)}>
+      <strong>{row.ticker}</strong>
+      <PillarStackBar row={row} maxSide={maxSide} />
+      <LightStatePill state={row.state} />
+      <span>{signedFmt(row.s_score)}</span>
+      <span>{momentumFmt(row.momentum_pct)}</span>
+    </button>
   );
 }
 

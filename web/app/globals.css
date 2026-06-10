@@ -3411,6 +3411,34 @@ select:focus-visible {
   background: #f4f1ec;
 }
 
+.composition-overflow {
+  border-bottom: 1px solid #e6e1d8;
+}
+
+.composition-overflow summary {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 0;
+  color: #7a7066;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.composition-overflow summary:hover,
+.composition-overflow[open] summary {
+  color: #12324a;
+  background: #f4f1ec;
+}
+
+.composition-overflow .composition-row:last-child {
+  border-bottom: 0;
+}
+
 .composition-row:hover,
 .composition-row:focus-visible {
   position: relative;

@@ -387,7 +387,18 @@ def test_next_shell_c1_heatmap_uses_compact_state_and_shared_bar_domain():
 
 
 def test_next_shell_c1_heatmap_uses_compact_live_row_density():
+    chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
     css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    for marker in (
+        "const C1_VISIBLE_ROW_TARGET = 67;",
+        "function c1VisibleRowCounts",
+        "const visibleCounts = c1VisibleRowCounts(grouped, classes);",
+        'className="composition-overflow"',
+        "{overflow.length} more live rows",
+        "function CompositionRowButton",
+    ):
+        assert marker in chart_source
 
     for marker in (
         "min-height: 32px;",
@@ -397,6 +408,8 @@ def test_next_shell_c1_heatmap_uses_compact_live_row_density():
         "height: 20px;",
         "height: 16px;",
         "padding: 10px 0 3px;",
+        ".composition-overflow summary",
+        ".composition-overflow[open] summary",
     ):
         assert marker in css_source
 
