@@ -1808,6 +1808,10 @@ main {
   overflow: hidden;
 }
 
+.c-right-rail .c-rail-card {
+  padding: 18px 22px;
+}
+
 .c-sec-head {
   display: flex;
   align-items: center;
@@ -1817,13 +1821,18 @@ main {
   border-bottom: 1px solid #e6e1d8;
 }
 
+.c-right-rail .c-sec-head {
+  margin-bottom: 8px;
+  padding: 0 0 8px;
+}
+
 .c-rail-card button {
   display: grid;
-  grid-template-columns: 8px 48px minmax(0, 1fr) auto;
+  grid-template-columns: 8px 44px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   width: 100%;
-  padding: 9px 16px;
+  padding: 8px 0;
   color: #1a1714;
   font: inherit;
   text-align: left;
@@ -1834,7 +1843,7 @@ main {
 }
 
 .c-rail-card button.c-cohort-row {
-  grid-template-columns: 54px minmax(0, 1fr) auto;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
 }
 
 .c-rail-card button:hover,
@@ -1847,7 +1856,7 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 11px 16px;
+  padding: 10px 0;
   border-bottom: 1px solid #f0ebe3;
 }
 
@@ -1887,7 +1896,7 @@ main {
 
 .c-rail-empty {
   margin: 0;
-  padding: 14px 16px 16px;
+  padding: 12px 0 0;
   line-height: 1.45;
 }
 

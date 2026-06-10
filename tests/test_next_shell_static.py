@@ -311,6 +311,20 @@ def test_next_shell_c_weather_strip_uses_handoff_outer_band_and_inner_card():
     assert ".c-weather-card > div:not(.c-weather-lead) strong" in css_source
 
 
+def test_next_shell_c1_right_rail_uses_handoff_padded_cards():
+    css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    for marker in (
+        ".c-right-rail .c-rail-card",
+        "padding: 18px 22px;",
+        ".c-right-rail .c-sec-head",
+        "grid-template-columns: 8px 44px minmax(0, 1fr) auto;",
+        "grid-template-columns: 48px minmax(0, 1fr) auto;",
+        "padding: 10px 0;",
+    ):
+        assert marker in css_source
+
+
 def test_next_shell_rrg_and_flow_have_native_value_specific_tooltips():
     chart_source = (WEB / "app" / "chart-primitives.tsx").read_text(encoding="utf-8")
     css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
