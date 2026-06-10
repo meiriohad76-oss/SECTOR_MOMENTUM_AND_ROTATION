@@ -918,13 +918,14 @@ function CWeatherStrip({ snapshot }: { snapshot: DashboardSnapshotPayload }) {
   const breadth = snapshot.summary.universe_count
     ? Math.round((leaders.length / snapshot.summary.universe_count) * 100)
     : 0;
+  const headline = `${leadText} leads; ${riskText} under pressure.`;
   return (
     <section className="c-weather" aria-label="Display C weather strip">
       <div className="c-weather-card">
         <div className="c-weather-lead">
           <span>TODAY | SAVED DASHBOARD RUN</span>
-          <strong>{leadText} leading while {riskText} carries the weakest composite pressure.</strong>
-          <p>{warnings} warning/exit rows. {bullish} bullish rows. Universe size {snapshot.summary.universe_count}.</p>
+          <strong>{headline}</strong>
+          <p>{warnings} warning/exit rows. {bullish} bullish. Universe size {snapshot.summary.universe_count}.</p>
         </div>
         <div><span>Regime</span><strong>{snapshot.run?.metadata?.phase ? String(snapshot.run.metadata.phase) : "Current"}</strong><p>{snapshot.run?.provider || "provider"} data</p></div>
         <div><span>Cycle</span><strong>{snapshot.run?.metadata?.cycle_phase ? String(snapshot.run.metadata.cycle_phase) : "Live"}</strong><p>macro context</p></div>

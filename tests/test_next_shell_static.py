@@ -305,6 +305,8 @@ def test_next_shell_c_weather_strip_uses_handoff_outer_band_and_inner_card():
     assert 'className="c-weather-card"' in client_source
     assert ".c-weather-card" in css_source
     assert ".c-overview-screen" in css_source
+    assert "const headline = `${leadText} leads; ${riskText} under pressure.`;" in client_source
+    assert "<strong>{headline}</strong>" in client_source
     assert "padding: 24px 0 20px;" in css_source
     assert "grid-template-columns: 1.4fr repeat(5, minmax(0, 1fr));" in css_source
     assert "padding: 18px 24px;" in css_source
@@ -382,6 +384,21 @@ def test_next_shell_c1_heatmap_uses_compact_state_and_shared_bar_domain():
         "momentumFmt(row.momentum_pct)",
     ):
         assert marker in chart_source
+
+
+def test_next_shell_c1_heatmap_uses_compact_live_row_density():
+    css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
+
+    for marker in (
+        "min-height: 32px;",
+        "padding: 4px 0;",
+        "min-width: 68px;",
+        "font-size: 0.62rem;",
+        "height: 20px;",
+        "height: 16px;",
+        "padding: 10px 0 3px;",
+    ):
+        assert marker in css_source
 
 
 def test_next_shell_rrg_and_flow_have_native_value_specific_tooltips():
