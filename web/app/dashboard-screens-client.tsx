@@ -19,7 +19,7 @@ import { FlowRiver, MomentumBars, PillarDetailGrid, PillarHeatmap, PillarStackBa
 type ScreenId = "overview" | "deepdive" | "rotation";
 type SortKey = "ticker" | "state" | "quadrant" | "s_score" | "f_score" | "rs_ratio" | "rs_momentum" | "momentum_pct" | "cmf21";
 type SortDirection = "asc" | "desc";
-type PresentationMode = "default" | "handoff-a" | "handoff-b" | "handoff-c";
+type PresentationMode = "default" | "handoff-a" | "handoff-b" | "handoff-c" | "admin";
 
 const SCREENS: { id: ScreenId; label: string; title: string }[] = [
   { id: "overview", label: "A", title: "Overview" },
@@ -2483,6 +2483,15 @@ export default function DashboardScreensClient({
         </div>
         <p className="subtle padded">{snapshot?.message || "Run a dashboard refresh to create a journal-backed snapshot."}</p>
       </section>
+    );
+  }
+
+  if (presentation === "admin") {
+    return (
+      <div className="screen-stack">
+        <PortfolioAnalyzerPanel onSelectTicker={() => {}} />
+        <BacktestArtifactPanel payload={backtestArtifacts} />
+      </div>
     );
   }
 
