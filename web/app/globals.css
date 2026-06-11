@@ -21,8 +21,14 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans, Arial, Helvetica, sans-serif);
   letter-spacing: 0;
+}
+
+/* Mono utility — use on all numerics, tickers, state labels, timestamps */
+.mono {
+  font-family: var(--font-mono, monospace);
+  font-feature-settings: "tnum";
 }
 
 main {
@@ -32,6 +38,19 @@ main {
 .handoff-main {
   background: #fbfaf8;
   color: #1a1714;
+}
+
+/* Display A (Terminal) dark-theme tokens */
+.a-shell {
+  --bg:     #0a0a0a;
+  --panel:  #111111;
+  --border: #1f1f1f;
+  --fg:     #e8e8e8;
+  --muted:  #7c7c7c;
+  --accent: #5fa8d3;
+  --green:  #26d65b;
+  --red:    #ef4f4a;
+  --amber:  #e6b450;
 }
 
 .c-shell {
@@ -159,15 +178,6 @@ main {
   border: 1px solid #e6e1d8;
   border-radius: 6px;
   cursor: pointer;
-}
-
-.a-shell {
-  min-height: 100vh;
-  color: #e8e8e8;
-  background: #0a0a0a;
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 12px;
-  letter-spacing: 0.005em;
 }
 
 .a-topbar {
