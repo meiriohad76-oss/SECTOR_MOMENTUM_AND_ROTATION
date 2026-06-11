@@ -4167,3 +4167,59 @@ select:focus-visible {
 .b-shell .transition-text,
 .c-shell .transition-date,
 .b-shell .transition-date { color: #7a7066; }
+
+/* ── StatusTiles ── */
+.status-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.status-tile {
+  background: var(--panel, #151d25);
+  border: 1px solid var(--line, #2b3742);
+  border-radius: 6px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.status-tile-label {
+  font-family: var(--font-sans, sans-serif);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted, #a9bac5);
+}
+
+.status-tile-value {
+  font-size: 1.4rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text, #f2f6f8);
+}
+
+.status-tile-sub {
+  font-size: 0.78rem;
+  color: var(--muted, #a9bac5);
+}
+
+/* Light theme overrides */
+.c-shell .status-tile,
+.b-shell .status-tile { background: #fff; border-color: #e6e1d8; }
+
+.c-shell .status-tile-label,
+.b-shell .status-tile-label { color: #7a7066; }
+
+.c-shell .status-tile-value,
+.b-shell .status-tile-value { color: #1a1714; }
+
+.c-shell .status-tile-sub,
+.b-shell .status-tile-sub { color: #7a7066; }
+
+@media (max-width: 767px) {
+  .status-tiles { grid-template-columns: 1fr; }
+}
