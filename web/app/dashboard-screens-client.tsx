@@ -2090,6 +2090,7 @@ function BOverviewScreen({
   const risks = snapshot.screens.overview?.risks ?? [];
   const actions = snapshot.screens.overview?.actions ?? [];
   const positions = snapshot.screens.overview?.positions ?? [];
+  const transitions = snapshot.screens.overview?.transitions ?? [];
   const exits = snapshot.summary.state_counts.EXIT ?? 0;
   const bears = snapshot.summary.state_counts.BEARISH_STAGE_4 ?? 0;
   const warnings = snapshot.summary.state_counts.WARNING ?? 0;
@@ -2126,7 +2127,14 @@ function BOverviewScreen({
       </div>
       <div className="b-main-grid">
         <main>
-          <BSectionRule title="This week's transitions" sub="The state machine decisions below are written as short stories. Click any story to open the editorial deep dive for that ticker." />
+          <TransitionsBanner
+            transitions={transitions}
+            onSelect={(ticker) => {
+              onSelectTicker(ticker);
+              setActiveScreen("deepdive");
+            }}
+            light={true}
+          />
           {stories.map((decision) => {
             const row = rowByTicker(snapshot.rows, decision.ticker);
             return (
