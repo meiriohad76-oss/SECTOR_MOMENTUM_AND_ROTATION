@@ -3891,3 +3891,89 @@ select:focus-visible {
     flex-direction: column;
   }
 }
+
+/* ── Display Toolbar ── */
+.display-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  height: 52px;
+  padding: 0 28px;
+  background: #0f1318;
+  border-bottom: 1px solid #2a3542;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.display-toolbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-right: 8px;
+}
+
+.display-toolbar-brand strong {
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #e8e8e8;
+}
+
+.display-toolbar-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.display-toolbar-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #6a7a88;
+  cursor: pointer;
+  transition: color 150ms, border-color 150ms;
+}
+
+.display-toolbar-tab.active {
+  color: #e8e8e8;
+  border-bottom: 2px solid #5fa8d3;
+  border-radius: 0;
+}
+
+.display-toolbar-tab:hover:not(.active) { color: #aab8c4; }
+
+.display-toolbar-tab-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.display-toolbar-tab-title {
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.display-toolbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.display-toolbar-timestamp {
+  font-size: 0.72rem;
+  color: #4e5e6a;
+}
+
+.display-toolbar-admin {
+  font-size: 0.72rem;
+  color: #4e5e6a;
+  text-decoration: none;
+}
+
+.display-toolbar-admin:hover { color: #8a9aaa; }
