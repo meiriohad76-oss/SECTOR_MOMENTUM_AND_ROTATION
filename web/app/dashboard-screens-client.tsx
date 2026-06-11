@@ -15,6 +15,7 @@ import type {
   TickerChartPayload,
 } from "../lib/api";
 import { FlowRiver, MomentumBars, PillarDetailGrid, PillarHeatmap, PillarStackBar, RrgChart, WaterfallChart } from "./chart-primitives";
+import { stateColor, stateShortLabel } from "../lib/state-colors";
 
 type ScreenId = "overview" | "deepdive" | "rotation";
 type SortKey = "ticker" | "state" | "quadrant" | "s_score" | "f_score" | "rs_ratio" | "rs_momentum" | "momentum_pct" | "cmf21";
@@ -36,8 +37,19 @@ function statusClass(status: string) {
   return "warn";
 }
 
-function StatusPill({ status }: { status: string }) {
-  return <span className={`status-pill ${statusClass(status)}`}>{status || "unknown"}</span>;
+function StatusPill({ status, light = false }: { status: string; light?: boolean }) {
+  const bg = stateColor(status, light);
+  const label = stateShortLabel(status) || status || "unknown";
+  return (
+    <span
+      className="state-pill mono"
+      style={{ background: bg, color: "#fff", padding: "2px 9px", borderRadius: "11px",
+               fontSize: "0.72rem", fontWeight: 600, letterSpacing: "0.03em",
+               display: "inline-block", lineHeight: 1.4 }}
+    >
+      {label}
+    </span>
+  );
 }
 
 function compactStateText(state: string): string {
@@ -1524,19 +1536,24 @@ function ATopBar({
   setActiveScreen: (screen: ScreenId) => void;
   generatedAt: string;
 }) {
+  const labels: { id: ScreenId; label: string }[] = [
+    { id: "overview", label: "Overview" },
+    { id: "deepdive", label: "Deep Dive" },
+    { id: "rotation", label: "Rotation" },
+  ];
   return (
     <header className="a-topbar">
       <div className="a-brand"><i /> <strong>SENTIMENT BOARD</strong><span>v2 / momentum</span></div>
-      <nav className="a-tabs" aria-label="Display A screen selector">
-        {SCREENS.map((screen) => (
+      <nav className="a-screen-tabs" aria-label="Display A screen selector">
+        {labels.map((item) => (
           <button
             type="button"
-            key={screen.id}
-            className={activeScreen === screen.id ? "active" : ""}
-            onClick={() => setActiveScreen(screen.id)}
-            aria-pressed={activeScreen === screen.id}
+            key={item.id}
+            className={activeScreen === item.id ? "active" : ""}
+            onClick={() => setActiveScreen(item.id)}
+            aria-pressed={activeScreen === item.id}
           >
-            {screen.title}
+            {item.label}
           </button>
         ))}
       </nav>
@@ -2036,20 +2053,25 @@ function BMasthead({
   setActiveScreen: (screen: ScreenId) => void;
   compact?: boolean;
 }) {
+  const labels: { id: ScreenId; label: string }[] = [
+    { id: "overview", label: "Overview" },
+    { id: "deepdive", label: "Deep Dive" },
+    { id: "rotation", label: "Rotation" },
+  ];
   return (
     <header className={compact ? "b-masthead compact" : "b-masthead"}>
       <strong>The Sentiment Brief</strong>
-      <span>{compact ? activeScreen === "deepdive" ? "DEEP-DIVE" : "THE ROTATION MAP" : "EVENING EDITION"}</span>
+      <span>{compact ? (activeScreen === "deepdive" ? "DEEP-DIVE" : "THE ROTATION MAP") : "EVENING EDITION"}</span>
       <nav aria-label="Display B screen selector">
-        {SCREENS.map((screen) => (
+        {labels.map((item) => (
           <button
             type="button"
-            key={screen.id}
-            className={activeScreen === screen.id ? "active" : ""}
-            onClick={() => setActiveScreen(screen.id)}
-            aria-pressed={activeScreen === screen.id}
+            key={item.id}
+            className={activeScreen === item.id ? "active" : ""}
+            onClick={() => setActiveScreen(item.id)}
+            aria-pressed={activeScreen === item.id}
           >
-            {screen.title}
+            {item.label}
           </button>
         ))}
       </nav>

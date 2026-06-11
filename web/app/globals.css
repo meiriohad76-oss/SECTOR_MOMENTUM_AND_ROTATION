@@ -3987,3 +3987,16 @@ select:focus-visible {
 }
 
 .display-toolbar-admin:hover { color: #8a9aaa; }
+
+/* ── State Pill ── */
+.state-pill {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 11px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1.4;
+  color: #fff;
+  white-space: nowrap;
+}
