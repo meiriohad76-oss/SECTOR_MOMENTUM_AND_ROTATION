@@ -4270,3 +4270,8 @@ select:focus-visible {
 @media (max-width: 767px) {
   .picks-grid { grid-template-columns: 1fr; }
 }
+
+/* ── C status block ── */
+.c-status-block {
+  padding: 20px 32px 0;
+}

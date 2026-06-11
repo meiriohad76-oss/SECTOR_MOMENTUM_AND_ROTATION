@@ -16,6 +16,9 @@ import type {
 } from "../lib/api";
 import { FlowRiver, MomentumBars, PillarDetailGrid, PillarHeatmap, PillarStackBar, RrgChart, WaterfallChart } from "./chart-primitives";
 import { stateColor, stateShortLabel } from "../lib/state-colors";
+import StatusTiles from "../components/StatusTiles";
+import TransitionsBanner from "../components/TransitionsBanner";
+import PicksGrid from "../components/PicksGrid";
 
 type ScreenId = "overview" | "deepdive" | "rotation";
 type SortKey = "ticker" | "state" | "quadrant" | "s_score" | "f_score" | "rs_ratio" | "rs_momentum" | "momentum_pct" | "cmf21";
@@ -962,52 +965,29 @@ function COverviewScreen({
   const transitions = snapshot.screens.overview?.transitions ?? [];
   const positions = snapshot.screens.overview?.positions ?? [];
   const bullish = snapshot.rows.filter((row) => row.state === "STAGE_2_BULLISH").slice(0, 8);
+  const navigate = (ticker: string) => {
+    onSelectTicker(ticker);
+    setActiveScreen("deepdive");
+  };
   return (
     <section className="c-screen c-overview-screen" aria-label="Display C heatmap overview">
       <CWeatherStrip snapshot={snapshot} />
+      <div className="c-status-block">
+        <StatusTiles snapshot={snapshot} />
+        <TransitionsBanner
+          transitions={transitions}
+          onSelect={navigate}
+          light={true}
+        />
+        <PicksGrid rows={snapshot.rows} light={true} onSelect={navigate} />
+      </div>
       <div className="c-overview-grid">
         <PillarHeatmap
           rows={snapshot.rows}
-          sourceNote={`Provider: ${snapshot.run?.provider || "unknown"}. Rows: ${snapshot.summary.universe_count}. Decisions: ${snapshot.decisions.length}. Fed by the latest persisted run journal, not handoff fixture data.`}
-          onSelectTicker={(ticker) => {
-            onSelectTicker(ticker);
-            setActiveScreen("deepdive");
-          }}
+          sourceNote={`Provider: ${snapshot.run?.provider || "unknown"}. Rows: ${snapshot.summary.universe_count}. Decisions: ${snapshot.decisions.length}.`}
+          onSelectTicker={navigate}
         />
         <aside className="c-right-rail">
-          <div className="c-rail-card">
-            <div className="c-sec-head">
-              <strong>State changes</strong>
-              <span>{transitions.length ? `last ${Math.min(transitions.length, 8)} saved` : `${actions.length} actions`}</span>
-            </div>
-            {transitions.slice(0, 8).map((transition) => (
-              <TransitionRailRow
-                key={`${transition.ticker}-${transition.from}-${transition.to}-${transition.date}`}
-                transition={transition}
-                onSelect={(ticker) => {
-                  onSelectTicker(ticker);
-                  setActiveScreen("deepdive");
-                }}
-              />
-            ))}
-            {!transitions.length ? actions.slice(0, 8).map((decision) => (
-              <button
-                type="button"
-                key={`${decision.action}-${decision.ticker}`}
-                className="c-decision-row"
-                onClick={() => {
-                  onSelectTicker(decision.ticker);
-                  setActiveScreen("deepdive");
-                }}
-              >
-                <i />
-                <strong>{decision.ticker}</strong>
-                <span>{decision.action}</span>
-              </button>
-            )) : null}
-            {!transitions.length && actions.length ? <p className="c-rail-empty">No saved transition rows were found in the snapshot; showing latest model actions instead.</p> : null}
-            {!transitions.length && !actions.length ? <p className="c-rail-empty">No saved transition rows or decisions are available in the latest run.</p> : null}
-          </div>
           <div className="c-rail-card">
             <div className="c-sec-head">
               <strong>Your positions</strong>
@@ -1017,7 +997,7 @@ function COverviewScreen({
               <PositionRailRow key={`${position.source_name}-${position.ticker}`} position={position} />
             ))}
             {!positions.length ? (
-              <p className="c-rail-empty">No saved local portfolio is available yet. Save a portfolio in the Streamlit analyzer and this rail will summarize its holdings.</p>
+              <p className="c-rail-empty">No saved local portfolio available yet.</p>
             ) : null}
           </div>
           <div className="c-rail-card">
@@ -1027,10 +1007,7 @@ function COverviewScreen({
                 type="button"
                 className="c-cohort-row"
                 key={row.ticker}
-                onClick={() => {
-                  onSelectTicker(row.ticker);
-                  setActiveScreen("deepdive");
-                }}
+                onClick={() => navigate(row.ticker)}
               >
                 <strong>{row.ticker}</strong>
                 <span>{row.identity}</span>
@@ -1857,6 +1834,11 @@ function AOverviewScreen({
 }) {
   const actions = snapshot.screens.overview?.actions ?? [];
   const positions = snapshot.screens.overview?.positions ?? [];
+  const transitions = snapshot.screens.overview?.transitions ?? [];
+  const navigate = (ticker: string) => {
+    onSelectTicker(ticker);
+    setActiveScreen("deepdive");
+  };
   const warningPositions = positions.filter((position) => {
     const row = rowByTicker(snapshot.rows, position.ticker);
     return row && ["WARNING", "EXIT", "BEARISH_STAGE_4"].includes(row.state);
@@ -1864,20 +1846,20 @@ function AOverviewScreen({
   return (
     <section className="a-screen">
       <ABlufStrip snapshot={snapshot} />
-      <AStatusStrip snapshot={snapshot} />
+      <StatusTiles snapshot={snapshot} />
+      <TransitionsBanner
+        transitions={transitions}
+        onSelect={navigate}
+        light={false}
+      />
+      <PicksGrid rows={snapshot.rows} light={false} onSelect={navigate} />
       <div className="a-body-grid">
-        <ATerminalHeatmap rows={snapshot.rows} onSelectTicker={(ticker) => {
-          onSelectTicker(ticker);
-          setActiveScreen("deepdive");
-        }} />
+        <ATerminalHeatmap rows={snapshot.rows} onSelectTicker={navigate} />
         <aside className="a-right-rail">
           <section className="a-panel">
             <div className="a-section-head"><strong>TRANSITIONS</strong><span>latest saved decisions</span><em>{actions.length} EVENTS</em></div>
             {actions.slice(0, 9).map((decision) => (
-              <button type="button" className="a-transition-row" key={`${decision.ticker}-${decision.action}`} onClick={() => {
-                onSelectTicker(decision.ticker);
-                setActiveScreen("deepdive");
-              }}>
+              <button type="button" className="a-transition-row" key={`${decision.ticker}-${decision.action}`} onClick={() => navigate(decision.ticker)}>
                 <i className={statusClass(decision.action)} />
                 <strong>{decision.ticker}</strong>
                 <span>{decision.action}</span>
@@ -1891,10 +1873,7 @@ function AOverviewScreen({
             {positions.slice(0, 6).map((position) => {
               const row = rowByTicker(snapshot.rows, position.ticker);
               return (
-                <button type="button" className="a-position-row" key={`${position.source_name}-${position.ticker}`} onClick={() => {
-                  onSelectTicker(position.ticker);
-                  setActiveScreen("deepdive");
-                }}>
+                <button type="button" className="a-position-row" key={`${position.source_name}-${position.ticker}`} onClick={() => navigate(position.ticker)}>
                   <i className={stateToneForClass(row?.state || "")} />
                   <strong>{position.ticker}</strong>
                   <span>{position.identity}</span>
