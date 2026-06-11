@@ -4006,3 +4006,83 @@ select:focus-visible {
   display: block;
   overflow: visible;
 }
+
+/* ── PickCard ── */
+.pick-card {
+  background: var(--panel, #151d25);
+  border: 1px solid var(--line, #2b3742);
+  border-left: 3px solid var(--state-color, #666);
+  border-radius: 6px;
+  padding: 12px 14px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-left-color 150ms ease;
+}
+
+.pick-card:hover { border-left-color: var(--accent, #5fa8d3); }
+
+.pick-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pick-card-ticker {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text, #f2f6f8);
+}
+
+.pick-card-pill {
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 2px 9px;
+  border-radius: 11px;
+  line-height: 1.4;
+}
+
+.pick-card-class {
+  font-size: 0.72rem;
+  color: var(--muted, #a9bac5);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pick-card-scores {
+  display: flex;
+  gap: 12px;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.pick-card-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--muted, #a9bac5);
+}
+
+/* Light theme overrides for C and B shells */
+.c-shell .pick-card,
+.b-shell .pick-card {
+  background: #fff;
+  border-color: #e6e1d8;
+  color: #1a1714;
+}
+
+.c-shell .pick-card-ticker,
+.b-shell .pick-card-ticker { color: #1a1714; }
+
+.c-shell .pick-card-class,
+.b-shell .pick-card-class { color: #7a7066; }
+
+.c-shell .pick-card-footer,
+.b-shell .pick-card-footer { color: #7a7066; }
