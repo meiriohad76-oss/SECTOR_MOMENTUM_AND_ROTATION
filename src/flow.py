@@ -61,8 +61,8 @@ def _config_flag(name: str, default: bool) -> bool:
 STUB_MODE = True
 ETF_PRIMARY_FLOW_STUB_MODE = _config_flag("FLOW_STUB_MODE", True)
 MASSIVE_TRADES_STUB_MODE = _config_flag("MASSIVE_TRADES_STUB_MODE", True)
-FINRA_ATS_STUB_MODE = _config_flag("FINRA_ATS_STUB_MODE", True)
-FINRA_SHORT_INTEREST_STUB_MODE = _config_flag("FINRA_SHORT_INTEREST_STUB_MODE", True)
+FINRA_ATS_STUB_MODE = _config_flag("FINRA_ATS_STUB_MODE", False)
+FINRA_SHORT_INTEREST_STUB_MODE = _config_flag("FINRA_SHORT_INTEREST_STUB_MODE", False)
 SEC_13F_STUB_MODE = _config_flag("SEC_13F_STUB_MODE", True)
 MASSIVE_BROWSER_URL = "https://render.joinmassive.com/browser"
 MASSIVE_STOCK_TRADES_URL_TEMPLATE = "https://api.massive.com/v3/trades/{ticker}"
