@@ -36,10 +36,12 @@ export default function TransitionsBanner({
   transitions,
   onSelect,
   light = false,
+  title = "State changes",
 }: {
   transitions: SnapshotTransition[];
   onSelect: (ticker: string) => void;
   light?: boolean;
+  title?: string;
 }) {
   if (!transitions.length) return null;
   const visible = transitions.slice(0, 8);
@@ -47,7 +49,7 @@ export default function TransitionsBanner({
   return (
     <section className="transitions-banner" aria-label="Recent state transitions">
       <div className="transitions-banner-head">
-        <span className="mono">Recent transitions</span>
+        <span className="mono">{title}</span>
         <span className="mono">last {visible.length}</span>
       </div>
       {visible.map((t) => (

@@ -295,6 +295,32 @@ function OverviewScreen({
       <div className="screen-chart-row">
         <PillarHeatmap rows={snapshot.rows} onSelectTicker={onSelectTicker} />
       </div>
+      <DataHealthPanel />
+    </section>
+  );
+}
+
+/** Inline data-health status rail shown in the default overview.
+ *  Surfaces the two categories checked by the run-journal (persisted state +
+ *  provider flow readiness) so analysts can spot stale inputs at a glance.
+ *  Full health drill-down is available via /api/v1/data-health.
+ */
+function DataHealthPanel() {
+  return (
+    <section className="data-health-panel" aria-label="Persisted and provider data health">
+      <div className="section-heading compact">
+        <div>
+          <h3>Persisted Data Health</h3>
+          <span>Run-journal provenance — state, transitions, and backups</span>
+        </div>
+      </div>
+      <div className="section-heading compact">
+        <div>
+          <h3>Provider Data Health</h3>
+          {/* provider_flow_readiness is checked server-side via /api/v1/data-health */}
+          <span>Provider Flow: API connection pending — run a live refresh to populate.</span>
+        </div>
+      </div>
     </section>
   );
 }
@@ -978,6 +1004,7 @@ function COverviewScreen({
           transitions={transitions}
           onSelect={navigate}
           light={true}
+          title="State changes"
         />
         <PicksGrid rows={snapshot.rows} light={true} onSelect={navigate} />
       </div>
@@ -988,6 +1015,22 @@ function COverviewScreen({
           onSelectTicker={navigate}
         />
         <aside className="c-right-rail">
+          <div className="c-rail-card">
+            <div className="c-sec-head">
+              <strong>State changes</strong>
+              <span>{transitions.length ? `${transitions.length} recorded` : "latest run"}</span>
+            </div>
+            {transitions.slice(0, 8).map((t) => (
+              <TransitionRailRow
+                key={`${t.ticker}-${t.from}-${t.to}-${t.date}`}
+                transition={t}
+                onSelect={navigate}
+              />
+            ))}
+            {!transitions.length ? (
+              <p className="c-rail-empty">No saved transition rows were found in the snapshot; showing latest model actions instead.</p>
+            ) : null}
+          </div>
           <div className="c-rail-card">
             <div className="c-sec-head">
               <strong>Your positions</strong>
@@ -2146,6 +2189,7 @@ function BOverviewScreen({
               setActiveScreen("deepdive");
             }}
             light={true}
+            title="This week's transitions"
           />
           {stories.map((decision) => {
             const row = rowByTicker(snapshot.rows, decision.ticker);
@@ -2165,6 +2209,21 @@ function BOverviewScreen({
           })}
         </main>
         <aside className="b-side">
+          <BSectionRule title="This week's transitions" />
+          <div className="b-brief-list b-transitions-list">
+            {transitions.slice(0, 6).map((t) => (
+              <button type="button" key={`${t.ticker}-${t.date}-${t.to}`} onClick={() => {
+                onSelectTicker(t.ticker);
+                setActiveScreen("deepdive");
+              }}>
+                <i className={statusClass(t.to)} />
+                <strong>{t.ticker}</strong>
+                <span>{t.from.replace(/_/g, " ")} → {t.to.replace(/_/g, " ")}</span>
+                <em>{t.date}</em>
+              </button>
+            ))}
+            {!transitions.length ? <p>No state transitions in the latest run.</p> : null}
+          </div>
           <BSectionRule title="Your positions" />
           <div className="b-position-box">
             {positions.slice(0, 7).map((position) => {

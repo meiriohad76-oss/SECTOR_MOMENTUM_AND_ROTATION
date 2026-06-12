@@ -73,9 +73,11 @@ def test_next_shell_renders_health_tables_and_provider_rail_without_fixture_mark
 
 def test_next_shell_snapshot_sections_are_api_driven_not_hardcoded():
     page_source = (WEB / "app" / "page.tsx").read_text(encoding="utf-8")
+    display_shell_source = (WEB / "components" / "DisplayShell.tsx").read_text(encoding="utf-8")
     client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
 
-    assert "DashboardScreensClient" in page_source
+    # DashboardScreensClient is used through DisplayShell (Server → DisplayShell → DashboardScreensClient)
+    assert "DashboardScreensClient" in page_source + display_shell_source
     assert "snapshot.screens.overview?.leaders" in client_source
     assert "snapshot.screens.overview?.positions" in client_source
     assert "snapshot.screens.rotation?.sectors" in client_source
@@ -168,14 +170,16 @@ def test_next_shell_has_native_react_interactions_for_abc_screens():
 
 
 def test_next_shell_has_handoff_presentation_modes_for_visual_parity():
-    page_source = (WEB / "app" / "page.tsx").read_text(encoding="utf-8")
+    display_shell_source = (WEB / "components" / "DisplayShell.tsx").read_text(encoding="utf-8")
     client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
     css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
 
-    assert 'presentation === "a"' in page_source
-    assert 'presentation === "b"' in page_source
-    assert 'presentation === "c"' in page_source
-    assert '"handoff-b" : "handoff-c"' in page_source
+    # Presentation mode branching lives in DisplayShell (client component)
+    assert 'presentation === "a"' in display_shell_source
+    assert 'presentation === "b"' in display_shell_source
+    assert 'presentation === "c"' in display_shell_source
+    assert '"handoff-b"' in display_shell_source
+    assert '"handoff-c"' in display_shell_source
     assert 'type PresentationMode = "default" | "handoff-a" | "handoff-b" | "handoff-c"' in client_source
     assert "HandoffAScreens" in client_source
     assert "AOverviewScreen" in client_source
@@ -367,7 +371,8 @@ def test_next_shell_c1_heatmap_uses_handoff_pillar_palette_and_layout():
         "padding: 22px 28px;",
         "background: #fff;",
         ".c-heatmap-heading h3",
-        "grid-template-columns: 52px minmax(260px, 1fr) 78px 60px 64px;",
+        # 6-column grid: TKR | TREND (sparkline) | COMPOSITION | STATE | S | MOM
+        "grid-template-columns: 52px 64px minmax(196px, 1fr) 78px 60px 64px;",
         "font-family: ui-monospace, SFMono-Regular, Consolas, monospace;",
         "border-bottom: 1px solid #e6e1d8;",
     ):

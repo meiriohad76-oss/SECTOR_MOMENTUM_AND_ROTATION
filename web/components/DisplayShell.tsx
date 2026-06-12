@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { DashboardSnapshotPayload } from "../lib/api";
+import type { BacktestArtifactsPayload, DashboardSnapshotPayload } from "../lib/api";
 import DashboardScreensClient from "../app/dashboard-screens-client";
 import DisplayToolbar from "./DisplayToolbar";
 
@@ -11,10 +11,14 @@ const STORAGE_KEY = "momentum.display";
 
 export default function DisplayShell({
   snapshot,
+  backtestArtifacts = null,
+  backtestError,
 }: {
   snapshot: DashboardSnapshotPayload | null;
+  backtestArtifacts?: BacktestArtifactsPayload | null;
+  backtestError?: string | null;
 }) {
-  const [display, setDisplay] = useState<DisplayMode>("c");
+  const [presentation, setPresentation] = useState<DisplayMode>("c");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -22,25 +26,28 @@ export default function DisplayShell({
     const params = new URLSearchParams(window.location.search);
     const urlParam = params.get("presentation");
     if (urlParam === "a" || urlParam === "b" || urlParam === "c") {
-      setDisplay(urlParam);
+      setPresentation(urlParam);
     } else {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored === "a" || stored === "b" || stored === "c") {
-        setDisplay(stored);
+        setPresentation(stored);
       }
     }
     setHydrated(true);
   }, []);
 
-  function switchDisplay(mode: DisplayMode) {
-    setDisplay(mode);
+  function switchPresentation(mode: DisplayMode) {
+    setPresentation(mode);
     localStorage.setItem(STORAGE_KEY, mode);
   }
 
   const generatedAt = snapshot?.generated_at ?? "";
 
-  const presentation =
-    display === "a" ? "handoff-a" : display === "b" ? "handoff-b" : "handoff-c";
+  const presentationMode =
+    presentation === "a" ? "handoff-a"
+    : presentation === "b" ? "handoff-b"
+    : presentation === "c" ? "handoff-c"
+    : "handoff-c";
 
   // Suppress flash of wrong display before hydration
   if (!hydrated) {
@@ -52,11 +59,15 @@ export default function DisplayShell({
   return (
     <>
       <DisplayToolbar
-        activeDisplay={display}
+        activeDisplay={presentation}
         generatedAt={generatedAt}
-        onSwitch={switchDisplay}
+        onSwitch={switchPresentation}
       />
-      <DashboardScreensClient snapshot={snapshot} presentation={presentation} />
+      <DashboardScreensClient
+        snapshot={snapshot}
+        presentation={presentationMode}
+        backtestArtifacts={backtestArtifacts}
+      />
     </>
   );
 }
