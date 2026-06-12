@@ -3397,7 +3397,7 @@ select:focus-visible {
 .composition-header,
 .composition-row {
   display: grid;
-  grid-template-columns: 52px minmax(260px, 1fr) 78px 60px 64px;
+  grid-template-columns: 52px 64px minmax(196px, 1fr) 78px 60px 64px;
   gap: 10px;
   align-items: center;
 }
@@ -3443,6 +3443,11 @@ select:focus-visible {
 
 .composition-row:hover {
   background: #f4f1ec;
+}
+
+.composition-row .sparkline {
+  display: block;
+  overflow: hidden;
 }
 
 .composition-overflow {

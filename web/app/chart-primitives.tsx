@@ -1,6 +1,7 @@
 "use client";
 
 import type { SnapshotRow } from "../lib/api";
+import Sparkline from "../components/Sparkline";
 
 type PillarKey = "mom_12_1" | "mansfield_rs" | "rs_ratio" | "rs_momentum" | "breadth_50d" | "cycle_tilt" | "cmf21";
 
@@ -288,6 +289,7 @@ export function PillarHeatmap({
       </div>
       <div className="composition-header">
         <span>TKR</span>
+        <span>TREND</span>
         <span>COMPOSITION</span>
         <span>STATE</span>
         <span>S</span>
@@ -335,6 +337,7 @@ function CompositionRowButton({
   return (
     <button type="button" key={row.ticker} className="composition-row" onClick={() => onSelectTicker(row.ticker)}>
       <strong>{row.ticker}</strong>
+      <Sparkline ticker={row.ticker} state={row.state} w={64} h={24} />
       <PillarStackBar row={row} maxSide={maxSide} />
       <LightStatePill state={row.state} />
       <span>{signedFmt(row.s_score)}</span>
