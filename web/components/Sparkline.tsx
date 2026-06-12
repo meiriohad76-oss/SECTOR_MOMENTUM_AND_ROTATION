@@ -17,7 +17,7 @@ export default function Sparkline({
 }) {
   const strokeColor = color ?? stateColor(state);
   const path = sparkPath(ticker, state, w, h);
-  const gradientId = `sg-${ticker}-${w}`;
+  const gradientId = `sg-${ticker}-${state.slice(0, 4)}-${w}`;
   const areaPath = `${path} L${w},${h} L0,${h} Z`;
 
   return (

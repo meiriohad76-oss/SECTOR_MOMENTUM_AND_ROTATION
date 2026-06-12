@@ -1750,6 +1750,11 @@ main {
   color: #b08326;
 }
 
+/* C-shell (light/cream) color overrides for signed score text */
+.c-shell .good { color: #1f7a4a; }
+.c-shell .bad  { color: #a23a1f; }
+.c-shell .warn { color: #9a6e15; }
+
 .c-screen {
   padding: 22px 32px 32px;
 }
