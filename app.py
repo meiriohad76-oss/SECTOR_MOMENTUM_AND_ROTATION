@@ -2450,8 +2450,12 @@ def render_status():
 
     n_warn = bluf["warns_count"] + bluf["exits_count"]
     today = datetime.now(timezone.utc).date().isoformat()
-    transition_count_24h = sum(1 for row in transitions if str(row.get("date", "")) == today)
-    delta = f'<span class="tile-delta">{transition_count_24h} today</span>' if n_warn > 0 else ""
+    _BAD_STATES = {"EXIT", "WARNING", "BEARISH_STAGE_4"}
+    transition_count_24h = sum(
+        1 for row in transitions
+        if str(row.get("date", "")) == today and row.get("to", "") in _BAD_STATES
+    )
+    delta = f'<span class="tile-delta">+{transition_count_24h} TODAY</span>' if transition_count_24h > 0 else ""
 
     yc_label = (
         "POSITIVE" if regime.yield_curve_positive
