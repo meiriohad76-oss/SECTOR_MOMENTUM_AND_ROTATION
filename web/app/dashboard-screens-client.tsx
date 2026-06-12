@@ -1832,7 +1832,6 @@ function AOverviewScreen({
   onSelectTicker: (ticker: string) => void;
   setActiveScreen: (screen: ScreenId) => void;
 }) {
-  const actions = snapshot.screens.overview?.actions ?? [];
   const positions = snapshot.screens.overview?.positions ?? [];
   const transitions = snapshot.screens.overview?.transitions ?? [];
   const navigate = (ticker: string) => {
@@ -1843,33 +1842,31 @@ function AOverviewScreen({
     const row = rowByTicker(snapshot.rows, position.ticker);
     return row && ["WARNING", "EXIT", "BEARISH_STAGE_4"].includes(row.state);
   });
+  const bullishRows = snapshot.rows
+    .filter((r) => ["BULLISH", "BULLISH_EARLY", "BULLISH_MATURING"].includes(r.state))
+    .sort((a, b) => b.s_score - a.s_score)
+    .slice(0, 20);
   return (
     <section className="a-screen">
       <ABlufStrip snapshot={snapshot} />
       <StatusTiles snapshot={snapshot} />
-      <TransitionsBanner
-        transitions={transitions}
-        onSelect={navigate}
-        light={false}
-      />
-      <PicksGrid rows={snapshot.rows} light={false} onSelect={navigate} />
       <div className="a-body-grid">
         <ATerminalHeatmap rows={snapshot.rows} onSelectTicker={navigate} />
         <aside className="a-right-rail">
           <section className="a-panel">
-            <div className="a-section-head"><strong>TRANSITIONS</strong><span>latest saved decisions</span><em>{actions.length} EVENTS</em></div>
-            {actions.slice(0, 9).map((decision) => (
-              <button type="button" className="a-transition-row" key={`${decision.ticker}-${decision.action}`} onClick={() => navigate(decision.ticker)}>
-                <i className={statusClass(decision.action)} />
-                <strong>{decision.ticker}</strong>
-                <span>{decision.action}</span>
-                <em>{decision.rationale || `state=${decision.action}`}</em>
+            <div className="a-section-head"><strong>TRANSITIONS</strong><span>state changes this run</span><em>{transitions.length} EVENTS</em></div>
+            {transitions.slice(0, 12).map((t) => (
+              <button type="button" className="a-transition-row" key={`${t.ticker}-${t.date}-${t.to}`} onClick={() => navigate(t.ticker)}>
+                <i className={statusClass(t.to)} />
+                <strong>{t.ticker}</strong>
+                <span className="a-tr-arrow">{t.from.replace(/_/g, " ")} → {t.to.replace(/_/g, " ")}</span>
+                <em>{t.date}</em>
               </button>
             ))}
-            {!actions.length ? <p className="a-empty">No saved decisions in the latest run.</p> : null}
+            {!transitions.length ? <p className="a-empty">No state transitions recorded in the latest run.</p> : null}
           </section>
           <section className="a-panel">
-            <div className="a-section-head"><strong>WATCHLIST | MY POSITIONS</strong><span>saved local portfolio</span><em>{positions.length} HOLDINGS</em></div>
+            <div className="a-section-head"><strong>YOUR POSITIONS</strong><span>saved local portfolio</span><em>{positions.length} HOLDINGS</em></div>
             {positions.slice(0, 6).map((position) => {
               const row = rowByTicker(snapshot.rows, position.ticker);
               return (
@@ -1881,7 +1878,22 @@ function AOverviewScreen({
                 </button>
               );
             })}
-            <p className="a-callout">{warningPositions.length ? `Action this week: ${warningPositions.map((position) => position.ticker).join(", ")} need review because they are in WARNING/EXIT gates.` : "No saved position is currently in a warning/exit state."}</p>
+            {!positions.length ? <p className="a-empty">No saved positions. Add tickers to your watchlist.</p> : null}
+            {warningPositions.length > 0 && (
+              <p className="a-callout">Action this week: {warningPositions.map((p) => p.ticker).join(", ")} need review — WARNING/EXIT gates.</p>
+            )}
+          </section>
+          <section className="a-panel">
+            <div className="a-section-head"><strong>BULLISH COHORT</strong><span>ranked by S-score</span><em>{bullishRows.length} SETUPS</em></div>
+            {bullishRows.map((row) => (
+              <button type="button" className="a-transition-row" key={row.ticker} onClick={() => navigate(row.ticker)}>
+                <i className="good" />
+                <strong>{row.ticker}</strong>
+                <span>{row.identity}</span>
+                <em>{row.state.replaceAll("_", " ")} · {row.s_score >= 0 ? "+" : ""}{row.s_score.toFixed(2)}</em>
+              </button>
+            ))}
+            {!bullishRows.length ? <p className="a-empty">No bullish setups in current run — market in risk-off.</p> : null}
           </section>
         </aside>
       </div>

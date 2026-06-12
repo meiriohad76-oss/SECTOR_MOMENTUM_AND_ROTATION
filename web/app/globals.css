@@ -466,6 +466,12 @@ main {
   font-style: normal;
 }
 
+/* "FROM → TO" label in the TRANSITIONS right-rail panel */
+.a-tr-arrow {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
 .a-state {
   display: inline-flex;
   justify-content: center;

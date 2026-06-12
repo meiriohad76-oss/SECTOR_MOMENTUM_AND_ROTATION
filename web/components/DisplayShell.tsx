@@ -18,9 +18,16 @@ export default function DisplayShell({
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "a" || stored === "b" || stored === "c") {
-      setDisplay(stored);
+    // URL param takes priority (enables QA/deeplink) over persisted preference
+    const params = new URLSearchParams(window.location.search);
+    const urlParam = params.get("presentation");
+    if (urlParam === "a" || urlParam === "b" || urlParam === "c") {
+      setDisplay(urlParam);
+    } else {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored === "a" || stored === "b" || stored === "c") {
+        setDisplay(stored);
+      }
     }
     setHydrated(true);
   }, []);
