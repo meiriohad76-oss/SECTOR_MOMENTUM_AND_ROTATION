@@ -1012,7 +1012,7 @@ def render_display_c(rows: list[MomentumV2Row], as_of: str) -> str:
           <h3>{_esc(headline)}</h3>
           <p>{_esc(story_body)} {len(exits)} exit/bearish rows and {len(bullish)} bullish candidates across the current universe.</p>
         </div>
-        {_c_weather_item("Regime", "RISK-ON" if avg_s >= 0 else "RISK-OFF", f"average S {_fmt(avg_s)}", "mv2-pos" if avg_s >= 0 else "mv2-neg")}
+        {_c_weather_item("Regime", "RISK-ON" if (avg_s >= 0 and bullish) else ("CAUTION" if avg_s >= 0 else "RISK-OFF"), f"average S {_fmt(avg_s)} | {len(bullish)} bullish", "mv2-pos" if (avg_s >= 0 and bullish) else "mv2-neg")}
         {_c_weather_item("Phase", phase, "S/F/breadth proxy")}
         {_c_weather_item("Warnings", str(len(warnings)), f"{len(exits)} exit", "mv2-neg" if warnings else "mv2-pos")}
         {_c_weather_item("Breadth", f"{breadth:.0%}", "below 50% gate" if breadth < .5 else "above 50% gate", "mv2-pos" if breadth >= .5 else "mv2-neg")}
