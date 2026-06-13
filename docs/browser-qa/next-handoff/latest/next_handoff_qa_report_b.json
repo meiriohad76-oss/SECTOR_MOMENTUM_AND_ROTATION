@@ -1,13 +1,13 @@
 {
-  "generated_at_utc": "2026-06-10T16:51:08Z",
+  "generated_at_utc": "2026-06-13T15:26:16Z",
   "profile": "b",
   "reference_profile": "Momentum v2 Display B handoff: B1/B2/B3",
   "screens": [
     {
-      "capture": "docs\\browser-qa\\next-handoff\\latest\\next-b-overview.png",
+      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-b-overview.png",
       "capture_size": [
         1440,
-        2306
+        2352
       ],
       "error": "",
       "missing_text": [],
@@ -24,15 +24,15 @@
         "BY THE NUMBERS",
         "This week's transitions"
       ],
-      "rms": 40.1065,
+      "rms": 51.539,
       "screen": "overview",
-      "similarity": 0.8427
+      "similarity": 0.7979
     },
     {
-      "capture": "docs\\browser-qa\\next-handoff\\latest\\next-b-deepdive.png",
+      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-b-deepdive.png",
       "capture_size": [
         1440,
-        2415
+        2467
       ],
       "error": "",
       "missing_text": [],
@@ -49,15 +49,15 @@
         "The seven pillars, explained",
         "What would escalate this state"
       ],
-      "rms": 47.5735,
+      "rms": 68.4797,
       "screen": "deepdive",
-      "similarity": 0.8134
+      "similarity": 0.7315
     },
     {
-      "capture": "docs\\browser-qa\\next-handoff\\latest\\next-b-rotation.png",
+      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-b-rotation.png",
       "capture_size": [
         1440,
-        2196
+        2248
       ],
       "error": "",
       "missing_text": [],
@@ -74,9 +74,9 @@
         "Where the money is going",
         "Where the flow went"
       ],
-      "rms": 39.4188,
+      "rms": 50.7039,
       "screen": "rotation",
-      "similarity": 0.8454
+      "similarity": 0.8012
     }
   ],
   "url": "http://127.0.0.1:3100/?presentation=b&qa=shots"

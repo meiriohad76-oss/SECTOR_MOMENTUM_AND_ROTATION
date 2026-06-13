@@ -1893,6 +1893,8 @@ function AOverviewScreen({
     <section className="a-screen">
       <ABlufStrip snapshot={snapshot} />
       <StatusTiles snapshot={snapshot} />
+      <TransitionsBanner transitions={transitions} onSelect={navigate} />
+      <PicksGrid rows={snapshot.rows} onSelect={navigate} />
       <div className="a-body-grid">
         <ATerminalHeatmap rows={snapshot.rows} onSelectTicker={navigate} />
         <aside className="a-right-rail">

@@ -1,13 +1,13 @@
 {
-  "generated_at_utc": "2026-06-10T15:37:55Z",
+  "generated_at_utc": "2026-06-13T15:26:24Z",
   "profile": "c",
   "reference_profile": "Momentum v2 Display C handoff: C1/C2/C3",
   "screens": [
     {
-      "capture": "docs\\browser-qa\\next-handoff\\latest\\next-overview.png",
+      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-overview.png",
       "capture_size": [
         1440,
-        3058
+        3970
       ],
       "error": "",
       "missing_text": [],
@@ -24,15 +24,15 @@
         "State changes",
         "Bullish cohort"
       ],
-      "rms": 45.6367,
+      "rms": 51.4841,
       "screen": "overview",
-      "similarity": 0.821
+      "similarity": 0.7981
     },
     {
-      "capture": "docs\\browser-qa\\next-handoff\\latest\\next-deepdive.png",
+      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-deepdive.png",
       "capture_size": [
         1440,
-        2021
+        2073
       ],
       "error": "",
       "missing_text": [],
@@ -49,15 +49,15 @@
         "FOCUS",
         "State machine"
       ],
-      "rms": 41.3513,
+      "rms": 54.2315,
       "screen": "deepdive",
-      "similarity": 0.8378
+      "similarity": 0.7873
     },
     {
-      "capture": "docs\\browser-qa\\next-handoff\\latest\\next-rotation.png",
+      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-rotation.png",
       "capture_size": [
         1440,
-        1947
+        1999
       ],
       "error": "",
       "missing_text": [],
@@ -74,9 +74,9 @@
         "The flow river",
         "Flow internals"
       ],
-      "rms": 36.2426,
+      "rms": 51.2681,
       "screen": "rotation",
-      "similarity": 0.8579
+      "similarity": 0.7989
     }
   ],
   "url": "http://127.0.0.1:3100/?presentation=c&qa=shots"
