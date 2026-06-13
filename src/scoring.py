@@ -13,6 +13,8 @@ import threading
 from typing import Mapping, Optional
 from zoneinfo import ZoneInfo
 
+import filelock
+
 import numpy as np
 import pandas as pd
 
@@ -31,9 +33,20 @@ STATE_TRANSITION_JOURNAL = (
     else None
 )
 _STATE_LOCK = threading.RLock()
+# Cross-process file lock for state.json writes (guards against concurrent Streamlit workers
+# or two uvicorn instances running on the same host). _STATE_LOCK handles intra-process threads;
+# _STATE_FILE_LOCK handles inter-process races so the read-modify-write cycle is atomic.
+_STATE_FILE_LOCK = filelock.FileLock(str(STATE_FILE) + ".lock", timeout=5)
 EASTERN_TZ = ZoneInfo("America/New_York")
 
 STATES = ["STAGE_2_BULLISH", "HOLD", "WARNING", "EXIT", "BEARISH_STAGE_4", "STAGE_1_BASING"]
+# Calibration note — Mansfield RS appears twice in the decision logic:
+#   1. As z_mans (12% weight) in the S-score composite below.
+#   2. As a hard binary gate (mansfield_rs < 0 → EXIT/BEARISH) in STATE_MACHINE_THRESHOLDS.
+# This intentional double-weighting means negative RS both lowers rank *and* forces exit.
+# In broad corrective periods most sector ETFs sit below 0, so many tickers land on EXIT
+# simultaneously.  If state distribution looks over-weighted toward EXIT, consider raising
+# the mansfield_rs_lt thresholds to -5.0 (require a 5 pp RS deterioration before gating).
 COMPOSITE_WEIGHTS = {
     "mom_12_1_z": 0.22,
     "mansfield_rs_z": 0.12,
@@ -504,22 +517,35 @@ def _load_state() -> dict:
 
 
 def _save_state(by_ticker: dict, transitions: list[dict]) -> None:
-    with _STATE_LOCK:
-        existing_payload = _state_payload()
-        _backup_existing_state(existing_payload)
-        log = list(existing_payload.get("transitions", []) or [])
-        _seed_transition_journal(log)
-        normalized_transitions = [_normalize_transition(row) for row in transitions]
-        _append_transition_journal(normalized_transitions)
-        _ensure_transition_journal_file()
-        log.extend(normalized_transitions)
-        payload = {
-            "updated": datetime.now(timezone.utc).isoformat(),
-            "by_ticker": by_ticker,
-            "transitions": log[-500:],   # cap snapshot; journal remains append-only
-            "transition_journal": str(_transition_journal_path()),
-        }
-        _atomic_write_json(STATE_FILE, payload)
+    # _STATE_FILE_LOCK: cross-process guard (concurrent Streamlit/uvicorn workers).
+    # On timeout we fall through and write anyway — dropping a concurrent update is
+    # less harmful than silently skipping the state write entirely.
+    lock_acquired = False
+    try:
+        _STATE_FILE_LOCK.acquire(timeout=5)
+        lock_acquired = True
+    except filelock.Timeout:
+        pass
+    try:
+        with _STATE_LOCK:
+            existing_payload = _state_payload()
+            _backup_existing_state(existing_payload)
+            log = list(existing_payload.get("transitions", []) or [])
+            _seed_transition_journal(log)
+            normalized_transitions = [_normalize_transition(row) for row in transitions]
+            _append_transition_journal(normalized_transitions)
+            _ensure_transition_journal_file()
+            log.extend(normalized_transitions)
+            payload = {
+                "updated": datetime.now(timezone.utc).isoformat(),
+                "by_ticker": by_ticker,
+                "transitions": log[-500:],   # cap snapshot; journal remains append-only
+                "transition_journal": str(_transition_journal_path()),
+            }
+            _atomic_write_json(STATE_FILE, payload)
+    finally:
+        if lock_acquired:
+            _STATE_FILE_LOCK.release()
     if transitions:
         _send_transition_alerts(transitions)
 

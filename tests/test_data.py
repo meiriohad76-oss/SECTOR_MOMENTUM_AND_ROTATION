@@ -433,6 +433,7 @@ def test_fetch_ohlcv_result_reports_public_fred_macro_fallback_failure(monkeypat
 
 
 def test_fetch_ohlcv_result_uses_yfinance_fallback_when_massive_misses(monkeypatch):
+    """When Massive fails and no stale cache exists, yfinance is tried as a live fallback."""
     dates = pd.bdate_range("2024-01-01", periods=40)
     fallback_frame = pd.DataFrame(
         {
@@ -460,17 +461,21 @@ def test_fetch_ohlcv_result_uses_yfinance_fallback_when_massive_misses(monkeypat
 
     result = data.fetch_ohlcv_result(["XLK"], period="2mo", provider="massive")
 
-    assert calls == [("massive", ("XLK",), "2mo", "1d")]
+    assert calls == [
+        ("massive", ("XLK",), "2mo", "1d"),
+        ("yfinance", ("XLK",), "2mo", "1d"),
+    ]
     assert result.provider == "massive"
-    assert result.data == {}
-    assert result.fetched == ()
-    assert result.missing == ("XLK",)
-    assert result.source_by_ticker == {}
-    assert result.provider_by_ticker == {}
-    assert result.warnings == ("Missing OHLCV for 1 symbol after massive fetch.",)
+    assert list(result.data) == ["XLK"]
+    assert result.fetched == ("XLK",)
+    assert result.missing == ()
+    assert result.source_by_ticker == {"XLK": "yfinance_live"}
+    assert result.provider_by_ticker == {"XLK": "yfinance"}
+    assert result.warnings == ("Massive unavailable; yfinance fallback used for 1 symbol.",)
 
 
 def test_fetch_ohlcv_result_ignores_yfinance_cache_when_massive_is_requested(tmp_path, monkeypatch):
+    """yfinance cache entries are excluded from Massive results; live yfinance fallback is allowed."""
     from src import ohlcv_store
 
     cache_path = tmp_path / "ohlcv.duckdb"
@@ -491,18 +496,15 @@ def test_fetch_ohlcv_result_ignores_yfinance_cache_when_massive_is_requested(tmp
     monkeypatch.setenv("OHLCV_CACHE_PATH", str(cache_path))
     monkeypatch.setenv("OHLCV_CACHE_ENABLED", "true")
     monkeypatch.setattr(data, "_fetch_massive_ohlcv", lambda tickers, period, interval: data._ProviderFetchResult({}))
-    monkeypatch.setattr(
-        data,
-        "_fetch_yfinance_ohlcv",
-        lambda tickers, period, interval: (_ for _ in ()).throw(
-            AssertionError("Massive production path must not fall back to yfinance")
-        ),
-    )
+    # Live yfinance fallback is allowed when Massive fails; it also returns nothing here.
+    monkeypatch.setattr(data, "_fetch_yfinance_ohlcv", lambda tickers, period, interval: data._ProviderFetchResult({}))
 
     result = data.fetch_ohlcv_result(["XLK"], period="2mo", provider="massive")
 
-    assert result.data == {}
+    # yfinance cache entry is excluded (fresh_cache_hits is empty)
     assert result.fresh_cache_hits == ()
+    # Live yfinance fallback also returned nothing → still missing
+    assert result.data == {}
     assert result.missing == ("XLK",)
     assert result.provider_by_ticker == {}
     assert result.warnings == ("Missing OHLCV for 1 symbol after massive fetch.",)

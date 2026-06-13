@@ -603,6 +603,30 @@ def fetch_ohlcv_result(
         except Exception:
             stale_cached = {}
             stale_cached_meta = {}
+
+    # yfinance live fallback — only when Massive is the configured primary provider and
+    # some equity tickers have no data from either the live Massive fetch or the stale cache.
+    # Macro-index symbols (^VIX, ^TNX, ^IRX) are excluded: they route through FRED, not yfinance.
+    # This keeps the dashboard alive (with clearly-sourced live data) when Massive is down.
+    yfinance_fallback: dict[str, pd.DataFrame] = {}
+    if provider_name == "massive" and provider_misses:
+        truly_missing = [
+            t for t in provider_misses
+            if t not in stale_cached
+            and str(t).upper() not in stale_cached
+            and str(t).upper() not in MACRO_OHLCV_FRED_FALLBACKS
+        ]
+        if truly_missing:
+            yf_result = _fetch_yfinance_ohlcv(truly_missing, period=period, interval=interval)
+            if yf_result.data:
+                yfinance_fallback = yf_result.data
+                fetched = {**fetched, **yfinance_fallback}
+                if cache_enabled:
+                    try:
+                        write_cached_ohlcv(yfinance_fallback, provider="yfinance", interval=interval)
+                    except Exception:
+                        pass
+
     combined = {**cached, **stale_cached, **fetched}
     ordered = {}
     for ticker in tickers:
@@ -629,6 +653,11 @@ def fetch_ohlcv_result(
             + ", ".join(failed_fred_public)
             + "."
         )
+    if yfinance_fallback:
+        count = len(yfinance_fallback)
+        warnings.append(
+            f"Massive unavailable; yfinance fallback used for {count} {_warning_symbol_text(count)}."
+        )
     if stale_cached:
         count = len(stale_cached)
         warnings.append(
@@ -648,6 +677,9 @@ def fetch_ohlcv_result(
             if key in fred_public_fallback:
                 source_by_ticker[key] = "fred_macro_live"
                 provider_by_ticker[key] = "fred_macro"
+            elif key in yfinance_fallback:
+                source_by_ticker[key] = "yfinance_live"
+                provider_by_ticker[key] = "yfinance"
             else:
                 source_by_ticker[key] = f"{provider_name}_live"
                 provider_by_ticker[key] = provider_name
@@ -660,7 +692,7 @@ def fetch_ohlcv_result(
 
     if provider_by_ticker:
         provider_mix = sorted(set(provider_by_ticker.values()))
-        allowed_massive_mix = provider_name == "massive" and set(provider_mix).issubset({"massive", "fred_macro"})
+        allowed_massive_mix = provider_name == "massive" and set(provider_mix).issubset({"massive", "fred_macro", "yfinance"})
         if (len(provider_mix) > 1 or provider_name not in provider_mix) and not allowed_massive_mix:
             warnings.append(
                 "OHLCV source mix: "
