@@ -23,9 +23,9 @@ def _fetch_text(url: str, timeout: float) -> tuple[int, str]:
     request = urllib.request.Request(url, headers={"User-Agent": "b170-retirement-readiness/1.0"})
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            return int(response.status), response.read(200_000).decode("utf-8", errors="replace")
+            return int(response.status), response.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as exc:
-        return int(exc.code), exc.read(200_000).decode("utf-8", errors="replace")
+        return int(exc.code), exc.read().decode("utf-8", errors="replace")
     except Exception as exc:
         return 0, f"{type(exc).__name__}: {exc}"
 
