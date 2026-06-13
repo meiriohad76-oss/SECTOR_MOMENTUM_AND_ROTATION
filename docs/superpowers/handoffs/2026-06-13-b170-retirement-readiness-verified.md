@@ -4,20 +4,30 @@
 **Branch:** backlog-stepwise-qa  
 **Verified by:** `python scripts/check_b170_retirement_readiness.py`
 
-## Gate Results
+## ✅ Pi Production Deployment — Verified 2026-06-13
+
+Host: `ahad@AHADPI5` (`~/SECTOR_MOMENTUM_AND_ROTATION`)  
+All 5 gates pass on the Pi with live data (83 rows, XLK state=EXIT, S_score=1.27).
+
+**Bug fixed during deployment:** `_fetch_text()` had a 200KB read cap that truncated the snapshot response. Fixed by removing the cap (`response.read()` — no limit). Committed as `200298a`.
+
+---
+
+## Gate Results (Pi — production)
 
 | Gate | Result | Detail |
 |---|---|---|
 | `feature_parity` | ✅ ok=true | next_status=200, row_count=83, selected_ticker=XLK present |
-| `data_parity` | ✅ ok=true | health=ok, data_health=ok, provider_health=ok, snapshot=ok; XLK state=WARNING, quadrant=Weakening, S_score=1.27 |
+| `data_parity` | ✅ ok=true | health=ok, data_health=ok, provider_health=ok, snapshot=ok; XLK state=EXIT, quadrant=Weakening, S_score=1.27 |
 | `visual_parity` | ✅ ok=true | All 9 screens pass across A/B/C profiles (no missing_text, all nonblank) |
 | `operational_parity` | ✅ ok=true | api_health_ok=True, next_status=200, streamlit_status=200 |
 | `rollback` | ✅ ok=true | streamlit_status=200 |
 
-## Services at time of check (local dev)
+## Services running on Pi (systemd)
 
-- **FastAPI** — `uvicorn src.api_server:create_app --factory --host 127.0.0.1 --port 8000`
-- **Next.js** — `npm run dev` on port 3000
+- **`sector-api.service`** — uvicorn on `127.0.0.1:8000`, enabled + running
+- **`sector-next.service`** — `npm run start` on port 3000, enabled + running
+- **`sector-dashboard.service`** — Streamlit on port 8501, enabled + running (rollback target)
 - **Streamlit** — `python -m streamlit run app.py --server.port 8501 --server.headless true`
 
 ## QA Reports location
