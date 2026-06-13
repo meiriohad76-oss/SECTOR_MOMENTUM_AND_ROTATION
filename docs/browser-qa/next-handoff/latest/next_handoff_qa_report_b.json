@@ -1,0 +1,83 @@
+{
+  "generated_at_utc": "2026-06-13T15:26:16Z",
+  "profile": "b",
+  "reference_profile": "Momentum v2 Display B handoff: B1/B2/B3",
+  "screens": [
+    {
+      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-b-overview.png",
+      "capture_size": [
+        1440,
+        2352
+      ],
+      "error": "",
+      "missing_text": [],
+      "nonblank": true,
+      "ok": true,
+      "reference": "C:\\Users\\meiri\\momentum and flow\\momentum v2\\design_handoff_momentum_v2\\media\\screens\\B1-editorial-brief.png",
+      "reference_exists": true,
+      "reference_size": [
+        1440,
+        1923
+      ],
+      "required_text": [
+        "The Sentiment Brief",
+        "BY THE NUMBERS",
+        "This week's transitions"
+      ],
+      "rms": 51.539,
+      "screen": "overview",
+      "similarity": 0.7979
+    },
+    {
+      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-b-deepdive.png",
+      "capture_size": [
+        1440,
+        2467
+      ],
+      "error": "",
+      "missing_text": [],
+      "nonblank": true,
+      "ok": true,
+      "reference": "C:\\Users\\meiri\\momentum and flow\\momentum v2\\design_handoff_momentum_v2\\media\\screens\\B2-editorial-article.png",
+      "reference_exists": true,
+      "reference_size": [
+        1440,
+        2571
+      ],
+      "required_text": [
+        "The Sentiment Brief",
+        "The seven pillars, explained",
+        "What would escalate this state"
+      ],
+      "rms": 68.4797,
+      "screen": "deepdive",
+      "similarity": 0.7315
+    },
+    {
+      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-b-rotation.png",
+      "capture_size": [
+        1440,
+        2248
+      ],
+      "error": "",
+      "missing_text": [],
+      "nonblank": true,
+      "ok": true,
+      "reference": "C:\\Users\\meiri\\momentum and flow\\momentum v2\\design_handoff_momentum_v2\\media\\screens\\B3-editorial-rotation.png",
+      "reference_exists": true,
+      "reference_size": [
+        1440,
+        1797
+      ],
+      "required_text": [
+        "The Sentiment Brief",
+        "Where the money is going",
+        "Where the flow went"
+      ],
+      "rms": 50.7039,
+      "screen": "rotation",
+      "similarity": 0.8012
+    }
+  ],
+  "url": "http://127.0.0.1:3100/?presentation=b&qa=shots"
+}

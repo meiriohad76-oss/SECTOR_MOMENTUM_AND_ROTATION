@@ -26,9 +26,23 @@ Thumbs.db
 
 # --- Streamlit / app local state ---
 .streamlit/secrets.toml
+.streamlit/secrets.toml.bak.*
+.streamlit/secrets.toml.save
 state.json
+data/state.json
+data/state_transitions.jsonl
+data/state_backups/
+data/.state.json.tmp
 *.log
 .cache/
+node_modules/
+web/.next/
+web/out/
+web/node_modules/
+.browser-qa-cloudflare/
+.browser-qa-cloudflare-cdp/
+momentum v2/
+momentum v2.zip
 
 # --- OS junk ---
 *.tmp
@@ -41,6 +55,24 @@ state.json
 *.duckdb
 *.parquet
 data_cache/
+data/feeds/
+data/logs/
+data/api_refresh/
+data/provider_flow_cache/
+data/provider_snapshots/
+data/rendered_dashboard_smoke/
+data/run_journal/
+data/saved_inputs.json
+data/preference_profiles.json
+data/preference_profiles.json.tmp
+data/pwa_push_subscriptions.json
+data/vapid_private_key.pem
+public/feeds/
+
+# Local security-review notes may contain provider/account details.
+docs/IOC_AUDIT_*.md
 
 # --- Streamlit secrets (API keys etc.) ---
 .streamlit/secrets.toml
+.streamlit/secrets.toml.bak.*
+.streamlit/secrets.toml.save

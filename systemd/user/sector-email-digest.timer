@@ -1,0 +1,12 @@
+# Sector Rotation Email Digest - 08:00 US/Eastern user timer
+
+[Unit]
+Description=Run Sector Rotation Email Digest daily at 08:00 ET
+
+[Timer]
+OnCalendar=*-*-* 08:00:00 America/New_York
+Persistent=true
+Unit=sector-email-digest.service
+
+[Install]
+WantedBy=timers.target

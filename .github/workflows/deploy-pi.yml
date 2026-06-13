@@ -1,0 +1,89 @@
+name: Deploy to Raspberry Pi
+
+on:
+  push:
+    branches: [backlog-stepwise-qa]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-pi
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, sector-pi]
+    timeout-minutes: 25
+    env:
+      PI_HOST: ${{ secrets.PI_HOST }}
+      PI_USER: ${{ secrets.PI_USER }}
+      PI_SSH_KEY: ${{ secrets.PI_SSH_KEY }}
+      PI_KNOWN_HOSTS: ${{ secrets.PI_KNOWN_HOSTS }}
+      PI_REPO_PATH: ${{ secrets.PI_REPO_PATH }}
+      PI_SERVICE_NAME: ${{ secrets.PI_SERVICE_NAME || 'sector-dashboard' }}
+    steps:
+      - name: Validate deploy secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in PI_HOST PI_USER PI_SSH_KEY PI_KNOWN_HOSTS PI_REPO_PATH; do
+            if [ -z "${!name}" ]; then
+              echo "::error ::Missing required secret $name"
+              exit 1
+            fi
+          done
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$PI_SSH_KEY" > ~/.ssh/pi_deploy_key
+          chmod 600 ~/.ssh/pi_deploy_key
+          printf '%s\n' "$PI_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy and smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/pi_deploy_key -o BatchMode=yes -o ConnectTimeout=10 "$PI_USER@$PI_HOST" \
+            "PI_REPO_PATH='$PI_REPO_PATH' PI_SERVICE_NAME='$PI_SERVICE_NAME' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$PI_REPO_PATH"
+          git fetch origin backlog-stepwise-qa
+          git checkout backlog-stepwise-qa
+          git pull --ff-only origin backlog-stepwise-qa
+          ./.venv/bin/python -m pip install -r requirements.txt
+          ./.venv/bin/python -m playwright install chromium
+          ./.venv/bin/python -m pytest -q
+          ./.venv/bin/python scripts/enforce_safe_config.py --secrets-path "$PI_REPO_PATH/.streamlit/secrets.toml"
+          ./.venv/bin/python scripts/install_user_timers.py --repo-root "$PI_REPO_PATH"
+          ./.venv/bin/python scripts/smoke_provider_flow_lanes.py --ticker SPY --limit 25 --timeout 20 --require-massive
+          ./.venv/bin/python scripts/warm_provider_flow_cache.py --universe us-sectors --timeout 20
+          ./.venv/bin/python scripts/refresh_dashboard_state.py --period 3y --provider-flow-mode cache-only
+          ./.venv/bin/python scripts/check_ops_readiness.py --strict-production
+
+          # Helper prints restart_result=healthy after the fresh process serves HTTP 200.
+          ./.venv/bin/python scripts/restart_sector_dashboard.py \
+            --service "$PI_SERVICE_NAME" \
+            --url "http://127.0.0.1:8501/?ticker=XLK" \
+            --timeout-seconds 60
+
+          ./.venv/bin/python scripts/rendered_dashboard_smoke.py \
+            --url "http://127.0.0.1:8501/?ticker=XLK" \
+            --timeout-ms 120000 \
+            --output-json "$PI_REPO_PATH/data/rendered_dashboard_smoke/latest.json"
+          systemctl --user reset-failed sector-rendered-dashboard-smoke.service || true
+          systemctl --user start sector-rendered-dashboard-smoke.service
+
+          ./.venv/bin/python scripts/check_ops_readiness.py --strict-production --require-rendered-smoke
+
+          ./.venv/bin/python scripts/smoke_deploy_gate.py \
+            --local-dashboard-url "http://127.0.0.1:8501/?ticker=XLK" \
+            --state-file "$PI_REPO_PATH/data/state.json" \
+            --min-state-tickers 80 \
+            --max-state-age-seconds 300 \
+            --public-dashboard-url "https://sentimentdashboard.ahaddashboards.uk/?ticker=XLK" \
+            --expect-cloudflare-access
+          REMOTE

@@ -1,0 +1,83 @@
+{
+  "generated_at_utc": "2026-06-13T15:26:24Z",
+  "profile": "c",
+  "reference_profile": "Momentum v2 Display C handoff: C1/C2/C3",
+  "screens": [
+    {
+      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-overview.png",
+      "capture_size": [
+        1440,
+        3970
+      ],
+      "error": "",
+      "missing_text": [],
+      "nonblank": true,
+      "ok": true,
+      "reference": "C:\\Users\\meiri\\momentum and flow\\momentum v2\\design_handoff_momentum_v2\\media\\screens\\C1-pillarstack-heatmap.png",
+      "reference_exists": true,
+      "reference_size": [
+        1440,
+        2911
+      ],
+      "required_text": [
+        "The composite, dissected",
+        "State changes",
+        "Bullish cohort"
+      ],
+      "rms": 51.4841,
+      "screen": "overview",
+      "similarity": 0.7981
+    },
+    {
+      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-deepdive.png",
+      "capture_size": [
+        1440,
+        2073
+      ],
+      "error": "",
+      "missing_text": [],
+      "nonblank": true,
+      "ok": true,
+      "reference": "C:\\Users\\meiri\\momentum and flow\\momentum v2\\design_handoff_momentum_v2\\media\\screens\\C2-pillarstack-waterfall.png",
+      "reference_exists": true,
+      "reference_size": [
+        1440,
+        1526
+      ],
+      "required_text": [
+        "The composite, built pillar by pillar",
+        "FOCUS",
+        "State machine"
+      ],
+      "rms": 54.2315,
+      "screen": "deepdive",
+      "similarity": 0.7873
+    },
+    {
+      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-rotation.png",
+      "capture_size": [
+        1440,
+        1999
+      ],
+      "error": "",
+      "missing_text": [],
+      "nonblank": true,
+      "ok": true,
+      "reference": "C:\\Users\\meiri\\momentum and flow\\momentum v2\\design_handoff_momentum_v2\\media\\screens\\C3-pillarstack-rotation.png",
+      "reference_exists": true,
+      "reference_size": [
+        1440,
+        1790
+      ],
+      "required_text": [
+        "The rotation map",
+        "The flow river",
+        "Flow internals"
+      ],
+      "rms": 51.2681,
+      "screen": "rotation",
+      "similarity": 0.7989
+    }
+  ],
+  "url": "http://127.0.0.1:3100/?presentation=c&qa=shots"
+}

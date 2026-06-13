@@ -1,0 +1,108 @@
+{
+  "baseline_config_sha256": "70d9b9ba8879ed98142d330c3611312aeab956850115484a2a16533c6cffb69f",
+  "calibration_split_status": "ready",
+  "calibration_split_summary": {
+    "coverage_years": 7.92,
+    "effective_calibration_years": 5,
+    "final_holdout": {
+      "end": "2026-05-22",
+      "start": "2025-05-23"
+    },
+    "fold_count": 2,
+    "folds": [
+      {
+        "calibration_end": "2023-06-16",
+        "calibration_start": "2018-06-22",
+        "calibration_years": 5,
+        "final_holdout_end": "2026-05-22",
+        "final_holdout_start": "2025-05-23",
+        "name": "fold_01",
+        "validation_end": "2024-06-21",
+        "validation_start": "2023-06-23"
+      },
+      {
+        "calibration_end": "2024-06-21",
+        "calibration_start": "2019-06-28",
+        "calibration_years": 5,
+        "final_holdout_end": "2026-05-22",
+        "final_holdout_start": "2025-05-23",
+        "name": "fold_02",
+        "validation_end": "2025-05-16",
+        "validation_start": "2024-06-28"
+      }
+    ],
+    "history_window_reason": "available history is shorter than 10 years but meets the configured minimum",
+    "history_window_status": "accepted_short_history",
+    "minimum_accepted_years": 5,
+    "no_lookahead_verified": true,
+    "requested_years": 10,
+    "status": "ready",
+    "window": {
+      "end": "2026-05-22",
+      "start": "2018-06-22"
+    }
+  },
+  "candidate_config_available": true,
+  "candidate_rows": 20,
+  "candidate_rule": {
+    "candidate_id": "positive_score_ge_1_0",
+    "horizon_weeks": 52,
+    "negative_max_s_score_after_veto": null,
+    "positive_min_s_score_after_veto": 1.0,
+    "selection_source": "calibration_window_only"
+  },
+  "config_status": "rejected_final_holdout_no_data",
+  "final_holdout_evaluated": false,
+  "final_holdout_rows_used": 0,
+  "gate_reasons": [
+    "final_holdout_no_mature_labels",
+    "separate_live_promotion_ticket_required"
+  ],
+  "live_promotion_allowed": false,
+  "purpose": "research_only_calibrated_rerun_gate",
+  "research_only": true,
+  "safety": {
+    "candidate_promotion": "separate_ticket_required",
+    "final_holdout": "not_evaluated",
+    "live_scoring_change": "none",
+    "parameter_tuning": "research_only_calibrated_rerun_gate"
+  },
+  "selected_candidate": {
+    "baseline_calibration_negative_hit_rate": 0.8410417602155366,
+    "baseline_calibration_positive_hit_rate": 0.3284111045481394,
+    "baseline_validation_negative_hit_rate": 0.789179104477612,
+    "baseline_validation_positive_hit_rate": 0.43147208121827413,
+    "calibration_negative_hit_rate": 0.8410417602155366,
+    "calibration_negative_hit_rate_delta_vs_baseline": 0.0,
+    "calibration_negative_signal_available_count": 4454,
+    "calibration_objective_delta": 0.3000473934755761,
+    "calibration_positive_hit_rate": 0.6284584980237155,
+    "calibration_positive_hit_rate_delta_vs_baseline": 0.3000473934755761,
+    "calibration_positive_signal_available_count": 253,
+    "candidate_id": "positive_score_ge_1_0",
+    "directions_changed": "positive",
+    "final_holdout_evaluated": false,
+    "final_holdout_rows_used": 0,
+    "fold_count": 2,
+    "gate_status": "rejected_final_holdout_no_data",
+    "horizon_weeks": 52,
+    "live_promotion_allowed": false,
+    "minimum_validation_fold_hit_rate_delta": 0.0,
+    "negative_max_s_score_after_veto": null,
+    "positive_min_s_score_after_veto": 1.0,
+    "promotion_label": "do not promote",
+    "rejection_reasons": "final_holdout_no_mature_labels;separate_live_promotion_ticket_required",
+    "rule_order": 2,
+    "selected_by_calibration": true,
+    "selection_source": "calibration_window_only",
+    "validation_negative_hit_rate": 0.789179104477612,
+    "validation_negative_hit_rate_delta_vs_baseline": 0.0,
+    "validation_negative_signal_available_count": 536,
+    "validation_positive_hit_rate": 0.6382978723404256,
+    "validation_positive_hit_rate_delta_vs_baseline": 0.20682579112215144,
+    "validation_positive_signal_available_count": 47
+  },
+  "selected_candidate_id": "positive_score_ge_1_0",
+  "slice": "B-163.8",
+  "ticket": "B-163"
+}

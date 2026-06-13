@@ -1,5 +1,14 @@
 # Exposing the dashboard via Cloudflare Tunnel
 
+## Public methodology landing page
+
+B-152 keeps the public root separate from the dashboard:
+
+- Public root: `https://ahaddashboards.uk` and `https://www.ahaddashboards.uk` -> `http://localhost:8500`
+- Protected dashboard: `https://sentimentdashboard.ahaddashboards.uk` -> `http://localhost:8501`
+
+Serve the static `public/` directory with `systemd/methodology-landing.service` or the non-sudo `systemd/user/methodology-landing.service`, then route the root hostnames to that static service. Keep Cloudflare Access on the dashboard hostname so the live Streamlit app stays private while the methodology overview is public.
+
 This gives you a public URL like `https://dashboard.yourdomain.com` that:
 - Routes traffic securely through Cloudflare (no inbound port-forward on your router)
 - Auto-issues a valid TLS certificate
@@ -9,6 +18,7 @@ This gives you a public URL like `https://dashboard.yourdomain.com` that:
 ## Prerequisites
 
 - A domain managed by Cloudflare (free plan is fine). If your domain is registered elsewhere, change its nameservers to Cloudflare first — Cloudflare's onboarding walks you through it.
+- The public methodology landing page running on your Pi at `http://127.0.0.1:8500` when serving from the Pi.
 - The dashboard running on your Pi at `http://127.0.0.1:8501` (per [`DEPLOY_RASPBERRY_PI.md`](DEPLOY_RASPBERRY_PI.md)).
 - A free Cloudflare account.
 
@@ -42,10 +52,12 @@ Note the **tunnel UUID** it prints — you'll need it in the next step. The cred
 
 ## 4. Point a DNS record at the tunnel
 
-Pick the subdomain (e.g. `dashboard`):
+Pick the root and dashboard hostnames:
 
 ```bash
-cloudflared tunnel route dns sector-dashboard dashboard.yourdomain.com
+cloudflared tunnel route dns sector-dashboard ahaddashboards.uk
+cloudflared tunnel route dns sector-dashboard www.ahaddashboards.uk
+cloudflared tunnel route dns sector-dashboard sentimentdashboard.ahaddashboards.uk
 ```
 
 This adds a `CNAME` to your Cloudflare DNS pointing at the tunnel. Repeat for additional subdomains if needed.
@@ -64,7 +76,11 @@ tunnel: <YOUR-TUNNEL-UUID>
 credentials-file: /home/meiri/.cloudflared/<YOUR-TUNNEL-UUID>.json
 
 ingress:
-  - hostname: dashboard.yourdomain.com
+  - hostname: ahaddashboards.uk
+    service: http://localhost:8500
+  - hostname: www.ahaddashboards.uk
+    service: http://localhost:8500
+  - hostname: sentimentdashboard.ahaddashboards.uk
     service: http://localhost:8501
     originRequest:
       # Streamlit uses WebSocket for live updates
@@ -75,13 +91,53 @@ ingress:
 
 A copy of this template is in [`../config/cloudflared-config.yml.example`](../config/cloudflared-config.yml.example).
 
+### B-170 candidate Next.js route plan
+
+Keep `sentimentdashboard.ahaddashboards.uk` routed to `http://localhost:8501`
+until the React/Next.js migration passes feature parity, data parity, visual
+parity, and rollback review. The candidate route should use a separate hostname
+so the current Streamlit production route remains untouched:
+
+```yaml
+ingress:
+  - hostname: ahaddashboards.uk
+    service: http://localhost:8500
+  - hostname: www.ahaddashboards.uk
+    service: http://localhost:8500
+  - hostname: sentimentdashboard.ahaddashboards.uk
+    service: http://localhost:8501
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 30s
+  - hostname: next-sentimentdashboard.ahaddashboards.uk
+    service: http://localhost:3000
+    originRequest:
+      connectTimeout: 30s
+  - service: http_status:404
+```
+
+Do not expose the FastAPI service directly unless you add a separate Access
+policy, CORS policy, rate limits, and explicit API threat model. The intended
+candidate shape is Cloudflare -> Next.js on `3000` -> local FastAPI on `8000`.
+The rollback path is to leave or restore the production hostname on
+`http://localhost:8501`, disable the candidate hostname, and stop only
+`sector-next`/`sector-api` if needed.
+
+Before any cutover, complete the B-170 Streamlit retirement readiness checklist
+in [`DEPLOY_RASPBERRY_PI.md`](DEPLOY_RASPBERRY_PI.md). A route change without
+feature parity, data parity, visual parity, operational parity, and documented
+rollback evidence is not considered a production deployment.
+Capture the local evidence with
+`./.venv/bin/python scripts/check_b170_retirement_readiness.py --json` before
+editing Cloudflare ingress.
+
 ## 6. Test the tunnel manually
 
 ```bash
 cloudflared tunnel run sector-dashboard
 ```
 
-Open `https://dashboard.yourdomain.com` in your browser — you should see the dashboard. `Ctrl+C` to stop.
+Open `https://ahaddashboards.uk` in your browser to see the public methodology page. Open `https://sentimentdashboard.ahaddashboards.uk` to verify the dashboard route. `Ctrl+C` to stop.
 
 ## 7. Install as a service (auto-start on boot)
 
@@ -103,9 +159,9 @@ cloudflared tunnel info sector-dashboard     # tunnel health
 cloudflared tunnel list
 ```
 
-## (Optional) Lock the dashboard behind login — Cloudflare Access
+## Lock the dashboard behind login — Cloudflare Access
 
-By default `https://dashboard.yourdomain.com` is reachable by anyone. To restrict access:
+Do not put the public root behind Access unless the methodology page should be private. The dashboard route should stay behind login:
 
 1. In Cloudflare dashboard, go to **Zero Trust → Access → Applications → Add an application → Self-hosted.**
 2. Application name: `Sector Dashboard.` Subdomain: `dashboard`. Domain: `yourdomain.com`.

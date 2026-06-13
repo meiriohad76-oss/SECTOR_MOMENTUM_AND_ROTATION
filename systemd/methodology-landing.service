@@ -1,0 +1,31 @@
+# Public Methodology Landing Page - systemd unit file
+#
+# Install:
+#   sudo cp systemd/methodology-landing.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now methodology-landing
+#
+# Adjust User=, Group=, and WorkingDirectory= to match the Pi clone path.
+
+[Unit]
+Description=Public Methodology Landing Page
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=meiri
+Group=meiri
+WorkingDirectory=/home/meiri/sector-rotation-dashboard
+ExecStart=/usr/bin/python3 -m http.server 8500 --bind 127.0.0.1 --directory public
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+TimeoutStartSec=30
+TimeoutStopSec=15
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

@@ -32,8 +32,6 @@ US_INDUSTRIES = [
     "XOP",   # Oil & gas E&P
     "OIH",   # Oil services
     "GDX",   # Gold miners
-    "TAN",   # Solar
-    "ICLN",  # Clean energy
     "KWEB",  # China internet
     "FDN",   # Internet
     "ITA",   # Aerospace & defense
@@ -78,6 +76,33 @@ FACTORS = [
     "IWB",   # Russell 1000
 ]
 
+THEMES = [
+    "ARKK",  # Disruptive innovation
+    "HACK",  # Cybersecurity
+    "MOO",   # Agribusiness
+    "URA",   # Uranium
+    "LIT",   # Lithium and battery technology
+    "TAN",   # Solar
+    "ICLN",  # Clean energy
+    "BOTZ",  # Robotics and artificial intelligence
+]
+
+CRYPTO = [
+    "BITO",  # Bitcoin futures
+    "IBIT",  # Spot bitcoin
+    "ETHE",  # Ethereum exposure
+]
+
+MEGA_CAP_STOCKS = [
+    "NVDA",   # NVIDIA
+    "AAPL",   # Apple
+    "MSFT",   # Microsoft
+    "AMZN",   # Amazon
+    "GOOGL",  # Alphabet
+    "META",   # Meta Platforms
+    "TSLA",   # Tesla
+]
+
 DEFENSIVES = ["TLT", "IEF", "GLD", "UUP", "DBC"]  # for risk-off pivot
 
 BENCH = {
@@ -91,14 +116,24 @@ UNIVERSE_BY_CLASS = {
     "US Industries": US_INDUSTRIES,
     "Countries":    COUNTRIES,
     "Factors":      FACTORS,
+    "Themes":       THEMES,
+    "Crypto":       CRYPTO,
+    "Mega-Cap Stocks": MEGA_CAP_STOCKS,
 }
 
-ALL_TICKERS = (
+SCORED_TICKERS = (
     US_SECTORS
     + US_INDUSTRIES
     + COUNTRIES
     + FACTORS
+    + THEMES
+    + CRYPTO
+    + MEGA_CAP_STOCKS
     + DEFENSIVES
+)
+
+ALL_TICKERS = (
+    SCORED_TICKERS
     + list(BENCH.values())
 )
 
@@ -121,4 +156,7 @@ TOP_N = {
     "US Industries": 3,
     "Countries":    3,
     "Factors":      2,
+    "Themes":       3,
+    "Crypto":       1,
+    "Mega-Cap Stocks": 3,
 }

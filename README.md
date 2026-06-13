@@ -1,6 +1,6 @@
 # Sector Rotation Dashboard
 
-A Streamlit dashboard that monitors **67+ ETFs across US sectors, US industries, international markets, and style factors** using a 7-pillar layered methodology to identify bullish sectors and alert on bearish reversals.
+A Streamlit dashboard that monitors **83+ instruments across US sectors, US industries, international markets, style factors, thematic exposures, crypto exposures, and mega-cap stocks** using a 7-pillar layered methodology to identify bullish sectors and alert on bearish reversals.
 
 > The methodology layers six peer-reviewed price pillars (cross-sectional momentum, Faber 10mo SMA, Weinstein Stage 2, Antonacci dual momentum, RRG, business cycle) with a seventh **institutional flow** pillar (CMF, OBV, MFI, RVOL, distribution days, block-trade tape, ETF creations, 13F, short interest).
 >
@@ -10,12 +10,204 @@ A Streamlit dashboard that monitors **67+ ETFs across US sectors, US industries,
 
 ## What you get
 
+- A **read-only portfolio / single-stock analyzer** that accepts one ticker or a CSV/XLS/XLSX holdings file and maps the input to the current methodology snapshot.
+- A local **P&L tracker** for uploaded/saved holdings with shares and cost basis, using already-loaded dashboard prices.
+- A **personal trade-history backtest** that compares uploaded trades with historical methodology-state artifacts from the manual backtest runner.
+- A **read-only custom universe builder** that accepts pasted tickers or a CSV/XLS/XLSX ticker file, de-duplicates the list, and ranks matched tickers against the current methodology snapshot.
+- **Saved watchlists and portfolios** stored locally in `data/saved_inputs.json` so repeated ticker lists and uploaded holdings can be reloaded without broker access or cloud sync.
+- A **responsive single-page dashboard layout** with phone-width guards for the header, section controls, alert rows, tables, drill controls, and compact action summaries.
+- A **US sector relative-strength spaghetti chart** that overlays all sector ETF lines versus SPY over the last 12 months.
+- A **per-ticker chart range selector** for drilling into 3M, 6M, 1Y, 3Y, or all currently loaded price/flow history.
+- A **full-table hover preview** that shows a compact RRG dot card for each ticker row on desktop.
+- A **state transition pulse** that briefly highlights alert rows and active pick cards when a ticker changed state today.
+- A **ticker comparison view** for reviewing 2-4 scored tickers side by side from the current methodology snapshot.
+- **Pick-card sparklines with a 30-week MA reference line** when enough weekly history is loaded.
+- **Custom dashboard palettes**: Default, Solarized, Nord, and Mono layered over the existing dark/light theme.
+- **Expanded FRED macro context** with read-only rates, inflation, liquidity, growth, credit, and commodity tiles when `FRED_API_KEY` is configured; the same snapshot is stored in the local run journal and used for macro-conditioned debrief summaries.
+- A static **PWA alert shell** for HIGH severity transition notifications once VAPID keys and browser subscriptions are configured.
+- A generated **component-doc inventory** that documents each Streamlit render section, its inputs, UI states, and QA coverage in a Storybook-style reference panel.
 - A **single-page Streamlit app** (`app.py`) with two sections:
   - **Top:** 7-pillar heatmap — every ticker scored on every pillar, color-coded, with composite score and current state (`STAGE_2_BULLISH` / `HOLD` / `WARNING` / `EXIT` / `BEARISH_STAGE_4` / `STAGE_1_BASING`).
   - **Below:** drill-down tabs — RRG quadrant chart, cross-sectional momentum bar, institutional flow detail, state-machine transition log, per-ticker deep dive with price/CMF/OBV charts.
-- A **persistent state machine** (`state.json`) so bearish transitions trigger only once and stay visible across sessions.
+- A **persistent state machine** (`data/state.json` plus `data/state_transitions.jsonl`) so bearish transitions trigger only once and stay visible across sessions and restarts.
 - A **bearish alert system** with three severity levels (WARNING → EXIT → BEARISH) plus three flow-only early warnings (distribution day, dark-pool sell, OBV/price divergence).
-- **No paid feeds required for v1** — runs entirely on free Yahoo Finance data. Institutional-flow stubs ship pre-wired so you can drop in iShares SHO, Polygon, FINRA, or SEC EDGAR feeds when ready.
+- **No paid feeds required for v1** — defaults to free Yahoo Finance data. Historical OHLCV can use Massive when `MASSIVE_API_KEY` is configured, and institutional-flow stubs ship pre-wired so you can drop in iShares SHO, Massive, FINRA, or SEC EDGAR feeds when ready.
+
+## Backtest harness
+
+B-011 adds a pure pandas/numpy backtest accounting core in `src/backtest.py`. The core is deterministic and covered by offline pytest cases for weight timing, drift, turnover, cost scenarios, benchmarks, acceptance gates, and no-lookahead historical methodology target construction.
+
+The historical target builder accepts preloaded OHLCV, slices each rebalance snapshot through the rebalance date, scores it with pure `src/` modules, converts selected tickers into equal target weights, and records per-ticker states via `decide_state()` without calling `apply_state_machine()` or writing `state.json`. Provider-backed ETF flow is forced neutral in this historical path until as-of provider snapshots exist, so the builder stays OHLCV-only and avoids current-data leakage.
+
+Manual backtest smoke run:
+
+```powershell
+python scripts/run_backtest.py
+```
+
+Fast live data smoke, without writing report artifacts or running the full historical methodology simulation:
+
+```powershell
+python scripts/run_backtest.py --live-smoke
+```
+
+Opt-in FRED macro variant analysis:
+
+```powershell
+python scripts/run_backtest.py --macro-variants
+```
+
+The manual runner uses `OHLCV_PROVIDER=auto`: it prefers Massive aggregate bars when `MASSIVE_API_KEY` is configured and falls back to yfinance otherwise. Set `OHLCV_PROVIDER=massive` to force Massive historical bars, or `OHLCV_PROVIDER=yfinance` to force the free default. Keep `MASSIVE_VERIFY_SSL=true` unless a local certificate store blocks manual smoke testing; `MASSIVE_VERIFY_SSL=false` is an explicit troubleshooting override, not a production setting.
+
+The macro-variant flag fetches historical FRED observations when `FRED_API_KEY` is configured, aligns each macro series to rebalance dates without lookahead, and compares analysis-only defensive exposure filters against the baseline methodology. Normal manual backtests do not fetch FRED unless the flag is used.
+
+The runner writes `docs/backtest_report.md` when market data downloads successfully. Treat that report as manual evidence, not a replacement for the deterministic test suite.
+The report uses the historical methodology target builder as the strategy path, then compares it with 60/40 and equal-weight sector benchmarks. It includes strategy metrics, benchmark comparison, 3/5/10 bps cost sensitivity, historical simulation evidence, in-sample / out-of-sample metrics, and acceptance-gate status with the evidence/rule behind each gate. The simulation evidence records rebalance count, state ticker coverage, selected ticker count, state transition count, and state transitions per ticker-year. Acceptance gates use out-of-sample metrics by default, with 2015-01-01 as the current OOS boundary, and the state-transition gate now uses the simulated historical states instead of a placeholder. The runner also writes `docs/backtest_methodology_report.md`, `docs/backtest_equity.csv`, `docs/backtest_states.csv`, and `docs/backtest_metadata.json`; the dashboard's Backtest Lab section displays the summary report, normalized equity chart, and drawdown chart only when the metadata hashes match the artifact files. Use `notebooks/backtest_methodology_report.ipynb` as a lightweight artifact inspection guide. These are manual research artifacts, not live-edge claims.
+
+## Calibration and evidence gates
+
+B-163 adds a dashboard Calibration Lab that surfaces the frozen baseline config, walk-forward split metadata, and calibration artifacts from `docs/` without running calibration on page load. The manual backtest runner now accepts shortened history when it meets the configured 5-year minimum, adapts the calibration window down to the 3-year floor when shorter history requires it, writes the baseline calibration report, summary CSV, metadata JSON, a research-only candidate CSV from point-in-time labels, directional success metrics, fold-local candidate search, final-holdout evidence when the selected candidate has mature holdout labels, and a fail-closed calibrated candidate config artifact. The lab remains read-only; it does not tune live parameters, change live scoring, or promote a candidate.
+
+B-164 extends the same research-only path with a fixed five-year calibration window and a two-to-three-year holdout profile for broader threshold/filter research. `python scripts/run_backtest.py` now also writes `docs/calibration_expanded_report.md`, `docs/calibration_expanded_candidates.csv`, `docs/calibration_sector_overrides.csv`, and `docs/calibration_expanded_metadata.json`. The expanded artifacts evaluate global, class-level, and ticker-level US sector candidate rules with deterministic paired block bootstrap confidence intervals by rebalance date, minimum-sample gates, and a fail-closed true-sector override gate. The dashboard displays these artifacts only as read-only evidence; no sector-specific weight, threshold, veto, alert, broker action, or recommendation is promoted live from B-164.
+
+B-158/B-160 add a dashboard Evidence Gates section for the FRED and Massive promotion gates. It reads the committed validation summaries, shows fail-closed gate decisions such as `blocked_no_candidates`, and displays `Live Promotion Allowed = False` until a separate reviewed promotion patch exists.
+
+## Run debrief lab
+
+B-153 records dashboard methodology runs in the local SQLite journal at `data/run_journal/runs.sqlite`, then the Debrief lab joins saved decisions to already-loaded OHLCV to calculate matured forward outcomes. The lab can export a flat outcome CSV and a Markdown debrief report for offline review. B-155 adds macro-conditioned summaries from the journaled `fred_macro_snapshot`, so the dashboard can compare hit rate, average forward return, and average max drawdown by FRED series trend without fetching data or changing the recommendation logic.
+
+## Portfolio analyzer
+
+B-165 adds a first-class **Analyze ticker** section before the drill-down. Enter a symbol from the current scored universe and the dashboard shows the same methodology snapshot used everywhere else: state, S score, F score, class/rank, selected flag, veto status, and a one-row methodology table. The section is read-only and includes a direct jump into the full drill-down for that ticker.
+
+B-130 adds a read-only analyzer section inside the Streamlit app:
+
+- **Ticker mode:** enter one ticker and see its current state, score, flow, class, selection flag, and portfolio-weighted exposure as a one-position analysis.
+- **Portfolio mode:** upload `.csv`, `.xlsx`, or `.xls` holdings. The file needs a ticker-like column: `ticker`, `symbol`, `holding`, or `asset`.
+- Optional upload columns include `shares`, `quantity`, `qty`, `cost_basis`, `cost`, `market_value`, `value`, `weight`, `sector`, `account`, and `notes`.
+- Weights can be decimals (`0.25`) or percents (`25%` or `25`). If no valid weights are present, analysis falls back to market value weights, then equal weights.
+- Unknown tickers are reported as missing instead of crashing. Uploaded files are analyzed in memory; named portfolios can be saved locally to `data/saved_inputs.json`, which is ignored by git and Docker. The app does not connect to broker accounts.
+- B-131 adds a local P&L tracker in the same section. If holdings include `shares` and `cost_basis`, the dashboard joins them to already-loaded latest closes and shows cost, value, unrealized P&L, P&L %, and missing-input diagnostics. Broker sync remains config pending; no broker API calls are made.
+- Broker readiness can be checked without connecting to a broker or printing secrets:
+
+```bash
+./.venv/bin/python scripts/check_broker_config.py --provider alpaca
+./.venv/bin/python scripts/check_broker_config.py --provider ibkr
+```
+
+## Personal trade-history backtest
+
+B-132 adds an offline alignment check for personal trade history:
+
+- Run `python scripts/run_backtest.py` first so `docs/backtest_states.csv` and matching metadata hashes exist.
+- Upload a CSV/XLS/XLSX trade file with date, ticker, side, shares, and price columns.
+- BUY trades are aligned when the latest methodology state at or before the trade date is `STAGE_2_BULLISH` or `HOLD`.
+- SELL trades are aligned when the latest methodology state is `WARNING`, `EXIT`, or `BEARISH_STAGE_4`.
+- Uploaded trades are not saved, sent to a broker, or written into the run journal.
+
+## Custom universe builder
+
+B-105 adds a read-only custom universe section inside the Streamlit app:
+
+- **Paste tickers:** enter a comma, space, semicolon, or newline separated ticker list.
+- **Upload file:** upload `.csv`, `.xlsx`, or `.xls` files with a ticker-like column: `ticker`, `symbol`, `holding`, or `asset`.
+- Duplicate tickers are ignored after the first occurrence. Unknown tickers are reported as missing instead of crashing.
+- Matched tickers are ranked by current `S_score` inside the custom list and retain their methodology state, class, flow score, class rank, selection flag, and veto flag.
+- The builder is snapshot-only for scoring: it does not fetch new OHLCV, alter `src/universe.py`, or write state-machine files. Named watchlists can be saved locally to `data/saved_inputs.json`, which is ignored by git and Docker.
+
+## Mobile view
+
+B-110 adds CSS and Streamlit markup hooks for narrower screens:
+
+- Header metadata wraps instead of pushing content off screen.
+- RRG class buttons and drill buttons wrap into usable rows on phone widths.
+- Dense tables scroll horizontally rather than squeezing all columns into unreadable text.
+- Alert rows, action summaries, status tiles, defensive cards, and drill metrics collapse into tighter mobile-friendly grids.
+
+## Sector relative strength
+
+B-111 adds a sector spaghetti chart after the RRG section. It uses the already-loaded OHLCV snapshot, compares each US sector ETF with SPY, normalizes every line to 100 at the start of the 12-month window, and sorts traces by latest relative strength.
+
+## Drill-down chart ranges
+
+B-112 adds a `CHART RANGE` control to the per-ticker drill-down. The selector clips the visible weekly price/30wMA, CMF, and OBV chart windows while keeping the full loaded ticker OHLCV available for rolling-indicator warmup.
+
+- Supported ranges: `3M`, `6M`, `1Y`, `3Y`, and `MAX`.
+- The range is anchored to the latest available date in the loaded data, not the system clock.
+- `MAX` means all OHLCV already loaded for the current dashboard run; it does not request a longer provider window.
+
+## Table hover previews
+
+B-113 adds a CSS-only hover preview to each full matrix ticker row on desktop. The preview uses already-computed `rs_ratio`, `rs_momentum`, state, S-score, and F-score values to show a mini RRG grid and dot without fetching data or changing scoring.
+
+## Transition pulse
+
+B-114 adds a visual-only pulse class for tickers with state transitions dated today in the existing `state.json` transition log. The pulse highlights recent alert rows and any matching active pick card, uses the new state color, and disables animation when the user prefers reduced motion.
+
+## Comparison view
+
+B-115 adds a read-only comparison section after the per-ticker drill-down. Pick 2-4 scored tickers and compare state, class, S/F scores, 12-1 momentum, Weinstein stage, RRG quadrant, class rank, selection flag, and veto status side by side. The section uses the existing scored snapshot only.
+
+## Sparkline 30wMA reference
+
+B-116 adds a subtle dashed 30-week moving-average reference line to pick-card sparklines when enough weekly history is available. The line is computed from the same loaded OHLCV used for the price sparkline and does not fetch or score anything new.
+
+## Custom palettes
+
+B-117 adds a `Palette` preference in `VIEW OPTIONS`. Choose `Default`, `Solarized`, `Nord`, or `Mono`; the choice sets CSS tokens only and works alongside the existing dark/light toggle. B-025 also lets you save, load, and delete named local view profiles for BLUF mode, density, sparkline style, and palette in `data/preference_profiles.json`.
+
+## Component docs
+
+B-150 adds a generated component inventory inside the dashboard. The catalog lives in `src/component_docs.py`, and the Streamlit panel renders the catalog without fetching market data, recomputing signals, or writing state. It documents each render section, its primary inputs, expected UI states, and the test surface that guards it.
+
+## Extending the methodology
+
+Use [`docs/how-to-add-sector-indicator-pillar.md`](docs/how-to-add-sector-indicator-pillar.md) before adding a universe class, indicator, or pillar. It lists the source files, methodology docs, safety boundaries, and verification commands that must move together.
+
+## Public methodology landing
+
+B-152 adds a static public root in [`public/index.html`](public/index.html). Deployment notes live in [`docs/PUBLIC_METHODOLOGY_LANDING.md`](docs/PUBLIC_METHODOLOGY_LANDING.md): the public methodology page is served separately from the protected dashboard so no live signals or protected dashboard content are exposed.
+
+## PWA high-severity alerts
+
+B-121 adds static PWA assets and a push-notification sender seam:
+
+```bash
+./.venv/bin/python scripts/send_pwa_push_notifications.py
+```
+
+Generate a local VAPID key pair first:
+
+```bash
+./.venv/bin/python scripts/generate_vapid_keys.py --claim-email ops@example.com
+```
+
+Store the printed `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, and `VAPID_CLAIM_EMAIL` values in Streamlit secrets or environment variables. The private key path defaults to `data/vapid_private_key.pem`, which is ignored by git and Docker.
+
+The sender script writes `public/notification-feed.json` from recent HIGH severity transitions and can send Web Push notifications once `VAPID_PRIVATE_KEY`, `VAPID_CLAIM_EMAIL`, optional `PWA_DASHBOARD_URL`, and local browser subscriptions in `data/pwa_push_subscriptions.json` are configured. Check readiness without sending or rewriting the feed file:
+
+```bash
+./.venv/bin/python scripts/send_pwa_push_notifications.py --dry-run
+```
+
+The subscription file is ignored by git and Docker.
+
+To capture a browser subscription, open `public/pwa.html?vapid_public_key=PUBLIC_KEY`, use the subscribe control, then register the copied JSON locally:
+
+```bash
+./.venv/bin/python scripts/register_pwa_subscription.py --label ahad-phone < subscription.json
+```
+
+Check production data readiness and all optional integration readiness in one sanitized command:
+
+```bash
+./.venv/bin/python scripts/check_ops_readiness.py
+```
+
+The readiness output includes secret-safe labels for OHLCV/Massive, FRED, provider-flow live/stub state, state
+persistence, run journal, provider snapshots, the OHLCV cache, the browser-QA fixture guard, and optional alert,
+feed, PWA, email, and broker integrations. It prints configured/missing states and row counts, not API keys, tokens,
+webhook URLs, or raw provider payloads.
 
 ## Quick start
 
@@ -32,6 +224,48 @@ streamlit run app.py
 
 Or just double-click `run.bat` (creates venv + installs deps automatically on first run). If it fails, run `run-diagnostic.bat` for step-by-step output.
 
+### Browser QA Screenshots
+
+The visual/responsive QA evidence for implemented dashboard tickets lives in `docs/browser-qa/latest/`. Regenerate it from a QA-mode dashboard with:
+
+```powershell
+python -m pip install -r requirements-qa.txt
+$env:BROWSER_QA_MODE="1"; $env:MASSIVE_API_KEY=""; $env:FRED_API_KEY=""
+$env:BROWSER_QA_ALLOW_FIXTURES="1"
+python -m streamlit run app.py --server.address=127.0.0.1 --server.port=8503 --server.headless=true
+
+# In a second shell:
+python scripts/capture_browser_qa.py --base-url http://127.0.0.1:8503 --browser-channel chrome --qa-mode browser-qa-secret-free
+```
+
+Use `--browser-channel msedge` if Edge is installed and Chrome is not. Both `BROWSER_QA_MODE=1` and `BROWSER_QA_ALLOW_FIXTURES=1` must be set before starting Streamlit; this two-key lock enables deterministic visual fixtures for palette, transition-pulse, provider-status screenshots, and secret-free OHLCV/FRED-off screenshot runs. Clearing `MASSIVE_API_KEY` plus `FRED_API_KEY` keeps the run explicit. Production should not set `BROWSER_QA_ALLOW_FIXTURES`. The script writes `browser_qa_report.md`, `browser_qa_manifest.json`, and nonblank screenshots without requiring API keys or webhook secrets.
+
+For a faster rendered-content smoke without screenshot capture, run:
+
+```powershell
+python scripts/rendered_dashboard_smoke.py --url http://127.0.0.1:8501/?ticker=XLK --browser-channel chrome
+```
+
+This verifies that the browser-rendered page contains core dashboard sections
+such as `SENTIMENT BOARD`, `BLUF`, and `Data and dashboard health`. The Pi deploy
+installs Playwright Chromium and runs this smoke after the dashboard restart as a
+mandatory rendered-DOM gate. Use `--allow-unavailable` only for non-blocking
+ad hoc observability runs.
+
+For the protected Pi route, authenticate through Cloudflare Access first, then run the
+same capture against the public dashboard URL:
+
+```powershell
+python scripts/capture_browser_qa.py --base-url https://sentimentdashboard.ahaddashboards.uk --browser-channel chrome --user-data-dir .browser-qa-cloudflare --headed --qa-mode cloudflare-access-authenticated
+python scripts/rendered_dashboard_smoke.py --url https://sentimentdashboard.ahaddashboards.uk/?ticker=XLK --browser-channel chrome --user-data-dir .browser-qa-cloudflare --headed
+```
+
+The first headed run can be used to complete Cloudflare Access authentication in the
+persistent `.browser-qa-cloudflare` profile. Later runs can reuse the same
+`--user-data-dir` without `--headed`. Without an authenticated Cloudflare Access
+browser session, the public route will stop at the Access login page and browser QA
+will correctly fail its dashboard text checks.
+
 ### Linux / macOS / Raspberry Pi
 
 ```bash
@@ -43,7 +277,25 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-For a 24/7 deployment on a Raspberry Pi with a public URL via Cloudflare Tunnel, see [`docs/DEPLOY_RASPBERRY_PI.md`](docs/DEPLOY_RASPBERRY_PI.md) and [`docs/DEPLOY_CLOUDFLARE_TUNNEL.md`](docs/DEPLOY_CLOUDFLARE_TUNNEL.md).
+For a 24/7 deployment on a Raspberry Pi with a public URL via Cloudflare Tunnel, see [`docs/DEPLOY_RASPBERRY_PI.md`](docs/DEPLOY_RASPBERRY_PI.md) and [`docs/DEPLOY_CLOUDFLARE_TUNNEL.md`](docs/DEPLOY_CLOUDFLARE_TUNNEL.md). For push-to-Pi automation, see [`docs/DEPLOY_GITHUB_ACTIONS_PI.md`](docs/DEPLOY_GITHUB_ACTIONS_PI.md).
+
+### Docker Compose (dev)
+
+To run the dashboard in a local container:
+
+```bash
+docker compose up --build
+```
+
+Open `http://127.0.0.1:8501/?ticker=XLK`. The compose stack mounts `.streamlit/` and `data/`; container state is written to `data/state.json` through the `STATE_FILE` environment variable, so a clean checkout starts without a pre-created root `state.json`. `.dockerignore` keeps real secrets, private keys, and generated data out of the image build context.
+
+If port `8501` is already used by a local service, run a conflict-free smoke on another host port:
+
+```bash
+DASHBOARD_HOST_PORT=18501 docker compose up --build
+```
+
+Then open `http://127.0.0.1:18501/?ticker=XLK`.
 
 ## Project layout
 
@@ -57,11 +309,13 @@ sector-rotation-dashboard/
 ├── run.bat                         <- Windows one-click launcher
 ├── run-diagnostic.bat              <- Windows verbose launcher
 ├── src/
-│   ├── universe.py                 <- 67+ tickers grouped by class
-│   ├── data.py                     <- yfinance ingestion (daily/weekly/monthly resample)
+│   ├── universe.py                 <- 83+ tickers grouped by class
+│   ├── data.py                     <- OHLCV ingestion: yfinance default, Massive optional
 │   ├── indicators.py               <- Pillars 1-5 + breadth
 │   ├── flow.py                     <- Pillar 7: CMF/OBV/MFI/RVOL + 5 stubs
 │   ├── macro.py                    <- Pillar 6: Faber + yield curve
+│   ├── portfolio.py                <- Read-only ticker/portfolio parsing and analysis
+│   ├── custom_universe.py          <- Read-only custom universe parsing and ranking
 │   ├── scoring.py                  <- Composite + state machine
 │   └── visuals.py                  <- Plotly RRG/momentum/price charts
 ├── docs/
@@ -80,23 +334,92 @@ sector-rotation-dashboard/
 
 | # | Pillar | Status | Notes |
 |---|--------|--------|-------|
-| 1 | Cross-sectional 12-1 momentum | **LIVE** | yfinance daily bars |
+| 1 | Cross-sectional 12-1 momentum | **LIVE** | yfinance daily bars by default; Massive aggregate bars optional |
 | 2 | Faber 10-month SMA | **LIVE** | monthly resample |
 | 3 | Weinstein Stage 2 (30wMA + Mansfield RS) | **LIVE** | weekly resample |
 | 4 | Antonacci dual momentum | **LIVE** | vs BIL T-bill ETF |
 | 5 | RRG (RS-Ratio + RS-Momentum) | **LIVE** | approximation of JdK formulas |
-| 6 | Business-cycle phase | **PARTIAL** | Faber 10mo on SPY + ^TNX/^IRX curve sign; full ISM PMI requires FRED API key |
-| 7 | Volume & institutional flow | **LIVE** for CMF, OBV, MFI, RVOL, distribution days, OBV/price divergence · **STUBBED** for ETF SHO, block trades, dark pool, short interest, 13F |
+| 6 | Business-cycle phase | **PROVIDER-READY** | Fallback: Faber 10mo on SPY + ^TNX/^IRX curve sign. With `FRED_API_KEY`: INDPRO, yield curves, NFCI, recession probability, unemployment, HY spread, and read-only expanded macro context. |
+| 7 | Volume & institutional flow | **LIVE** for CMF, OBV, MFI, RVOL, distribution days, OBV/price divergence · **PROVIDER-READY** for ETF primary flow · **STUBBED** for block trades, dark pool, short interest, 13F |
 
 ## Wiring real institutional-flow feeds
 
-Each stubbed signal has a `get_<signal>()` hook in `src/flow.py`. After wiring, flip `STUB_MODE = False` at the top of that file.
+Each provider-backed signal has a hook in `src/flow.py`. ETF primary flow now has a provider seam: leave `FLOW_STUB_MODE=true` or unset for neutral behavior, or set `FLOW_STUB_MODE=false` plus `MASSIVE_API_KEY` and `ETF_PRIMARY_FLOW_URL_<TICKER>` values in Streamlit secrets or environment variables.
 
-- `etf_primary_flow_5d_pct()` → iShares / SSGA daily SHO CSV (free)
-- `block_trade_upside_ratio()` → Polygon `/v3/trades` or NYSE TAQ
-- `dark_pool_pct()` → FINRA ATS Transparency (free, T+1)
-- `short_interest_delta_15d()` → FINRA Reg SHO bi-monthly (free)
-- `thirteen_f_net_buys_q()` → SEC EDGAR Form 13F-HR quarterly (free, T+45)
+The deploy hardening script now enables the Massive block-trade and free FINRA lanes after the live smoke test and persistent provider-flow cache are in place. Leave `FLOW_STUB_MODE` and `SEC_13F_STUB_MODE` unset/`true` until those feed-specific inputs are configured:
+
+- `MASSIVE_TRADES_STUB_MODE`
+- `FINRA_ATS_STUB_MODE`
+- `FINRA_SHORT_INTEREST_STUB_MODE`
+- `SEC_13F_STUB_MODE`
+
+- `etf_primary_flow_5d_pct()` → Massive-rendered issuer SHO/source URL per ticker
+- `block_trade_upside_ratio()` → Massive `/v3/trades`; enable with `MASSIVE_TRADES_STUB_MODE=false`
+- `dark_pool_pct()` → FINRA ATS weekly summary; enable with `FINRA_ATS_STUB_MODE=false`
+- `short_interest_delta_15d()` → FINRA consolidated short interest; enable with `FINRA_SHORT_INTEREST_STUB_MODE=false`
+- `thirteen_f_net_buys_q()` → configured SEC Form 13F data-set zip plus `SEC_13F_CUSIP_<TICKER>` mapping; enable with `SEC_13F_STUB_MODE=false`
+
+The dashboard data-health panel reports each provider lane separately. When a live
+lane runs, the panel also shows its last in-process outcome: live OK, missing ticker
+source, no provider data, invalid provider value, or request-error neutral fallback.
+These diagnostics are secret-safe and intentionally do not print API keys, webhook
+URLs, or raw provider payloads.
+Provider-flow responses are cached in `data/provider_flow_cache/provider_flow_cache.sqlite` so dashboard reruns can reuse fresh Massive/FINRA payloads and degrade to warning-only stale fallback during provider outages.
+The Pi deploy installs `sector-provider-flow-cache.timer`, a non-sudo user timer that warms the cached Massive/FINRA provider-flow lanes for the scored dashboard universe before the US open and after the close.
+The Pi deploy also installs `sector-dashboard-state-refresh.timer`, which runs the methodology headlessly after cache warmup so `data/state.json`, `data/state_transitions.jsonl`, and `data/run_journal/runs.sqlite` stay fresh even when no browser session is open.
+Massive provider snapshots are stored in `data/provider_snapshots/provider_snapshots.sqlite`; readiness reports both total snapshot rows and `stock_trades_coverage` so operators can see expected ticker coverage, missing tickers, latest `as_of`, and latest capture time for future provider-flow backtesting.
+`sector-rendered-dashboard-smoke.timer` adds continuous browser observability: every 30 minutes it attempts a rendered Playwright smoke against `http://127.0.0.1:8501/?ticker=XLK` and writes `data/rendered_dashboard_smoke/latest.json`. The scheduled timer retries transient render misses three times before failing, so brief Streamlit restarts do not leave stale false alarms. The deploy also runs the same smoke after restart as a mandatory rendered-DOM gate.
+Use `./.venv/bin/python scripts/check_ops_readiness.py --strict-production` for the deploy-grade data/process readiness gate, and add `--require-rendered-smoke` after running `scripts/rendered_dashboard_smoke.py` when you also want the latest browser-render evidence enforced. Timer readiness includes both the installed/enabled/active state and a separate `last_service_state`, so a scheduled one-shot failure stays visible even when the timer itself is active. Optional secret-backed channels such as Telegram, email, push, Discord, and broker execution remain reported but non-blocking.
+
+## State transition alerts
+
+`apply_state_machine()` writes the durable state snapshot to `data/state.json`, appends state changes to `data/state_transitions.jsonl`, keeps local backups under `data/state_backups/`, and then sends optional transition alerts through Telegram, Slack, Discord, and/or Mattermost. If an old repo-root `state.json` exists and no explicit `STATE_FILE` is configured, it is migrated into `data/state.json` before the next write. Alert delivery deduplicates repeated transition rows and retries transient HTTP failures with bounded backoff. Leave alert secrets unset to disable network calls. To enable alerts, configure `TELEGRAM_BOT_TOKEN` plus `TELEGRAM_CHAT_ID`, and/or `SLACK_WEBHOOK_URL`, `DISCORD_WEBHOOK_URL`, or `MATTERMOST_WEBHOOK_URL`, in Streamlit secrets or environment variables.
+
+B-123 adds a Discord/Mattermost-only smoke script so webhook configuration can be checked without touching Telegram or Slack:
+
+```bash
+./.venv/bin/python scripts/smoke_discord_mattermost_webhooks.py --dry-run
+./.venv/bin/python scripts/smoke_discord_mattermost_webhooks.py --send-test
+```
+
+B-021 Telegram/Slack validation is kept separate:
+
+```bash
+./.venv/bin/python scripts/smoke_telegram_slack_alerts.py --dry-run
+./.venv/bin/python scripts/smoke_telegram_slack_alerts.py --send-test
+```
+
+B-120 adds an optional LOW-severity email digest for transitions from the previous US/Eastern day. Configure `SMTP_HOST`, optional `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `EMAIL_DIGEST_FROM`, and comma-separated `EMAIL_DIGEST_TO`, then schedule:
+
+```bash
+cd "$PI_REPO_PATH"
+./.venv/bin/python scripts/send_email_digest.py
+```
+
+Check the digest input without sending email:
+
+```bash
+./.venv/bin/python scripts/send_email_digest.py --dry-run
+```
+
+For 08:00 ET delivery from cron, set `CRON_TZ=America/New_York` and run the command at `0 8 * * *`. For systemd, install `systemd/sector-email-digest.service` and `systemd/sector-email-digest.timer` on the Pi. With no SMTP settings or no LOW-severity transitions, the script exits cleanly with `email_digest=skipped`.
+
+B-122 adds local RSS and iCal feed artifact generation from the same transition log:
+
+```bash
+cd "$PI_REPO_PATH"
+./.venv/bin/python scripts/export_transition_feeds.py
+```
+
+The script writes `data/feeds/transitions.rss` and `data/feeds/transitions.ics` and prints the generated paths. To publish feed copies through the static public service, run:
+
+```bash
+./.venv/bin/python scripts/export_transition_feeds.py --publish-dir public/feeds --public-base-url https://www.ahaddashboards.uk/feeds/
+```
+
+The generated `data/feeds/` and `public/feeds/` artifacts are gitignored local outputs.
+
+Dashboard deep links support `?ticker=XLK`; the app opens with that ticker selected in the per-ticker drill-down.
 
 ## Methodology references
 

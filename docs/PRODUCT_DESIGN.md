@@ -8,7 +8,7 @@
 
 ## 1. Product summary
 
-A single-page institutional-grade sector rotation dashboard that monitors **67+ ETFs** across US sectors, US industries, international markets, and style factors. Implements a 7-pillar methodology (cross-sectional momentum, Faber, Weinstein Stage 2, Antonacci dual momentum, RRG, business cycle, institutional flow) to identify bullish sectors and alert on bearish reversals.
+A single-page institutional-grade sector rotation dashboard that monitors **83+ instruments** across US sectors, US industries, international markets, style factors, thematic exposures, crypto exposures, and mega-cap stocks. Implements a 7-pillar methodology (cross-sectional momentum, Faber, Weinstein Stage 2, Antonacci dual momentum, RRG, business cycle, institutional flow) to identify bullish sectors and alert on bearish reversals.
 
 **One-line product positioning:**
 *"Bloomberg Terminal aesthetic, retail-trader simplicity. See sector rotation at a glance, get alerted before the breakdown."*
@@ -71,21 +71,25 @@ HOME (single scrollable page)
 │   ├── Cycle phase (EARLY / MID / LATE / RECESSION)
 │   └── Active warnings count
 ├── Alerts banner (last 8 state transitions, color-coded dots)
-├── Picks grid (4 cards per row, scrollable horizontally on mobile)
+├── Picks grid (4 cards per row on desktop, single-column on phone widths)
 │   └── Card: ticker, state pill, sparkline, S-score, F-score, momentum, RRG quadrant
 ├── Rotation centerpiece
 │   ├── Class selector (US Sectors / Industries / Countries / Factors)
 │   └── Big RRG quadrant chart (interactive, hover + click)
-├── Full 7-pillar table (collapsed by default, expandable)
+├── US sector relative-strength spaghetti chart (12-month lines vs SPY)
+├── Full 7-pillar table (collapsed by default, expandable, desktop hover RRG previews)
 └── Per-ticker drill-down
     ├── Ticker picker
+    ├── Chart range selector (3M / 6M / 1Y / 3Y / MAX loaded data)
     ├── 4 metric tiles (S-score, F-score, state, RRG quadrant)
     ├── Weekly price + 30wMA chart
     ├── CMF chart
     └── OBV / price divergence chart
+├── Comparison view (2-4 tickers side by side from current scored snapshot)
 
-SIDEBAR (persistent)
+HEADER / VIEW OPTIONS
 ├── Theme toggle (dark default)
+├── Palette selector in VIEW OPTIONS (Default / Solarized / Nord / Mono)
 ├── Lookback selector (3y / 5y / max)
 ├── Refresh data button
 ├── Asset class filter (multi-select)
@@ -146,12 +150,13 @@ SIDEBAR (persistent)
 
 ### 5.3 Spacing & layout
 
-- **Grid:** 12-column responsive, 24px gutters
+- **Grid:** 12-column responsive, 24px gutters; phone-width sections collapse to one column, while dense data tables keep horizontal scroll.
 - **Tile/card padding:** 14px vertical, 18px horizontal (tiles), 12px/14px (cards)
 - **Section spacing:** 24px between major sections, divider line above each section header
 - **Border radius:** 6px on tiles, cards, and pills (matches Bloomberg-style rectangularity — keep it tight, not pill-shaped)
 - **Border thickness:** 1px standard; 3px left-accent on cards (state-colored)
 - **Page max-width:** 1440px centered (works comfortably on 16:9 monitors)
+- **Mobile behavior:** header metadata wraps, RRG/drill controls wrap, full data tables scroll horizontally, and drill metrics collapse to one column below 520px.
 
 ### 5.4 State colors (consistent across product)
 
@@ -211,7 +216,7 @@ Apply the state color as:
 │ XLK            HOLD  │  ← ticker (mono) + pill (right)
 │ US Sectors           │  ← class name, small, muted
 │                      │
-│ ▁▂▃▅▇█ sparkline     │  ← 50px tall, no axes, green or red fill
+│ ▁▂▃▅▇█ sparkline     │  ← 50px tall, no axes, green/red fill, dashed 30wMA reference when available
 │                      │
 │ S +1.83  ·  F +0.67  │  ← composite + flow scores, mono
 │ MOM +32.4%  Stage 2  │  ← momentum colored, stage number
@@ -257,12 +262,41 @@ Four metric tiles in a row:
 - State (pill or large colored text)
 - RRG quadrant (text only)
 
+Above the chart group, a compact range selector controls the time window used by the drill charts:
+- 3M, 6M, 1Y, 3Y, MAX
+- The selected range clips the visible chart window while indicators compute from the full loaded ticker OHLCV warmup.
+- MAX means the full loaded dashboard payload, not a fresh provider fetch.
+
 Then three full-width charts stacked or in 2-column:
 - Weekly price + 30wMA line (Plotly)
 - CMF(21) with ±0.10 reference lines
 - OBV + price overlay (dual-axis)
 
 Below: expandable raw table of every indicator value for that ticker.
+
+The full 7-pillar matrix uses row hover previews on desktop:
+- Ticker cell reveals a compact RRG card on hover.
+- The card shows current quadrant, mini RRG dot, RS-ratio, RS-momentum, S-score, and F-score.
+- Previews are disabled on phone widths where hover is not a reliable interaction.
+
+### 6.7 Comparison view
+
+Read-only side-by-side cards for 2-4 tickers:
+- Multiselect capped at four scored tickers.
+- Defaults start with the active drill ticker, then active picks by rank.
+- Cards show state, class, S/F scores, 12-1 momentum, Weinstein stage, RRG quadrant, class rank, selected/watch flag, and veto status.
+
+### 6.8 Sparkline 30wMA context
+
+Pick-card sparklines include a subtle dashed horizontal 30-week MA reference when at least 30 weekly closes are available. This keeps the card glanceable while exposing Weinstein context without opening the drill-down.
+
+### 6.9 Palette options
+
+The dashboard keeps the dark/light theme toggle and adds palette variants as CSS token overrides:
+- Default: existing Bloomberg-terminal palette.
+- Solarized: warm analytical palette with Solarized dark/light bases.
+- Nord: cool blue-gray palette for lower-contrast scanning.
+- Mono: grayscale operator mode with state colors preserved.
 
 ---
 
@@ -280,7 +314,7 @@ Below: expandable raw table of every indicator value for that ticker.
 - **No flashy animations.** This is a trading dashboard — fast, calm, instant feedback.
 - **Hover states:** card left border accent change (`var(--border)` → `var(--accent)`), 150ms ease
 - **Loading states:** subtle inline skeleton bars in cards; never a full-page spinner
-- **State transitions:** when a state changes, briefly (500ms) pulse the card's left border in the new state color before settling
+- **State transitions:** when a state changes, briefly pulse the alert row and matching active pick card in the new state color before settling; respect reduced-motion preferences
 - **Refresh data button:** during fetch, replace text with "FETCHING…" and animated dots
 - **Chart hover:** instant tooltip, no fade
 
@@ -403,17 +437,16 @@ Use this realistic mock data set when populating mockups:
 - Real-time WebSocket data (we run on yfinance 1-hour cache)
 - Position tracking / P&L (this dashboard is signals-only, not a broker)
 - News integration (out of scope; Bloomberg-style headline ticker is a v3 idea)
-- Custom universe builder UI (currently in `src/universe.py` code; web UI to manage is v3)
+- Custom universe persistence/editing beyond the read-only B-105 builder
 - Multi-user / multi-tenant (Cloudflare Access is per-email allowlist for now)
 
 ---
 
 ## 15. Open questions for designer
 
-1. Should the **sparklines** on cards include a horizontal "30-week MA" line so the Weinstein context is visible in a glance? Or keep cards pure-price for cleanliness?
-2. The **state pill** — do we double-encode (color + emoji icon), or keep it text-only? Text-only is more "Bloomberg," icon-tagged is more "Linear."
-3. For **mobile**, do we ditch the RRG chart entirely (too small to read on a phone) or render it with a "fullscreen" expand button?
-4. Do we want a **portfolio overlay** — let the user paste in current positions, and the dashboard color-codes which ones are in WARNING / EXIT state? (Lightweight CSV upload, no broker API.)
+1. The **state pill** — do we double-encode (color + emoji icon), or keep it text-only? Text-only is more "Bloomberg," icon-tagged is more "Linear."
+2. For **mobile**, do we ditch the RRG chart entirely (too small to read on a phone) or render it with a "fullscreen" expand button?
+3. **Resolved in B-130:** add a read-only portfolio / single-stock analyzer. It accepts one ticker or CSV/XLS/XLSX holdings upload, maps positions to the existing methodology snapshot, flags WARNING / EXIT / BULLISH action lists, and does not save portfolios or connect to broker APIs.
 
 ---
 

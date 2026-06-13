@@ -5,6 +5,9 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
+from .data import close_price
+from .ticker_identity import ticker_display_label
+
 
 # ---- color helpers ---------------------------------------------------------------
 
@@ -94,12 +97,56 @@ def momentum_bar(df: pd.DataFrame, title: str = "12-1 Cross-sectional Momentum")
 
 # ---- Price + 30wMA chart for the drill-down -------------------------------------
 
-def price_chart_with_30wma(df_daily: pd.DataFrame, ticker: str) -> go.Figure:
+
+def _clip_to_visible_since(
+    data: pd.Series | pd.DataFrame,
+    visible_since: object | None,
+) -> pd.Series | pd.DataFrame:
+    if visible_since is None or not isinstance(data.index, pd.DatetimeIndex):
+        return data
+    try:
+        cutoff = pd.Timestamp(visible_since)
+    except (TypeError, ValueError):
+        return data
+    if pd.isna(cutoff):
+        return data
+    return data.loc[data.index >= cutoff]
+
+
+def _padded_axis_range(
+    values: pd.Series,
+    *,
+    anchors: tuple[float, ...] = (),
+    fallback: tuple[float, float] = (-0.5, 0.5),
+    pad_ratio: float = 0.12,
+    min_pad: float = 0.05,
+) -> list[float]:
+    numeric = pd.to_numeric(pd.concat([values, pd.Series(anchors)]), errors="coerce").dropna()
+    if numeric.empty:
+        return [fallback[0], fallback[1]]
+    finite = numeric[np.isfinite(numeric)]
+    if finite.empty:
+        return [fallback[0], fallback[1]]
+    low = float(finite.min())
+    high = float(finite.max())
+    if low == high:
+        pad = max(abs(high) * pad_ratio, min_pad)
+    else:
+        pad = max((high - low) * pad_ratio, min_pad)
+    return [low - pad, high + pad]
+
+
+def price_chart_with_30wma(
+    df_daily: pd.DataFrame,
+    ticker: str,
+    visible_since: object | None = None,
+) -> go.Figure:
     weekly = df_daily.resample("W-FRI").agg({"close": "last"})
     weekly["sma30"] = weekly["close"].rolling(30).mean()
+    visible_weekly = _clip_to_visible_since(weekly, visible_since)
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=weekly.index, y=weekly["close"], name="Close (weekly)", line=dict(width=2)))
-    fig.add_trace(go.Scatter(x=weekly.index, y=weekly["sma30"], name="30-week SMA", line=dict(width=1.5, dash="dash")))
+    fig.add_trace(go.Scatter(x=visible_weekly.index, y=visible_weekly["close"], name="Close (weekly)", line=dict(width=2)))
+    fig.add_trace(go.Scatter(x=visible_weekly.index, y=visible_weekly["sma30"], name="30-week SMA", line=dict(width=1.5, dash="dash")))
     fig.update_layout(
         title=f"{ticker} — weekly price vs 30-week SMA",
         height=400,
@@ -110,33 +157,44 @@ def price_chart_with_30wma(df_daily: pd.DataFrame, ticker: str) -> go.Figure:
     return fig
 
 
-def cmf_chart(df_daily: pd.DataFrame, ticker: str) -> go.Figure:
+def cmf_chart(
+    df_daily: pd.DataFrame,
+    ticker: str,
+    visible_since: object | None = None,
+) -> go.Figure:
     high, low, close, vol = df_daily["high"], df_daily["low"], df_daily["close"], df_daily["volume"]
     rng = (high - low).replace(0, np.nan)
     mfm = ((close - low) - (high - close)) / rng
     mfv = (mfm * vol).fillna(0)
     cmf = mfv.rolling(21).sum() / vol.rolling(21).sum().replace(0, np.nan)
+    visible_cmf = _clip_to_visible_since(cmf, visible_since)
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=cmf.index, y=cmf, name="CMF(21)", line=dict(width=1.5)))
+    fig.add_trace(go.Scatter(x=visible_cmf.index, y=visible_cmf, name="CMF(21)", line=dict(width=1.5)))
     fig.add_hline(y=0.10, line=dict(color="#1A8A4E", dash="dot"))
     fig.add_hline(y=0, line=dict(color="#999"))
     fig.add_hline(y=-0.10, line=dict(color="#D5562C", dash="dot"))
     fig.update_layout(
         title=f"{ticker} — Chaikin Money Flow (21d)",
-        height=320,
-        yaxis=dict(range=[-0.5, 0.5]),
+        height=400,
+        yaxis=dict(range=_padded_axis_range(visible_cmf, anchors=(-0.10, 0.0, 0.10))),
         margin=dict(l=40, r=40, t=60, b=40),
         plot_bgcolor="#FAFAFA",
     )
     return fig
 
 
-def obv_chart(df_daily: pd.DataFrame, ticker: str) -> go.Figure:
+def obv_chart(
+    df_daily: pd.DataFrame,
+    ticker: str,
+    visible_since: object | None = None,
+) -> go.Figure:
     sign = np.sign(df_daily["close"].diff().fillna(0))
     obv = (sign * df_daily["volume"]).cumsum()
+    visible_daily = _clip_to_visible_since(df_daily, visible_since)
+    visible_obv = _clip_to_visible_since(obv, visible_since)
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df_daily.index, y=df_daily["close"], name="Close", yaxis="y1", line=dict(width=1.5)))
-    fig.add_trace(go.Scatter(x=obv.index, y=obv, name="OBV", yaxis="y2", line=dict(width=1.5, color="#3B6FB6")))
+    fig.add_trace(go.Scatter(x=visible_daily.index, y=visible_daily["close"], name="Close", yaxis="y1", line=dict(width=1.5)))
+    fig.add_trace(go.Scatter(x=visible_obv.index, y=visible_obv, name="OBV", yaxis="y2", line=dict(width=1.5, color="#3B6FB6")))
     fig.update_layout(
         title=f"{ticker} — Price vs OBV (divergence detector)",
         height=350,
@@ -149,6 +207,34 @@ def obv_chart(df_daily: pd.DataFrame, ticker: str) -> go.Figure:
     return fig
 
 
+_DRILL_LOOKBACK_OFFSETS = {
+    "3M": pd.DateOffset(months=3),
+    "6M": pd.DateOffset(months=6),
+    "1Y": pd.DateOffset(years=1),
+    "3Y": pd.DateOffset(years=3),
+}
+
+
+def filter_ohlcv_lookback(df_daily: pd.DataFrame, range_key: str) -> pd.DataFrame:
+    """Return daily OHLCV rows inside the selected drill-down chart range."""
+    frame = df_daily.copy()
+    if frame.empty or not isinstance(frame.index, pd.DatetimeIndex):
+        return frame
+
+    frame = frame.sort_index()
+    key = str(range_key or "1Y").upper()
+    if key == "MAX":
+        return frame.copy()
+
+    offset = _DRILL_LOOKBACK_OFFSETS.get(key, _DRILL_LOOKBACK_OFFSETS["1Y"])
+    latest = frame.index.max()
+    if pd.isna(latest):
+        return frame.copy()
+
+    cutoff = latest - offset
+    return frame.loc[frame.index >= cutoff].copy()
+
+
 # ---- Bloomberg-terminal style additions -----------------------------------------
 
 # Terminal-style palette tokens (used in app.py via CSS variables too)
@@ -157,6 +243,100 @@ TERM_RED    = "#ef4f4a"
 TERM_AMBER  = "#e6b450"
 TERM_BLUE   = "#5fa8d3"
 TERM_MUTED  = "#8b8b8b"
+
+
+def relative_strength_lines_frame(
+    ohlcv: dict[str, pd.DataFrame],
+    sector_tickers: list[str],
+    bench_ticker: str = "SPY",
+    lookback_days: int = 252,
+) -> pd.DataFrame:
+    """Return sector relative-strength lines normalized to 100 at the start."""
+    if bench_ticker not in ohlcv:
+        return pd.DataFrame()
+
+    try:
+        bench = close_price(ohlcv[bench_ticker]).dropna().astype(float)
+    except (KeyError, TypeError, ValueError):
+        return pd.DataFrame()
+    if bench.empty:
+        return pd.DataFrame()
+
+    lines: dict[str, pd.Series] = {}
+    for ticker in sector_tickers:
+        if ticker == bench_ticker or ticker not in ohlcv:
+            continue
+        try:
+            prices = close_price(ohlcv[ticker]).dropna().astype(float)
+        except (KeyError, TypeError, ValueError):
+            continue
+        aligned = pd.concat({"price": prices, "bench": bench}, axis=1, sort=False).dropna()
+        if aligned.empty:
+            continue
+        aligned = aligned.tail(max(2, int(lookback_days)))
+        ratio = aligned["price"] / aligned["bench"].replace(0, np.nan)
+        ratio = ratio.replace([np.inf, -np.inf], np.nan).dropna()
+        if len(ratio) < 2 or ratio.iloc[0] == 0 or pd.isna(ratio.iloc[0]):
+            continue
+        lines[ticker] = (ratio / ratio.iloc[0]) * 100.0
+
+    if not lines:
+        return pd.DataFrame()
+
+    frame = pd.DataFrame(lines).dropna(how="all")
+    if frame.empty:
+        return frame
+    latest = frame.apply(lambda column: column.dropna().iloc[-1] if column.notna().any() else np.nan)
+    ordered = latest.dropna().sort_values(ascending=False).index.tolist()
+    return frame[ordered]
+
+
+def sector_spaghetti_chart(
+    ohlcv: dict[str, pd.DataFrame],
+    sector_tickers: list[str],
+    bench_ticker: str = "SPY",
+    lookback_days: int = 252,
+) -> go.Figure:
+    """Overlaid 12-month sector relative-strength lines versus SPY."""
+    frame = relative_strength_lines_frame(
+        ohlcv,
+        sector_tickers,
+        bench_ticker=bench_ticker,
+        lookback_days=lookback_days,
+    )
+    fig = go.Figure()
+    for ticker in frame.columns:
+        display_label = ticker_display_label(ticker)
+        fig.add_trace(
+            go.Scatter(
+                x=frame.index,
+                y=frame[ticker],
+                mode="lines",
+                name=display_label,
+                customdata=[[ticker, display_label] for _ in frame.index],
+                line=dict(width=1.8),
+                hovertemplate="<b>%{customdata[1]}</b><br>%{x|%Y-%m-%d}<br>Relative strength %{y:.1f}<extra></extra>",
+            )
+        )
+    fig.add_hline(y=100, line=dict(color="#444", width=1, dash="dot"))
+    fig.update_layout(
+        title=dict(text="US SECTOR RELATIVE STRENGTH", font=dict(size=14, color="#ccc", family="JetBrains Mono, monospace")),
+        xaxis=dict(title="", color="#888", gridcolor="#222", showgrid=True),
+        yaxis=dict(title=f"Relative strength vs {bench_ticker}, start = 100", color="#888", gridcolor="#222", showgrid=True),
+        height=460,
+        margin=dict(l=44, r=24, t=48, b=36),
+        plot_bgcolor="#0a0a0a",
+        paper_bgcolor="rgba(0,0,0,0)",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.22,
+            xanchor="left",
+            x=0,
+            font=dict(size=10, color="#ccc", family="JetBrains Mono, monospace"),
+        ),
+    )
+    return fig
 
 
 def sparkline(df_daily: pd.DataFrame, height: int = 60) -> go.Figure:
@@ -211,7 +391,7 @@ def rrg_chart_dark(df: pd.DataFrame, title: str = "Rotation") -> go.Figure:
         x=sub["rs_ratio"], y=sub["rs_momentum"],
         mode="markers+text",
         text=sub.index, textposition="top center",
-        textfont=dict(size=10, color="#ddd", family="JetBrains Mono, monospace"),
+        textfont=dict(size=14, color="#ffffff", family="JetBrains Mono, monospace"),
         marker=dict(
             size=11,
             color=[color_for_state(s) for s in sub.get("state", pd.Series([""] * len(sub), index=sub.index))],
@@ -219,14 +399,14 @@ def rrg_chart_dark(df: pd.DataFrame, title: str = "Rotation") -> go.Figure:
         ),
         hovertemplate="<b>%{text}</b><br>RS-Ratio %{x:.1f}<br>RS-Mom %{y:.1f}<extra></extra>",
     ))
-    fig.add_annotation(x=119, y=119, text="LEADING",   showarrow=False, font=dict(size=10, color=TERM_GREEN, family="JetBrains Mono, monospace"))
-    fig.add_annotation(x=119, y=81,  text="WEAKENING", showarrow=False, font=dict(size=10, color=TERM_AMBER, family="JetBrains Mono, monospace"))
-    fig.add_annotation(x=81,  y=81,  text="LAGGING",   showarrow=False, font=dict(size=10, color=TERM_RED,   family="JetBrains Mono, monospace"))
-    fig.add_annotation(x=81,  y=119, text="IMPROVING", showarrow=False, font=dict(size=10, color=TERM_BLUE,  family="JetBrains Mono, monospace"))
+    fig.add_annotation(x=119, y=119, text="LEADING - strong relative trend",   showarrow=False, font=dict(size=11, color=TERM_GREEN, family="JetBrains Mono, monospace"))
+    fig.add_annotation(x=119, y=81,  text="WEAKENING - leadership fading", showarrow=False, font=dict(size=11, color=TERM_AMBER, family="JetBrains Mono, monospace"))
+    fig.add_annotation(x=81,  y=81,  text="LAGGING - weak relative trend",   showarrow=False, font=dict(size=11, color=TERM_RED,   family="JetBrains Mono, monospace"))
+    fig.add_annotation(x=81,  y=119, text="IMPROVING - early recovery", showarrow=False, font=dict(size=11, color=TERM_BLUE,  family="JetBrains Mono, monospace"))
     fig.update_layout(
         title=dict(text=title, font=dict(size=14, color="#ccc", family="JetBrains Mono, monospace")),
-        xaxis=dict(title="RS-RATIO",    range=[80, 120], color="#888", gridcolor="#222", zerolinecolor="#444", showgrid=True, title_font=dict(size=10, family="JetBrains Mono, monospace")),
-        yaxis=dict(title="RS-MOMENTUM", range=[80, 120], color="#888", gridcolor="#222", zerolinecolor="#444", showgrid=True, title_font=dict(size=10, family="JetBrains Mono, monospace")),
+        xaxis=dict(title="RS-RATIO (relative strength)",    range=[80, 120], color="#d7dde7", gridcolor="#2f3640", zerolinecolor="#667085", showgrid=True, title_font=dict(size=11, family="JetBrains Mono, monospace")),
+        yaxis=dict(title="RS-MOMENTUM (rotation speed)", range=[80, 120], color="#d7dde7", gridcolor="#2f3640", zerolinecolor="#667085", showgrid=True, title_font=dict(size=11, family="JetBrains Mono, monospace")),
         height=560,
         margin=dict(l=40, r=40, t=50, b=40),
         plot_bgcolor="#0a0a0a",
@@ -237,31 +417,62 @@ def rrg_chart_dark(df: pd.DataFrame, title: str = "Rotation") -> go.Figure:
 
 # ---- Inline SVG sparkline (for HTML-rendered cards) -----------------------------
 
-def svg_sparkline(df_daily, color: str, width: int = 240, height: int = 50) -> str:
+def svg_sparkline(df_daily, color: str, width: int = 240, height: int = 50, style: str = "filled") -> str:
     """Return raw SVG markup for an inline sparkline. Matches Claude Design output."""
+    mode = str(style).strip().lower()
+    if mode == "off":
+        return ""
     if df_daily is None or df_daily.empty:
         return ""
     try:
-        p = df_daily["close"].dropna().iloc[-90:].astype(float).values
+        close = df_daily["close"].dropna().astype(float)
+        p = close.iloc[-90:].values
     except Exception:
         return ""
     if len(p) < 5:
         return ""
-    mn, mx = float(p.min()), float(p.max())
+
+    ma30 = np.nan
+    if isinstance(close.index, pd.DatetimeIndex):
+        weekly = close.resample("W-FRI").last().dropna()
+        if len(weekly) >= 30:
+            ma30 = float(weekly.rolling(30).mean().dropna().iloc[-1])
+
+    scale_values = p
+    if np.isfinite(ma30):
+        scale_values = np.append(scale_values, ma30)
+    mn, mx = float(scale_values.min()), float(scale_values.max())
     rng = max(0.001, mx - mn)
+
+    def y_for(value):
+        return height - ((value - mn) / rng) * (height - 6) - 3
+
     step_x = width / (len(p) - 1)
-    pts = [(i * step_x, height - ((v - mn) / rng) * (height - 6) - 3) for i, v in enumerate(p)]
+    pts = [(i * step_x, y_for(v)) for i, v in enumerate(p)]
     path = " ".join(f"{'M' if i == 0 else 'L'}{x:.2f},{y:.2f}" for i, (x, y) in enumerate(pts))
     area = f"{path} L{width},{height} L0,{height} Z"
     grad_id = f"sg-{abs(hash(color + str(len(p)))) % 100000}"
     last_x, last_y = pts[-1]
+    fill = ""
+    if mode == "filled":
+        fill = (
+            f'<defs><linearGradient id="{grad_id}" x1="0" x2="0" y1="0" y2="1">'
+            f'<stop offset="0%" stop-color="{color}" stop-opacity="0.32"/>'
+            f'<stop offset="100%" stop-color="{color}" stop-opacity="0"/></linearGradient></defs>'
+            f'<path d="{area}" fill="url(#{grad_id})"/>'
+        )
+    ma_line = ""
+    if np.isfinite(ma30):
+        ma_y = y_for(ma30)
+        ma_line = (
+            f'<line class="spark-ma30" x1="0" y1="{ma_y:.2f}" x2="{width}" y2="{ma_y:.2f}" '
+            f'stroke="currentColor" stroke-opacity="0.42" stroke-width="1" stroke-dasharray="4 3"/>'
+        )
     return (
         f'<svg class="pick-spark" viewBox="0 0 {width} {height}" preserveAspectRatio="none" '
         f'xmlns="http://www.w3.org/2000/svg">'
-        f'<defs><linearGradient id="{grad_id}" x1="0" x2="0" y1="0" y2="1">'
-        f'<stop offset="0%" stop-color="{color}" stop-opacity="0.32"/>'
-        f'<stop offset="100%" stop-color="{color}" stop-opacity="0"/></linearGradient></defs>'
-        f'<path d="{area}" fill="url(#{grad_id})"/>'
+        f'{fill}'
+        f'{ma_line}'
         f'<path d="{path}" fill="none" stroke="{color}" stroke-width="1.5"/>'
         f'<circle cx="{last_x:.2f}" cy="{last_y:.2f}" r="2.2" fill="{color}"/>'
         f'</svg>'

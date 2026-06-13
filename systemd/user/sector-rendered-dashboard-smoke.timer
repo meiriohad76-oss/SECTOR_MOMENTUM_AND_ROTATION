@@ -1,0 +1,13 @@
+# Sector Rotation Rendered Dashboard Smoke - user timer
+
+[Unit]
+Description=Run rendered dashboard smoke for optional browser observability
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=30min
+Persistent=true
+Unit=sector-rendered-dashboard-smoke.service
+
+[Install]
+WantedBy=timers.target

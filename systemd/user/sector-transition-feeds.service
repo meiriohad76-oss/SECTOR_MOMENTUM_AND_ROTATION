@@ -1,0 +1,18 @@
+# Sector Rotation Transition Feeds - user systemd one-shot unit
+#
+# Install without sudo:
+#   mkdir -p ~/.config/systemd/user
+#   cp systemd/user/sector-transition-feeds.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now sector-transition-feeds.timer
+
+[Unit]
+Description=Sector Rotation Transition RSS and iCal Feed Export
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/SECTOR_MOMENTUM_AND_ROTATION
+Environment=PYTHONUNBUFFERED=1
+ExecStart=%h/SECTOR_MOMENTUM_AND_ROTATION/.venv/bin/python scripts/export_transition_feeds.py --publish-dir public/feeds --public-base-url https://www.ahaddashboards.uk/feeds/

@@ -21,24 +21,76 @@ FRED series used:
 from __future__ import annotations
 
 import os
-from typing import Optional
+from typing import Callable, Optional
 
 import pandas as pd
+
+from .tls import ensure_system_trust_store
+
+ensure_system_trust_store()
 
 
 FRED_SERIES = {
     "T10Y2Y": "Yield curve 10Y - 2Y",
     "T10Y3M": "Yield curve 10Y - 3M",
+    "DGS10": "10-Year Treasury yield",
     "INDPRO": "Industrial Production Index",
     "UNRATE": "Unemployment Rate",
     "NFCI":   "Chicago Fed Financial Conditions",
     "RECPROUSM156N": "Recession Probability (smoothed)",
     "BAMLH0A0HYM2":  "HY credit spread (OAS)",
+    "CPIAUCSL": "Consumer Price Index",
+    "PCEPILFE": "Core PCE price index",
+    "T10YIE": "10-Year breakeven inflation",
+    "WALCL": "Fed total assets",
+    "M2SL": "M2 money supply",
+    "CFNAI": "Chicago Fed National Activity Index",
+    "ICSA": "Initial claims",
+    "UMCSENT": "University of Michigan consumer sentiment",
+    "BAMLC0A0CM": "Corporate credit spread (OAS)",
+    "STLFSI4": "St. Louis Fed Financial Stress Index",
+    "DCOILWTICO": "WTI crude oil price",
+    "DHHNGSP": "Henry Hub natural gas price",
+    "DTWEXBGS": "Nominal Broad U.S. Dollar Index",
+}
+
+_LAST_FETCH_DIAGNOSTICS: dict[str, object] = {
+    "status": "not_attempted",
+    "configured": False,
+    "series_loaded": 0,
+    "series_failed": 0,
+    "errors": [],
 }
 
 
+def _set_fetch_diagnostics(**updates: object) -> None:
+    _LAST_FETCH_DIAGNOSTICS.clear()
+    _LAST_FETCH_DIAGNOSTICS.update(
+        {
+            "status": "not_attempted",
+            "configured": False,
+            "series_loaded": 0,
+            "series_failed": 0,
+            "errors": [],
+        }
+    )
+    _LAST_FETCH_DIAGNOSTICS.update(updates)
+
+
+def fred_fetch_diagnostics() -> dict[str, object]:
+    """Return secret-safe diagnostics for the most recent FRED fetch attempt."""
+    return {
+        **_LAST_FETCH_DIAGNOSTICS,
+        "errors": list(_LAST_FETCH_DIAGNOSTICS.get("errors", []) or []),
+    }
+
+
 def _resolve_api_key() -> Optional[str]:
-    """Pull the FRED API key from Streamlit secrets first, fall back to env var."""
+    """Pull the FRED API key from env first, then Streamlit secrets."""
+    key = os.environ.get("FRED_API_KEY")
+    if key:
+        return key.strip()
+
     # Try Streamlit secrets - lazy import so module usable without streamlit
     try:
         import streamlit as st  # type: ignore
@@ -51,9 +103,7 @@ def _resolve_api_key() -> Optional[str]:
                 pass
     except Exception:
         pass
-    # Fall back to env var
-    key = os.environ.get("FRED_API_KEY")
-    return key.strip() if key else None
+    return None
 
 
 def fred_available() -> bool:
@@ -67,30 +117,63 @@ def fred_available() -> bool:
         return False
 
 
-def fetch_fred(start_date: str = "2018-01-01") -> dict[str, pd.Series]:
+def fetch_fred(
+    start_date: str = "2018-01-01",
+    client_factory: Optional[Callable[[str], object]] = None,
+) -> dict[str, pd.Series]:
     """Fetch all configured FRED series. Returns {series_id: Series} or {} on failure.
 
     Caches via Streamlit if available.
     """
     key = _resolve_api_key()
     if key is None:
+        _set_fetch_diagnostics(status="missing_key", configured=False)
         return {}
+
+    if client_factory is None:
+        try:
+            from fredapi import Fred  # type: ignore
+        except ImportError:
+            _set_fetch_diagnostics(status="missing_library", configured=True)
+            return {}
+        client_factory = Fred
 
     try:
-        from fredapi import Fred  # type: ignore
-    except ImportError:
+        fred = client_factory(key)
+    except Exception as exc:
+        _set_fetch_diagnostics(
+            status="client_error",
+            configured=True,
+            errors=[f"client: {type(exc).__name__}"],
+        )
         return {}
-
-    fred = Fred(api_key=key)
     out: dict[str, pd.Series] = {}
+    errors: list[str] = []
     for series_id in FRED_SERIES:
         try:
             s = fred.get_series(series_id, observation_start=start_date)
             if s is not None and not s.empty:
-                out[series_id] = s.dropna()
-        except Exception:
-            # Bad key, network blip, series renamed - skip and continue
+                cleaned = s.dropna().sort_index()
+                if cleaned.index.has_duplicates:
+                    cleaned = cleaned.groupby(level=0).last()
+                out[series_id] = cleaned
+        except Exception as exc:
+            errors.append(f"{series_id}: {type(exc).__name__}")
             continue
+    failed = len(FRED_SERIES) - len(out)
+    if out and errors:
+        status = "partial"
+    elif out:
+        status = "ok"
+    else:
+        status = "failed"
+    _set_fetch_diagnostics(
+        status=status,
+        configured=True,
+        series_loaded=len(out),
+        series_failed=failed,
+        errors=errors[:8],
+    )
     return out
 
 

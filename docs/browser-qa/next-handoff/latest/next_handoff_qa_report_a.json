@@ -1,0 +1,83 @@
+{
+  "generated_at_utc": "2026-06-13T15:25:12Z",
+  "profile": "a",
+  "reference_profile": "Momentum v2 Display A handoff: A1/A2/A3",
+  "screens": [
+    {
+      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-a-overview.png",
+      "capture_size": [
+        1440,
+        3939
+      ],
+      "error": "",
+      "missing_text": [],
+      "nonblank": true,
+      "ok": true,
+      "reference": "C:\\Users\\meiri\\momentum and flow\\momentum v2\\design_handoff_momentum_v2\\media\\screens\\A1-terminal-overview.png",
+      "reference_exists": true,
+      "reference_size": [
+        1440,
+        2625
+      ],
+      "required_text": [
+        "SENTIMENT BOARD",
+        "7-PILLAR HEATMAP",
+        "TRANSITIONS"
+      ],
+      "rms": 34.7853,
+      "screen": "overview",
+      "similarity": 0.8636
+    },
+    {
+      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-a-deepdive.png",
+      "capture_size": [
+        1440,
+        1800
+      ],
+      "error": "",
+      "missing_text": [],
+      "nonblank": true,
+      "ok": true,
+      "reference": "C:\\Users\\meiri\\momentum and flow\\momentum v2\\design_handoff_momentum_v2\\media\\screens\\A2-terminal-deepdive.png",
+      "reference_exists": true,
+      "reference_size": [
+        1440,
+        1458
+      ],
+      "required_text": [
+        "DEEP DIVE",
+        "COMPOSITE FORWARD-OUTLOOK",
+        "STATE GATES"
+      ],
+      "rms": 36.2112,
+      "screen": "deepdive",
+      "similarity": 0.858
+    },
+    {
+      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-a-rotation.png",
+      "capture_size": [
+        1440,
+        1800
+      ],
+      "error": "",
+      "missing_text": [],
+      "nonblank": true,
+      "ok": true,
+      "reference": "C:\\Users\\meiri\\momentum and flow\\momentum v2\\design_handoff_momentum_v2\\media\\screens\\A3-terminal-rotation.png",
+      "reference_exists": true,
+      "reference_size": [
+        1440,
+        1397
+      ],
+      "required_text": [
+        "ROTATION MAP",
+        "INSTITUTIONAL FLOW DETAIL",
+        "MACRO | BUSINESS CYCLE"
+      ],
+      "rms": 29.9884,
+      "screen": "rotation",
+      "similarity": 0.8824
+    }
+  ],
+  "url": "http://127.0.0.1:3100/?presentation=a&qa=shots"
+}

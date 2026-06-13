@@ -1,0 +1,12 @@
+# Sector Rotation Transition Feeds - every 15 minutes user timer
+
+[Unit]
+Description=Export Sector Rotation transition RSS and iCal feeds every 15 minutes
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+Unit=sector-transition-feeds.service
+
+[Install]
+WantedBy=timers.target

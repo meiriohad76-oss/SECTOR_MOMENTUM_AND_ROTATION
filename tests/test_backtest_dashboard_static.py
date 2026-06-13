@@ -1,0 +1,46 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def test_app_surfaces_backtest_artifacts_without_running_backtest():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+
+    assert 'BACKTEST_REPORT_PATH = APP_ROOT / "docs" / "backtest_report.md"' in app_source
+    assert 'BACKTEST_EQUITY_PATH = APP_ROOT / "docs" / "backtest_equity.csv"' in app_source
+    assert 'BACKTEST_METADATA_PATH = APP_ROOT / "docs" / "backtest_metadata.json"' in app_source
+    assert "from src.backtest import drawdown_frame, normalized_equity_frame" in app_source
+    assert "def render_backtest_lab():" in app_source
+    assert "def _load_backtest_metadata():" in app_source
+    assert "def _artifact_hash_matches(" in app_source
+    assert "python scripts/run_backtest.py" in app_source
+    assert "pd.read_csv(BACKTEST_EQUITY_PATH" in app_source
+    assert "normalized_equity_frame(equity)" in app_source
+    assert "drawdown_frame(equity)" in app_source
+    assert "Normalized equity" in app_source
+    assert "Drawdown" in app_source
+    assert "st.line_chart(" in app_source
+    assert 'with st.expander("Backtest lab", expanded=False):' in app_source
+    assert "run_backtest.main(" not in app_source
+
+
+def test_backtest_lab_renders_collapsed_at_dashboard_bottom():
+    app_source = (ROOT / "app.py").read_text(encoding="utf-8")
+
+    render_order = [
+        '_render_timed("render_portfolio_analyzer", render_portfolio_analyzer)',
+        '_render_timed("render_custom_universe_builder", render_custom_universe_builder)',
+        '_render_timed("render_calibration_lab", render_calibration_lab)',
+        '_render_timed("render_evidence_gate_lab", render_evidence_gate_lab)',
+        '_render_timed("render_debrief_lab", render_debrief_lab)',
+        '_render_timed("render_full_table", render_full_table)',
+        '_render_timed("render_personal_trade_backtest", render_personal_trade_backtest)',
+        '_render_timed("render_backtest_lab", render_backtest_lab)',
+        '_render_timed("render_footer", render_footer)',
+    ]
+    positions = [app_source.index(call) for call in render_order]
+
+    assert positions == sorted(positions)

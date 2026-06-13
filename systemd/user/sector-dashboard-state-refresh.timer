@@ -1,0 +1,13 @@
+# Sector Rotation Dashboard State Refresh - weekday user timer
+
+[Unit]
+Description=Refresh dashboard state/run journal after provider-flow cache warmup
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 10:00:00 America/New_York
+OnCalendar=Mon..Fri *-*-* 16:45:00 America/New_York
+Persistent=true
+Unit=sector-dashboard-state-refresh.service
+
+[Install]
+WantedBy=timers.target

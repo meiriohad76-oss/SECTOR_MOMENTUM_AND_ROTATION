@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def test_api_server_is_optional_fastapi_boundary_not_streamlit_import():
+    source = (ROOT / "src" / "api_server.py").read_text(encoding="utf-8")
+
+    assert "def create_app(" in source
+    assert "from fastapi import BackgroundTasks, Body" in source
+    assert "from fastapi import FastAPI, HTTPException" in source
+    assert "except ModuleNotFoundError" in source
+    assert "payload: dict[str, Any] | None = Body(default=None)" in source
+    assert "HTTPException" in source
+    assert "from .api_backtest_artifacts import build_backtest_artifacts_payload" in source
+    assert "from .api_refresh import create_refresh_job, get_refresh_job, list_refresh_events, queued_refresh_response" in source
+    assert "from .api_refresh_runner import run_refresh_job" in source
+    assert "from .api_saved_portfolios import (" in source
+    assert "from .api_data_health import build_provider_data_health_payload" in source
+    assert "from .api_dashboard_snapshot import build_latest_dashboard_snapshot_payload" in source
+    assert "from .api_portfolio import build_portfolio_analysis_payload" in source
+    assert "from .api_status import build_persisted_status_payload" in source
+    assert "from .api_ticker_chart import build_ticker_chart_payload" in source
+    assert "backtest_artifacts_provider: BacktestArtifactsProvider | None = None" in source
+    assert "ticker_chart_provider: TickerChartProvider | None = None" in source
+    assert "saved_inputs_path: str | None = None" in source
+    assert "backtest_reader = backtest_artifacts_provider or build_backtest_artifacts_payload" in source
+    assert "ticker_chart_reader = ticker_chart_provider or build_ticker_chart_payload" in source
+    assert "return build_persisted_status_payload()" in source
+    assert "return build_provider_data_health_payload()" in source
+    assert 'app.get("/api/v1/health")' in source
+    assert 'app.get("/api/v1/status")' in source
+    assert 'app.get("/api/v1/data-health")' in source
+    assert 'app.get("/api/v1/provider-health")' in source
+    assert 'app.get("/api/v1/dashboard-snapshot")' in source
+    assert 'app.get("/api/v1/backtest-artifacts")' in source
+    assert 'app.get("/api/v1/ticker-chart")' in source
+    assert "return backtest_reader()" in source
+    assert 'def ticker_chart(ticker: str, period: str = "3y", benchmark: str | None = None)' in source
+    assert "return ticker_chart_reader(**kwargs)" in source
+    assert 'app.post("/api/v1/portfolio/analyze")' in source
+    assert 'app.get("/api/v1/portfolios")' in source
+    assert 'app.post("/api/v1/portfolios")' in source
+    assert 'app.delete("/api/v1/portfolios")' in source
+    assert 'app.post("/api/v1/refresh", status_code=202)' in source
+    assert 'app.get("/api/v1/refresh/{job_id}")' in source
+    assert 'app.get("/api/v1/refresh/{job_id}/events")' in source
+    assert "background_tasks.add_task(runner" in source
+    assert "job = runner(job[\"job_id\"]" in source
+    assert 'raise HTTPException(status_code=404, detail="Refresh job not found")' in source
+    assert "import streamlit" not in source
+    assert "fetch_ohlcv_result" not in source
+    assert "FastAPI is not installed" in source
+
+
+def test_api_contract_is_pure_and_documents_migration_stage():
+    source = (ROOT / "src" / "api_contract.py").read_text(encoding="utf-8")
+
+    assert "def build_dashboard_status_payload(" in source
+    assert "def normalize_health_lane(" in source
+    assert '"streamlit_compat_api_foundation"' in source
+    assert "import streamlit" not in source
+    assert "fetch_ohlcv_result" not in source
+
+
+def test_api_dependencies_are_declared_for_future_service():
+    requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+
+    assert "fastapi>=0.115" in requirements
+    assert "uvicorn[standard]>=0.30" in requirements
+    assert "httpx>=0.27" in requirements

@@ -1,0 +1,302 @@
+{
+  "baseline_config": {
+    "accounting": {
+      "periods_per_year": 252,
+      "transaction_cost_bps": 5.0
+    },
+    "algorithm_components": {
+      "accounting_engine": "src.backtest.run_weight_backtest",
+      "flow_builder": "src.flow.compute_flow_signals",
+      "indicator_builder": "src.indicators.compute_all_indicators",
+      "score_builder": "src.scoring.compute_composite",
+      "state_function": "src.scoring.decide_state",
+      "target_builder": "src.backtest.build_historical_methodology_targets",
+      "weight_builder": "src.backtest.target_weights_from_scores"
+    },
+    "benchmarks": [
+      "AGG",
+      "SPY",
+      "XLB",
+      "XLC",
+      "XLE",
+      "XLF",
+      "XLI",
+      "XLK",
+      "XLP",
+      "XLRE",
+      "XLU",
+      "XLV",
+      "XLY"
+    ],
+    "methodology": {
+      "bench_ticker": "SPY",
+      "bil_ticker": "BIL",
+      "phase": "MID",
+      "selection_policy": "equal_weight_selected_tickers",
+      "target_normalization": "absolute_weight_sum_capped_at_1"
+    },
+    "provider_flags": {
+      "fred_macro": "analysis_only_point_in_time_when_enabled",
+      "historical_provider_flow": "neutral_stub",
+      "massive_provider_flow": "analysis_only_snapshot_replay_when_available",
+      "ohlcv_provider": "auto"
+    },
+    "purpose": "research_only_10_year_walk_forward_calibration",
+    "rebalance": {
+      "cadence": "W-FRI",
+      "date_builder": "src.backtest.weekly_rebalance_dates"
+    },
+    "safety": {
+      "live_promotion_requires_separate_ticket": true,
+      "no_live_scoring_changes": true,
+      "research_only": true
+    },
+    "scoring_parameters": {
+      "binary_filter_count": 3.0,
+      "composite_weights": {
+        "binary_filters": 0.12,
+        "cycle_tilt": 0.08,
+        "mansfield_rs_z": 0.12,
+        "mom_12_1_z": 0.22,
+        "provider_flow_z": 0.23,
+        "rs_momentum_z": 0.08,
+        "rs_ratio_z": 0.15
+      },
+      "flow_veto": {
+        "replacement_score": -9.99,
+        "threshold_z": -0.5
+      },
+      "rank_ascending": false,
+      "rank_method": "min",
+      "selection_top_n_by_class": {
+        "Countries": 3,
+        "Crypto": 1,
+        "Factors": 2,
+        "Mega-Cap Stocks": 3,
+        "Themes": 3,
+        "US Industries": 3,
+        "US Sectors": 4
+      },
+      "state_machine": {
+        "bearish_stage_4": {
+          "cmf21_lt": -0.1,
+          "mansfield_rs_lt": 0.0
+        },
+        "exit": {
+          "antonacci_eq": 0,
+          "block_up_ratio_lt": 0.7,
+          "cmf21_lt": -0.1,
+          "etf_flow_5d_pct_lt": -1.5,
+          "mansfield_rs_lt": 0.0,
+          "rrg_quadrant_eq": "Lagging"
+        },
+        "hold": {
+          "stage_eq": 2
+        },
+        "stage_1_basing": {
+          "stage_eq": 1
+        },
+        "stage_2_bullish": {
+          "breadth_50d_gte": 0.6,
+          "cmf21_gt": 0.05,
+          "etf_flow_5d_pct_gte": 0.0,
+          "rrg_quadrant_eq": "Leading",
+          "stage_eq": 2
+        },
+        "warning": {
+          "breadth_50d_lt": 0.5,
+          "cmf21_lt": 0.0,
+          "dist_days_25_gte": 4,
+          "obv_divergence_eq": true,
+          "rrg_quadrant_eq": "Weakening"
+        }
+      },
+      "state_order": [
+        "STAGE_2_BULLISH",
+        "HOLD",
+        "WARNING",
+        "EXIT",
+        "BEARISH_STAGE_4",
+        "STAGE_1_BASING"
+      ]
+    },
+    "signal_labels": {
+      "forward_horizons_weeks": [
+        4,
+        13,
+        26,
+        52
+      ],
+      "negative_success": [
+        "avoided_underperformance",
+        "avoided_drawdown",
+        "failed_positive_follow_through",
+        "risk_off_or_reduce_exposure_success"
+      ],
+      "positive_success": [
+        "forward_absolute_return",
+        "forward_excess_return_vs_class_benchmark",
+        "post_entry_drawdown"
+      ]
+    },
+    "slice": "B-163.1",
+    "state_machine": {
+      "historical_policy": "recompute_state_per_rebalance_snapshot",
+      "state_file_writes": "disabled"
+    },
+    "ticket": "B-163",
+    "universe": [
+      "AGG",
+      "BIL",
+      "SPY",
+      "XLB",
+      "XLC",
+      "XLE",
+      "XLF",
+      "XLI",
+      "XLK",
+      "XLP",
+      "XLRE",
+      "XLU",
+      "XLV",
+      "XLY"
+    ],
+    "universe_classes": {
+      "AGG": "Other",
+      "BIL": "Benchmark",
+      "SPY": "Benchmark",
+      "XLB": "US Sectors",
+      "XLC": "US Sectors",
+      "XLE": "US Sectors",
+      "XLF": "US Sectors",
+      "XLI": "US Sectors",
+      "XLK": "US Sectors",
+      "XLP": "US Sectors",
+      "XLRE": "US Sectors",
+      "XLU": "US Sectors",
+      "XLV": "US Sectors",
+      "XLY": "US Sectors"
+    },
+    "walk_forward": {
+      "calibration_years": 5,
+      "final_holdout_years": 1,
+      "requested_years": 10,
+      "validation_years": 1
+    }
+  },
+  "baseline_config_artifact": "docs/calibration_10y_baseline_config.json",
+  "baseline_config_artifact_sha256": "07a335f234be88cf37438ab9bfe0d1f9ff5d2dc117b485c8e7f667d75ed9c384",
+  "baseline_config_sha256": "70d9b9ba8879ed98142d330c3611312aeab956850115484a2a16533c6cffb69f",
+  "calibration_10y_candidate_config_sha256": "d0657434f1ab2a2659901d7f6e48a5ca8e24763a232a5df68c3badf9269d1696",
+  "calibration_10y_candidates_sha256": "509156e4f09c4a7b4e532e721b003e27dcac9e229b44451ec4b3a15237fb93e5",
+  "calibration_10y_metadata_sha256": "bed5f4f1cc915f805ca0efa3ecd7780b61c73628c4940c8d97ad0a33bdca5519",
+  "calibration_10y_report_sha256": "c72c8c55a1cca9a572c2771fbd7af070e5772073f6e61cf9f7004e2862955fa2",
+  "calibration_10y_summary_sha256": "3bec57028ab59142e5f4ac24099a2ea341c5f81fc7c0ee6393223d99c786582d",
+  "calibration_expanded_candidates_sha256": "66095b1c45217798ddf616845a9320cdd220bee3d8c8f367b5c20baf6647f24f",
+  "calibration_expanded_metadata_sha256": "7b4ee022bfca24ef98e3454fb1e6fd57e7a467f267c1ae201c6f40d51e87f117",
+  "calibration_expanded_report_sha256": "f5f7e52f5f26204950a9834af242de868e261116830101f043c7bc0951e99e8a",
+  "calibration_sector_overrides_sha256": "86b9e7fee8ce75f991345053e377bb353849735943a5f3cc75d1338368acd10b",
+  "calibration_split_summary": {
+    "coverage_years": 7.92,
+    "effective_calibration_years": 5,
+    "final_holdout": {
+      "end": "2026-05-22",
+      "start": "2025-05-23"
+    },
+    "fold_count": 2,
+    "folds": [
+      {
+        "calibration_end": "2023-06-16",
+        "calibration_start": "2018-06-22",
+        "calibration_years": 5,
+        "final_holdout_end": "2026-05-22",
+        "final_holdout_start": "2025-05-23",
+        "name": "fold_01",
+        "validation_end": "2024-06-21",
+        "validation_start": "2023-06-23"
+      },
+      {
+        "calibration_end": "2024-06-21",
+        "calibration_start": "2019-06-28",
+        "calibration_years": 5,
+        "final_holdout_end": "2026-05-22",
+        "final_holdout_start": "2025-05-23",
+        "name": "fold_02",
+        "validation_end": "2025-05-16",
+        "validation_start": "2024-06-28"
+      }
+    ],
+    "history_window_reason": "available history is shorter than 10 years but meets the configured minimum",
+    "history_window_status": "accepted_short_history",
+    "minimum_accepted_years": 5,
+    "no_lookahead_verified": true,
+    "requested_years": 10,
+    "status": "ready",
+    "window": {
+      "end": "2026-05-22",
+      "start": "2018-06-22"
+    }
+  },
+  "equity_columns": [
+    "Methodology",
+    "60/40 SPY/AGG",
+    "Equal-weight sectors"
+  ],
+  "equity_rows": 1993,
+  "equity_sha256": "03767338f1b13790411058c914f49655b8a56b01deb61033887e3b67246bacc9",
+  "generated_at_utc": "2026-05-24T19:08:12.126898Z",
+  "macro_variant_summary": [],
+  "massive_validation_summary": [],
+  "methodology_report_sha256": "b74a106f3054d8e1c6da646a5aad033713090ab8f6c284b634d7530dac2e93db",
+  "ohlcv_source": {
+    "cache_policy": "normal",
+    "fetched_count": 0,
+    "fresh_cache_hit_count": 0,
+    "missing_count": 0,
+    "provider": "",
+    "stale_cache_hit_count": 0,
+    "warnings": []
+  },
+  "report_sha256": "fb4872aeb9bebfefaeb4a04eef58fd6ff6784c031549d80d852f841f5121af88",
+  "required_tickers": [
+    "AGG",
+    "BIL",
+    "SPY",
+    "XLB",
+    "XLC",
+    "XLE",
+    "XLF",
+    "XLI",
+    "XLK",
+    "XLP",
+    "XLRE",
+    "XLU",
+    "XLV",
+    "XLY"
+  ],
+  "simulation_summary": {
+    "end_date": "2026-05-22",
+    "rebalance_count": 414,
+    "selected_ticker_count": 11,
+    "start_date": "2018-06-22",
+    "state_ticker_count": 12,
+    "state_transition_count": 939,
+    "state_transitions_per_ticker_year": 9.85230024213075
+  },
+  "states_columns": [
+    "AGG",
+    "XLB",
+    "XLC",
+    "XLE",
+    "XLF",
+    "XLI",
+    "XLK",
+    "XLP",
+    "XLRE",
+    "XLU",
+    "XLV",
+    "XLY"
+  ],
+  "states_rows": 414,
+  "states_sha256": "00bb71bd8ddf1dd95979ff0adb93a207c7dae9c8b84973693a6ef978d6cde917"
+}
