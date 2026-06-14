@@ -9,6 +9,7 @@ import {
   type HealthLane,
 } from "../../lib/api";
 import DashboardScreensClient from "../dashboard-screens-client";
+import RefreshButton from "../../components/RefreshButton";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -38,6 +39,9 @@ function HeroBand({ payload }: { payload: DashboardHealthPayload | null }) {
         <p className="subtle">
           {health?.detail || "Waiting for the FastAPI backend health payload."}
         </p>
+        <div className="hero-band-actions">
+          <RefreshButton laneId="all" label="all data lanes" />
+        </div>
       </div>
       <div className="summary-strip">
         <div><span>Health</span><strong>{health?.label || "Unavailable"}</strong></div>
@@ -62,6 +66,7 @@ function HealthTable({ title, lanes }: { title: string; lanes: HealthLane[] }) {
             <tr>
               <th>Lane</th><th>Status</th><th>Latest</th>
               <th>Freshness</th><th>Coverage</th><th>Operational Detail</th>
+              <th>Refresh</th>
             </tr>
           </thead>
           <tbody>
@@ -73,10 +78,18 @@ function HealthTable({ title, lanes }: { title: string; lanes: HealthLane[] }) {
                 <td>{lane.freshness || "-"}</td>
                 <td>{lane.coverage || "-"}</td>
                 <td>{lane.detail || lane.sla || "-"}</td>
+                <td className="refresh-cell">
+                  {lane.refresh_key ? (
+                    <RefreshButton
+                      laneId={lane.refresh_key}
+                      label={lane.refresh_label || lane.refresh_key}
+                    />
+                  ) : null}
+                </td>
               </tr>
             ))}
             {!lanes.length ? (
-              <tr><td colSpan={6}>No API health lanes returned yet.</td></tr>
+              <tr><td colSpan={7}>No API health lanes returned yet.</td></tr>
             ) : null}
           </tbody>
         </table>

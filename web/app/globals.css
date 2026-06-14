@@ -2703,6 +2703,73 @@ td small,
   line-height: 1.45;
 }
 
+/* --- Refresh button --------------------------------------------------- */
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  color: var(--soft);
+  border-color: var(--soft);
+}
+
+.refresh-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.refresh-btn--running {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.refresh-btn--running .refresh-btn-icon {
+  display: inline-block;
+  animation: refresh-spin 0.9s linear infinite;
+}
+
+.refresh-btn--done {
+  color: var(--good);
+  border-color: var(--good);
+}
+
+.refresh-btn--error {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+
+@keyframes refresh-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Hero-band actions row (holds "Refresh all" button) */
+.hero-band-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* Admin table: refresh column keeps width tight */
+.refresh-cell {
+  width: 44px;
+  text-align: center;
+}
+
 .screen-stack {
   display: grid;
   gap: 20px;

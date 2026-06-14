@@ -313,6 +313,36 @@ export type ApiResult<T> = {
   error: string;
 };
 
+export type RefreshJobStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | string;
+
+export type RefreshJobPayload = {
+  job_id: string;
+  lane_id: string;
+  status: RefreshJobStatus;
+  progress_pct: number;
+  message: string;
+  status_url: string;
+  events_url: string;
+};
+
+export async function triggerRefresh(laneId = "all") {
+  return postDashboardApi<RefreshJobPayload>("/api/v1/refresh", {
+    lane_id: laneId,
+    run_now: true,
+    background: true,
+  });
+}
+
+export async function pollRefreshJob(jobId: string) {
+  return fetchDashboardApi<RefreshJobPayload>(`/api/v1/refresh/${jobId}`);
+}
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   process.env.API_BASE_URL ||

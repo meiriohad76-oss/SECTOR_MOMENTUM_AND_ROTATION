@@ -1,5 +1,6 @@
 // web/components/DisplayToolbar.tsx
 import type { DisplayMode } from "./DisplayShell";
+import RefreshButton from "./RefreshButton";
 
 const DISPLAY_TABS: { mode: DisplayMode; label: string; title: string }[] = [
   { mode: "a", label: "A", title: "Terminal" },
@@ -43,6 +44,7 @@ export default function DisplayToolbar({
         {generatedAt ? (
           <span className="display-toolbar-timestamp mono">{generatedAt}</span>
         ) : null}
+        <RefreshButton laneId="all" label="all data" />
         <a href="/admin" className="display-toolbar-admin">Admin</a>
       </div>
     </header>
