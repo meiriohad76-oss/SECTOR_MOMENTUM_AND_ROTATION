@@ -18,21 +18,26 @@ export async function runRefreshAction(laneId: string = "all"): Promise<{
   ok: boolean;
   message: string;
 }> {
+  console.log(`[runRefreshAction] START laneId=${laneId} API_BASE=${API_BASE}`);
   // 1. Start the background job
   let jobId: string;
   try {
+    console.log(`[runRefreshAction] POST ${API_BASE}/api/v1/refresh`);
     const res = await fetch(`${API_BASE}/api/v1/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ lane_id: laneId, run_now: true, background: true }),
     });
+    console.log(`[runRefreshAction] POST status=${res.status}`);
     if (!res.ok) {
       return { ok: false, message: `Failed to start refresh (HTTP ${res.status})` };
     }
     const data = await res.json();
     jobId = data.job_id;
+    console.log(`[runRefreshAction] job_id=${jobId}`);
     if (!jobId) return { ok: false, message: "No job_id in response" };
   } catch (err) {
+    console.error(`[runRefreshAction] fetch error:`, err);
     return { ok: false, message: `Could not reach API: ${err}` };
   }
 
