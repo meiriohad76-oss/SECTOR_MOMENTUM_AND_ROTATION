@@ -685,9 +685,9 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
       <svg className="flow-river" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Current flow river from weakening to strengthening instruments">
         <defs>
           <linearGradient id="flowRiverGradient" x1="0%" x2="100%" y1="0%" y2="0%">
-            <stop offset="0%" stopColor="#b34a4a" stopOpacity="0.52" />
-            <stop offset="52%" stopColor="#cfa490" stopOpacity="0.24" />
-            <stop offset="100%" stopColor="#1f7a4a" stopOpacity="0.48" />
+            <stop offset="0%" stopColor="#9b2a2a" stopOpacity="0.85" />
+            <stop offset="48%" stopColor="#7a5a3a" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#1a6b3a" stopOpacity="0.85" />
           </linearGradient>
         </defs>
         <text x="22" y="20">NET OUTFLOWS</text>
@@ -707,7 +707,7 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
                 d={`M ${leftX} ${y1} C ${leftX + 190} ${y1}, ${rightX - 190} ${y2}, ${rightX} ${y2}`}
                 fill="none"
                 stroke="url(#flowRiverGradient)"
-                strokeOpacity="0.2"
+                strokeOpacity="0.32"
                 strokeWidth={strokeWidth}
               >
                 <title>{flowLaneTooltip(source, target, strokeWidth, pressure)}</title>
@@ -728,7 +728,7 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
               d={`M ${leftX} ${y1} C ${leftX + 190} ${y1}, ${rightX - 190} ${y2}, ${rightX} ${y2}`}
               fill="none"
               stroke="url(#flowRiverGradient)"
-              strokeOpacity="0.48"
+              strokeOpacity="0.80"
               strokeWidth={strokeWidth}
             >
               <title>{flowLaneTooltip(source, target, strokeWidth, pressure)}</title>
