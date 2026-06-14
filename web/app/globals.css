@@ -2734,11 +2734,20 @@ td small,
 .refresh-btn--running {
   color: var(--accent);
   border-color: var(--accent);
+  width: auto;
+  padding: 0 10px;
+  gap: 6px;
 }
 
 .refresh-btn--running .refresh-btn-icon {
   display: inline-block;
   animation: refresh-spin 0.9s linear infinite;
+}
+
+.refresh-btn-label {
+  font-size: 0.75rem;
+  white-space: nowrap;
+  font-weight: 500;
 }
 
 .refresh-btn--done {

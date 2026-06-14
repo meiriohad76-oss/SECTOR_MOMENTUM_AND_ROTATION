@@ -89,7 +89,8 @@ export default function RefreshButton({
     state === "done"    ? "✓" :
     state === "error"   ? "✗" : "↺";
 
-  const title = `Refresh ${label ?? laneId}`;
+  const runningLabel = label ? `Refreshing ${label}…` : "Refreshing…";
+  const title = state === "running" ? runningLabel : `Refresh ${label ?? laneId}`;
 
   return (
     <button
@@ -101,6 +102,9 @@ export default function RefreshButton({
       aria-label={title}
     >
       <span className="refresh-btn-icon" aria-hidden="true">{icon}</span>
+      {state === "running" && (
+        <span className="refresh-btn-label">Refreshing…</span>
+      )}
     </button>
   );
 }
