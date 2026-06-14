@@ -343,10 +343,14 @@ export async function pollRefreshJob(jobId: string) {
   return fetchDashboardApi<RefreshJobPayload>(`/api/v1/refresh/${jobId}`);
 }
 
+// Server-side: use direct FastAPI URL. Client-side: use relative URLs so
+// requests go to the Next.js server on the same origin and are proxied to
+// FastAPI via the rewrites in next.config.mjs. This handles deployments where
+// the browser cannot reach 127.0.0.1:8000 directly (e.g. port-forwarded).
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  process.env.API_BASE_URL ||
-  "http://127.0.0.1:8000";
+  typeof window === "undefined"
+    ? process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || "http://127.0.0.1:8000"
+    : process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 function endpoint(path: string): string {
   return `${API_BASE_URL.replace(/\/$/, "")}${path}`;
