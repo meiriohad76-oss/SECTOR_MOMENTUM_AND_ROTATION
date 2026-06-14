@@ -214,7 +214,7 @@ def _print_line(name: str, payload: dict[str, Any]) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--api-base-url", default="http://127.0.0.1:8000")
-    parser.add_argument("--next-url", default="http://127.0.0.1:3000/?presentation=c")
+    parser.add_argument("--next-url", default="http://127.0.0.1:3100/?presentation=c")
     parser.add_argument("--streamlit-url", default="http://127.0.0.1:8501/?ticker=XLK")
     parser.add_argument("--qa-dir", type=Path, default=DEFAULT_QA_DIR)
     parser.add_argument("--selected-ticker", default="XLK")
