@@ -4367,3 +4367,30 @@ select:focus-visible {
 .c-status-block {
   padding: 20px 32px 0;
 }
+
+/* ── Global floating tooltip ── */
+/* Rendered by <TooltipRoot> — works in HTML and SVG. Opt in with data-tooltip="..." */
+.global-tooltip {
+  position: fixed;
+  z-index: 9999;
+  max-width: 340px;
+  padding: 10px 14px;
+  background: #0f2236;
+  color: #e8f0f8;
+  border: 1px solid rgba(140, 190, 230, 0.22);
+  border-radius: 8px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.36);
+  font-size: 0.795rem;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: 0;
+  pointer-events: none;
+  white-space: normal;
+  overflow-wrap: break-word;
+  animation: tooltip-in 80ms ease both;
+}
+
+@keyframes tooltip-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

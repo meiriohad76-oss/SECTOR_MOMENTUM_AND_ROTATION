@@ -2,6 +2,7 @@
 
 import type { SnapshotRow } from "../lib/api";
 import Sparkline from "../components/Sparkline";
+import { PILLAR_TOOLTIP, RRG_QUADRANT_TOOLTIP, SCORE_TOOLTIP, STATE_TOOLTIP } from "../lib/tooltips";
 
 type PillarKey = "mom_12_1" | "mansfield_rs" | "rs_ratio" | "rs_momentum" | "breadth_50d" | "cycle_tilt" | "cmf21";
 
@@ -138,7 +139,8 @@ export function PillarLegend() {
 }
 
 function LightStatePill({ state }: { state: string }) {
-  return <span className={`light-state-pill ${stateTone(state)}`}>{compactStateLabel(state)}</span>;
+  const tooltip = STATE_TOOLTIP[state] ?? `State: ${state.replaceAll("_", " ")}`;
+  return <span className={`light-state-pill ${stateTone(state)}`} data-tooltip={tooltip} style={{ cursor: "help" }}>{compactStateLabel(state)}</span>;
 }
 
 function pillarReading(row: SnapshotRow, pillar: PillarContribution): string {
@@ -153,7 +155,9 @@ function pillarReading(row: SnapshotRow, pillar: PillarContribution): string {
 
 function pillarTooltip(row: SnapshotRow, pillar: PillarContribution): string {
   const sign = pillar.contribution >= 0 ? "bullish support" : "bearish drag";
-  return `${pillar.code} ${pillar.fullName} for ${row.ticker}: ${pillarReading(row, pillar)} Weight ${Math.round(pillar.weight * 100)}%; normalized input ${fmt(pillar.raw, 2)}; contribution ${fmt(pillar.contribution, 2)} (${sign}).`;
+  const general = PILLAR_TOOLTIP[pillar.key] ?? pillar.reading;
+  const specific = `${row.ticker}: ${pillarReading(row, pillar)} Weight ${Math.round(pillar.weight * 100)}%; contribution ${fmt(pillar.contribution, 2)} (${sign}).`;
+  return `${general} — ${specific}`;
 }
 
 function pillarSideTotals(row: SnapshotRow): { positiveTotal: number; negativeTotal: number } {
@@ -456,9 +460,8 @@ function stateColor(row: SnapshotRow) {
 function rrgTooltip(row: SnapshotRow): string {
   const ratio = fmt(row.rs_ratio, 1);
   const momentum = fmt(row.rs_momentum, 1);
-  const ratioReading = (row.rs_ratio ?? 100) >= 100 ? "relative strength is above the benchmark" : "relative strength is below the benchmark";
-  const momentumReading = (row.rs_momentum ?? 100) >= 100 ? "rotation momentum is improving" : "rotation momentum is fading";
-  return `${row.display_label}: ${row.quadrant} quadrant. RS-ratio ${ratio} means ${ratioReading}; RS-momentum ${momentum} means ${momentumReading}. S ${fmt(row.s_score)} and F ${fmt(row.f_score)} summarize composite and flow support.`;
+  const quadrantExplain = RRG_QUADRANT_TOOLTIP[row.quadrant] ?? `${row.quadrant} quadrant.`;
+  return `${row.display_label} — ${quadrantExplain} Current values: RS-Ratio ${ratio} (${(row.rs_ratio ?? 100) >= 100 ? "outperforming" : "underperforming"}), RS-Momentum ${momentum} (${(row.rs_momentum ?? 100) >= 100 ? "improving" : "fading"}). Composite S ${fmt(row.s_score)}, Flow F ${fmt(row.f_score)}.`;
 }
 
 export function RrgChart({

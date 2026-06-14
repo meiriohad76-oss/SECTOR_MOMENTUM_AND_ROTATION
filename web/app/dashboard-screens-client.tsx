@@ -16,6 +16,7 @@ import type {
 } from "../lib/api";
 import { FlowRiver, MomentumBars, PillarDetailGrid, PillarHeatmap, PillarStackBar, RrgChart, WaterfallChart } from "./chart-primitives";
 import { stateColor, stateShortLabel } from "../lib/state-colors";
+import { STATE_TOOLTIP, SCORE_TOOLTIP } from "../lib/tooltips";
 import StatusTiles from "../components/StatusTiles";
 import TransitionsBanner from "../components/TransitionsBanner";
 import PicksGrid from "../components/PicksGrid";
@@ -43,12 +44,14 @@ function statusClass(status: string) {
 function StatusPill({ status, light = false }: { status: string; light?: boolean }) {
   const bg = stateColor(status, light);
   const label = stateShortLabel(status) || status || "unknown";
+  const tooltip = STATE_TOOLTIP[status] ?? `State: ${status.replaceAll("_", " ")}`;
   return (
     <span
       className="state-pill mono"
       style={{ background: bg, color: "#fff", padding: "2px 9px", borderRadius: "11px",
                fontSize: "0.72rem", fontWeight: 600, letterSpacing: "0.03em",
-               display: "inline-block", lineHeight: 1.4 }}
+               display: "inline-block", lineHeight: 1.4, cursor: "help" }}
+      data-tooltip={tooltip}
     >
       {label}
     </span>
@@ -191,10 +194,10 @@ function SnapshotCard({
       </div>
       <StatusPill status={row.state} />
       <dl>
-        <div><dt>S</dt><dd>{fmt(row.s_score)}</dd></div>
-        <div><dt>F</dt><dd>{fmt(row.f_score)}</dd></div>
-        <div><dt>RS-R</dt><dd>{fmt(row.rs_ratio, 1)}</dd></div>
-        <div><dt>RS-M</dt><dd>{fmt(row.rs_momentum, 1)}</dd></div>
+        <div><dt data-tooltip={SCORE_TOOLTIP.s_score} style={{ cursor: "help" }}>S</dt><dd>{fmt(row.s_score)}</dd></div>
+        <div><dt data-tooltip={SCORE_TOOLTIP.f_score} style={{ cursor: "help" }}>F</dt><dd>{fmt(row.f_score)}</dd></div>
+        <div><dt data-tooltip={SCORE_TOOLTIP.rs_ratio} style={{ cursor: "help" }}>RS-R</dt><dd>{fmt(row.rs_ratio, 1)}</dd></div>
+        <div><dt data-tooltip={SCORE_TOOLTIP.rs_momentum} style={{ cursor: "help" }}>RS-M</dt><dd>{fmt(row.rs_momentum, 1)}</dd></div>
       </dl>
     </button>
   );
@@ -865,11 +868,11 @@ function RotationScreen({
               <tr>
                 <th>Ticker</th>
                 <th>Identity</th>
-                <th>State</th>
-                <th>S</th>
-                <th>F</th>
-                <th>RS Ratio</th>
-                <th>RS Momentum</th>
+                <th data-tooltip="Trend state from the 7-pillar state machine. Hover each state pill for a full explanation. BULLISH = buy/hold zone · HOLD = trend intact, lower conviction · WARN = deterioration, reduce · EXIT = confirmed breakdown · BEAR = full downtrend · BASE = basing, wait for breakout." style={{ cursor: "help" }}>State</th>
+                <th data-tooltip={SCORE_TOOLTIP.s_score} style={{ cursor: "help" }}>S</th>
+                <th data-tooltip={SCORE_TOOLTIP.f_score} style={{ cursor: "help" }}>F</th>
+                <th data-tooltip={SCORE_TOOLTIP.rs_ratio} style={{ cursor: "help" }}>RS Ratio</th>
+                <th data-tooltip={SCORE_TOOLTIP.rs_momentum} style={{ cursor: "help" }}>RS Momentum</th>
               </tr>
             </thead>
             <tbody>
