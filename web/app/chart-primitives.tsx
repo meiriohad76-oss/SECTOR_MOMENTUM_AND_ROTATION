@@ -647,20 +647,20 @@ function flowLaneTooltip(source: SnapshotRow, target: SnapshotRow, width: number
   return `Flow-river lane from ${source.display_label} to ${target.display_label}: relative pressure ${fmt(pressure, 2)} and lane width ${fmt(width, 1)} are derived from current saved F/CMF/S pressure. This is a rotation-pressure map, not a literal cash-transfer ledger.`;
 }
 
-export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
+export function FlowRiver({ rows, generatedAt }: { rows: SnapshotRow[]; generatedAt?: string }) {
   const outflows = rows
     .filter((row) => (row.f_score < 0 || (row.cmf21 ?? 0) < 0 || row.s_score < 0))
     .slice()
     .sort((a, b) => Math.abs((b.f_score || b.cmf21 || b.s_score)) - Math.abs((a.f_score || a.cmf21 || a.s_score)))
-    .slice(0, 5);
+    .slice(0, 10);
   const inflows = rows
     .filter((row) => (row.f_score > 0 || (row.cmf21 ?? 0) > 0 || row.s_score > 0))
     .slice()
     .sort((a, b) => (b.f_score + (b.cmf21 ?? 0) + b.s_score) - (a.f_score + (a.cmf21 ?? 0) + a.s_score))
-    .slice(0, 5);
+    .slice(0, 10);
   const pairCount = Math.min(outflows.length, inflows.length);
   const width = 1100;
-  const height = 260;
+  const height = 430;
   const leftX = 220;
   const rightX = width - 280;
   const top = 46;
@@ -673,14 +673,23 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
     ...outflows.map(flowMagnitude),
     ...inflows.map(flowMagnitude),
   );
+  // Format the snapshot date for display
+  const dateLabel = generatedAt
+    ? (() => { try { return new Date(generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); } catch { return generatedAt.slice(0, 10); } })()
+    : null;
   return (
     <div className="chart-card light-card" aria-label="Flow river">
       <div className="chart-heading">
         <div>
           <h3>The flow river</h3>
-          <p>Data-derived map from current weakest flow/score rows into strongest flow/score rows. Strand width follows relative pressure magnitude.</p>
+          <p>
+            CMF(21) rotation map — sectors losing net buying pressure (left) vs gaining it (right).
+            CMF(21) measures what fraction of the past 21 trading days&apos; volume was net buying or selling.
+            Strand width = relative signal magnitude. Not a dollar-transfer ledger.
+            {dateLabel ? <> · Snapshot: <strong>{dateLabel}</strong></> : null}
+          </p>
         </div>
-        <strong>{pairCount} lanes | {fmt(balancedPressure, 2)} pressure</strong>
+        <strong>{pairCount} pairs · 21-day window</strong>
       </div>
       <svg className="flow-river" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Current flow river from weakening to strengthening instruments">
         <defs>
@@ -744,7 +753,7 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
               <title>{tooltip}</title>
               <rect className="flow-out-node" x={leftX - 18} y={y - h / 2} width="12" height={h} />
               <text x={leftX - 26} y={y - 2} textAnchor="end">{flowLabel(row)}</text>
-              <text x={leftX - 26} y={y + 13} textAnchor="end" className="flow-value">-{fmt(flowMagnitude(row), 2)}</text>
+              <text x={leftX - 26} y={y + 13} textAnchor="end" className="flow-value">CMF {fmt(row.cmf21 ?? row.f_score, 2)}</text>
             </g>
           );
         })}
@@ -757,7 +766,7 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
               <title>{tooltip}</title>
               <rect className="flow-in-node" x={rightX + 6} y={y - h / 2} width="12" height={h} />
               <text x={rightX + 26} y={y - 2}>{flowLabel(row)}</text>
-              <text x={rightX + 26} y={y + 13} className="flow-value">+{fmt(flowMagnitude(row), 2)}</text>
+              <text x={rightX + 26} y={y + 13} className="flow-value">CMF +{fmt(row.cmf21 ?? row.f_score, 2)}</text>
             </g>
           );
         })}
@@ -765,7 +774,10 @@ export function FlowRiver({ rows }: { rows: SnapshotRow[] }) {
       </svg>
       {pairCount ? (
         <p className="flow-caption">
-          Current saved snapshot shows {fmt(balancedPressure, 2)} units of opposing rotation pressure: weakest support is led by {outflows[0].display_label}, while strongest sponsorship is led by {inflows[0].display_label}. Use this as a rotation map, not a literal dollar-transfer ledger.
+          Strongest net outflow: <strong>{outflows[0].display_label}</strong> (CMF {fmt(outflows[0].cmf21 ?? outflows[0].f_score, 2)} — {Math.round(Math.abs(outflows[0].cmf21 ?? outflows[0].f_score ?? 0) * 100)}% of 21-day volume was net selling).
+          {" "}Strongest net inflow: <strong>{inflows[0].display_label}</strong> (CMF +{fmt(inflows[0].cmf21 ?? inflows[0].f_score, 2)} — {Math.round(Math.abs(inflows[0].cmf21 ?? inflows[0].f_score ?? 0) * 100)}% of 21-day volume was net buying).
+          {" "}Matched signal depth: {fmt(balancedPressure, 2)} (total CMF magnitude on both sides; higher = broader rotation conviction).
+          {" "}Dollar volume figures require additional backend work.
         </p>
       ) : null}
     </div>

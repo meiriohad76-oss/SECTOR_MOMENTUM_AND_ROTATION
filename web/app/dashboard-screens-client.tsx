@@ -852,7 +852,7 @@ function RotationScreen({
         <MomentumBars rows={sectors} onSelectTicker={onSelectTicker} />
       </div>
       <div className="screen-chart-row">
-        <FlowRiver rows={sectors} />
+        <FlowRiver rows={sectors} generatedAt={snapshot.generated_at} />
       </div>
       <div className="rotation-detail" aria-label="Selected quadrant instrument list">
         <div className="section-heading compact">
@@ -1501,7 +1501,7 @@ function CRotationScreen({
           }}
         />
       </div>
-      <FlowRiver rows={rows} />
+      <FlowRiver rows={rows} generatedAt={snapshot.generated_at} />
       <div className="c-lower-grid">
         <div className="c-flow-table c-macro-panel">
           <div className="c-sec-head"><strong>Macro / business cycle</strong><span>run context</span></div>
