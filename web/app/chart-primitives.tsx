@@ -525,6 +525,15 @@ export function RrgChart({
             point,
           ];
           const tooltip = rrgTooltip(row);
+          // Arrowhead on the final trail segment, pointing toward the current dot
+          const penX = x(trail[trail.length - 2].x);
+          const penY = y(trail[trail.length - 2].y);
+          const angle = Math.atan2(pointY - penY, pointX - penX);
+          const aLen = 6, aWid = 3;
+          const ax1 = pointX - aLen * Math.cos(angle) + aWid * Math.sin(angle);
+          const ay1 = pointY - aLen * Math.sin(angle) - aWid * Math.cos(angle);
+          const ax2 = pointX - aLen * Math.cos(angle) - aWid * Math.sin(angle);
+          const ay2 = pointY - aLen * Math.sin(angle) + aWid * Math.cos(angle);
           return (
             <g
               key={row.ticker}
@@ -542,7 +551,24 @@ export function RrgChart({
               data-tooltip={tooltip}
             >
               <title>{tooltip}</title>
-              <polyline points={trail.map((p) => `${x(p.x)},${y(p.y)}`).join(" ")} fill="none" stroke={stateColor(row)} strokeOpacity="0.34" strokeWidth="2" />
+              {/* Trail segments fade from faint (old) to solid (recent) */}
+              {trail.slice(0, -1).map((p, i) => (
+                <line
+                  key={i}
+                  x1={x(p.x)} y1={y(p.y)}
+                  x2={x(trail[i + 1].x)} y2={y(trail[i + 1].y)}
+                  stroke={stateColor(row)}
+                  strokeOpacity={0.10 + (i / (trail.length - 2)) * 0.40}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              ))}
+              {/* Arrowhead — tip at dot center, circle drawn on top covers the overlap */}
+              <polygon
+                points={`${pointX},${pointY} ${ax1},${ay1} ${ax2},${ay2}`}
+                fill={stateColor(row)}
+                fillOpacity="0.55"
+              />
               <line x1={pointX} x2={labelX + (anchor === "start" ? -4 : 4)} y1={pointY} y2={labelY - 3} className="label-leader" />
               <circle cx={pointX} cy={pointY} r="5" fill={stateColor(row)} />
               <text className="rrg-label" x={labelX} y={labelY} textAnchor={anchor}>{row.ticker}</text>
