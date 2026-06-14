@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import sys
+import uuid
 from urllib.parse import parse_qs, urlparse
 
 
@@ -142,7 +143,51 @@ class NextQaApiHandler(BaseHTTPRequestHandler):
             payload = build_latest_dashboard_snapshot_payload(focus_ticker=ticker)
             self._write_json(200, _compact_snapshot_payload(payload))
             return
+        # Refresh job status poll — return "succeeded" immediately so the
+        # Server Action completes and revalidates the page without waiting.
+        if parsed.path.startswith("/api/v1/refresh/"):
+            job_id = parsed.path.split("/api/v1/refresh/", 1)[1].strip("/")
+            self._write_json(200, {
+                "job_id": job_id,
+                "lane_id": "all",
+                "status": "succeeded",
+                "progress_pct": 100,
+                "message": "QA stub: refresh complete (read persisted data from disk)",
+                "error": "",
+                "status_url": f"/api/v1/refresh/{job_id}",
+                "events_url": f"/api/v1/refresh/{job_id}/events",
+            })
+            return
         self._write_json(404, {"detail": "not found"})
+
+    def do_POST(self) -> None:  # noqa: N802 - stdlib signature
+        """Handle POST /api/v1/refresh — return a stub job so the RefreshButton works locally."""
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/v1/refresh":
+            # Read and discard request body
+            length = int(self.headers.get("Content-Length", 0))
+            if length:
+                self.rfile.read(length)
+            job_id = uuid.uuid4().hex
+            self._write_json(202, {
+                "job_id": job_id,
+                "lane_id": "all",
+                "status": "queued",
+                "progress_pct": 0,
+                "message": "QA stub: refresh queued (no live provider fetch in QA mode)",
+                "error": "",
+                "status_url": f"/api/v1/refresh/{job_id}",
+                "events_url": f"/api/v1/refresh/{job_id}/events",
+            })
+            return
+        self._write_json(404, {"detail": "not found"})
+
+    def do_OPTIONS(self) -> None:  # noqa: N802 - stdlib signature
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
