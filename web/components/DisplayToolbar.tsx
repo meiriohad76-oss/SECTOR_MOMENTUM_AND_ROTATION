@@ -1,4 +1,5 @@
 // web/components/DisplayToolbar.tsx
+"use client";
 import type { DisplayMode } from "./DisplayShell";
 import RefreshButton from "./RefreshButton";
 
