@@ -67,6 +67,7 @@ def create_app(
     """Create the optional FastAPI app without making FastAPI mandatory at import time."""
     try:
         from fastapi import FastAPI, HTTPException
+        from fastapi.middleware.cors import CORSMiddleware
     except ModuleNotFoundError as exc:  # pragma: no cover - exercised when dependency is absent.
         raise RuntimeError("FastAPI is not installed. Install requirements.txt to run the API server.") from exc
 
@@ -80,6 +81,13 @@ def create_app(
         title="Sector Momentum Dashboard API",
         version="0.1.0",
         description="Migration API for the Sector Momentum and Rotation dashboard.",
+    )
+    # Allow the Next.js frontend (any localhost port) to call the API from the browser.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:3100", "http://127.0.0.1:3100"],
+        allow_methods=["GET", "POST", "DELETE"],
+        allow_headers=["*"],
     )
 
     @app.get("/api/v1/health")
