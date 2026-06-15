@@ -641,6 +641,13 @@ function flowLabel(row: SnapshotRow): string {
   return `${row.ticker} | ${compactIdentity}`;
 }
 
+function fmtDollarVolume(adv: number | null | undefined): string {
+  if (adv === null || adv === undefined || !Number.isFinite(adv)) return "";
+  if (adv >= 1e9) return `$${(adv / 1e9).toFixed(1)}B`;
+  if (adv >= 1e6) return `$${Math.round(adv / 1e6)}M`;
+  return `$${Math.round(adv / 1e3)}K`;
+}
+
 function flowTooltip(row: SnapshotRow, side: "outflow" | "inflow"): string {
   const direction = side === "inflow" ? "supporting inflow" : "weakening outflow";
   return `${row.display_label}: ${direction}. F-score ${fmt(row.f_score)}; CMF(21) ${fmt(row.cmf21, 2)}; S ${fmt(row.s_score)}. Higher magnitude means this row is exerting more pressure in the current flow river.`;
@@ -756,7 +763,10 @@ export function FlowRiver({ rows, generatedAt }: { rows: SnapshotRow[]; generate
               <title>{tooltip}</title>
               <rect className="flow-out-node" x={leftX - 18} y={y - h / 2} width="12" height={h} />
               <text x={leftX - 26} y={y - 2} textAnchor="end">{flowLabel(row)}</text>
-              <text x={leftX - 26} y={y + 13} textAnchor="end" className="flow-value">CMF {fmt(row.cmf21 ?? row.f_score, 2)}</text>
+              <text x={leftX - 26} y={y + 13} textAnchor="end" className="flow-value">
+                CMF {fmt(row.cmf21 ?? row.f_score, 2)}
+                {row.adv_20d ? ` · ${fmtDollarVolume(row.adv_20d)}` : ""}
+              </text>
             </g>
           );
         })}
@@ -769,7 +779,10 @@ export function FlowRiver({ rows, generatedAt }: { rows: SnapshotRow[]; generate
               <title>{tooltip}</title>
               <rect className="flow-in-node" x={rightX + 6} y={y - h / 2} width="12" height={h} />
               <text x={rightX + 26} y={y - 2}>{flowLabel(row)}</text>
-              <text x={rightX + 26} y={y + 13} className="flow-value">CMF +{fmt(row.cmf21 ?? row.f_score, 2)}</text>
+              <text x={rightX + 26} y={y + 13} className="flow-value">
+                CMF +{fmt(row.cmf21 ?? row.f_score, 2)}
+                {row.adv_20d ? ` · ${fmtDollarVolume(row.adv_20d)}` : ""}
+              </text>
             </g>
           );
         })}
@@ -780,7 +793,14 @@ export function FlowRiver({ rows, generatedAt }: { rows: SnapshotRow[]; generate
           Strongest net outflow: <strong>{outflows[0].display_label}</strong> (CMF {fmt(outflows[0].cmf21 ?? outflows[0].f_score, 2)} — {Math.round(Math.abs(outflows[0].cmf21 ?? outflows[0].f_score ?? 0) * 100)}% of 21-day volume was net selling).
           {" "}Strongest net inflow: <strong>{inflows[0].display_label}</strong> (CMF +{fmt(inflows[0].cmf21 ?? inflows[0].f_score, 2)} — {Math.round(Math.abs(inflows[0].cmf21 ?? inflows[0].f_score ?? 0) * 100)}% of 21-day volume was net buying).
           {" "}Matched signal depth: {fmt(balancedPressure, 2)} (total CMF magnitude on both sides; higher = broader rotation conviction).
-          {" "}Dollar volume figures require additional backend work.
+          {(outflows[0]?.adv_20d || inflows[0]?.adv_20d) ? (
+            <>
+              {" "}Avg daily vol (20d): <strong>{outflows[0].display_label}</strong>{" "}
+              {fmtDollarVolume(outflows[0].adv_20d)}{" / "}
+              <strong>{inflows[0].display_label}</strong>{" "}
+              {fmtDollarVolume(inflows[0].adv_20d)}.
+            </>
+          ) : null}
         </p>
       ) : null}
     </div>
