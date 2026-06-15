@@ -949,3 +949,11 @@ def test_adv_20d_returns_mean_dollar_volume_over_lookback(ohlcv_frame_factory):
 def test_adv_20d_returns_none_when_fewer_than_lookback_rows(ohlcv_frame_factory):
     df = ohlcv_frame_factory(days=10)
     assert flow.adv_20d(df, lookback=20) is None
+
+
+def test_compute_flow_signals_includes_adv_20d_column(ohlcv_frame_factory):
+    out = flow.compute_flow_signals({"XLK": ohlcv_frame_factory(days=80)})
+    assert "adv_20d" in out.columns
+    # close starts at 100 and grows at 0.1% daily, volume at 1_000_000 with variation
+    # Last 20 rows: closes ~100.3-101.8, volumes ~1M-1.019M → adv_20d ≈ 105-110M
+    assert out.loc["XLK", "adv_20d"] == pytest.approx(108_000_000, rel=0.05)

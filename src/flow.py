@@ -1338,6 +1338,7 @@ def compute_flow_signals(ohlcv):
                 "obv_slope":       obv_slope(df, 20),
                 "mfi14":           money_flow_index(df, 14),
                 "rvol":            relative_volume(df, 20),
+                "adv_20d":         adv_20d(df, 20),
                 "dist_days_25":    distribution_day_count(df, 25),
                 "obv_divergence":  obv_price_divergence(df, 20),
                 "etf_flow_5d_pct": etf_flow_5d_pct,
