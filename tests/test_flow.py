@@ -938,8 +938,9 @@ def test_fetch_massive_browser_content_sends_bearer_token_and_browser_params(mon
 
 
 def test_adv_20d_returns_mean_dollar_volume_over_lookback(ohlcv_frame_factory):
-    # 20 days, close=50, variable volume (fixture adds steps % 20 * 1_000)
-    # → mean volume over last 20 = 214_750 → mean dv = 50 * 214_750 = 10_737_500
+    # 25 days, close=50 (daily_return=0.0), base volume=200_000.
+    # Fixture adds (step % 20) * 1_000 to each row, so last 20 rows (steps 5-24)
+    # have mean volume 209_500 → mean dv = 50 * 209_500 = 10_475_000.
     df = ohlcv_frame_factory(days=25, start_price=50.0, daily_return=0.0, volume=200_000)
     result = flow.adv_20d(df, lookback=20)
     assert result == pytest.approx(10_475_000.0, rel=1e-4)
