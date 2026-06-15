@@ -112,8 +112,8 @@ python scripts/serve_next_qa_api.py --port 8765
 - RRG trail direction (fade + arrowhead)
 - Flow river improvements (10 sectors, CMF labels, timestamp, contrast)
 - Global tooltip system with rich indicator explanations
+- Dashboard design recovery (DisplayShell, DisplayToolbar, /admin route, PickCard, PicksGrid, TransitionsBanner, StatusTiles, semantic state colors, JetBrains Mono) — **fully implemented and merged**
 
 ## Known deferred work
-- **Dollar volume on flow river:** OHLCV has `close × volume` data. Need to compute 20-day ADV in `src/flow.py`, add to row payload in `src/api_dashboard_snapshot.py`, type in `web/lib/api.ts`, surface in FlowRiver component.
+- **Dollar volume on flow river:** Spec written and approved (`docs/superpowers/specs/2026-06-15-adv20-flow-river-design.md`). Implementation plan not yet written. Next step: invoke `superpowers:writing-plans` against that spec, then execute. Four files: `src/flow.py`, `src/api_dashboard_snapshot.py`, `web/lib/api.ts`, `web/app/chart-primitives.tsx`.
 - **Real-time sparklines:** Currently synthetic (path generated from state in `web/lib/sparkline.ts`). Would need OHLCV endpoint per ticker.
-- **Dashboard design recovery:** Spec exists at `docs/superpowers/specs/2026-06-11-dashboard-design-recovery-design.md`. Plan at `docs/superpowers/plans/`. Not yet implemented.
