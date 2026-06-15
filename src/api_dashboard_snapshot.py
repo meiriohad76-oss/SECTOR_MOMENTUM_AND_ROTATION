@@ -90,6 +90,7 @@ def _row_payload(row: Mapping[str, Any]) -> dict[str, Any]:
         "rs_ratio": _float_or_none(_pillar_value(row, "rs_ratio")),
         "rs_momentum": _float_or_none(_pillar_value(row, "rs_momentum")),
         "cmf21": _float_or_none(_pillar_value(row, "cmf21")),
+        "adv_20d": _float_or_none(_payload_value(row, "adv_20d")),
         "pillar_scores": dict(row.get("pillar_scores", {}) or {}),
         "payload": dict(row.get("payload", {}) or {}),
     }

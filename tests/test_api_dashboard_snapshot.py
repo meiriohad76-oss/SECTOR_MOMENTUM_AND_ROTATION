@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from src.api_dashboard_snapshot import build_latest_dashboard_snapshot_payload
 from src.portfolio import HoldingInput
 from src.run_journal import DecisionRecord, RunRecord, ScoredSnapshotRecord, append_run
@@ -187,3 +189,75 @@ def test_latest_dashboard_snapshot_reads_saved_portfolio_positions(tmp_path):
     assert positions[0]["cost"] == 1000.0
     assert positions[0]["unrealized_pct"] == 0.2
     assert positions[1]["unrealized_pct"] is None
+
+
+def test_row_payload_includes_adv_20d_from_payload_dict(tmp_path):
+    journal_path = tmp_path / "runs.sqlite"
+    append_run(
+        journal_path,
+        RunRecord(
+            run_id="run-adv",
+            started_at_utc="2026-06-15T10:00:00Z",
+            provider="massive",
+            universe_count=1,
+            metadata={},
+        ),
+        scored_rows=[
+            ScoredSnapshotRecord(
+                ticker="XLK",
+                asset_class="US Sectors",
+                state="STAGE_2_BULLISH",
+                s_score=1.0,
+                f_score=0.3,
+                pillar_scores={"cmf21": 0.12},
+                payload={"adv_20d": 1_200_000_000.0},
+            ),
+        ],
+        decisions=[],
+    )
+
+    payload = build_latest_dashboard_snapshot_payload(
+        journal_path=journal_path,
+        saved_inputs_path=tmp_path / "missing.json",
+        transition_journal_path=tmp_path / "missing.jsonl",
+        generated_at="2026-06-15T12:00:00+00:00",
+    )
+
+    row = next(r for r in payload["rows"] if r["ticker"] == "XLK")
+    assert row["adv_20d"] == pytest.approx(1_200_000_000.0)
+
+
+def test_row_payload_adv_20d_is_none_when_absent_from_payload(tmp_path):
+    journal_path = tmp_path / "runs.sqlite"
+    append_run(
+        journal_path,
+        RunRecord(
+            run_id="run-noadv",
+            started_at_utc="2026-06-15T10:00:00Z",
+            provider="massive",
+            universe_count=1,
+            metadata={},
+        ),
+        scored_rows=[
+            ScoredSnapshotRecord(
+                ticker="XLE",
+                asset_class="US Sectors",
+                state="WARNING",
+                s_score=-0.5,
+                f_score=-0.2,
+                pillar_scores={"cmf21": -0.08},
+                payload={},   # no adv_20d
+            ),
+        ],
+        decisions=[],
+    )
+
+    payload = build_latest_dashboard_snapshot_payload(
+        journal_path=journal_path,
+        saved_inputs_path=tmp_path / "missing.json",
+        transition_journal_path=tmp_path / "missing.jsonl",
+        generated_at="2026-06-15T12:00:00+00:00",
+    )
+
+    row = next(r for r in payload["rows"] if r["ticker"] == "XLE")
+    assert row["adv_20d"] is None
