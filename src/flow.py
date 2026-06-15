@@ -599,6 +599,18 @@ def relative_volume(df, lookback=20):
     return float(df["volume"].iloc[-1] / avg)
 
 
+def adv_20d(df: pd.DataFrame, lookback: int = 20) -> Optional[float]:
+    """20-day average daily dollar volume (close × volume).
+
+    Returns None when fewer than lookback rows are available.
+    """
+    if len(df) < lookback:
+        return None
+    dv = df["close"] * df["volume"]
+    result = dv.iloc[-lookback:].mean()
+    return float(result) if np.isfinite(result) else None
+
+
 def distribution_day_count(df, window=25):
     if len(df) < window + 21:
         return None

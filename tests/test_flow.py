@@ -935,3 +935,16 @@ def test_fetch_massive_browser_content_sends_bearer_token_and_browser_params(mon
     assert calls[0][1]["params"]["format"] == "raw"
     assert calls[0][1]["params"]["expiration"] == 0
     assert calls[0][1]["timeout"] == 7
+
+
+def test_adv_20d_returns_mean_dollar_volume_over_lookback(ohlcv_frame_factory):
+    # 20 days, close=50, variable volume (fixture adds steps % 20 * 1_000)
+    # → mean volume over last 20 = 214_750 → mean dv = 50 * 214_750 = 10_737_500
+    df = ohlcv_frame_factory(days=25, start_price=50.0, daily_return=0.0, volume=200_000)
+    result = flow.adv_20d(df, lookback=20)
+    assert result == pytest.approx(10_475_000.0, rel=1e-4)
+
+
+def test_adv_20d_returns_none_when_fewer_than_lookback_rows(ohlcv_frame_factory):
+    df = ohlcv_frame_factory(days=10)
+    assert flow.adv_20d(df, lookback=20) is None
