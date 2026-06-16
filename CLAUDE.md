@@ -113,7 +113,7 @@ python scripts/serve_next_qa_api.py --port 8765
 - Flow river improvements (10 sectors, CMF labels, timestamp, contrast)
 - Global tooltip system with rich indicator explanations
 - Dashboard design recovery (DisplayShell, DisplayToolbar, /admin route, PickCard, PicksGrid, TransitionsBanner, StatusTiles, semantic state colors, JetBrains Mono) — **fully implemented and merged**
+- **ADV20 on flow river** — `adv_20d()` indicator, compute_flow_signals wiring, snapshot payload, TypeScript type, FlowRiver render (`CMF 0.12 · $1.2B`) — **fully implemented and pushed 2026-06-16**
 
 ## Known deferred work
-- **Dollar volume on flow river:** Spec written and approved (`docs/superpowers/specs/2026-06-15-adv20-flow-river-design.md`). Implementation plan not yet written. Next step: invoke `superpowers:writing-plans` against that spec, then execute. Four files: `src/flow.py`, `src/api_dashboard_snapshot.py`, `web/lib/api.ts`, `web/app/chart-primitives.tsx`.
 - **Real-time sparklines:** Currently synthetic (path generated from state in `web/lib/sparkline.ts`). Would need OHLCV endpoint per ticker.
