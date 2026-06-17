@@ -532,7 +532,7 @@ export function RrgChart({
           const penX = x(trail[trail.length - 2].x);
           const penY = y(trail[trail.length - 2].y);
           const angle = Math.atan2(pointY - penY, pointX - penX);
-          const aLen = 6, aWid = 3;
+          const aLen = 10, aWid = 5;
           const ax1 = pointX - aLen * Math.cos(angle) + aWid * Math.sin(angle);
           const ay1 = pointY - aLen * Math.sin(angle) - aWid * Math.cos(angle);
           const ax2 = pointX - aLen * Math.cos(angle) - aWid * Math.sin(angle);
@@ -566,11 +566,21 @@ export function RrgChart({
                   strokeLinecap="round"
                 />
               ))}
+              {/* Hollow ring at trail start (oldest position — marks where this ticker was) */}
+              <circle
+                cx={x(trail[0].x)}
+                cy={y(trail[0].y)}
+                r={3}
+                fill="none"
+                stroke={stateColor(row)}
+                strokeOpacity={0.5}
+                strokeWidth={1.5}
+              />
               {/* Arrowhead — tip at dot center, circle drawn on top covers the overlap */}
               <polygon
                 points={`${pointX},${pointY} ${ax1},${ay1} ${ax2},${ay2}`}
                 fill={stateColor(row)}
-                fillOpacity="0.55"
+                fillOpacity="0.85"
               />
               <line x1={pointX} x2={labelX + (anchor === "start" ? -4 : 4)} y1={pointY} y2={labelY - 3} className="label-leader" />
               <circle cx={pointX} cy={pointY} r="5" fill={stateColor(row)} />
