@@ -272,9 +272,8 @@ def test_next_shell_c3_rotation_uses_handoff_metadata_without_static_rows():
     for marker in (
         'title="Relative rotation | US Sectors"',
         'subtitle="4-week trail"',
-        "meta={`${rows.length} rows`}",
+        "generatedAt={snapshot.generated_at}",  # replaced static meta props — now uses live snapshot date
         'title="12-1 momentum"',
-        'meta="z-scored"',
         "Where the money was, where it is, where it's heading.",
     ):
         assert marker in client_source
@@ -282,7 +281,7 @@ def test_next_shell_c3_rotation_uses_handoff_metadata_without_static_rows():
     for marker in (
         "title = \"Relative Rotation Graph\"",
         "meta?: string;",
-        "{meta ? <strong>{meta}</strong> : null}",
+        "{metaLabel ? <strong>{metaLabel}</strong> : null}",  # meta replaced by metaLabel (generatedAt-aware)
         "title = \"12-1 Momentum Rank\"",
     ):
         assert marker in chart_source
