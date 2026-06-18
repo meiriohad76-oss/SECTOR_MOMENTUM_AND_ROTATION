@@ -465,11 +465,10 @@ function rrgTooltip(row: SnapshotRow): string {
 }
 
 function fmtSnapshotDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  } catch {
-    return iso.slice(0, 10);
-  }
+  const d = new Date(iso);
+  return isNaN(d.getTime())
+    ? iso.slice(0, 10)
+    : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 export function RrgChart({
@@ -487,7 +486,7 @@ export function RrgChart({
   meta?: string;
   generatedAt?: string;
 }) {
-  const metaLabel = generatedAt ? `52w window · ${fmtSnapshotDate(generatedAt)}` : meta;
+  const metaLabel = generatedAt ? `weekly · ${fmtSnapshotDate(generatedAt)}` : meta;
   const width = 680;
   const height = 420;
   const left = 44;
