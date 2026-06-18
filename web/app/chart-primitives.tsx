@@ -464,19 +464,30 @@ function rrgTooltip(row: SnapshotRow): string {
   return `${row.display_label} — ${quadrantExplain} Current values: RS-Ratio ${ratio} (${(row.rs_ratio ?? 100) >= 100 ? "outperforming" : "underperforming"}), RS-Momentum ${momentum} (${(row.rs_momentum ?? 100) >= 100 ? "improving" : "fading"}). Composite S ${fmt(row.s_score)}, Flow F ${fmt(row.f_score)}.`;
 }
 
+function fmtSnapshotDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
+
 export function RrgChart({
   rows,
   onSelectTicker,
   title = "Relative Rotation Graph",
   subtitle = "Quadrants are split at 100 RS-ratio and 100 RS-momentum. Trails show recent direction from saved signal values.",
   meta,
+  generatedAt,
 }: {
   rows: SnapshotRow[];
   onSelectTicker: (ticker: string) => void;
   title?: string;
   subtitle?: string;
   meta?: string;
+  generatedAt?: string;
 }) {
+  const metaLabel = generatedAt ? `52w window · ${fmtSnapshotDate(generatedAt)}` : meta;
   const width = 680;
   const height = 420;
   const left = 44;
@@ -509,7 +520,7 @@ export function RrgChart({
           <h3>{title}</h3>
           <p>{subtitle}</p>
         </div>
-        {meta ? <strong>{meta}</strong> : null}
+        {metaLabel ? <strong>{metaLabel}</strong> : null}
       </div>
       <svg className="rrg-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="RRG sector rotation chart">
         <rect x={left} y={top} width={plotW} height={plotH} rx={8} className="plot-bg" />
@@ -599,13 +610,16 @@ export function MomentumBars({
   title = "12-1 Momentum Rank",
   subtitle = "Sorted by current saved momentum signal.",
   meta,
+  generatedAt,
 }: {
   rows: SnapshotRow[];
   onSelectTicker: (ticker: string) => void;
   title?: string;
   subtitle?: string;
   meta?: string;
+  generatedAt?: string;
 }) {
+  const metaLabel = generatedAt ? `12-1 month · ${fmtSnapshotDate(generatedAt)}` : meta;
   const sorted = rows
     .filter((row) => typeof row.momentum_pct === "number")
     .slice()
@@ -619,7 +633,7 @@ export function MomentumBars({
           <h3>{title}</h3>
           <p>{subtitle}</p>
         </div>
-        {meta ? <strong>{meta}</strong> : null}
+        {metaLabel ? <strong>{metaLabel}</strong> : null}
       </div>
       {sorted.map((row) => {
         const value = row.momentum_pct ?? 0;

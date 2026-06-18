@@ -851,8 +851,8 @@ function RotationScreen({
         ))}
       </div>
       <div className="rotation-chart-grid">
-        <RrgChart rows={sectors} onSelectTicker={onSelectTicker} />
-        <MomentumBars rows={sectors} onSelectTicker={onSelectTicker} />
+        <RrgChart rows={sectors} onSelectTicker={onSelectTicker} generatedAt={snapshot.generated_at} />
+        <MomentumBars rows={sectors} onSelectTicker={onSelectTicker} generatedAt={snapshot.generated_at} />
       </div>
       <div className="screen-chart-row">
         <FlowRiver rows={sectors} generatedAt={snapshot.generated_at} />
@@ -1487,7 +1487,7 @@ function CRotationScreen({
           rows={rows}
           title="Relative rotation | US Sectors"
           subtitle="4-week trail"
-          meta={`${rows.length} rows`}
+          generatedAt={snapshot.generated_at}
           onSelectTicker={(ticker) => {
             onSelectTicker(ticker);
             setActiveScreen("deepdive");
@@ -1497,7 +1497,7 @@ function CRotationScreen({
           rows={rows}
           title="12-1 momentum"
           subtitle="cross-sectional momentum ranking"
-          meta="z-scored"
+          generatedAt={snapshot.generated_at}
           onSelectTicker={(ticker) => {
             onSelectTicker(ticker);
             setActiveScreen("deepdive");
