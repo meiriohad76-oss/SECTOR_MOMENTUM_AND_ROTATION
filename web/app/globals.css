@@ -4394,3 +4394,65 @@ select:focus-visible {
   from { opacity: 0; transform: translateY(3px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ── Full 7-Pillar Matrix Table ───────────────────────── */
+.full-table-panel {
+  margin: 18px 0 0;
+}
+.full-table-summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  padding: 6px 0;
+  user-select: none;
+}
+.full-table-summary:hover {
+  opacity: 1;
+}
+.full-table-scroll {
+  overflow-x: auto;
+  margin-top: 10px;
+}
+.full-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.75rem;
+  font-family: var(--font-mono, monospace);
+}
+.full-table th {
+  text-align: right;
+  padding: 5px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+  cursor: pointer;
+  white-space: nowrap;
+  font-weight: 600;
+  opacity: 0.7;
+  user-select: none;
+}
+.full-table th:first-child,
+.full-table th:nth-child(2),
+.full-table th:nth-child(3) {
+  text-align: left;
+}
+.full-table th:hover,
+.full-table th.ft-sorted {
+  opacity: 1;
+}
+.full-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  text-align: right;
+  white-space: nowrap;
+}
+.full-table tbody tr:hover {
+  background: rgba(255,255,255,0.04);
+}
+.ft-ticker { text-align: left; font-weight: 600; }
+.ft-class  { text-align: left; opacity: 0.7; }
+.ft-state  { text-align: left; }
+.ft-num    { font-variant-numeric: tabular-nums; }
+.ft-pos    { color: #4caf87; }
+.ft-neg    { color: #e07070; }

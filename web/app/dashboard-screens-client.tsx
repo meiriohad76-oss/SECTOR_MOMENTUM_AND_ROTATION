@@ -20,6 +20,7 @@ import { STATE_TOOLTIP, SCORE_TOOLTIP } from "../lib/tooltips";
 import StatusTiles from "../components/StatusTiles";
 import TransitionsBanner from "../components/TransitionsBanner";
 import PicksGrid from "../components/PicksGrid";
+import FullTable from "../components/FullTable";
 
 type ScreenId = "overview" | "deepdive" | "rotation";
 type SortKey = "ticker" | "state" | "quadrant" | "s_score" | "f_score" | "rs_ratio" | "rs_momentum" | "momentum_pct" | "cmf21";
@@ -1063,6 +1064,7 @@ function COverviewScreen({
           </div>
         </aside>
       </div>
+      <FullTable rows={snapshot.rows} />
     </section>
   );
 }
