@@ -2,7 +2,7 @@ name: Deploy to Raspberry Pi
 
 on:
   push:
-    branches: [backlog-stepwise-qa]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -51,9 +51,9 @@ jobs:
             "PI_REPO_PATH='$PI_REPO_PATH' PI_SERVICE_NAME='$PI_SERVICE_NAME' bash -s" <<'REMOTE'
           set -euo pipefail
           cd "$PI_REPO_PATH"
-          git fetch origin backlog-stepwise-qa
-          git checkout backlog-stepwise-qa
-          git pull --ff-only origin backlog-stepwise-qa
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
           ./.venv/bin/python -m pip install -r requirements.txt
           ./.venv/bin/python -m playwright install chromium
           ./.venv/bin/python -m pytest -q
