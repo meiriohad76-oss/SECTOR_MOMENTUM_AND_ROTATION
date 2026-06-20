@@ -1,4 +1,8 @@
-"""Restart the Pi Streamlit dashboard non-interactively by cycling MainPID."""
+"""Restart the Pi dashboard service non-interactively by cycling MainPID.
+
+Supports both Streamlit (system service, Streamlit content check) and
+Next.js (user service, HTTP-200-only check) via --user-service flag.
+"""
 from __future__ import annotations
 
 import argparse
@@ -24,16 +28,21 @@ def _run_text(args: list[str]) -> str:
     return result.stdout.strip()
 
 
-def _main_pid(service: str) -> int:
-    raw = _run_text(["systemctl", "show", service, "-p", "MainPID", "--value"])
+def _systemctl(user_service: bool) -> list[str]:
+    """Return base systemctl command, with --user if this is a user service."""
+    return ["systemctl", "--user"] if user_service else ["systemctl"]
+
+
+def _main_pid(service: str, user_service: bool = False) -> int:
+    raw = _run_text(_systemctl(user_service) + ["show", service, "-p", "MainPID", "--value"])
     try:
         return int(raw)
     except ValueError:
         return 0
 
 
-def _active(service: str) -> str:
-    return _run_text(["systemctl", "is-active", service]) or "unknown"
+def _active(service: str, user_service: bool = False) -> str:
+    return _run_text(_systemctl(user_service) + ["is-active", service]) or "unknown"
 
 
 def _http_probe(url: str, timeout: float) -> tuple[int, str]:
@@ -45,35 +54,58 @@ def _http_probe(url: str, timeout: float) -> tuple[int, str]:
         return 0, ""
 
 
-def restart_and_wait(service: str, url: str, timeout_seconds: int, poll_seconds: float) -> int:
-    old_pid = _main_pid(service)
+def _classify(status: int, body: str, require_content: bool) -> tuple[bool, str]:
+    """Return (ok, state_label). For Next.js (require_content=False), HTTP 200 is sufficient."""
+    if not require_content:
+        if status == 200:
+            return True, "http_200_ok"
+        return False, f"http_{status}"
+    smoke = classify_local_dashboard_response(status_code=status, text=body)
+    return smoke.ok, smoke.state
+
+
+def restart_and_wait(
+    service: str,
+    url: str,
+    timeout_seconds: int,
+    poll_seconds: float,
+    user_service: bool = False,
+    require_content: bool = True,
+) -> int:
+    old_pid = _main_pid(service, user_service)
     if old_pid <= 0:
-        print(f"restart_action=no_mainpid service={service}")
-        print(f"restart_result=failed_no_mainpid service={service}")
-        return 1
-    try:
-        os.kill(old_pid, signal.SIGTERM)
-        print(f"restart_action=sent_sigterm pid={old_pid} service={service}")
-    except ProcessLookupError:
-        print(f"restart_action=mainpid_already_exited pid={old_pid} service={service}")
-    except PermissionError:
-        print(f"restart_result=failed_permission pid={old_pid} service={service}")
-        return 1
+        if user_service:
+            # User services can be started directly (no privilege escalation needed).
+            print(f"restart_action=starting_stopped_service service={service}")
+            _run_text(_systemctl(user_service) + ["start", service])
+        else:
+            print(f"restart_action=no_mainpid service={service}")
+            print(f"restart_result=failed_no_mainpid service={service}")
+            return 1
+    else:
+        try:
+            os.kill(old_pid, signal.SIGTERM)
+            print(f"restart_action=sent_sigterm pid={old_pid} service={service}")
+        except ProcessLookupError:
+            print(f"restart_action=mainpid_already_exited pid={old_pid} service={service}")
+        except PermissionError:
+            print(f"restart_result=failed_permission pid={old_pid} service={service}")
+            return 1
 
     deadline = time.monotonic() + timeout_seconds
     attempt = 0
     sigkill_sent = False
     while time.monotonic() < deadline:
         attempt += 1
-        active = _active(service)
+        active = _active(service, user_service)
         status, body = _http_probe(url, timeout=min(5.0, poll_seconds))
-        smoke = classify_local_dashboard_response(status_code=status, text=body)
-        pid = _main_pid(service)
-        print(f"poll_{attempt} active={active} http={status} content={smoke.state} pid={pid}")
-        if active == "active" and smoke.ok and pid > 0 and pid != old_pid:
-            print(f"restart_result=healthy service={service} pid={pid} http={status} content={smoke.state}")
+        ok, content_state = _classify(status, body, require_content)
+        pid = _main_pid(service, user_service)
+        print(f"poll_{attempt} active={active} http={status} content={content_state} pid={pid}")
+        if active == "active" and ok and pid > 0 and pid != old_pid:
+            print(f"restart_result=healthy service={service} pid={pid} http={status} content={content_state}")
             return 0
-        if not sigkill_sent and attempt >= 5 and pid == old_pid and status == 0:
+        if not sigkill_sent and attempt >= 5 and old_pid > 0 and pid == old_pid and status == 0:
             try:
                 os.kill(old_pid, SIGKILL)
                 sigkill_sent = True
@@ -87,8 +119,8 @@ def restart_and_wait(service: str, url: str, timeout_seconds: int, poll_seconds:
         time.sleep(poll_seconds)
 
     status, body = _http_probe(url, timeout=5)
-    smoke = classify_local_dashboard_response(status_code=status, text=body)
-    print(f"restart_result=failed service={service} active={_active(service)} http={status} content={smoke.state}")
+    ok, content_state = _classify(status, body, require_content)
+    print(f"restart_result=failed service={service} active={_active(service, user_service)} http={status} content={content_state}")
     return 1
 
 
@@ -98,8 +130,22 @@ def main() -> int:
     parser.add_argument("--url", default="http://127.0.0.1:8501/?ticker=XLK")
     parser.add_argument("--timeout-seconds", type=int, default=60)
     parser.add_argument("--poll-seconds", type=float, default=2.0)
+    parser.add_argument(
+        "--user-service",
+        action="store_true",
+        default=False,
+        help="Use 'systemctl --user' (for user-scoped services like sector-next). "
+             "Also skips Streamlit content check — HTTP 200 is sufficient.",
+    )
     args = parser.parse_args()
-    return restart_and_wait(args.service, args.url, args.timeout_seconds, args.poll_seconds)
+    return restart_and_wait(
+        args.service,
+        args.url,
+        args.timeout_seconds,
+        args.poll_seconds,
+        user_service=args.user_service,
+        require_content=not args.user_service,
+    )
 
 
 if __name__ == "__main__":
