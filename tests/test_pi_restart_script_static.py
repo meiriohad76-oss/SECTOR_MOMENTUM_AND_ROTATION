@@ -33,7 +33,7 @@ def test_pi_restart_docs_reference_noninteractive_helper_and_cloudflare_access_q
 
 
 def test_restart_helper_fails_closed_when_initial_mainpid_is_missing(monkeypatch, capsys):
-    monkeypatch.setattr(restart_sector_dashboard, "_main_pid", lambda service: 0)
+    monkeypatch.setattr(restart_sector_dashboard, "_main_pid", lambda service, user_service=False: 0)
 
     exit_code = restart_sector_dashboard.restart_and_wait(
         "sector-dashboard",
@@ -49,8 +49,8 @@ def test_restart_helper_fails_closed_when_initial_mainpid_is_missing(monkeypatch
 
 def test_restart_helper_tolerates_pid_race_when_fresh_pid_becomes_healthy(monkeypatch, capsys):
     pids = iter([123, 124])
-    monkeypatch.setattr(restart_sector_dashboard, "_main_pid", lambda service: next(pids, 124))
-    monkeypatch.setattr(restart_sector_dashboard, "_active", lambda service: "active")
+    monkeypatch.setattr(restart_sector_dashboard, "_main_pid", lambda service, user_service=False: next(pids, 124))
+    monkeypatch.setattr(restart_sector_dashboard, "_active", lambda service, user_service=False: "active")
     monkeypatch.setattr(
         restart_sector_dashboard,
         "_http_probe",
@@ -77,8 +77,8 @@ def test_restart_helper_tolerates_pid_race_when_fresh_pid_becomes_healthy(monkey
 
 def test_restart_helper_rejects_http_200_with_wrong_content(monkeypatch, capsys):
     pids = iter([123, 124, 124])
-    monkeypatch.setattr(restart_sector_dashboard, "_main_pid", lambda service: next(pids, 124))
-    monkeypatch.setattr(restart_sector_dashboard, "_active", lambda service: "active")
+    monkeypatch.setattr(restart_sector_dashboard, "_main_pid", lambda service, user_service=False: next(pids, 124))
+    monkeypatch.setattr(restart_sector_dashboard, "_active", lambda service, user_service=False: "active")
     monkeypatch.setattr(restart_sector_dashboard.os, "kill", lambda pid, sig: None)
     monkeypatch.setattr(
         restart_sector_dashboard,
@@ -112,8 +112,8 @@ def test_restart_helper_escalates_wedged_old_pid_with_dead_http(monkeypatch, cap
     )
     kills: list[tuple[int, int]] = []
 
-    monkeypatch.setattr(restart_sector_dashboard, "_main_pid", lambda service: next(pids, 124))
-    monkeypatch.setattr(restart_sector_dashboard, "_active", lambda service: "active")
+    monkeypatch.setattr(restart_sector_dashboard, "_main_pid", lambda service, user_service=False: next(pids, 124))
+    monkeypatch.setattr(restart_sector_dashboard, "_active", lambda service, user_service=False: "active")
     monkeypatch.setattr(restart_sector_dashboard, "_http_probe", lambda url, timeout: next(probes))
 
     def record_kill(pid, sig):
