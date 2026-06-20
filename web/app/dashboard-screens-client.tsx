@@ -16,7 +16,7 @@ import type {
 } from "../lib/api";
 import { FlowRiver, MomentumBars, PillarDetailGrid, PillarHeatmap, PillarStackBar, RrgChart, WaterfallChart } from "./chart-primitives";
 import { stateColor, stateShortLabel } from "../lib/state-colors";
-import { STATE_TOOLTIP, SCORE_TOOLTIP } from "../lib/tooltips";
+import { SCORE_TOOLTIP, stateTooltip } from "../lib/tooltips";
 import StatusTiles from "../components/StatusTiles";
 import TransitionsBanner from "../components/TransitionsBanner";
 import PicksGrid from "../components/PicksGrid";
@@ -45,10 +45,10 @@ function statusClass(status: string) {
   return "warn";
 }
 
-function StatusPill({ status, light = false }: { status: string; light?: boolean }) {
+function StatusPill({ status, light = false, sScore, fScore }: { status: string; light?: boolean; sScore?: number; fScore?: number }) {
   const bg = stateColor(status, light);
   const label = stateShortLabel(status) || status || "unknown";
-  const tooltip = STATE_TOOLTIP[status] ?? `State: ${status.replaceAll("_", " ")}`;
+  const tooltip = stateTooltip(status, sScore, fScore);
   return (
     <span
       className="state-pill mono"
@@ -196,7 +196,7 @@ function SnapshotCard({
         <strong>{row.display_label}</strong>
         <span>{row.asset_class} | {row.quadrant}</span>
       </div>
-      <StatusPill status={row.state} />
+      <StatusPill status={row.state} sScore={row.s_score} fScore={row.f_score} />
       <dl>
         <div><dt data-tooltip={SCORE_TOOLTIP.s_score} style={{ cursor: "help" }}>S</dt><dd>{fmt(row.s_score)}</dd></div>
         <div><dt data-tooltip={SCORE_TOOLTIP.f_score} style={{ cursor: "help" }}>F</dt><dd>{fmt(row.f_score)}</dd></div>
@@ -892,7 +892,7 @@ function RotationScreen({
                 >
                   <td><strong>{row.ticker}</strong></td>
                   <td>{row.identity}</td>
-                  <td><StatusPill status={row.state} /></td>
+                  <td><StatusPill status={row.state} sScore={row.s_score} fScore={row.f_score} /></td>
                   <td>{fmt(row.s_score)}</td>
                   <td>{fmt(row.f_score)}</td>
                   <td>{fmt(row.rs_ratio, 1)}</td>
