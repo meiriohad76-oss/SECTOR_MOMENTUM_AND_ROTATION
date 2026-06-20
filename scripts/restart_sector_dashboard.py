@@ -134,8 +134,15 @@ def main() -> int:
         "--user-service",
         action="store_true",
         default=False,
-        help="Use 'systemctl --user' (for user-scoped services like sector-next). "
-             "Also skips Streamlit content check — HTTP 200 is sufficient.",
+        help="Use 'systemctl --user' (for user-scoped services). "
+             "Implies --no-content-check.",
+    )
+    parser.add_argument(
+        "--no-content-check",
+        action="store_true",
+        default=False,
+        help="Accept HTTP 200 as healthy without checking for Streamlit page markers. "
+             "Use for Next.js or any non-Streamlit service.",
     )
     args = parser.parse_args()
     return restart_and_wait(
@@ -144,7 +151,7 @@ def main() -> int:
         args.timeout_seconds,
         args.poll_seconds,
         user_service=args.user_service,
-        require_content=not args.user_service,
+        require_content=not args.user_service and not args.no_content_check,
     )
 
 

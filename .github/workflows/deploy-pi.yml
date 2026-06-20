@@ -65,10 +65,12 @@ jobs:
           ./.venv/bin/python scripts/check_ops_readiness.py --strict-production
 
           # Helper prints restart_result=healthy after the fresh process serves HTTP 200.
-          # B-170: production is Next.js on port 3100 (sector-next.service), not Streamlit.
+          # B-170: production is Next.js on port 3100 (sector-next.service, system service).
+          # --no-content-check: accepts HTTP 200 without Streamlit page markers.
           ./.venv/bin/python scripts/restart_sector_dashboard.py \
             --service "$PI_SERVICE_NAME" \
             --url "http://127.0.0.1:3100/?ticker=XLK" \
+            --no-content-check \
             --timeout-seconds 60
 
           ./.venv/bin/python scripts/rendered_dashboard_smoke.py \
