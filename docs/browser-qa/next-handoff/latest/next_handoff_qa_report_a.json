@@ -1,14 +1,15 @@
 {
-  "generated_at_utc": "2026-06-13T15:25:12Z",
+  "generated_at_utc": "2026-06-20T09:38:55Z",
   "profile": "a",
   "reference_profile": "Momentum v2 Display A handoff: A1/A2/A3",
   "screens": [
     {
-      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-a-overview.png",
+      "capture": "docs\\browser-qa\\next-handoff\\latest\\next-a-overview.png",
       "capture_size": [
         1440,
-        3939
+        3886
       ],
+      "compared_height": 2625,
       "error": "",
       "missing_text": [],
       "nonblank": true,
@@ -24,16 +25,17 @@
         "7-PILLAR HEATMAP",
         "TRANSITIONS"
       ],
-      "rms": 34.7853,
+      "rms": 0.7138,
       "screen": "overview",
-      "similarity": 0.8636
+      "similarity": 0.9972
     },
     {
-      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-a-deepdive.png",
+      "capture": "docs\\browser-qa\\next-handoff\\latest\\next-a-deepdive.png",
       "capture_size": [
         1440,
         1800
       ],
+      "compared_height": 1458,
       "error": "",
       "missing_text": [],
       "nonblank": true,
@@ -49,16 +51,17 @@
         "COMPOSITE FORWARD-OUTLOOK",
         "STATE GATES"
       ],
-      "rms": 36.2112,
+      "rms": 0.9578,
       "screen": "deepdive",
-      "similarity": 0.858
+      "similarity": 0.9962
     },
     {
-      "capture": "C:\\Users\\meiri\\momentum and flow\\.tmp\\next_handoff_qa\\next-a-rotation.png",
+      "capture": "docs\\browser-qa\\next-handoff\\latest\\next-a-rotation.png",
       "capture_size": [
         1440,
         1800
       ],
+      "compared_height": 1397,
       "error": "",
       "missing_text": [],
       "nonblank": true,
@@ -74,10 +77,10 @@
         "INSTITUTIONAL FLOW DETAIL",
         "MACRO | BUSINESS CYCLE"
       ],
-      "rms": 29.9884,
+      "rms": 0.9785,
       "screen": "rotation",
-      "similarity": 0.8824
+      "similarity": 0.9962
     }
   ],
-  "url": "http://127.0.0.1:3100/?presentation=a&qa=shots"
+  "url": "http://127.0.0.1:3000/?presentation=a"
 }

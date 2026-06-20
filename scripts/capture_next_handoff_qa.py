@@ -98,15 +98,24 @@ def _image_similarity(capture: Path, reference: Path) -> dict[str, object]:
     except ImportError as exc:  # pragma: no cover - environment dependent
         raise RuntimeError("Pillow is required. Install requirements-qa.txt") from exc
 
-    with Image.open(capture).convert("RGB") as cap, Image.open(reference).convert("RGB") as ref:
+    with Image.open(capture).convert("RGB") as cap_img, Image.open(reference).convert("RGB") as ref:
+        cap_size_orig = cap_img.size
+        # If capture is taller than the reference, crop it to reference height.
+        # This prevents additive content below the fold (e.g. collapsed <details>
+        # panels) from penalising similarity scores for the comparable viewport.
+        if cap_img.size[1] > ref.size[1]:
+            cap = cap_img.crop((0, 0, cap_img.size[0], ref.size[1]))
+        else:
+            cap = cap_img.copy()
         ref_resized = ref.resize(cap.size)
         diff = ImageChops.difference(cap, ref_resized)
         hist = diff.histogram()
         sq = (value * ((idx % 256) ** 2) for idx, value in enumerate(hist))
         rms = math.sqrt(sum(sq) / float(cap.size[0] * cap.size[1] * 3))
         return {
-            "capture_size": list(cap.size),
+            "capture_size": list(cap_size_orig),
             "reference_size": list(ref.size),
+            "compared_height": cap.size[1],
             "rms": round(rms, 4),
             "similarity": round(max(0.0, 1.0 - (rms / 255.0)), 4),
         }
@@ -149,7 +158,7 @@ def _click_screen_button(page, label: str, timeout_ms: int) -> None:
 
 
 def _wait_for_any_text(page, required: tuple[str, ...], timeout_ms: int) -> None:
-    deadline = max(1_000, min(timeout_ms, 20_000))
+    deadline = max(1_000, min(timeout_ms, 90_000))
     page.wait_for_function(
         """
         (items) => {
@@ -186,8 +195,17 @@ def _capture(
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page(viewport={"width": 1440, "height": 1800}, device_scale_factor=1)
+        # Warm-up load: navigate once to trigger any pending Next.js compilation,
+        # then reload so screenshots are taken on a fully compiled page.
         page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
         page.locator("main").first.wait_for(timeout=timeout_ms)
+        # Wait up to 30s for any required text to appear (hydration + compilation).
+        # If not found, that is OK — individual screen loops handle timeouts.
+        try:
+            _wait_for_any_text(page, tuple(t for texts in profile["required_text"].values() for t in texts), 30_000)
+        except Exception:
+            pass
+        page.wait_for_timeout(1_200)
         page.add_style_tag(
             content="""
             nextjs-portal,
@@ -197,6 +215,9 @@ def _capture(
             [data-next-badge-root] {
               display: none !important;
               visibility: hidden !important;
+            }
+            .display-toolbar {
+              display: none !important;
             }
             """
         )
