@@ -4456,3 +4456,66 @@ select:focus-visible {
 .ft-num    { font-variant-numeric: tabular-nums; }
 .ft-pos    { color: #4caf87; }
 .ft-neg    { color: #e07070; }
+
+/* ── Debrief Lab ──────────────────────────────────────── */
+.debrief-lab-panel {
+  margin: 18px 0 0;
+}
+.debrief-lab-summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  padding: 6px 0;
+  user-select: none;
+}
+.debrief-lab-summary:hover { opacity: 1; }
+.dl-empty {
+  font-size: 0.8rem;
+  opacity: 0.5;
+  margin: 8px 0;
+}
+.dl-section { margin-top: 14px; }
+.dl-heading {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  margin: 0 0 6px;
+}
+.dl-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.75rem;
+  font-family: var(--font-mono, monospace);
+}
+.dl-table th {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+  font-weight: 600;
+  opacity: 0.65;
+  white-space: nowrap;
+}
+.dl-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  white-space: nowrap;
+}
+.dl-ticker { font-weight: 600; }
+.dl-pos { color: #4caf87; }
+.dl-neg { color: #e07070; }
+.dl-action {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 0.67rem;
+  font-weight: 700;
+}
+.dl-action-buy     { background: rgba(76,175,135,0.25); color: #4caf87; }
+.dl-action-exit    { background: rgba(224,112,112,0.25); color: #e07070; }
+.dl-action-hold    { background: rgba(92,157,203,0.25); color: #5c9dcb; }
+.dl-action-neutral { opacity: 0.5; }

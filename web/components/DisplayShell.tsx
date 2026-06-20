@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { BacktestArtifactsPayload, DashboardSnapshotPayload } from "../lib/api";
+import type { BacktestArtifactsPayload, DebriefPayload, DashboardSnapshotPayload } from "../lib/api";
 import DashboardScreensClient from "../app/dashboard-screens-client";
 import DisplayToolbar from "./DisplayToolbar";
 
@@ -13,10 +13,12 @@ export default function DisplayShell({
   snapshot,
   backtestArtifacts = null,
   backtestError,
+  debriefData = null,
 }: {
   snapshot: DashboardSnapshotPayload | null;
   backtestArtifacts?: BacktestArtifactsPayload | null;
   backtestError?: string | null;
+  debriefData?: DebriefPayload | null;
 }) {
   const [presentation, setPresentation] = useState<DisplayMode>("c");
   const [hydrated, setHydrated] = useState(false);
@@ -67,6 +69,7 @@ export default function DisplayShell({
         snapshot={snapshot}
         presentation={presentationMode}
         backtestArtifacts={backtestArtifacts}
+        debriefData={debriefData}
       />
     </>
   );

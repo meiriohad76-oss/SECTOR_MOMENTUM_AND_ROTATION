@@ -21,6 +21,8 @@ import StatusTiles from "../components/StatusTiles";
 import TransitionsBanner from "../components/TransitionsBanner";
 import PicksGrid from "../components/PicksGrid";
 import FullTable from "../components/FullTable";
+import DebriefLab from "../components/DebriefLab";
+import type { DebriefPayload } from "../lib/api";
 
 type ScreenId = "overview" | "deepdive" | "rotation";
 type SortKey = "ticker" | "state" | "quadrant" | "s_score" | "f_score" | "rs_ratio" | "rs_momentum" | "momentum_pct" | "cmf21";
@@ -250,10 +252,12 @@ function OverviewScreen({
   snapshot,
   selectedTicker,
   onSelectTicker,
+  debriefData,
 }: {
   snapshot: DashboardSnapshotPayload;
   selectedTicker: string;
   onSelectTicker: (ticker: string) => void;
+  debriefData?: DebriefPayload | null;
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("s_score");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -300,6 +304,7 @@ function OverviewScreen({
         <PillarHeatmap rows={snapshot.rows} onSelectTicker={onSelectTicker} />
       </div>
       <DataHealthPanel />
+      <DebriefLab debrief={debriefData} />
     </section>
   );
 }
@@ -2552,10 +2557,12 @@ export default function DashboardScreensClient({
   snapshot,
   backtestArtifacts = null,
   presentation = "default",
+  debriefData = null,
 }: {
   snapshot: DashboardSnapshotPayload | null;
   backtestArtifacts?: BacktestArtifactsPayload | null;
   presentation?: PresentationMode;
+  debriefData?: DebriefPayload | null;
 }) {
   const [activeScreen, setActiveScreen] = useState<ScreenId>("overview");
   const initialTicker = snapshot?.focus?.ticker || snapshot?.rows[0]?.ticker || "";
@@ -2612,7 +2619,7 @@ export default function DashboardScreensClient({
         ))}
       </nav>
       {activeScreen === "overview" ? (
-        <OverviewScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} />
+        <OverviewScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} debriefData={debriefData} />
       ) : null}
       {activeScreen === "deepdive" ? (
         <DeepDiveScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} />
