@@ -19,7 +19,7 @@ jobs:
       PI_SSH_KEY: ${{ secrets.PI_SSH_KEY }}
       PI_KNOWN_HOSTS: ${{ secrets.PI_KNOWN_HOSTS }}
       PI_REPO_PATH: ${{ secrets.PI_REPO_PATH }}
-      PI_SERVICE_NAME: ${{ secrets.PI_SERVICE_NAME || 'sector-dashboard' }}
+      PI_SERVICE_NAME: ${{ secrets.PI_SERVICE_NAME || 'sector-next' }}
     steps:
       - name: Validate deploy secrets
         shell: bash
@@ -65,14 +65,17 @@ jobs:
           ./.venv/bin/python scripts/check_ops_readiness.py --strict-production
 
           # Helper prints restart_result=healthy after the fresh process serves HTTP 200.
+          # B-170: production is Next.js on port 3100 (sector-next.service), not Streamlit.
           ./.venv/bin/python scripts/restart_sector_dashboard.py \
             --service "$PI_SERVICE_NAME" \
-            --url "http://127.0.0.1:8501/?ticker=XLK" \
+            --url "http://127.0.0.1:3100/?ticker=XLK" \
             --timeout-seconds 60
 
           ./.venv/bin/python scripts/rendered_dashboard_smoke.py \
-            --url "http://127.0.0.1:8501/?ticker=XLK" \
+            --url "http://127.0.0.1:3100/?ticker=XLK" \
             --timeout-ms 120000 \
+            --expect-text "text:Momentum" \
+            --expect-text "text:COMPOSITE FORWARD-OUTLOOK" \
             --output-json "$PI_REPO_PATH/data/rendered_dashboard_smoke/latest.json"
           systemctl --user reset-failed sector-rendered-dashboard-smoke.service || true
           systemctl --user start sector-rendered-dashboard-smoke.service
@@ -80,7 +83,7 @@ jobs:
           ./.venv/bin/python scripts/check_ops_readiness.py --strict-production --require-rendered-smoke
 
           ./.venv/bin/python scripts/smoke_deploy_gate.py \
-            --local-dashboard-url "http://127.0.0.1:8501/?ticker=XLK" \
+            --local-dashboard-url "http://127.0.0.1:3100/?ticker=XLK" \
             --state-file "$PI_REPO_PATH/data/state.json" \
             --min-state-tickers 80 \
             --max-state-age-seconds 300 \

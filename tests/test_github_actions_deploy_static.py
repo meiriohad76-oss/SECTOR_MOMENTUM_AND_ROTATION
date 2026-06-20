@@ -45,7 +45,7 @@ def test_pi_deploy_workflow_fast_forwards_tests_and_smokes_service():
     assert "systemctl --user start sector-rendered-dashboard-smoke.service" in text
     assert "./.venv/bin/python scripts/smoke_deploy_gate.py" in text
     assert "--service \"$PI_SERVICE_NAME\"" in text
-    assert "http://127.0.0.1:8501/?ticker=XLK" in text
+    assert "http://127.0.0.1:3100/?ticker=XLK" in text
     assert "https://sentimentdashboard.ahaddashboards.uk/?ticker=XLK" in text
     assert "--state-file \"$PI_REPO_PATH/data/state.json\"" in text
     assert "--min-state-tickers 80" in text
