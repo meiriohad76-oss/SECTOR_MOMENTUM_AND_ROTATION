@@ -22,6 +22,7 @@ import TransitionsBanner from "../components/TransitionsBanner";
 import PicksGrid from "../components/PicksGrid";
 import FullTable from "../components/FullTable";
 import DebriefLab from "../components/DebriefLab";
+import CustomUniversePanel from "../components/CustomUniversePanel";
 import type { DebriefPayload } from "../lib/api";
 
 type ScreenId = "overview" | "deepdive" | "rotation";
@@ -304,6 +305,7 @@ function OverviewScreen({
         <PillarHeatmap rows={snapshot.rows} onSelectTicker={onSelectTicker} />
       </div>
       <DataHealthPanel />
+      <CustomUniversePanel />
       <DebriefLab debrief={debriefData} />
     </section>
   );
