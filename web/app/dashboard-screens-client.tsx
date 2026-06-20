@@ -1719,14 +1719,91 @@ function ACompositeBreakdown({ row }: { row: SnapshotRow }) {
   );
 }
 
+function pillarIndicatorLabel(key: string): string {
+  const k = key.toLowerCase();
+  if (k === "cmf21" || k === "cmf") return "Money Flow (21-day)";
+  if (k === "mfi14" || k === "mfi") return "Buying Pressure Index";
+  if (k === "dark_pool_pct") return "Dark Pool Activity";
+  if (k === "dist_days_25") return "Distribution Days";
+  if (k === "mansfield_rs") return "Relative Strength vs Market";
+  if (k === "breadth_50d") return "Trend Filters";
+  if (k === "cycle_tilt") return "Business Cycle Tilt";
+  if (k === "mom_12_1" || k === "mom") return "12-Month Momentum";
+  if (k === "rs_ratio" || k === "rsr") return "RS Trend";
+  if (k === "rs_momentum" || k === "rsm") return "RS Acceleration";
+  if (k === "s") return "Composite Score";
+  if (k === "f") return "Flow Score";
+  return key.toUpperCase();
+}
+
+function pillarIndicatorCardText(key: string, value: number, row: SnapshotRow): string {
+  const k = key.toLowerCase();
+  const v = fmt(value, 3);
+  if (k === "cmf21" || k === "cmf") {
+    const verdict = value >= 0.10 ? "strong buying pressure" : value >= 0.05 ? "mild buying" : value >= -0.05 ? "neutral" : value >= -0.10 ? "mild selling" : "strong selling pressure";
+    return `Reading: ${value >= 0 ? "+" : ""}${fmt(value, 2)} — ${verdict}`;
+  }
+  if (k === "mfi14" || k === "mfi") {
+    const verdict = value >= 70 ? "overbought — heavy buying" : value >= 50 ? "buyers in control" : value >= 30 ? "sellers in control" : "oversold — heavy selling";
+    return `Reading: ${fmt(value, 1)} / 100 — ${verdict}`;
+  }
+  if (k === "dark_pool_pct") {
+    const verdict = value >= 0.4 ? "elevated dark pool activity" : value >= 0.2 ? "moderate institutional off-exchange trading" : "low dark pool activity";
+    return `Reading: ${fmt(value * 100, 1)}% dark pool — ${verdict}`;
+  }
+  if (k === "dist_days_25") {
+    const verdict = value <= 2 ? "few distribution days — healthy" : value <= 5 ? "some distribution — watch closely" : "heavy distribution — institutional selling";
+    return `${Math.round(value)} distribution days in 25 sessions — ${verdict}`;
+  }
+  if (k === "mansfield_rs") {
+    const verdict = value >= 1 ? "strongly beating the market" : value >= 0 ? "outperforming S&P 500" : value >= -1 ? "underperforming S&P 500" : "well below the market";
+    return `vs market: ${value >= 0 ? "+" : ""}${fmt(value, 2)} — ${verdict}`;
+  }
+  if (k === "breadth_50d") {
+    const verdict = value >= 0.5 ? "all trend checks pass" : value >= 0 ? "most checks pass" : value >= -0.5 ? "some checks failing" : "most checks failing";
+    return `Filter score: ${value >= 0 ? "+" : ""}${fmt(value, 2)} — ${verdict}`;
+  }
+  if (k === "cycle_tilt") {
+    const verdict = value >= 0.3 ? "strongly favored this cycle" : value >= 0 ? "favored this cycle" : value >= -0.3 ? "slightly disfavored" : "historically weak here";
+    return `Tilt: ${value >= 0 ? "+" : ""}${fmt(value, 2)} — ${verdict}`;
+  }
+  if (k === "mom_12_1" || k === "mom") {
+    const pct = value * 100;
+    const verdict = pct >= 20 ? "very strong momentum" : pct >= 5 ? "positive momentum" : pct >= 0 ? "slight uptrend" : pct >= -10 ? "negative" : "strong downtrend";
+    return `Momentum: ${pct >= 0 ? "+" : ""}${fmt(pct, 1)}% — ${verdict}`;
+  }
+  if (k === "s") return `Composite score: ${value >= 0 ? "+" : ""}${fmt(value, 2)} — ${value >= 1.5 ? "strong setup" : value >= 0 ? "bullish lean" : value >= -1.5 ? "bearish lean" : "weak setup"}`;
+  if (k === "f") return `Flow score: ${value >= 0 ? "+" : ""}${fmt(value, 2)} — ${value >= 0.1 ? "institutional buying active" : value >= 0 ? "flow neutral-positive" : "selling pressure present"}`;
+  return `Value: ${v} — ${value >= 0 ? "positive contribution" : "negative contribution"}`;
+}
+
+function pillarIndicatorTooltip(key: string, value: number, row: SnapshotRow): string {
+  const k = key.toLowerCase();
+  if (k === "cmf21" || k === "cmf") return `${SCORE_TOOLTIP.cmf21} ${row.ticker}'s current reading is ${value >= 0 ? "+" : ""}${fmt(value, 2)}.`;
+  if (k === "mfi14" || k === "mfi") return `Money Flow Index (14-day). Measures buying vs selling pressure on a 0–100 scale. Above 50 means buyers are in control; below 50 means sellers. Above 70 is considered overbought (strong momentum but potential for reversal). Below 30 is oversold. ${row.ticker}'s reading is ${fmt(value, 1)}.`;
+  if (k === "dark_pool_pct") return `Dark Pool Activity. The percentage of ${row.ticker}'s trading volume happening off public exchanges (dark pools). Institutional investors use dark pools to move large blocks without showing their hand to the market. Higher dark pool activity can signal institutional accumulation or distribution. ${row.ticker}'s current reading is ${fmt(value * 100, 1)}%.`;
+  if (k === "dist_days_25") return `Distribution Days (25-session window). Counts how many of the last 25 trading sessions had price falling on above-average volume — a sign that institutional investors are selling. 0–2 days is healthy; 5+ is a warning sign. ${row.ticker} has ${Math.round(value)} distribution days.`;
+  if (k === "mansfield_rs") return `Relative Strength vs the Market (12% weight). Compares this ETF's 12-month performance against the S&P 500, centered at zero. Above 0 = beating the market; below 0 = lagging. A reading above +1 is a strong setup. ${row.ticker}'s reading is ${value >= 0 ? "+" : ""}${fmt(value, 2)}.`;
+  if (k === "breadth_50d") return `Trend Filters. Three independent checks: (1) price above 10-month average, (2) price above 30-week moving average and rising, (3) positive 12-month absolute return. Score near +1 = all pass; near 0 = mixed; negative = most failing. ${row.ticker}'s filter score is ${value >= 0 ? "+" : ""}${fmt(value, 2)}.`;
+  if (k === "cycle_tilt") return `Business Cycle Adjustment. Nudges the score based on which sectors historically outperform in the current economic phase (early/mid/late cycle or recession). A positive tilt means this ETF's sector tends to do well right now. ${row.ticker}'s tilt is ${value >= 0 ? "+" : ""}${fmt(value, 2)}.`;
+  if (k === "mom_12_1" || k === "mom") return `12-Month Price Momentum (22% weight). How much this ETF has gained over the past year, skipping the most recent month to avoid short-term noise. Cross-universe rank matters more than the raw number. ${row.ticker}'s momentum is ${fmt(value * 100, 1)}%.`;
+  if (k === "s") return `${SCORE_TOOLTIP.s_score} ${row.ticker}'s score is ${value >= 0 ? "+" : ""}${fmt(value, 2)}.`;
+  if (k === "f") return `${SCORE_TOOLTIP.f_score} ${row.ticker}'s flow score is ${value >= 0 ? "+" : ""}${fmt(value, 2)}.`;
+  return `${key.toUpperCase()} reading is ${fmt(value, 3)} for ${row.ticker}. ${value >= 0 ? "This is a positive contribution to the composite score." : "This is a negative contribution to the composite score."}`;
+}
+
 function APillarTerminalGrid({ row }: { row: SnapshotRow }) {
   return (
     <div className="a-pillar-grid" aria-label={`${row.ticker} terminal pillar detail`}>
       {numericPillars(row).map(([key, value]) => (
-        <div key={key}>
+        <div key={key}
+          data-tooltip={pillarIndicatorTooltip(key, value, row)}
+          title={pillarIndicatorTooltip(key, value, row)}
+          style={{ cursor: "help" }}
+        >
           <i className={value >= 0 ? "good" : "bad"} />
-          <span>{key.toUpperCase()}</span>
-          <p>{value >= 0 ? "supports" : "drags"} {row.ticker}'s composite score in the latest saved run.</p>
+          <span>{pillarIndicatorLabel(key)}</span>
+          <p>{pillarIndicatorCardText(key, value, row)}</p>
           <strong className={value >= 0 ? "good" : "bad"}>{fmt(value, 3)}</strong>
         </div>
       ))}
