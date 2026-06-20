@@ -21,7 +21,7 @@ WorkingDirectory=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION/web
 Environment=NODE_ENV=production
 Environment=PORT=3100
 Environment=HOSTNAME=127.0.0.1
-Environment=API_BASE_URL=http://127.0.0.1:8000
+Environment=API_BASE_URL=http://127.0.0.1:8001
 ExecStart=/usr/bin/npm run start
 Restart=always
 RestartSec=10

@@ -19,7 +19,7 @@ def test_b170_api_systemd_unit_is_localhost_candidate_service():
         in unit
     )
     assert ".venv/bin/python -m uvicorn src.api_server:create_app --factory" in unit
-    assert "--host 127.0.0.1 --port 8000" in unit
+    assert "--host 127.0.0.1 --port 8001" in unit
     assert "WantedBy=multi-user.target" in unit
 
 
@@ -30,7 +30,7 @@ def test_b170_next_systemd_unit_is_api_backed_candidate_frontend():
     assert "After=network-online.target sector-api.service" in unit
     assert "WorkingDirectory=/home/ahad/SECTOR_MOMENTUM_AND_ROTATION/web" in unit
     assert "Environment=NODE_ENV=production" in unit
-    assert "Environment=API_BASE_URL=http://127.0.0.1:8000" in unit
+    assert "Environment=API_BASE_URL=http://127.0.0.1:8001" in unit
     assert "NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000" not in unit
     assert "ExecStart=/usr/bin/npm run start" in unit
     assert "8501" not in unit
