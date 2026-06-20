@@ -11,11 +11,12 @@ export default async function HomePage() {
     fetchBacktestArtifacts(),
     fetchDebrief(),
   ]);
+  const backtestArtifacts = backtestResult.data;
   return (
     <main>
       <DisplayShell
         snapshot={snapshotResult.data}
-        backtestArtifacts={backtestResult.data}
+        backtestArtifacts={backtestArtifacts}
         backtestError={backtestResult.error}
         debriefData={debriefResult.data}
       />

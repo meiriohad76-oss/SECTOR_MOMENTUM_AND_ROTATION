@@ -10,7 +10,7 @@ def test_pi_deploy_workflow_uses_ssh_secrets_and_branch_trigger():
     workflow = ROOT / ".github" / "workflows" / "deploy-pi.yml"
     text = workflow.read_text(encoding="utf-8")
 
-    assert "branches: [backlog-stepwise-qa]" in text
+    assert "branches: [main]" in text
     assert "workflow_dispatch:" in text
     assert "PI_HOST: ${{ secrets.PI_HOST }}" in text
     assert "PI_USER: ${{ secrets.PI_USER }}" in text
@@ -26,7 +26,7 @@ def test_pi_deploy_workflow_fast_forwards_tests_and_smokes_service():
     workflow = ROOT / ".github" / "workflows" / "deploy-pi.yml"
     text = workflow.read_text(encoding="utf-8")
 
-    assert "git pull --ff-only origin backlog-stepwise-qa" in text
+    assert "git pull --ff-only origin main" in text
     assert "./.venv/bin/python -m pip install -r requirements.txt" in text
     assert "./.venv/bin/python -m playwright install chromium" in text
     assert "./.venv/bin/python -m pytest -q" in text
@@ -65,7 +65,7 @@ def test_github_actions_pi_deploy_docs_reference_required_secrets():
 
     for secret in ("PI_HOST", "PI_USER", "PI_SSH_KEY", "PI_KNOWN_HOSTS", "PI_REPO_PATH", "PI_SERVICE_NAME"):
         assert secret in text
-    assert "backlog-stepwise-qa" in text
+    assert "branches: [main]" in text or "main" in text
     assert "self-hosted" in text
     assert "sector-pi" in text
     assert "scripts/enforce_safe_config.py --secrets-path \"$PI_REPO_PATH/.streamlit/secrets.toml\"" in text

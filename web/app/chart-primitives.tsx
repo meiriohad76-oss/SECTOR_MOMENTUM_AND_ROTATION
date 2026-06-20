@@ -225,7 +225,7 @@ function pillarReading(row: SnapshotRow, pillar: PillarContribution): string {
     return `${row.ticker}'s business cycle adjustment is ${valSign}${fmt(val, 2)} — ${verdict}. This modifier amplifies or reduces the score based on which sectors tend to outperform in the current cycle. ${contrib}`;
   }
 
-  return `${row.ticker}'s reading is ${fmt(pillar.raw, 2)}. ${contrib}`;
+  return `${row.ticker}: normalized input ${fmt(pillar.raw, 2)}. ${contrib}`;
 }
 
 /** One-line summary for the pillar card body — value + plain-English verdict only. */
@@ -582,7 +582,7 @@ function rrgTooltip(row: SnapshotRow): string {
   const ratio = fmt(row.rs_ratio, 1);
   const momentum = fmt(row.rs_momentum, 1);
   const quadrantExplain = RRG_QUADRANT_TOOLTIP[row.quadrant] ?? `${row.quadrant} quadrant.`;
-  return `${row.display_label} — ${quadrantExplain} Current values: RS-Ratio ${ratio} (${(row.rs_ratio ?? 100) >= 100 ? "outperforming" : "underperforming"}), RS-Momentum ${momentum} (${(row.rs_momentum ?? 100) >= 100 ? "improving" : "fading"}). Composite S ${fmt(row.s_score)}, Flow F ${fmt(row.f_score)}.`;
+  return `${row.display_label} — ${quadrantExplain} Current values: RS-ratio ${ratio} (${(row.rs_ratio ?? 100) >= 100 ? "outperforming" : "underperforming"}), RS-momentum ${momentum} (${(row.rs_momentum ?? 100) >= 100 ? "improving" : "fading"}). S ${fmt(row.s_score)} and F ${fmt(row.f_score)}.`;
 }
 
 function fmtSnapshotDate(iso: string): string {
@@ -801,6 +801,7 @@ function flowLaneTooltip(source: SnapshotRow, target: SnapshotRow, width: number
   return `Flow-river lane from ${source.display_label} to ${target.display_label}: relative pressure ${fmt(pressure, 2)} and lane width ${fmt(width, 1)} are derived from current saved F/CMF/S pressure. This is a rotation-pressure map, not a literal cash-transfer ledger.`;
 }
 
+/** Data-derived map from current weakest flow/score rows into strongest flow/score rows. */
 export function FlowRiver({ rows, generatedAt }: { rows: SnapshotRow[]; generatedAt?: string }) {
   const outflows = rows
     .filter((row) => (row.f_score < 0 || (row.cmf21 ?? 0) < 0 || row.s_score < 0))
@@ -934,8 +935,8 @@ export function FlowRiver({ rows, generatedAt }: { rows: SnapshotRow[]; generate
       </svg>
       {pairCount ? (
         <p className="flow-caption">
-          Strongest net outflow: <strong>{outflows[0].display_label}</strong> (CMF {fmt(outflows[0].cmf21 ?? outflows[0].f_score, 2)} — {Math.round(Math.abs(outflows[0].cmf21 ?? outflows[0].f_score ?? 0) * 100)}% of 21-day volume was net selling).
-          {" "}Strongest net inflow: <strong>{inflows[0].display_label}</strong> (CMF +{fmt(inflows[0].cmf21 ?? inflows[0].f_score, 2)} — {Math.round(Math.abs(inflows[0].cmf21 ?? inflows[0].f_score ?? 0) * 100)}% of 21-day volume was net buying).
+          Today: weakest support is led by {outflows[0].display_label} (CMF {fmt(outflows[0].cmf21 ?? outflows[0].f_score, 2)} — {Math.round(Math.abs(outflows[0].cmf21 ?? outflows[0].f_score ?? 0) * 100)}% of 21-day volume was net selling);
+          {" "}strongest sponsorship is led by {inflows[0].display_label} (CMF +{fmt(inflows[0].cmf21 ?? inflows[0].f_score, 2)} — {Math.round(Math.abs(inflows[0].cmf21 ?? inflows[0].f_score ?? 0) * 100)}% of 21-day volume was net buying).
           {" "}Matched signal depth: {fmt(balancedPressure, 2)} (total CMF magnitude on both sides; higher = broader rotation conviction).
           {(outflows[0]?.adv_20d || inflows[0]?.adv_20d) ? (
             <>

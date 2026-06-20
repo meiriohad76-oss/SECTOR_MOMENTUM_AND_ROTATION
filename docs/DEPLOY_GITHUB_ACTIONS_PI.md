@@ -1,6 +1,6 @@
 # GitHub Actions Auto-Deploy To The Pi
 
-This repo includes `.github/workflows/deploy-pi.yml` for automatic deployment to the Raspberry Pi whenever `backlog-stepwise-qa` is pushed, plus manual runs through GitHub Actions `workflow_dispatch`. The workflow targets the repo self-hosted runner labeled `sector-pi` on the Pi so the deploy does not require exposing raw SSH to the public internet.
+This repo includes `.github/workflows/deploy-pi.yml` for automatic deployment to the Raspberry Pi whenever `main` is pushed, plus manual runs through GitHub Actions `workflow_dispatch`. The workflow targets the repo self-hosted runner labeled `sector-pi` on the Pi so the deploy does not require exposing raw SSH to the public internet.
 
 ## Required GitHub Secrets
 
@@ -25,13 +25,13 @@ The preflight prints only configured/missing secret names. It does not print the
 
 ## What The Workflow Does
 
-On push to `backlog-stepwise-qa`, the self-hosted `sector-pi` runner SSHes to the Pi and runs:
+On push to `main`, the self-hosted `sector-pi` runner SSHes to the Pi and runs:
 
 ```bash
 cd "$PI_REPO_PATH"
-git fetch origin backlog-stepwise-qa
-git checkout backlog-stepwise-qa
-git pull --ff-only origin backlog-stepwise-qa
+git fetch origin main
+git checkout main
+git pull --ff-only origin main
 ./.venv/bin/python -m pip install -r requirements.txt
 ./.venv/bin/python -m playwright install chromium
 ./.venv/bin/python -m pytest -q
