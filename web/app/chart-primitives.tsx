@@ -228,6 +228,50 @@ function pillarReading(row: SnapshotRow, pillar: PillarContribution): string {
   return `${row.ticker}'s reading is ${fmt(pillar.raw, 2)}. ${contrib}`;
 }
 
+/** One-line summary for the pillar card body — value + plain-English verdict only. */
+function pillarCardText(row: SnapshotRow, pillar: PillarContribution): string {
+  if (pillar.key === "cmf21") {
+    const val = typeof row.cmf21 === "number" && Number.isFinite(row.cmf21) ? row.cmf21 : pillar.raw * 0.25;
+    const verdict =
+      val >= 0.10 ? "strong buying pressure" :
+      val >= 0.05 ? "mild buying pressure" :
+      val >= -0.05 ? "neutral flow" :
+      val >= -0.10 ? "mild selling pressure" : "strong selling pressure";
+    return `Money flow: ${val >= 0 ? "+" : ""}${fmt(val, 2)} — ${verdict}`;
+  }
+  if (pillar.key === "mom_12_1") {
+    const pct = pillar.raw * 100;
+    const verdict = pct >= 20 ? "very strong momentum" : pct >= 5 ? "positive momentum" : pct >= 0 ? "slight uptrend" : pct >= -10 ? "negative" : "strong downtrend";
+    return `12-month momentum: ${pct >= 0 ? "+" : ""}${fmt(pct, 1)}% — ${verdict}`;
+  }
+  if (pillar.key === "mansfield_rs") {
+    const val = pillar.raw * 100;
+    const verdict = val >= 1 ? "strongly outperforming S&P 500" : val >= 0 ? "outperforming S&P 500" : val >= -1 ? "underperforming S&P 500" : "well below S&P 500";
+    return `vs market: ${val >= 0 ? "+" : ""}${fmt(val, 2)} — ${verdict}`;
+  }
+  if (pillar.key === "rs_ratio") {
+    const val = typeof row.rs_ratio === "number" && Number.isFinite(row.rs_ratio) ? row.rs_ratio : 100;
+    const verdict = val >= 100 ? "outperforming benchmark" : "underperforming benchmark";
+    return `RS trend: ${fmt(val, 1)} — ${verdict}`;
+  }
+  if (pillar.key === "rs_momentum") {
+    const val = typeof row.rs_momentum === "number" && Number.isFinite(row.rs_momentum) ? row.rs_momentum : 100;
+    const verdict = val >= 100 ? "RS improving" : "RS fading";
+    return `RS momentum: ${fmt(val, 1)} — ${verdict} (${row.quadrant})`;
+  }
+  if (pillar.key === "breadth_50d") {
+    const val = pillar.raw;
+    const verdict = val >= 0.5 ? "all trend checks pass" : val >= 0 ? "most checks pass" : val >= -0.5 ? "some checks failing" : "most checks failing";
+    return `Trend filters: ${val >= 0 ? "+" : ""}${fmt(val, 2)} — ${verdict}`;
+  }
+  if (pillar.key === "cycle_tilt") {
+    const val = pillar.raw;
+    const verdict = val >= 0.3 ? "strongly favored this cycle" : val >= 0 ? "favored this cycle" : val >= -0.3 ? "slightly disfavored" : "historically weak here";
+    return `Cycle tilt: ${val >= 0 ? "+" : ""}${fmt(val, 2)} — ${verdict}`;
+  }
+  return `Reading: ${fmt(pillar.raw, 2)}`;
+}
+
 function pillarTooltip(row: SnapshotRow, pillar: PillarContribution): string {
   const sign = pillar.contribution >= 0 ? "bullish support" : "bearish drag";
   const general = PILLAR_TOOLTIP[pillar.key] ?? pillar.reading;
@@ -500,12 +544,14 @@ export function PillarDetailGrid({ row }: { row: SnapshotRow }) {
       </div>
       <div className="pillar-card-grid">
         {contributions.map((pillar) => (
-          <div key={pillar.key} className="pillar-card" style={{ borderColor: pillar.hue }}>
+          <div key={pillar.key} className="pillar-card" style={{ borderColor: pillar.hue }}
+            data-tooltip={pillarTooltip(row, pillar)}
+            title={pillarTooltip(row, pillar)}
+          >
             <i style={{ background: pillar.hue }} />
             <div>
               <span>{pillar.fullName} <small>w {Math.round(pillar.weight * 100)}%</small></span>
-              <p>{pillarReading(row, pillar)}</p>
-              <em>{pillar.evidence}</em>
+              <p>{pillarCardText(row, pillar)}</p>
             </div>
             <strong className={pillar.contribution >= 0 ? "good" : "bad"}>{fmt(pillar.contribution)}</strong>
           </div>
