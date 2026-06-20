@@ -2,7 +2,7 @@
 
 import type { SnapshotRow } from "../lib/api";
 import Sparkline from "../components/Sparkline";
-import { PILLAR_TOOLTIP, RRG_QUADRANT_TOOLTIP, SCORE_TOOLTIP, STATE_TOOLTIP } from "../lib/tooltips";
+import { PILLAR_TOOLTIP, RRG_QUADRANT_TOOLTIP, SCORE_TOOLTIP, stateTooltip } from "../lib/tooltips";
 
 type PillarKey = "mom_12_1" | "mansfield_rs" | "rs_ratio" | "rs_momentum" | "breadth_50d" | "cycle_tilt" | "cmf21";
 
@@ -138,19 +138,94 @@ export function PillarLegend() {
   );
 }
 
-function LightStatePill({ state }: { state: string }) {
-  const tooltip = STATE_TOOLTIP[state] ?? `State: ${state.replaceAll("_", " ")}`;
+function LightStatePill({ state, sScore, fScore }: { state: string; sScore?: number; fScore?: number }) {
+  const tooltip = stateTooltip(state, sScore, fScore);
   return <span className={`light-state-pill ${stateTone(state)}`} data-tooltip={tooltip} style={{ cursor: "help" }}>{compactStateLabel(state)}</span>;
 }
 
 function pillarReading(row: SnapshotRow, pillar: PillarContribution): string {
-  if (pillar.key === "mom_12_1") return `${row.ticker} momentum input is ${fmt(pillar.raw, 2)}; this pillar contributes ${fmt(pillar.contribution, 2)} to S.`;
-  if (pillar.key === "mansfield_rs") return `Relative strength input is ${fmt(pillar.raw, 2)}; positive values support Stage 2 evidence, negative values weaken it.`;
-  if (pillar.key === "rs_ratio") return `RRG ratio is ${fmt(row.rs_ratio, 1)}; above 100 means relative strength is ahead of the benchmark.`;
-  if (pillar.key === "rs_momentum") return `RRG momentum is ${fmt(row.rs_momentum, 1)} and quadrant is ${row.quadrant}; this captures acceleration or fading leadership.`;
-  if (pillar.key === "breadth_50d") return `Trend-filter input is ${fmt(pillar.raw, 2)}; higher readings mean more confirmation from breadth and trend gates.`;
-  if (pillar.key === "cycle_tilt") return `Cycle tilt input is ${fmt(pillar.raw, 2)}; macro context adjusts how much the setup is favored.`;
-  return `CMF flow is ${fmt(row.cmf21, 2)} and F-score is ${fmt(row.f_score, 2)}; flow can confirm or veto price strength.`;
+  const sign = pillar.contribution >= 0 ? "+" : "";
+  const supportLabel = pillar.contribution >= 0 ? "bullish support" : "bearish drag";
+  const contrib = `Contributes ${sign}${fmt(pillar.contribution, 2)} to the overall score (${supportLabel}).`;
+
+  if (pillar.key === "cmf21") {
+    const val = typeof row.cmf21 === "number" && Number.isFinite(row.cmf21) ? row.cmf21 : pillar.raw * 0.25;
+    const valSign = val >= 0 ? "+" : "";
+    const verdict =
+      val >= 0.10 ? "strong buying pressure — institutions are accumulating" :
+      val >= 0.05 ? "mild buying pressure — more closes near daily highs on volume" :
+      val >= -0.05 ? "neutral — no clear buying or selling dominance" :
+      val >= -0.10 ? "mild selling pressure — more closes near daily lows on volume" :
+                     "strong selling pressure — distribution pattern";
+    return `${row.ticker}'s money flow reading is ${valSign}${fmt(val, 2)} (thresholds: above +0.05 = buying active, below −0.05 = selling active). ${verdict.charAt(0).toUpperCase() + verdict.slice(1)}. ${contrib}`;
+  }
+
+  if (pillar.key === "mom_12_1") {
+    const pctVal = pillar.raw * 100;
+    const pctSign = pctVal >= 0 ? "+" : "";
+    const verdict =
+      pctVal >= 20  ? "very strong momentum — top performers in the universe" :
+      pctVal >= 5   ? "positive momentum — trending higher" :
+      pctVal >= 0   ? "slightly positive — marginal uptrend" :
+      pctVal >= -10 ? "negative momentum — downtrend under way" :
+                      "strongly negative — significant downtrend";
+    return `${row.ticker}'s 12-month momentum is ${pctSign}${fmt(pctVal, 1)}%. ${verdict.charAt(0).toUpperCase() + verdict.slice(1)}. The model ranks this against all other ETFs — relative rank matters more than the raw number. ${contrib}`;
+  }
+
+  if (pillar.key === "mansfield_rs") {
+    const val = pillar.raw * 100;
+    const valSign = val >= 0 ? "+" : "";
+    const verdict =
+      val >= 1  ? "strongly outperforming the S&P 500" :
+      val >= 0  ? "outperforming the S&P 500" :
+      val >= -1 ? "underperforming the S&P 500" :
+                  "significantly underperforming the S&P 500";
+    return `${row.ticker}'s relative strength vs the market is ${valSign}${fmt(val, 2)} (above 0 = beating the S&P 500; above +1 = strong setup). ${verdict.charAt(0).toUpperCase() + verdict.slice(1)}. ${contrib}`;
+  }
+
+  if (pillar.key === "rs_ratio") {
+    const val = typeof row.rs_ratio === "number" && Number.isFinite(row.rs_ratio) ? row.rs_ratio : 100;
+    const verdict =
+      val >= 102 ? "clearly outperforming the benchmark" :
+      val >= 100 ? "slightly ahead of the benchmark" :
+      val >= 98  ? "slightly behind the benchmark" :
+                   "clearly underperforming the benchmark";
+    return `${row.ticker}'s relative strength trend is ${fmt(val, 1)} (above 100 = outperforming, below 100 = underperforming). ${verdict.charAt(0).toUpperCase() + verdict.slice(1)}. ${contrib}`;
+  }
+
+  if (pillar.key === "rs_momentum") {
+    const val = typeof row.rs_momentum === "number" && Number.isFinite(row.rs_momentum) ? row.rs_momentum : 100;
+    const verdict =
+      val >= 102 ? "relative strength is accelerating — gaining on the market" :
+      val >= 100 ? "relative strength is slightly improving" :
+      val >= 98  ? "relative strength is slightly fading" :
+                   "relative strength is decelerating — losing ground";
+    return `${row.ticker}'s relative strength momentum is ${fmt(val, 1)}, quadrant: ${row.quadrant} (above 100 = improving, below 100 = fading). ${verdict.charAt(0).toUpperCase() + verdict.slice(1)}. ${contrib}`;
+  }
+
+  if (pillar.key === "breadth_50d") {
+    const val = pillar.raw;
+    const valSign = val >= 0 ? "+" : "";
+    const verdict =
+      val >= 0.5  ? "all trend checks are passing — strong confirmation" :
+      val >= 0    ? "most trend checks pass — moderate confirmation" :
+      val >= -0.5 ? "some trend checks failing — weakening trend" :
+                    "most trend checks failing — downtrend confirmed";
+    return `${row.ticker}'s trend filter score is ${valSign}${fmt(val, 2)} (checks: price above 10-month average, above 30-week moving average, positive 12-month return). ${verdict.charAt(0).toUpperCase() + verdict.slice(1)}. ${contrib}`;
+  }
+
+  if (pillar.key === "cycle_tilt") {
+    const val = pillar.raw;
+    const valSign = val >= 0 ? "+" : "";
+    const verdict =
+      val >= 0.3  ? "strongly favored in the current economic phase" :
+      val >= 0    ? "moderately favored in the current economic phase" :
+      val >= -0.3 ? "slightly disfavored in the current economic phase" :
+                    "historically weak in the current economic phase";
+    return `${row.ticker}'s business cycle adjustment is ${valSign}${fmt(val, 2)} — ${verdict}. This modifier amplifies or reduces the score based on which sectors tend to outperform in the current cycle. ${contrib}`;
+  }
+
+  return `${row.ticker}'s reading is ${fmt(pillar.raw, 2)}. ${contrib}`;
 }
 
 function pillarTooltip(row: SnapshotRow, pillar: PillarContribution): string {
@@ -343,7 +418,7 @@ function CompositionRowButton({
       <strong>{row.ticker}</strong>
       <Sparkline ticker={row.ticker} state={row.state} w={64} h={24} />
       <PillarStackBar row={row} maxSide={maxSide} />
-      <LightStatePill state={row.state} />
+      <LightStatePill state={row.state} sScore={row.s_score} fScore={row.f_score} />
       <span>{signedFmt(row.s_score)}</span>
       <span>{momentumFmt(row.momentum_pct)}</span>
     </button>
