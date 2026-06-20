@@ -716,15 +716,16 @@ main {
 
 .a-pillar-grid div {
   display: grid;
-  grid-template-columns: 4px minmax(70px, auto) minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
+  grid-template-columns: 4px 110px minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  align-items: start;
   padding: 8px 0;
   border-bottom: 1px solid #161616;
 }
 
 .a-pillar-grid i {
   align-self: stretch;
+  margin-top: 2px;
 }
 
 .a-pillar-grid i.good {
@@ -738,20 +739,27 @@ main {
 .a-pillar-grid span {
   color: #e8e8e8;
   font-weight: 800;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-top: 1px;
 }
 
 .a-pillar-grid p {
   margin: 0;
   color: #7c7c7c;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-family: Inter, system-ui, sans-serif;
   letter-spacing: 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  word-break: break-word;
 }
 
 .a-pillar-grid strong {
   text-align: right;
+  font-size: 0.8rem;
+  padding-top: 1px;
 }
 
 .a-evidence-grid {

@@ -1721,60 +1721,53 @@ function ACompositeBreakdown({ row }: { row: SnapshotRow }) {
 
 function pillarIndicatorLabel(key: string): string {
   const k = key.toLowerCase();
-  if (k === "cmf21" || k === "cmf") return "Money Flow (21-day)";
-  if (k === "mfi14" || k === "mfi") return "Buying Pressure Index";
-  if (k === "dark_pool_pct") return "Dark Pool Activity";
-  if (k === "dist_days_25") return "Distribution Days";
-  if (k === "mansfield_rs") return "Relative Strength vs Market";
-  if (k === "breadth_50d") return "Trend Filters";
-  if (k === "cycle_tilt") return "Business Cycle Tilt";
-  if (k === "mom_12_1" || k === "mom") return "12-Month Momentum";
+  if (k === "cmf21" || k === "cmf") return "Money Flow";
+  if (k === "mfi14" || k === "mfi") return "Buy Pressure";
+  if (k === "dark_pool_pct") return "Dark Pool %";
+  if (k === "dist_days_25") return "Sell-off Days";
+  if (k === "mansfield_rs") return "vs S&P 500";
+  if (k === "breadth_50d") return "Trend Gates";
+  if (k === "cycle_tilt") return "Cycle Tilt";
+  if (k === "mom_12_1" || k === "mom") return "12M Momentum";
   if (k === "rs_ratio" || k === "rsr") return "RS Trend";
-  if (k === "rs_momentum" || k === "rsm") return "RS Acceleration";
-  if (k === "s") return "Composite Score";
-  if (k === "f") return "Flow Score";
+  if (k === "rs_momentum" || k === "rsm") return "RS Momentum";
+  if (k === "s") return "Composite";
+  if (k === "f") return "Flow";
   return key.toUpperCase();
 }
 
-function pillarIndicatorCardText(key: string, value: number, row: SnapshotRow): string {
+// Short verdict only — the numeric value is already shown in <strong>
+function pillarIndicatorCardText(key: string, value: number): string {
   const k = key.toLowerCase();
-  const v = fmt(value, 3);
   if (k === "cmf21" || k === "cmf") {
-    const verdict = value >= 0.10 ? "strong buying pressure" : value >= 0.05 ? "mild buying" : value >= -0.05 ? "neutral" : value >= -0.10 ? "mild selling" : "strong selling pressure";
-    return `Reading: ${value >= 0 ? "+" : ""}${fmt(value, 2)} — ${verdict}`;
+    return value >= 0.10 ? "strong buying pressure" : value >= 0.05 ? "mild buying pressure" : value >= -0.05 ? "flow is neutral" : value >= -0.10 ? "mild selling pressure" : "strong selling pressure";
   }
   if (k === "mfi14" || k === "mfi") {
-    const verdict = value >= 70 ? "overbought — heavy buying" : value >= 50 ? "buyers in control" : value >= 30 ? "sellers in control" : "oversold — heavy selling";
-    return `Reading: ${fmt(value, 1)} / 100 — ${verdict}`;
+    return value >= 70 ? "overbought — heavy buying" : value >= 50 ? "buyers in control" : value >= 30 ? "sellers in control" : "oversold — heavy selling";
   }
   if (k === "dark_pool_pct") {
-    const verdict = value >= 0.4 ? "elevated dark pool activity" : value >= 0.2 ? "moderate institutional off-exchange trading" : "low dark pool activity";
-    return `Reading: ${fmt(value * 100, 1)}% dark pool — ${verdict}`;
+    return value >= 0.4 ? "elevated — large block trading" : value >= 0.2 ? "moderate off-exchange activity" : "low dark pool activity";
   }
   if (k === "dist_days_25") {
-    const verdict = value <= 2 ? "few distribution days — healthy" : value <= 5 ? "some distribution — watch closely" : "heavy distribution — institutional selling";
-    return `${Math.round(value)} distribution days in 25 sessions — ${verdict}`;
+    const days = Math.round(value);
+    return days <= 2 ? `${days} days — healthy` : days <= 5 ? `${days} days — watch closely` : `${days} days — heavy distribution`;
   }
   if (k === "mansfield_rs") {
-    const verdict = value >= 1 ? "strongly beating the market" : value >= 0 ? "outperforming S&P 500" : value >= -1 ? "underperforming S&P 500" : "well below the market";
-    return `vs market: ${value >= 0 ? "+" : ""}${fmt(value, 2)} — ${verdict}`;
+    return value >= 1 ? "strongly beating market" : value >= 0 ? "outperforming S&P 500" : value >= -1 ? "underperforming market" : "well below market";
   }
   if (k === "breadth_50d") {
-    const verdict = value >= 0.5 ? "all trend checks pass" : value >= 0 ? "most checks pass" : value >= -0.5 ? "some checks failing" : "most checks failing";
-    return `Filter score: ${value >= 0 ? "+" : ""}${fmt(value, 2)} — ${verdict}`;
+    return value >= 0.5 ? "all trend gates pass" : value >= 0 ? "most gates pass" : value >= -0.5 ? "some gates failing" : "most gates failing";
   }
   if (k === "cycle_tilt") {
-    const verdict = value >= 0.3 ? "strongly favored this cycle" : value >= 0 ? "favored this cycle" : value >= -0.3 ? "slightly disfavored" : "historically weak here";
-    return `Tilt: ${value >= 0 ? "+" : ""}${fmt(value, 2)} — ${verdict}`;
+    return value >= 0.3 ? "strongly favored this cycle" : value >= 0 ? "cycle-favored" : value >= -0.3 ? "cycle disfavored" : "historically weak here";
   }
   if (k === "mom_12_1" || k === "mom") {
     const pct = value * 100;
-    const verdict = pct >= 20 ? "very strong momentum" : pct >= 5 ? "positive momentum" : pct >= 0 ? "slight uptrend" : pct >= -10 ? "negative" : "strong downtrend";
-    return `Momentum: ${pct >= 0 ? "+" : ""}${fmt(pct, 1)}% — ${verdict}`;
+    return pct >= 20 ? `+${fmt(pct, 1)}% — strong momentum` : pct >= 5 ? `+${fmt(pct, 1)}% — positive` : pct >= 0 ? `+${fmt(pct, 1)}% — slight uptrend` : `${fmt(pct, 1)}% — negative`;
   }
-  if (k === "s") return `Composite score: ${value >= 0 ? "+" : ""}${fmt(value, 2)} — ${value >= 1.5 ? "strong setup" : value >= 0 ? "bullish lean" : value >= -1.5 ? "bearish lean" : "weak setup"}`;
-  if (k === "f") return `Flow score: ${value >= 0 ? "+" : ""}${fmt(value, 2)} — ${value >= 0.1 ? "institutional buying active" : value >= 0 ? "flow neutral-positive" : "selling pressure present"}`;
-  return `Value: ${v} — ${value >= 0 ? "positive contribution" : "negative contribution"}`;
+  if (k === "s") return value >= 1.5 ? "strong bullish setup" : value >= 0 ? "bullish lean" : value >= -1.5 ? "bearish lean" : "strong bearish setup";
+  if (k === "f") return value >= 0.1 ? "institutional buying active" : value >= 0 ? "flow neutral-positive" : "selling pressure present";
+  return value >= 0 ? "positive contribution" : "negative contribution";
 }
 
 function pillarIndicatorTooltip(key: string, value: number, row: SnapshotRow): string {
@@ -1803,7 +1796,7 @@ function APillarTerminalGrid({ row }: { row: SnapshotRow }) {
         >
           <i className={value >= 0 ? "good" : "bad"} />
           <span>{pillarIndicatorLabel(key)}</span>
-          <p>{pillarIndicatorCardText(key, value, row)}</p>
+          <p>{pillarIndicatorCardText(key, value)}</p>
           <strong className={value >= 0 ? "good" : "bad"}>{fmt(value, 3)}</strong>
         </div>
       ))}
