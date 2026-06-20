@@ -456,3 +456,44 @@ export async function savePortfolio(name: string, payload: PortfolioAnalysisRequ
 export async function deleteSavedPortfolio(name: string) {
   return deleteDashboardApi<DeletePortfolioPayload>(`/api/v1/portfolios?name=${encodeURIComponent(name)}`);
 }
+
+export type DebriefRun = {
+  run_id: string;
+  started_at_utc: string;
+  provider: string | null;
+  universe_count: number;
+};
+
+export type DebriefDecision = {
+  run_id: string;
+  started_at_utc: string;
+  ticker: string;
+  action: string | null;
+  decision_type: string | null;
+  rationale: string | null;
+  state: string | null;
+  s_score: number | null;
+  f_score: number | null;
+};
+
+export type DebriefPayload = {
+  api_version: string;
+  generated_at: string;
+  runs: DebriefRun[];
+  decisions: DebriefDecision[];
+};
+
+export async function fetchDebrief(): Promise<{
+  data: DebriefPayload | null;
+  error: string | null;
+}> {
+  const base = process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
+  try {
+    const res = await fetch(`${base}/api/v1/debrief`, { cache: "no-store" });
+    if (!res.ok) return { data: null, error: `HTTP ${res.status}` };
+    const data = (await res.json()) as DebriefPayload;
+    return { data, error: null };
+  } catch (err) {
+    return { data: null, error: String(err) };
+  }
+}
