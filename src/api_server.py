@@ -23,6 +23,7 @@ from .api_portfolio import build_portfolio_analysis_payload
 from .api_status import build_persisted_status_payload
 from .api_ticker_chart import build_ticker_chart_payload
 from .api_debrief import build_debrief_payload
+from .api_universe import build_universe_analysis_payload
 
 try:
     from fastapi import BackgroundTasks, Body
@@ -134,6 +135,14 @@ def create_app(
     @app.get("/api/v1/debrief")
     def debrief() -> dict[str, Any]:
         return debrief_reader()
+
+    @app.post("/api/v1/universe/analyze")
+    def universe_analyze(payload: dict[str, Any] | None = Body(default=None)) -> dict[str, Any]:
+        body = payload or {}
+        raw_tickers = body.get("tickers", [])
+        tickers = [str(t).strip().upper() for t in raw_tickers if t]
+        snapshot = snapshot_reader()
+        return build_universe_analysis_payload(tickers, snapshot.get("rows", []))
 
     @app.get("/api/v1/ticker-chart")
     def ticker_chart(ticker: str, period: str = "3y", benchmark: str | None = None) -> dict[str, Any]:
