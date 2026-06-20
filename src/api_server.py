@@ -22,6 +22,7 @@ from .api_dashboard_snapshot import build_latest_dashboard_snapshot_payload
 from .api_portfolio import build_portfolio_analysis_payload
 from .api_status import build_persisted_status_payload
 from .api_ticker_chart import build_ticker_chart_payload
+from .api_debrief import build_debrief_payload
 
 try:
     from fastapi import BackgroundTasks, Body
@@ -38,6 +39,7 @@ SnapshotProvider = Callable[..., dict[str, Any]]
 RefreshRunner = Callable[..., dict[str, Any]]
 BacktestArtifactsProvider = Callable[[], dict[str, Any]]
 TickerChartProvider = Callable[..., dict[str, Any]]
+DebriefProvider = Callable[[], dict[str, Any]]
 
 
 def default_status_provider() -> dict[str, Any]:
@@ -62,6 +64,7 @@ def create_app(
     snapshot_provider: SnapshotProvider | None = None,
     backtest_artifacts_provider: BacktestArtifactsProvider | None = None,
     ticker_chart_provider: TickerChartProvider | None = None,
+    debrief_provider: DebriefProvider | None = None,
     saved_inputs_path: str | None = None,
 ):
     """Create the optional FastAPI app without making FastAPI mandatory at import time."""
@@ -76,6 +79,7 @@ def create_app(
     snapshot_reader = snapshot_provider or default_snapshot_provider
     backtest_reader = backtest_artifacts_provider or build_backtest_artifacts_payload
     ticker_chart_reader = ticker_chart_provider or build_ticker_chart_payload
+    debrief_reader = debrief_provider or build_debrief_payload
     runner = refresh_runner or run_refresh_job
     app = FastAPI(
         title="Sector Momentum Dashboard API",
@@ -126,6 +130,10 @@ def create_app(
     @app.get("/api/v1/backtest-artifacts")
     def backtest_artifacts() -> dict[str, Any]:
         return backtest_reader()
+
+    @app.get("/api/v1/debrief")
+    def debrief() -> dict[str, Any]:
+        return debrief_reader()
 
     @app.get("/api/v1/ticker-chart")
     def ticker_chart(ticker: str, period: str = "3y", benchmark: str | None = None) -> dict[str, Any]:
