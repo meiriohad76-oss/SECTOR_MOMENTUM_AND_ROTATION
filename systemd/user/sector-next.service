@@ -1,0 +1,34 @@
+# Sector Rotation Dashboard Next.js Frontend - user systemd unit
+#
+# Install without sudo (done automatically by deploy-pi.yml):
+#   mkdir -p ~/.config/systemd/user
+#   cp systemd/user/sector-next.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now sector-next
+#
+# %h is a systemd specifier that expands to the user's home directory at
+# runtime — no manual path substitution needed.
+# API_BASE_URL targets port 8001 (sector-api FastAPI); adjust if it moves.
+
+[Unit]
+Description=Sector Rotation Dashboard Next.js Frontend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/SECTOR_MOMENTUM_AND_ROTATION/web
+Environment=NODE_ENV=production
+Environment=PORT=3100
+Environment=HOSTNAME=127.0.0.1
+Environment=API_BASE_URL=http://127.0.0.1:8001
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+TimeoutStartSec=120
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target
