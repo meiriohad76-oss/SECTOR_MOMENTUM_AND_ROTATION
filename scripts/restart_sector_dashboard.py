@@ -79,9 +79,18 @@ def restart_and_wait(
             print(f"restart_action=starting_stopped_service service={service}")
             _run_text(_systemctl(user_service) + ["start", service])
         else:
-            print(f"restart_action=no_mainpid service={service}")
-            print(f"restart_result=failed_no_mainpid service={service}")
-            return 1
+            # System service with no running PID — try sudo restart/start.
+            # Requires the runner to have NOPASSWD sudo for systemctl on this service.
+            print(f"restart_action=sudo_restart_stopped_system_service service={service}")
+            result = subprocess.run(
+                ["sudo", "systemctl", "restart", service],
+                check=False, capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode != 0:
+                print(f"restart_result=failed_sudo_restart service={service} rc={result.returncode} stderr={result.stderr.strip()!r}")
+                return 1
+            print(f"restart_action=sudo_restart_issued service={service}")
+            # Fall through to the HTTP wait loop below.
     else:
         try:
             os.kill(old_pid, signal.SIGTERM)

@@ -64,6 +64,11 @@ jobs:
           ./.venv/bin/python scripts/refresh_dashboard_state.py --period 3y --provider-flow-mode cache-only
           ./.venv/bin/python scripts/check_ops_readiness.py --strict-production
 
+          # Build Next.js from the freshly pulled source before restarting the service.
+          # Without this step every deploy serves the old compiled bundle even after git pull.
+          npm --prefix web ci --prefer-offline
+          npm --prefix web run build
+
           # Helper prints restart_result=healthy after the fresh process serves HTTP 200.
           # B-170: production is Next.js on port 3100 (sector-next.service, system service).
           # --no-content-check: accepts HTTP 200 without Streamlit page markers.
