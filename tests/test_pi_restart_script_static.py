@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock
 
 from scripts import restart_sector_dashboard
 
@@ -35,40 +34,14 @@ def test_pi_restart_docs_reference_noninteractive_helper_and_cloudflare_access_q
     assert "--base-url https://sentimentdashboard.ahaddashboards.uk" in readme
 
 
-def test_restart_helper_tries_sudo_restart_when_system_service_has_no_mainpid(monkeypatch, capsys):
-    """When a system service has no running PID, the helper should attempt sudo restart
-    and report failed_sudo_restart if sudo itself fails."""
-    monkeypatch.setattr(restart_sector_dashboard, "_main_pid", lambda service, user_service=False: 0)
-
-    failing_result = MagicMock()
-    failing_result.returncode = 1
-    failing_result.stderr = "Access denied"
-    monkeypatch.setattr(restart_sector_dashboard.subprocess, "run", lambda *a, **kw: failing_result)
-
-    exit_code = restart_sector_dashboard.restart_and_wait(
-        "sector-next",
-        "http://127.0.0.1:3100/?ticker=XLK",
-        timeout_seconds=5,
-        poll_seconds=0,
-    )
-
-    captured = capsys.readouterr().out
-    assert exit_code == 1
-    assert "sudo_restart_stopped_system_service" in captured
-    assert "restart_result=failed_sudo_restart" in captured
-
-
-def test_restart_helper_waits_for_http_after_successful_sudo_restart(monkeypatch, capsys):
-    """When sudo restart succeeds, the helper waits for HTTP 200 before declaring healthy."""
+def test_restart_helper_waits_for_system_service_restart_when_pid_is_zero(monkeypatch, capsys):
+    """When a system service has no running PID (e.g. just killed by fuser),
+    the helper logs waiting_for_system_service_restart and polls until the new
+    PID appears — no sudo attempt, because it isn't available in CI."""
     pid_sequence = iter([0, 0, 999])
     monkeypatch.setattr(restart_sector_dashboard, "_main_pid", lambda service, user_service=False: next(pid_sequence, 999))
     monkeypatch.setattr(restart_sector_dashboard, "_active", lambda service, user_service=False: "active")
     monkeypatch.setattr(restart_sector_dashboard, "_http_probe", lambda url, timeout: (200, ""))
-
-    ok_result = MagicMock()
-    ok_result.returncode = 0
-    ok_result.stderr = ""
-    monkeypatch.setattr(restart_sector_dashboard.subprocess, "run", lambda *a, **kw: ok_result)
 
     exit_code = restart_sector_dashboard.restart_and_wait(
         "sector-next",
@@ -80,8 +53,29 @@ def test_restart_helper_waits_for_http_after_successful_sudo_restart(monkeypatch
 
     captured = capsys.readouterr().out
     assert exit_code == 0
-    assert "sudo_restart_stopped_system_service" in captured
+    assert "waiting_for_system_service_restart" in captured
     assert "restart_result=healthy" in captured
+
+
+def test_restart_helper_times_out_when_system_service_never_restarts(monkeypatch, capsys):
+    """When a system service stays down (pid=0, http=0 throughout), the helper
+    times out and reports failed rather than attempting sudo."""
+    monkeypatch.setattr(restart_sector_dashboard, "_main_pid", lambda service, user_service=False: 0)
+    monkeypatch.setattr(restart_sector_dashboard, "_active", lambda service, user_service=False: "inactive")
+    monkeypatch.setattr(restart_sector_dashboard, "_http_probe", lambda url, timeout: (0, ""))
+
+    exit_code = restart_sector_dashboard.restart_and_wait(
+        "sector-next",
+        "http://127.0.0.1:3100/?ticker=XLK",
+        timeout_seconds=1,
+        poll_seconds=0,
+    )
+
+    captured = capsys.readouterr().out
+    assert exit_code == 1
+    assert "waiting_for_system_service_restart" in captured
+    assert "restart_result=failed" in captured
+    assert "sudo" not in captured
 
 
 def test_restart_helper_tolerates_pid_race_when_fresh_pid_becomes_healthy(monkeypatch, capsys):
