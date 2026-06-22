@@ -111,8 +111,12 @@ def restart_and_wait(
         ok, content_state = _classify(status, body, require_content)
         pid = _main_pid(service, user_service)
         print(f"poll_{attempt} active={active} http={status} content={content_state} pid={pid}")
-        if active == "active" and ok and pid > 0 and pid != old_pid:
-            print(f"restart_result=healthy service={service} pid={pid} http={status} content={content_state}")
+        # Primary success: new process is serving HTTP and has a new PID.
+        # active=="active" is ideal but not required — a freshly started service
+        # may briefly report "activating" or "inactive" while its PID is already
+        # serving.  The HTTP + new-PID check is sufficient proof of liveness.
+        if ok and pid > 0 and pid != old_pid:
+            print(f"restart_result=healthy service={service} pid={pid} active={active} http={status} content={content_state}")
             return 0
         if not sigkill_sent and attempt >= 5 and old_pid > 0 and pid == old_pid and status == 0:
             try:

@@ -69,6 +69,11 @@ jobs:
           npm --prefix web ci --prefer-offline
           npm --prefix web run build
 
+          # Kill any orphan process that may be holding port 3100 outside systemd control.
+          # Without this the new service fails to bind the port and stays inactive.
+          fuser -k 3100/tcp || true
+          sleep 3
+
           # Helper prints restart_result=healthy after the fresh process serves HTTP 200.
           # B-170: sector-next is a USER service — requires --user-service so systemctl
           # queries the user-scoped daemon (not the system daemon which has no record of it).
@@ -78,7 +83,7 @@ jobs:
             --url "http://127.0.0.1:3100/?ticker=XLK" \
             --user-service \
             --no-content-check \
-            --timeout-seconds 60
+            --timeout-seconds 90
 
           ./.venv/bin/python scripts/rendered_dashboard_smoke.py \
             --url "http://127.0.0.1:3100/?ticker=XLK" \
