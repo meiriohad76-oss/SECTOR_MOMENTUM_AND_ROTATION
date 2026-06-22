@@ -599,6 +599,28 @@ def relative_volume(df, lookback=20):
     return float(df["volume"].iloc[-1] / avg)
 
 
+def net_dollar_flow_21d(df: pd.DataFrame, period: int = 21) -> Optional[float]:
+    """Estimated net dollar money flow over the past `period` trading days.
+
+    Uses the same money-flow-volume numerator as CMF(21) but returns the raw
+    dollar sum rather than normalising by total volume.  Positive = estimated
+    net buying pressure in dollars; negative = net selling pressure.
+
+    Formula per day:
+        mfm  = ((close - low) - (high - close)) / (high - low)   # [-1, +1]
+        mfv$ = mfm × volume × close                              # dollar MFV
+    Returns Σ mfv$ over the last `period` rows.
+    """
+    if len(df) < period:
+        return None
+    high = df["high"]; low = df["low"]; close = df["close"]; vol = df["volume"]
+    rng = (high - low).replace(0, np.nan)
+    mfm = ((close - low) - (high - close)) / rng
+    mfv_dollars = (mfm * vol * close).fillna(0)
+    total = float(mfv_dollars.iloc[-period:].sum())
+    return total if np.isfinite(total) else None
+
+
 def adv_20d(df: pd.DataFrame, lookback: int = 20) -> Optional[float]:
     """20-day average daily dollar volume (close × volume).
 
@@ -1335,6 +1357,7 @@ def compute_flow_signals(ohlcv):
             rows.append({
                 "ticker":          t,
                 "cmf21":           chaikin_money_flow(df, 21),
+                "net_flow_21d":    net_dollar_flow_21d(df, 21),
                 "obv_slope":       obv_slope(df, 20),
                 "mfi14":           money_flow_index(df, 14),
                 "rvol":            relative_volume(df, 20),

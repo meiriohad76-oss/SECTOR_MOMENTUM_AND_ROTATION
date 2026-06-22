@@ -65,6 +65,7 @@ export type SnapshotRow = {
   rs_momentum: number | null;
   cmf21: number | null;
   adv_20d: number | null;
+  net_flow_21d: number | null;
   pillar_scores: Record<string, number | string | boolean | null>;
   payload: Record<string, number | string | boolean | null>;
 };

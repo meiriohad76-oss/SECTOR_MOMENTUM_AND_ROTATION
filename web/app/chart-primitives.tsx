@@ -776,7 +776,7 @@ export function MomentumBars({
 }
 
 function flowMagnitude(row: SnapshotRow): number {
-  return Math.max(0.05, Math.abs(row.f_score || row.cmf21 || row.s_score));
+  return Math.max(0.05, Math.abs(row.cmf21 ?? row.f_score ?? row.s_score ?? 0));
 }
 
 function flowLabel(row: SnapshotRow): string {
@@ -792,6 +792,16 @@ function fmtDollarVolume(adv: number | null | undefined): string {
   return `$${Math.round(adv / 1e3)}K`;
 }
 
+/** Signed dollar volume: e.g. +$460M or -$1.2B */
+function fmtNetFlow(v: number | null | undefined): string {
+  if (v === null || v === undefined || !Number.isFinite(v)) return "";
+  const sign = v >= 0 ? "+" : "-";
+  const abs = Math.abs(v);
+  if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(1)}B`;
+  if (abs >= 1e6) return `${sign}$${Math.round(abs / 1e6)}M`;
+  return `${sign}$${Math.round(abs / 1e3)}K`;
+}
+
 function flowTooltip(row: SnapshotRow, side: "outflow" | "inflow"): string {
   const direction = side === "inflow" ? "supporting inflow" : "weakening outflow";
   return `${row.display_label}: ${direction}. F-score ${fmt(row.f_score)}; CMF(21) ${fmt(row.cmf21, 2)}; S ${fmt(row.s_score)}. Higher magnitude means this row is exerting more pressure in the current flow river.`;
@@ -803,15 +813,19 @@ function flowLaneTooltip(source: SnapshotRow, target: SnapshotRow, width: number
 
 /** Data-derived map from current weakest flow/score rows into strongest flow/score rows. */
 export function FlowRiver({ rows, generatedAt }: { rows: SnapshotRow[]; generatedAt?: string }) {
+  // Use a single composite signal per row so the two sets are mutually exclusive.
+  // Priority: cmf21 → f_score → s_score (first non-null wins).
+  // A row with positive composite goes to inflows, negative to outflows — never both.
+  const flowSignal = (row: SnapshotRow) => row.cmf21 ?? row.f_score ?? row.s_score ?? 0;
   const outflows = rows
-    .filter((row) => (row.f_score < 0 || (row.cmf21 ?? 0) < 0 || row.s_score < 0))
+    .filter((row) => flowSignal(row) < 0)
     .slice()
-    .sort((a, b) => Math.abs((b.f_score || b.cmf21 || b.s_score)) - Math.abs((a.f_score || a.cmf21 || a.s_score)))
+    .sort((a, b) => Math.abs(flowSignal(b)) - Math.abs(flowSignal(a)))
     .slice(0, 10);
   const inflows = rows
-    .filter((row) => (row.f_score > 0 || (row.cmf21 ?? 0) > 0 || row.s_score > 0))
+    .filter((row) => flowSignal(row) > 0)
     .slice()
-    .sort((a, b) => (b.f_score + (b.cmf21 ?? 0) + b.s_score) - (a.f_score + (a.cmf21 ?? 0) + a.s_score))
+    .sort((a, b) => flowSignal(b) - flowSignal(a))
     .slice(0, 10);
   const pairCount = Math.min(outflows.length, inflows.length);
   const width = 1100;
@@ -909,8 +923,9 @@ export function FlowRiver({ rows, generatedAt }: { rows: SnapshotRow[]; generate
               <rect className="flow-out-node" x={leftX - 18} y={y - h / 2} width="12" height={h} />
               <text x={leftX - 26} y={y - 2} textAnchor="end">{flowLabel(row)}</text>
               <text x={leftX - 26} y={y + 13} textAnchor="end" className="flow-value">
-                CMF {fmt(row.cmf21 ?? row.f_score, 2)}
+                CMF {signedFmt(row.cmf21 ?? row.f_score ?? row.s_score, 2)}
                 {row.adv_20d ? ` · ${fmtDollarVolume(row.adv_20d)}` : ""}
+                {row.net_flow_21d != null ? ` · net ${fmtNetFlow(row.net_flow_21d)}` : ""}
               </text>
             </g>
           );
@@ -925,8 +940,9 @@ export function FlowRiver({ rows, generatedAt }: { rows: SnapshotRow[]; generate
               <rect className="flow-in-node" x={rightX + 6} y={y - h / 2} width="12" height={h} />
               <text x={rightX + 26} y={y - 2}>{flowLabel(row)}</text>
               <text x={rightX + 26} y={y + 13} className="flow-value">
-                CMF +{fmt(row.cmf21 ?? row.f_score, 2)}
+                CMF {signedFmt(row.cmf21 ?? row.f_score ?? row.s_score, 2)}
                 {row.adv_20d ? ` · ${fmtDollarVolume(row.adv_20d)}` : ""}
+                {row.net_flow_21d != null ? ` · net ${fmtNetFlow(row.net_flow_21d)}` : ""}
               </text>
             </g>
           );
@@ -935,8 +951,8 @@ export function FlowRiver({ rows, generatedAt }: { rows: SnapshotRow[]; generate
       </svg>
       {pairCount ? (
         <p className="flow-caption">
-          Today: weakest support is led by {outflows[0].display_label} (CMF {fmt(outflows[0].cmf21 ?? outflows[0].f_score, 2)} — {Math.round(Math.abs(outflows[0].cmf21 ?? outflows[0].f_score ?? 0) * 100)}% of 21-day volume was net selling);
-          {" "}strongest sponsorship is led by {inflows[0].display_label} (CMF +{fmt(inflows[0].cmf21 ?? inflows[0].f_score, 2)} — {Math.round(Math.abs(inflows[0].cmf21 ?? inflows[0].f_score ?? 0) * 100)}% of 21-day volume was net buying).
+          Today: weakest support is led by {outflows[0].display_label} (CMF {signedFmt(outflows[0].cmf21 ?? outflows[0].f_score ?? outflows[0].s_score, 2)} — {Math.round(Math.abs(outflows[0].cmf21 ?? outflows[0].f_score ?? outflows[0].s_score ?? 0) * 100)}% of 21-day volume was net selling);
+          {" "}strongest sponsorship is led by {inflows[0].display_label} (CMF {signedFmt(inflows[0].cmf21 ?? inflows[0].f_score ?? inflows[0].s_score, 2)} — {Math.round(Math.abs(inflows[0].cmf21 ?? inflows[0].f_score ?? inflows[0].s_score ?? 0) * 100)}% of 21-day volume was net buying).
           {" "}Matched signal depth: {fmt(balancedPressure, 2)} (total CMF magnitude on both sides; higher = broader rotation conviction).
           {(outflows[0]?.adv_20d || inflows[0]?.adv_20d) ? (
             <>
