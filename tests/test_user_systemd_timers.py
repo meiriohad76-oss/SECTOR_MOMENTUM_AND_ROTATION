@@ -60,7 +60,7 @@ def test_user_rendered_dashboard_smoke_timer_runs_optional_browser_observability
     timer = _read_unit("sector-rendered-dashboard-smoke.timer")
 
     assert "WorkingDirectory=%h/SECTOR_MOMENTUM_AND_ROTATION" in service
-    assert "scripts/rendered_dashboard_smoke.py --url http://127.0.0.1:8501/?ticker=XLK" in service
+    assert "scripts/rendered_dashboard_smoke.py --url http://127.0.0.1:3100/?ticker=XLK" in service
     assert "--allow-unavailable" in service
     assert "--timeout-ms 120000" in service
     assert "--attempts 3" in service
