@@ -99,7 +99,7 @@ jobs:
             --url "http://127.0.0.1:3100/?ticker=XLK" \
             --timeout-ms 120000 \
             --expect-text "text:Momentum" \
-            --expect-text "text:COMPOSITE FORWARD-OUTLOOK" \
+            --expect-text "text:SAVED DASHBOARD RUN" \
             --output-json "$PI_REPO_PATH/data/rendered_dashboard_smoke/latest.json"
           systemctl --user reset-failed sector-rendered-dashboard-smoke.service || true
           systemctl --user start sector-rendered-dashboard-smoke.service
