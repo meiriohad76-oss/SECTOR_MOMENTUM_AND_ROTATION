@@ -70,11 +70,13 @@ jobs:
           npm --prefix web run build
 
           # Helper prints restart_result=healthy after the fresh process serves HTTP 200.
-          # B-170: production is Next.js on port 3100 (sector-next.service, system service).
+          # B-170: sector-next is a USER service — requires --user-service so systemctl
+          # queries the user-scoped daemon (not the system daemon which has no record of it).
           # --no-content-check: accepts HTTP 200 without Streamlit page markers.
           ./.venv/bin/python scripts/restart_sector_dashboard.py \
             --service "$PI_SERVICE_NAME" \
             --url "http://127.0.0.1:3100/?ticker=XLK" \
+            --user-service \
             --no-content-check \
             --timeout-seconds 60
 
