@@ -60,6 +60,20 @@ def test_classifies_local_streamlit_shell_as_healthy_smoke():
     assert result.state == "streamlit_shell"
 
 
+def test_classifies_local_nextjs_shell_as_healthy_smoke():
+    """Next.js app router responses contain __NEXT_DATA__ — accept them as a valid shell."""
+    nextjs_body = (
+        '<html><head></head><body>'
+        '<script id="__NEXT_DATA__" type="application/json">{"page":"/"}</script>'
+        '<script src="/_next/static/chunks/main.js"></script>'
+        '</body></html>'
+    )
+    result = classify_local_dashboard_response(status_code=200, text=nextjs_body)
+
+    assert result.ok is True
+    assert result.state == "nextjs_shell"
+
+
 def test_strict_local_dashboard_smoke_rejects_streamlit_shell_without_dashboard_markers():
     result = classify_local_dashboard_response(
         status_code=200,

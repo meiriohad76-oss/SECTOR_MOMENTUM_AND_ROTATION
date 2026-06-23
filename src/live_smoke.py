@@ -100,4 +100,9 @@ def classify_local_dashboard_response(
         return LocalDashboardSmoke(True, "dashboard_content_partial", "partial dashboard markers present")
     if "<title>streamlit</title>" in body and "static/js/" in body:
         return LocalDashboardSmoke(True, "streamlit_shell", "Streamlit shell served")
+    # Next.js app router pages contain __next_data__ or _next/static in the HTML.
+    # Accept them as a valid shell so the deploy gate passes after the Streamlit →
+    # Next.js cutover, even without the legacy Streamlit section markers.
+    if "__next" in body or "_next/static" in body:
+        return LocalDashboardSmoke(True, "nextjs_shell", "Next.js app served")
     return LocalDashboardSmoke(False, "wrong_content", "missing dashboard markers")
