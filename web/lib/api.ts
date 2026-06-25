@@ -351,7 +351,7 @@ export async function pollRefreshJob(jobId: string) {
 // the browser cannot reach 127.0.0.1:8000 directly (e.g. port-forwarded).
 const API_BASE_URL =
   typeof window === "undefined"
-    ? process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || "http://127.0.0.1:8000"
+    ? process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || "http://127.0.0.1:8001"
     : process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 function endpoint(path: string): string {
@@ -362,7 +362,10 @@ export async function fetchDashboardApi<T>(path: string): Promise<ApiResult<T>> 
   try {
     const response = await fetch(endpoint(path), {
       cache: "no-store",
-      headers: { Accept: "application/json" }
+      headers: { Accept: "application/json" },
+      // 30-second hard timeout prevents SSR from hanging indefinitely when
+      // sector-api is slow (e.g. right after a heavy refresh job completes).
+      signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) {
       return { ok: false, data: null, error: `HTTP ${response.status}` };
@@ -488,9 +491,12 @@ export async function fetchDebrief(): Promise<{
   data: DebriefPayload | null;
   error: string | null;
 }> {
-  const base = process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
+  const base = process.env.API_BASE_URL ?? "http://127.0.0.1:8001";
   try {
-    const res = await fetch(`${base}/api/v1/debrief`, { cache: "no-store" });
+    const res = await fetch(`${base}/api/v1/debrief`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(30_000),
+    });
     if (!res.ok) return { data: null, error: `HTTP ${res.status}` };
     const data = (await res.json()) as DebriefPayload;
     return { data, error: null };

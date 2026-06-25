@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-const API_BASE = process.env.API_BASE_URL || "http://127.0.0.1:8000";
+const API_BASE = process.env.API_BASE_URL || "http://127.0.0.1:8001";
 const POLL_INTERVAL_MS = 4000;
 const MAX_WAIT_MS = 5 * 60 * 1000; // 5 minutes
 

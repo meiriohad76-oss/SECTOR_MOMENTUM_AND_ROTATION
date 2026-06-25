@@ -1,6 +1,7 @@
 // web/components/RefreshButton.tsx
 "use client";
 import { useTransition, useState } from "react";
+import { useRouter } from "next/navigation";
 import { runRefreshAction } from "../app/actions";
 
 export default function RefreshButton({
@@ -10,6 +11,7 @@ export default function RefreshButton({
   laneId?: string;
   label?: string;
 }) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [done, setDone] = useState(false);
   const [errored, setErrored] = useState(false);
@@ -22,9 +24,17 @@ export default function RefreshButton({
       const result = await runRefreshAction(laneId);
       if (result.ok) {
         setDone(true);
-        // Page data is already fresh (revalidatePath was called server-side).
-        // Give the user a moment to see the ✓ before the page auto-refreshes.
-        setTimeout(() => window.location.reload(), 1500);
+        // Use router.refresh() instead of window.location.reload().
+        // router.refresh() is a Next.js soft refresh: it re-fetches server
+        // components without a full browser reload, so the JS context is
+        // preserved. window.location.reload() was crashing with
+        // ERR_NETWORK_IO_SUSPENDED / "Application error" because the browser
+        // attempted a cold full-page load immediately after a heavy sector-api
+        // refresh job — before sector-api had settled — causing SSR fetches to
+        // hang and the shared JS chunk to fail mid-load.
+        setTimeout(() => router.refresh(), 1500);
+        // Reset button back to idle once data has settled.
+        setTimeout(() => setDone(false), 5000);
       } else {
         setErrored(true);
         setTimeout(() => setErrored(false), 4000);
