@@ -130,7 +130,11 @@ def _transition_payloads(path: str | Path | None = DEFAULT_TRANSITION_JOURNAL_PA
     journal_path = Path(path)
     if not journal_path.exists():
         return []
-    rows: list[dict[str, Any]] = []
+    # Journal is append-only (chronological). We deduplicate by (ticker, date) so that
+    # same-day oscillations (e.g. SOXX EXIT→WARN then WARN→EXIT in two separate runs)
+    # show only the final recorded state change for each ticker per day. Later lines
+    # in the file overwrite earlier ones for the same key.
+    deduped: dict[tuple[str, str], dict[str, Any]] = {}
     for line in journal_path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
@@ -141,7 +145,8 @@ def _transition_payloads(path: str | Path | None = DEFAULT_TRANSITION_JOURNAL_PA
         if isinstance(parsed, Mapping):
             transition = _transition_payload(parsed)
             if transition["ticker"]:
-                rows.append(transition)
+                deduped[(transition["ticker"], transition["date"])] = transition
+    rows = list(deduped.values())
     rows.sort(key=_transition_sort_key, reverse=True)
     return rows[:limit]
 
