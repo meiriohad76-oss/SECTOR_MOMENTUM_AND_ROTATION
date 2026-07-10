@@ -172,6 +172,204 @@ def methodology_scoring_parameters(config: ScoringConfig | None = None) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Candidate configs (Tasks 3, 4, 6) — do NOT promote to DEFAULT_SCORING_CONFIG
+# without passing the calibration gate.
+# ---------------------------------------------------------------------------
+
+
+def make_four_pillar_candidate_config(
+    trend_weight: float = 0.25,
+    rs_weight: float = 0.25,
+    flow_weight: float = 0.25,
+    confirmation_weight: float = 0.25,
+) -> ScoringConfig:
+    """Task 3: 4-pillar composite candidate config (equal-weight prior).
+
+    Collapses the three RS sub-metrics into a single RS pillar (mansfield_rs
+    and rs_ratio blended 50/50 within the pillar), folding rs_momentum into the
+    confirmation pillar.  This eliminates the RS double-count where
+    mansfield_rs_z (12%) + rs_ratio_z (15%) + rs_momentum_z (8%) = 35% all
+    from the same price/benchmark ratio.
+
+    Weight breakdown (default 0.25 per pillar)::
+
+        mom_12_1_z       0.20   (80% of trend_weight, 20% reserved for binary_filters)
+        binary_filters   0.05   (20% of trend_weight)
+        mansfield_rs_z   0.125  (50% of rs_weight)
+        rs_ratio_z       0.125  (50% of rs_weight)
+        provider_flow_z  0.25   (full flow_weight)
+        rs_momentum_z    0.20   (80% of confirmation_weight, 20% for cycle_tilt)
+        cycle_tilt       0.05   (20% of confirmation_weight)
+        Total            1.0
+
+    Do NOT change DEFAULT_SCORING_CONFIG.  This config is for calibration runs only.
+    """
+    composite_weights = {
+        "mom_12_1_z": trend_weight * 0.80,
+        "binary_filters": trend_weight * 0.20,
+        "mansfield_rs_z": rs_weight * 0.50,
+        "rs_ratio_z": rs_weight * 0.50,
+        "provider_flow_z": flow_weight,
+        "rs_momentum_z": confirmation_weight * 0.80,
+        "cycle_tilt": confirmation_weight * 0.20,
+    }
+    total = sum(composite_weights.values())
+    assert abs(total - 1.0) < 1e-9, f"Four-pillar weights must sum to 1.0, got {total}"
+
+    return ScoringConfig(
+        composite_weights=composite_weights,
+        flow_veto=dict(DEFAULT_SCORING_CONFIG.flow_veto),
+        binary_filter_count=DEFAULT_SCORING_CONFIG.binary_filter_count,
+        state_machine_thresholds={
+            k: dict(v) for k, v in DEFAULT_SCORING_CONFIG.state_machine_thresholds.items()
+        },
+        pullback_risk_thresholds=dict(DEFAULT_SCORING_CONFIG.pullback_risk_thresholds),
+        min_flow_coverage=DEFAULT_SCORING_CONFIG.min_flow_coverage,
+    )
+
+
+def write_four_pillar_candidate_config(
+    path: str = "docs/calibration_10y_candidate_config.json",
+) -> str:
+    """Write the 4-pillar candidate composite_weights block to a JSON file.
+
+    This is a helper for calibration research only — it must be called
+    explicitly; it is never called from production code paths.
+
+    Returns the absolute path of the written file.
+    """
+    cfg = make_four_pillar_candidate_config()
+    out_path = Path(path) if Path(path).is_absolute() else ROOT / path
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    payload = {
+        "_comment": (
+            "Candidate config — Task 3 (4-pillar equal-weight prior). "
+            "Do NOT promote to DEFAULT_SCORING_CONFIG without calibration gate approval."
+        ),
+        "scoring_parameters": {
+            "composite_weights": {k: round(v, 6) for k, v in cfg.composite_weights.items()},
+            "flow_veto": dict(cfg.flow_veto),
+            "binary_filter_count": cfg.binary_filter_count,
+            "state_machine": {k: dict(v) for k, v in cfg.state_machine_thresholds.items()},
+            "pullback_risk_modifier": dict(cfg.pullback_risk_thresholds),
+            "min_flow_coverage": cfg.min_flow_coverage,
+        },
+    }
+    out_path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    return str(out_path)
+
+
+def make_flow_demoted_candidate_config(
+    flow_pillar_weight: float = 0.10,
+    graded_penalty_threshold_z: float = -1.5,
+    graded_penalty_max_deduction: float = 0.20,
+) -> ScoringConfig:
+    """Task 4: Flow demotion + graded-penalty candidate config.
+
+    Reduces provider_flow_z from its current 23% to ``flow_pillar_weight``
+    (default 10%) and scales the remaining pillars up proportionally so the
+    total stays at 1.0.
+
+    Replaces the hard kill-switch veto (threshold_z=-0.5, replacement_score=-9.99)
+    with a graded-penalty config::
+
+        threshold_z                  -1.5   (only truly extreme flow triggers)
+        graded                       True   (signals graded-penalty mode to calibration runner)
+        graded_penalty_max_deduction  0.20  (max score deduction, bounded)
+        replacement_score            None   (hard kill disabled; graded logic used instead)
+
+    NOTE: The live compute_composite() only reads flow_veto["threshold_z"] and
+    flow_veto["replacement_score"].  The extra keys (graded,
+    graded_penalty_max_deduction) are ignored by the live code — they are stored
+    for calibration-aware runners only.  Full graded logic requires a
+    calibration-gate approval before landing in compute_composite.
+
+    Do NOT change DEFAULT_SCORING_CONFIG.  This config is for calibration runs only.
+    """
+    base_weights = dict(DEFAULT_SCORING_CONFIG.composite_weights)
+    old_flow_weight = base_weights.get("provider_flow_z", 0.0)
+    weight_delta = old_flow_weight - flow_pillar_weight  # amount freed up
+
+    # Scale non-flow pillars proportionally to absorb the freed weight.
+    non_flow = {k: v for k, v in base_weights.items() if k != "provider_flow_z"}
+    non_flow_total = sum(non_flow.values()) or 1.0
+    scaled_non_flow = {k: v + v / non_flow_total * weight_delta for k, v in non_flow.items()}
+
+    composite_weights = {**scaled_non_flow, "provider_flow_z": flow_pillar_weight}
+
+    total = sum(composite_weights.values())
+    assert abs(total - 1.0) < 1e-9, f"Flow-demoted weights must sum to 1.0, got {total}"
+
+    flow_veto = {
+        "threshold_z": graded_penalty_threshold_z,
+        "replacement_score": None,  # hard kill disabled; graded logic used by calibration runner
+        "graded": True,
+        "graded_penalty_max_deduction": graded_penalty_max_deduction,
+    }
+
+    return ScoringConfig(
+        composite_weights=composite_weights,
+        flow_veto=flow_veto,
+        binary_filter_count=DEFAULT_SCORING_CONFIG.binary_filter_count,
+        state_machine_thresholds={
+            k: dict(v) for k, v in DEFAULT_SCORING_CONFIG.state_machine_thresholds.items()
+        },
+        pullback_risk_thresholds=dict(DEFAULT_SCORING_CONFIG.pullback_risk_thresholds),
+        min_flow_coverage=DEFAULT_SCORING_CONFIG.min_flow_coverage,
+    )
+
+
+def make_tightened_gate_candidate_config(
+    mansfield_rs_exit_lt: float = -5.0,
+    require_price_break_for_exit: bool = True,
+) -> ScoringConfig:
+    """Task 6: EXIT gate fix + RRG demotion candidate config.
+
+    Changes vs DEFAULT_SCORING_CONFIG:
+
+    EXIT gate:
+      - mansfield_rs_lt raised from 0.0 to -5.0 (mild underperformance no longer triggers)
+      - rrg_quadrant_eq removed (RRG "Lagging" can no longer solo-force EXIT)
+      - require_above_30wma_false_for_rs_exit added (documents AND-logic intent for
+        calibration runners; the live decide_state() ignores unknown keys)
+
+    WARNING gate:
+      - rrg_quadrant_eq removed (RRG "Weakening" can no longer solo-force WARNING)
+
+    The live decide_state() uses .get() for rrg_quadrant_eq so omitting the key
+    returns None — the comparison (rrg_q == None) is always False, safely disabling
+    the RRG solo-veto without KeyError.
+
+    Do NOT change DEFAULT_SCORING_CONFIG.  This config is for calibration runs only.
+    """
+    thresholds = {
+        k: dict(v) for k, v in DEFAULT_SCORING_CONFIG.state_machine_thresholds.items()
+    }
+
+    # Tighten EXIT gate.
+    exit_t = thresholds["exit"]
+    exit_t["mansfield_rs_lt"] = mansfield_rs_exit_lt
+    exit_t.pop("rrg_quadrant_eq", None)  # RRG "Lagging" no longer solo-forces EXIT
+    if require_price_break_for_exit:
+        # Documents AND-logic intent: RS<threshold AND price break required.
+        # Ignored by live decide_state(); used by calibration-aware runners.
+        exit_t["require_above_30wma_false_for_rs_exit"] = True
+
+    # Loosen WARNING gate — RRG "Weakening" no longer solo-forces WARNING.
+    thresholds["warning"].pop("rrg_quadrant_eq", None)
+
+    return ScoringConfig(
+        composite_weights=dict(DEFAULT_SCORING_CONFIG.composite_weights),
+        flow_veto=dict(DEFAULT_SCORING_CONFIG.flow_veto),
+        binary_filter_count=DEFAULT_SCORING_CONFIG.binary_filter_count,
+        state_machine_thresholds=thresholds,
+        pullback_risk_thresholds=dict(DEFAULT_SCORING_CONFIG.pullback_risk_thresholds),
+        min_flow_coverage=DEFAULT_SCORING_CONFIG.min_flow_coverage,
+    )
+
+
 def _z(s: pd.Series) -> pd.Series:
     s = s.astype(float)
     std = s.std(ddof=0)
@@ -294,6 +492,98 @@ def compute_composite(
     return out
 
 
+# ---------------------------------------------------------------------------
+# Task 7: Cross-class rotation view
+# ---------------------------------------------------------------------------
+
+def compute_class_rotation(
+    indicators_df: pd.DataFrame,
+    flow_df: pd.DataFrame,
+    *,
+    class_overrides: dict | None = None,
+) -> pd.DataFrame:
+    """Rank asset classes on a common cross-class basis.
+
+    Unlike ``compute_composite`` which z-scores *within* each class, this
+    function computes aggregate metrics on a **common** scale so the output
+    answers "which bucket is capital rotating into?".
+
+    Parameters
+    ----------
+    indicators_df:
+        Output of ``compute_all_indicators`` (indexed by ticker).
+    flow_df:
+        Flow DataFrame joined to indicators in ``compute_composite`` — must
+        contain ``breadth_50d``, ``cmf21``, and ``net_flow_21d`` columns
+        (missing columns are silently treated as NaN).
+    class_overrides:
+        Optional mapping of ticker → class that overrides the default
+        ``class_of()`` lookup.
+
+    Returns
+    -------
+    DataFrame indexed by asset class with columns:
+        agg_momentum, agg_breadth, agg_cmf, agg_mansfield_rs,
+        agg_net_flow_21d, class_score, rank  (1 = best class).
+    """
+    class_overrides = class_overrides or {}
+
+    # --- Join indicators and flow on the ticker index -----------------------
+    df = indicators_df.copy()
+    df = df.join(flow_df, how="left", rsuffix="_flow")
+
+    # Assign class; skip "Benchmark" tickers
+    df["_cls"] = [
+        class_overrides.get(str(t), class_of(str(t))) for t in df.index
+    ]
+    df = df[df["_cls"] != "Benchmark"]
+    if df.empty:
+        return pd.DataFrame(
+            columns=[
+                "agg_momentum", "agg_breadth", "agg_cmf",
+                "agg_mansfield_rs", "agg_net_flow_21d",
+                "class_score", "rank",
+            ]
+        )
+
+    # --- Helper: safe access to a column as float ---------------------------
+    def _col(name: str) -> pd.Series:
+        """Return column as float Series over df; NaN if absent."""
+        if name in df.columns:
+            return df[name].astype(float)
+        return pd.Series(np.nan, index=df.index)
+
+    rows: list[dict] = []
+    for cls, sub in df.groupby("_cls"):
+        agg_momentum = float(_col("mom_12_1")[sub.index].median())
+        agg_breadth = float(_col("breadth_50d")[sub.index].median())
+        agg_cmf = float(_col("cmf21")[sub.index].median())
+        agg_mansfield_rs = float(_col("mansfield_rs")[sub.index].median())
+        agg_net_flow_21d = float(_col("net_flow_21d")[sub.index].sum())
+        rows.append({
+            "asset_class": cls,
+            "agg_momentum": agg_momentum,
+            "agg_breadth": agg_breadth,
+            "agg_cmf": agg_cmf,
+            "agg_mansfield_rs": agg_mansfield_rs,
+            "agg_net_flow_21d": agg_net_flow_21d,
+        })
+
+    result = pd.DataFrame(rows).set_index("asset_class")
+
+    # --- Z-score each aggregate across the cross-class distribution ---------
+    agg_cols = [
+        "agg_momentum", "agg_breadth", "agg_cmf",
+        "agg_mansfield_rs", "agg_net_flow_21d",
+    ]
+    z_parts = {col: _z(result[col]) for col in agg_cols}
+
+    # equal-weight sum of z-scored aggregates → class_score
+    result["class_score"] = sum(z_parts[col] for col in agg_cols)
+    result["rank"] = result["class_score"].rank(ascending=False, method="min").astype(int)
+    return result
+
+
 # -------- State machine -----------------------------------------------------------
 
 def _nullable_bool(value) -> bool | None:
@@ -375,17 +665,21 @@ def decide_state(row: pd.Series, config: ScoringConfig | None = None) -> str:
         return "BEARISH_STAGE_4"
 
     # ---- EXIT ----
+    # Note: rrg_quadrant_eq uses .get() so candidate configs that omit the key
+    # disable the RRG solo-veto without KeyError (safe backward-compat).
     if (above is False) \
             or (mans is not None and mans < exit_thresholds["mansfield_rs_lt"]) \
             or (ant == exit_thresholds["antonacci_eq"]) \
-            or (rrg_q == exit_thresholds["rrg_quadrant_eq"]) \
+            or (rrg_q == exit_thresholds.get("rrg_quadrant_eq")) \
             or (cmf is not None and cmf < exit_thresholds["cmf21_lt"]) \
             or (nf5d_live and nf5d is not None and nf5d < exit_thresholds["etf_flow_5d_pct_lt"]) \
             or (blk_live and blk is not None and blk < exit_thresholds["block_up_ratio_lt"]):
         return "EXIT"
 
     # ---- WARNING ----
-    if (rrg_q == warning["rrg_quadrant_eq"]) \
+    # Note: rrg_quadrant_eq uses .get() so candidate configs that omit the key
+    # disable the RRG solo-veto without KeyError (safe backward-compat).
+    if (rrg_q == warning.get("rrg_quadrant_eq")) \
             or (breadth is not None and breadth < warning["breadth_50d_lt"]) \
             or (cmf is not None and cmf < warning["cmf21_lt"]) \
             or (ret5 is not None and ret5 <= warning["return_5d_lte"]) \
@@ -506,6 +800,68 @@ def apply_state_machine(
     df["prior_state"] = [prior.get(t, {}).get("state") for t in df.index]
     _save_state({tkr: {"state": s, "date": today} for tkr, s in zip(df.index, new_states)}, transitions)
     return df
+
+
+# ---------------------------------------------------------------------------
+# Task 5: Eligibility → rank sequencing
+# ---------------------------------------------------------------------------
+
+# Default ownable states.  Instruments in any other state (EXIT, WARNING,
+# BEARISH_STAGE_4, STAGE_1_BASING) are ineligible and never appear in the
+# buy-list — even if their raw S-score is high.
+ELIGIBLE_STATES: frozenset[str] = frozenset({"STAGE_2_BULLISH", "HOLD"})
+
+
+def apply_eligibility_gate(
+    scored_df: pd.DataFrame,
+    eligible_states: frozenset[str] | set[str] | None = None,
+) -> pd.DataFrame:
+    """Re-rank within eligible states; never select an ineligible instrument.
+
+    Must be called after :func:`apply_state_machine` (which adds ``state``).
+    Ineligible tickers keep their raw S-score for transparency but are
+    never ``selected``.  An ``eligible`` and ``ineligible_bucket`` column are
+    added; ``rank_in_class`` is set to NaN for ineligible rows so they sort
+    after all eligible ones.
+
+    Parameters
+    ----------
+    scored_df : pd.DataFrame
+        Output of ``apply_state_machine(compute_composite(...))``.
+    eligible_states : set[str] | None
+        Override :data:`ELIGIBLE_STATES`.  Default: ``STAGE_2_BULLISH``, ``HOLD``.
+    """
+    states = frozenset(eligible_states) if eligible_states is not None else ELIGIBLE_STATES
+    if "state" not in scored_df.columns:
+        raise ValueError(
+            "apply_eligibility_gate requires a 'state' column; "
+            "run apply_state_machine() first."
+        )
+    if "class" not in scored_df.columns:
+        raise ValueError(
+            "apply_eligibility_gate requires a 'class' column; "
+            "run compute_composite() first."
+        )
+    df = scored_df.copy()
+    df["eligible"] = df["state"].isin(states)
+    df["ineligible_bucket"] = ~df["eligible"]
+
+    out_parts = []
+    for cls, sub in df.groupby("class"):
+        sub = sub.copy()
+        top_n = int(sub["top_n_target"].iloc[0]) if "top_n_target" in sub.columns else 0
+        eligible_mask = sub["eligible"]
+        score_col = "S_score_after_veto" if "S_score_after_veto" in sub.columns else "S_score"
+        # Rank only within eligible tickers; ineligible → NaN (sorts last).
+        sub["rank_in_class"] = (
+            sub[score_col]
+            .where(eligible_mask)
+            .rank(ascending=False, method="min")
+        )
+        sub["selected"] = (sub["rank_in_class"] <= top_n) & eligible_mask
+        out_parts.append(sub)
+
+    return pd.concat(out_parts).sort_values(["class", "rank_in_class"])
 
 
 def _transition_journal_path() -> Path:
@@ -737,6 +1093,224 @@ def reconcile_states_from_storage(
             df.at[ticker, "state_storage_reconciled"] = True
         df.at[ticker, "state_storage_date"] = str(stored.get("date") or "")
     return df
+
+
+# ---------------------------------------------------------------------------
+# Task 8: Pillar-correlation / redundancy diagnostics
+# ---------------------------------------------------------------------------
+
+#: Pairs that feed the same sub-index and therefore compound when correlated.
+#: Key = frozenset of column names, value = sub-index label they share.
+_SAME_SUBINDEX_PAIRS: dict[frozenset, str] = {
+    frozenset({"mansfield_rs", "rs_ratio"}): "relative_strength",
+    frozenset({"rs_ratio", "rs_momentum"}): "relative_strength",
+    frozenset({"mansfield_rs", "rs_momentum"}): "relative_strength",
+}
+
+#: Ordered list of raw pillar columns fed into the S-score.
+PILLAR_COLUMNS = [
+    "mom_12_1",
+    "mansfield_rs",
+    "rs_ratio",
+    "rs_momentum",
+    "F_score",
+    "binary_filters",
+    "cycle_tilt",
+]
+
+
+def pillar_diagnostics(
+    scored_df: pd.DataFrame,
+    threshold: float = 0.8,
+) -> dict:
+    """Compute Spearman correlation across the 7 raw pillar inputs.
+
+    Parameters
+    ----------
+    scored_df:
+        The DataFrame returned by ``compute_composite()``.
+    threshold:
+        Absolute correlation value above which a pair is flagged as redundant.
+        Default 0.8.
+
+    Returns
+    -------
+    dict with keys:
+        ``correlation_matrix`` — dict-of-dicts (pillar → pillar → rho)
+        ``redundant_pairs``    — list of dicts for pairs where |ρ| > threshold
+                                  AND both pillars feed the same sub-index
+        ``threshold``          — the threshold used
+        ``pillar_count``       — number of pillars in the matrix
+    """
+    df = scored_df.copy()
+
+    # Build binary_filters if not already present (faber + stage==2 + antonacci).
+    if "binary_filters" not in df.columns:
+        stage2 = (df["stage"] == 2).astype(int) if "stage" in df.columns else 0
+        faber = df["faber"].fillna(0).astype(int) if "faber" in df.columns else 0
+        antonacci = df["antonacci"].fillna(0).astype(int) if "antonacci" in df.columns else 0
+        df["binary_filters"] = faber + stage2 + antonacci
+
+    # Keep only the pillar columns that actually exist in the frame.
+    available = [c for c in PILLAR_COLUMNS if c in df.columns]
+    pillar_df = df[available].astype(float)
+
+    corr_matrix = pillar_df.corr(method="spearman")
+
+    # Flag redundant pairs: |ρ| > threshold AND same sub-index.
+    redundant_pairs: list[dict] = []
+    cols = list(corr_matrix.columns)
+    for i, col_a in enumerate(cols):
+        for col_b in cols[i + 1 :]:
+            rho = corr_matrix.at[col_a, col_b]
+            if pd.isna(rho):
+                continue
+            if abs(rho) > threshold:
+                pair_key = frozenset({col_a, col_b})
+                if pair_key in _SAME_SUBINDEX_PAIRS:
+                    redundant_pairs.append(
+                        {
+                            "pillar_a": col_a,
+                            "pillar_b": col_b,
+                            "spearman_rho": round(float(rho), 4),
+                            "abs_rho": round(abs(float(rho)), 4),
+                            "sub_index": _SAME_SUBINDEX_PAIRS[pair_key],
+                        }
+                    )
+
+    # Sort by descending |ρ| so the worst offender is first.
+    redundant_pairs.sort(key=lambda d: d["abs_rho"], reverse=True)
+
+    return {
+        "correlation_matrix": {
+            col: {c2: round(float(v), 4) for c2, v in row.items()}
+            for col, row in corr_matrix.to_dict().items()
+        },
+        "redundant_pairs": redundant_pairs,
+        "threshold": threshold,
+        "pillar_count": len(available),
+    }
+
+
+def write_pillar_correlation_report(
+    scored_df: pd.DataFrame,
+    path: str = "docs/pillar_correlation_report.md",
+    threshold: float = 0.8,
+) -> str:
+    """Write a Markdown pillar-correlation report and return the resolved path.
+
+    The report documents the mansfield_rs ↔ rs_ratio redundancy explicitly
+    (both are derived from the same price/benchmark ratio, so they are nearly
+    perfectly correlated in practice).  Task 3 will address this.
+
+    Parameters
+    ----------
+    scored_df:
+        The scored DataFrame from ``compute_composite()``.
+    path:
+        Destination path for the report (relative paths resolved from the repo
+        root; absolute paths used as-is).
+    threshold:
+        Passed to ``pillar_diagnostics()``.
+
+    Returns
+    -------
+    str — the absolute path of the written file.
+    """
+    diag = pillar_diagnostics(scored_df, threshold=threshold)
+    corr = diag["correlation_matrix"]
+    pillars = list(corr.keys())
+
+    out_path = Path(path) if Path(path).is_absolute() else ROOT / path
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    lines: list[str] = []
+
+    lines.append("# Pillar Correlation Report")
+    lines.append("")
+    lines.append(
+        f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"
+    )
+    lines.append("")
+    lines.append(
+        "This report is produced automatically each scoring run by "
+        "`pillar_diagnostics()` in `src/scoring.py` (Task 8).  "
+        "It surfaces high Spearman correlations between the 7 raw pillar inputs "
+        "so redundant weighting can be identified and corrected."
+    )
+    lines.append("")
+
+    # --- Summary ---
+    lines.append("## Summary")
+    lines.append("")
+    lines.append(f"- **Pillar count**: {diag['pillar_count']}")
+    lines.append(f"- **Redundancy threshold**: |ρ| > {diag['threshold']}")
+    lines.append(
+        f"- **Flagged redundant pairs**: {len(diag['redundant_pairs'])} "
+        "(|ρ| > threshold AND feed the same sub-index)"
+    )
+    lines.append("")
+
+    # --- Known redundancy callout ---
+    lines.append("## Known Redundancy: mansfield_rs ↔ rs_ratio")
+    lines.append("")
+    lines.append(
+        "Both `mansfield_rs` and `rs_ratio` are derived from the same underlying "
+        "price-to-benchmark ratio.  `mansfield_rs` measures how far the ratio sits "
+        "above/below its 52-week moving average, while `rs_ratio` is the JdK RS-Ratio "
+        "oscillator from the RRG framework — but both are monotone functions of "
+        "ETF-price / SPY-price over recent history.  As a result, they are nearly "
+        "perfectly correlated in cross-sectional data and effectively double-count "
+        "the relative-strength sub-index in the S-score."
+    )
+    lines.append("")
+    lines.append(
+        "> **Action (Task 3)**: Replace `mansfield_rs_z` (12% weight) with a "
+        "genuinely orthogonal pillar (e.g. earnings quality / fundamental score) "
+        "or merge the two into a single RS pillar with the combined weight."
+    )
+    lines.append("")
+
+    # --- Correlation matrix table ---
+    lines.append("## Spearman Correlation Matrix")
+    lines.append("")
+    header = "| Pillar | " + " | ".join(pillars) + " |"
+    sep = "| --- | " + " | ".join(["---"] * len(pillars)) + " |"
+    lines.append(header)
+    lines.append(sep)
+    for row_pillar in pillars:
+        cells = []
+        for col_pillar in pillars:
+            rho = corr.get(row_pillar, {}).get(col_pillar, float("nan"))
+            if pd.isna(rho):
+                cells.append("—")
+            elif row_pillar == col_pillar:
+                cells.append("1.0000")
+            else:
+                cells.append(f"{rho:+.4f}")
+        lines.append(f"| {row_pillar} | " + " | ".join(cells) + " |")
+    lines.append("")
+
+    # --- Redundant pairs table ---
+    lines.append("## Flagged Redundant Pairs")
+    lines.append("")
+    if diag["redundant_pairs"]:
+        lines.append("| Pillar A | Pillar B | ρ | Sub-index |")
+        lines.append("| --- | --- | --- | --- |")
+        for pair in diag["redundant_pairs"]:
+            lines.append(
+                f"| {pair['pillar_a']} | {pair['pillar_b']} | "
+                f"{pair['spearman_rho']:+.4f} | {pair['sub_index']} |"
+            )
+    else:
+        lines.append(
+            f"_No pairs with |ρ| > {diag['threshold']} "
+            "that feed the same sub-index were found._"
+        )
+    lines.append("")
+
+    out_path.write_text("\n".join(lines), encoding="utf-8")
+    return str(out_path)
 
 
 def state_storage_health() -> dict[str, object]:
