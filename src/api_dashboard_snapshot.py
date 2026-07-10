@@ -236,12 +236,18 @@ def build_latest_dashboard_snapshot_payload(
     positions = _position_payloads(saved_inputs_path)
     transitions = _transition_payloads(transition_journal_path)
 
+    # Task 2: surface degraded_run in the snapshot so the UI can label runs
+    # that were computed with fewer than the full 7 pillars.
+    run_meta = dict(run)
+    run_degraded = bool(run_meta.get("metadata", {}).get("degraded_run", False))
+
     return {
         "api_version": "v1",
         "generated_at": generated_at or _utc_iso(),
         "status": "ready",
         "message": "Latest run-journal snapshot loaded.",
         "run": run,
+        "degraded_run": run_degraded,
         "summary": {
             "universe_count": len(rows),
             "state_counts": dict(state_counts),

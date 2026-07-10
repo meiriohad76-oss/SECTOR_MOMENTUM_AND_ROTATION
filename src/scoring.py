@@ -4,13 +4,14 @@ Formulas track §5 and §6 of sector-rotation-methodology.md exactly.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 from datetime import datetime, timezone
 import os
 from pathlib import Path
 import shutil
 import threading
-from typing import Mapping, Optional
+from typing import Mapping, Optional, Union
 from zoneinfo import ZoneInfo
 
 import filelock
@@ -97,20 +98,77 @@ PULLBACK_RISK_THRESHOLDS = {
 }
 
 
-def methodology_scoring_parameters() -> dict:
+# ---------------------------------------------------------------------------
+# Task 1: Configurable scoring parameters
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class ScoringConfig:
+    """Immutable bundle of all scoring and state-machine parameters.
+
+    Provides a single place to represent both the live defaults and any
+    candidate configuration under calibration.  Pass an instance to
+    ``compute_composite`` and ``decide_state`` to A/B-test or sweep weights
+    without editing source constants.
+    """
+    composite_weights: dict
+    flow_veto: dict
+    binary_filter_count: float
+    state_machine_thresholds: dict
+    pullback_risk_thresholds: dict
+    # Fraction of instruments that must have live provider flow for the flow
+    # pillar to be considered active (Task 2).  Below this the pillar is
+    # dropped and the remaining weights are renormalized to sum to 1.
+    min_flow_coverage: float = 0.5
+
+
+def scoring_config_from_dict(d: dict) -> ScoringConfig:
+    """Build a ScoringConfig from a calibration-config dict.
+
+    Accepts either the full calibration JSON (top-level ``scoring_parameters``
+    key) or a bare ``scoring_parameters`` block directly.
+
+    The schema matches ``docs/calibration_10y_baseline_config.json``.
+    """
+    sp = d.get("scoring_parameters", d)
+    return ScoringConfig(
+        composite_weights=dict(sp.get("composite_weights", COMPOSITE_WEIGHTS)),
+        flow_veto=dict(sp.get("flow_veto", FLOW_VETO)),
+        binary_filter_count=float(sp.get("binary_filter_count", BINARY_FILTER_COUNT)),
+        state_machine_thresholds={
+            k: dict(v)
+            for k, v in sp.get("state_machine", STATE_MACHINE_THRESHOLDS).items()
+        },
+        pullback_risk_thresholds=dict(sp.get("pullback_risk_modifier", PULLBACK_RISK_THRESHOLDS)),
+        min_flow_coverage=float(sp.get("min_flow_coverage", 0.5)),
+    )
+
+
+# Singleton default — behaviour is byte-identical to the pre-Task-1 constants.
+DEFAULT_SCORING_CONFIG: ScoringConfig = ScoringConfig(
+    composite_weights=dict(COMPOSITE_WEIGHTS),
+    flow_veto=dict(FLOW_VETO),
+    binary_filter_count=float(BINARY_FILTER_COUNT),
+    state_machine_thresholds={k: dict(v) for k, v in STATE_MACHINE_THRESHOLDS.items()},
+    pullback_risk_thresholds=dict(PULLBACK_RISK_THRESHOLDS),
+)
+
+
+def methodology_scoring_parameters(config: ScoringConfig | None = None) -> dict:
+    cfg = config if config is not None else DEFAULT_SCORING_CONFIG
     return {
-        "composite_weights": dict(COMPOSITE_WEIGHTS),
-        "binary_filter_count": BINARY_FILTER_COUNT,
-        "flow_veto": dict(FLOW_VETO),
+        "composite_weights": dict(cfg.composite_weights),
+        "binary_filter_count": cfg.binary_filter_count,
+        "flow_veto": dict(cfg.flow_veto),
         "rank_method": "min",
         "rank_ascending": False,
         "selection_top_n_by_class": dict(sorted(TOP_N.items())),
         "state_order": list(STATES),
         "state_machine": {
             state: dict(thresholds)
-            for state, thresholds in STATE_MACHINE_THRESHOLDS.items()
+            for state, thresholds in cfg.state_machine_thresholds.items()
         },
-        "pullback_risk_modifier": dict(PULLBACK_RISK_THRESHOLDS),
+        "pullback_risk_modifier": dict(cfg.pullback_risk_thresholds),
     }
 
 
@@ -125,15 +183,55 @@ def _z(s: pd.Series) -> pd.Series:
 def compute_composite(
     indicators_df: pd.DataFrame,
     flow_df: pd.DataFrame,
-    flow_z: pd.Series,
+    flow_z,  # pd.Series  OR  FlowCompositeResult (Task 2)
     phase: str,
     class_overrides: Mapping[str, str] | None = None,
+    config: ScoringConfig | None = None,
 ) -> pd.DataFrame:
     """Master composite S_i per §5.  Cross-sectional z-scoring is done within
-    each universe class so we don't compare a country ETF against a US sector."""
+    each universe class so we don't compare a country ETF against a US sector.
+
+    *flow_z* accepts either a plain ``pd.Series`` (backward-compatible) or a
+    ``FlowCompositeResult`` from ``flow_composite_z()`` (Task 2).  When the
+    latter is supplied and ``flow_available`` is False the ``provider_flow_z``
+    pillar is silently dropped and the remaining weights are renormalized so
+    the composite stays on the same scale (no zero-fill padding).
+    """
+    cfg = config if config is not None else DEFAULT_SCORING_CONFIG
+
+    # --- Unpack flow input (Task 2) -------------------------------------------
+    # Import here to avoid a circular import (flow imports from scoring indirectly).
+    try:
+        from .flow import FlowCompositeResult as _FCR
+        _has_fcr = True
+    except ImportError:
+        _has_fcr = False
+
+    if _has_fcr and isinstance(flow_z, _FCR):
+        flow_series: pd.Series = flow_z.z
+        flow_available: bool = flow_z.flow_available
+        flow_coverage: float = flow_z.flow_coverage
+    else:
+        # Plain Series: treat as fully available (backward-compatible path).
+        flow_series = flow_z  # type: ignore[assignment]
+        flow_available = True
+        flow_coverage = 1.0
+
+    flow_pillar_active = flow_available
+
+    # --- Decide effective weights (Task 2b renormalization) -------------------
+    base_weights = cfg.composite_weights
+    if flow_pillar_active:
+        eff_weights = dict(base_weights)
+    else:
+        # Drop provider_flow_z; scale remaining pillars to sum to 1.0.
+        remaining = {k: v for k, v in base_weights.items() if k != "provider_flow_z"}
+        total = sum(remaining.values()) or 1.0
+        eff_weights = {k: v / total for k, v in remaining.items()}
+
     df = indicators_df.copy()
     df = df.join(flow_df, how="left")
-    df["F_score"] = flow_z
+    df["F_score"] = flow_series
 
     # Universe class for grouped z-scoring
     class_overrides = class_overrides or {}
@@ -151,27 +249,32 @@ def compute_composite(
         filters = (sub["faber"].fillna(0).astype(int)
                    + stage2
                    + sub["antonacci"].fillna(0).astype(int))
-        filters_norm = filters / BINARY_FILTER_COUNT
+        filters_norm = filters / cfg.binary_filter_count
         z_m121 = _z(sub["mom_12_1"])
         z_mans = _z(sub["mansfield_rs"])
         z_rsr = _z(sub["rs_ratio"])
         z_rsm = _z(sub["rs_momentum"])
         z_F = _z(sub["F_score"])
         sub["S_score"] = (
-            COMPOSITE_WEIGHTS["mom_12_1_z"] * z_m121
-            + COMPOSITE_WEIGHTS["mansfield_rs_z"] * z_mans
-            + COMPOSITE_WEIGHTS["rs_ratio_z"] * z_rsr
-            + COMPOSITE_WEIGHTS["rs_momentum_z"] * z_rsm
-            + COMPOSITE_WEIGHTS["binary_filters"] * filters_norm
-            + COMPOSITE_WEIGHTS["cycle_tilt"] * sub["cycle_tilt"]
-            + COMPOSITE_WEIGHTS["provider_flow_z"] * z_F
+            eff_weights.get("mom_12_1_z", 0) * z_m121
+            + eff_weights.get("mansfield_rs_z", 0) * z_mans
+            + eff_weights.get("rs_ratio_z", 0) * z_rsr
+            + eff_weights.get("rs_momentum_z", 0) * z_rsm
+            + eff_weights.get("binary_filters", 0) * filters_norm
+            + eff_weights.get("cycle_tilt", 0) * sub["cycle_tilt"]
+            + eff_weights.get("provider_flow_z", 0) * z_F
         )
-        # Hard veto: F_i < -0.5σ kills the ranking even if S is high
-        sub["veto"] = (z_F < FLOW_VETO["threshold_z"]).fillna(False)
-        sub["S_score_after_veto"] = sub["S_score"].where(
-            ~sub["veto"],
-            other=FLOW_VETO["replacement_score"],
-        )
+        # Hard veto: F_i < threshold kills the ranking (disabled when flow is inactive).
+        if flow_pillar_active:
+            sub["veto"] = (z_F < cfg.flow_veto["threshold_z"]).fillna(False)
+            sub["S_score_after_veto"] = sub["S_score"].where(
+                ~sub["veto"],
+                other=cfg.flow_veto["replacement_score"],
+            )
+        else:
+            # Flow veto cannot fire without provider data — make this explicit.
+            sub["veto"] = pd.Series(False, index=sub.index)
+            sub["S_score_after_veto"] = sub["S_score"]
         sub["rank_in_class"] = sub["S_score_after_veto"].rank(
             ascending=False,
             method="min",
@@ -180,6 +283,14 @@ def compute_composite(
         sub["selected"] = sub["rank_in_class"] <= sub["top_n_target"]
         out_parts.append(sub)
     out = pd.concat(out_parts).sort_values(["class", "rank_in_class"])
+    # --- Task 2: attach run-level flow metadata --------------------------------
+    out["flow_pillar_active"] = flow_pillar_active
+    out["flow_coverage"] = flow_coverage
+    out["active_pillar_count"] = 7 if flow_pillar_active else 6
+    out["degraded_run"] = not flow_pillar_active
+    out["effective_weights"] = json.dumps(
+        {k: round(v, 6) for k, v in eff_weights.items()}, sort_keys=True
+    )
     return out
 
 
@@ -226,12 +337,16 @@ def _provider_gate_live(row: pd.Series, field: str) -> bool:
     return bool(parsed)
 
 
-def decide_state(row: pd.Series) -> str:
+def decide_state(row: pd.Series, config: ScoringConfig | None = None) -> str:
     """Pure-function state assignment for a ticker given today's indicators.
 
     Implements §6 of the methodology.  Conservative ordering: check the
     worst states first so we never under-classify a deteriorating sector.
+
+    Pass a ``ScoringConfig`` to use non-default thresholds (e.g. a candidate
+    configuration under calibration).
     """
+    cfg = config if config is not None else DEFAULT_SCORING_CONFIG
     stage = _nullable_int(row.get("stage"))
     above = _nullable_bool(row.get("above_30wma"))
     slope_pos = _nullable_bool(row.get("ma_slope_pos"))
@@ -248,10 +363,10 @@ def decide_state(row: pd.Series) -> str:
     blk_live = _provider_gate_live(row, "block_up_ratio_live")
     obv_div = _nullable_bool(row.get("obv_divergence"))
     dist = _nullable_float(row.get("dist_days_25"))
-    bearish = STATE_MACHINE_THRESHOLDS["bearish_stage_4"]
-    exit_thresholds = STATE_MACHINE_THRESHOLDS["exit"]
-    warning = STATE_MACHINE_THRESHOLDS["warning"]
-    bullish = STATE_MACHINE_THRESHOLDS["stage_2_bullish"]
+    bearish = cfg.state_machine_thresholds["bearish_stage_4"]
+    exit_thresholds = cfg.state_machine_thresholds["exit"]
+    warning = cfg.state_machine_thresholds["warning"]
+    bullish = cfg.state_machine_thresholds["stage_2_bullish"]
 
     # ---- BEARISH (Stage 4) ----
     if (above is False) and (slope_pos is False) \
@@ -287,11 +402,11 @@ def decide_state(row: pd.Series) -> str:
         return "STAGE_2_BULLISH"
 
     # ---- HOLD (Stage 2 intact but not strict-Bullish gate) ----
-    if stage == STATE_MACHINE_THRESHOLDS["hold"]["stage_eq"]:
+    if stage == cfg.state_machine_thresholds["hold"]["stage_eq"]:
         return "HOLD"
 
     # ---- STAGE 1 BASING ----
-    if stage == STATE_MACHINE_THRESHOLDS["stage_1_basing"]["stage_eq"]:
+    if stage == cfg.state_machine_thresholds["stage_1_basing"]["stage_eq"]:
         return "STAGE_1_BASING"
 
     return "HOLD"
@@ -371,7 +486,10 @@ def _transition_date(now: datetime | None = None) -> str:
     return current.astimezone(EASTERN_TZ).date().isoformat()
 
 
-def apply_state_machine(scored_df: pd.DataFrame) -> pd.DataFrame:
+def apply_state_machine(
+    scored_df: pd.DataFrame,
+    config: ScoringConfig | None = None,
+) -> pd.DataFrame:
     """Add a 'state' column. Reads + writes state.json so transitions persist."""
     prior = _load_state()
     df = scored_df.copy()
@@ -379,7 +497,7 @@ def apply_state_machine(scored_df: pd.DataFrame) -> pd.DataFrame:
     new_states = []
     transitions = []
     for tkr, row in df.iterrows():
-        s = decide_state(row)
+        s = decide_state(row, config=config)
         old = prior.get(tkr, {}).get("state")
         if old and old != s:
             transitions.append({"ticker": tkr, "from": old, "to": s, "date": today})

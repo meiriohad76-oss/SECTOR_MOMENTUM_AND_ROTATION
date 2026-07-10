@@ -299,7 +299,9 @@ def refresh_dashboard_state(
     scoring_ohlcv = {ticker: ohlcv[ticker] for ticker in ALL_TICKERS if ticker in ohlcv}
     indicators_df = compute_all_indicators(scoring_ohlcv, bench_ticker, bil_ticker)
     flow_df = compute_flow_signals(scoring_ohlcv)
-    flow_z = flow_composite_z(flow_df)
+    # flow_composite_z now returns a FlowCompositeResult (Task 2a); pass it
+    # directly to compute_composite which will renormalize when flow is degraded.
+    flow_result = flow_composite_z(flow_df)
     _emit_progress(
         progress_callback,
         "fred_macro",
@@ -314,12 +316,19 @@ def refresh_dashboard_state(
         "score_state",
         85,
         "Scoring instruments and applying the state machine",
-        {"phase": regime.phase_hint, "fred_used": bool(regime.fred_used)},
+        {
+            "phase": regime.phase_hint,
+            "fred_used": bool(regime.fred_used),
+            "flow_available": bool(flow_result.flow_available),
+            "flow_coverage": float(flow_result.flow_coverage),
+        },
     )
-    scored = compute_composite(indicators_df, flow_df, flow_z, phase=regime.phase_hint)
+    scored = compute_composite(indicators_df, flow_df, flow_result, phase=regime.phase_hint)
     scored = apply_state_machine(scored)
     bluf = _build_bluf(scored)
     provider = str(getattr(ohlcv_result, "provider", "") or _select_ohlcv_provider(None))
+    # degraded_run is set by compute_composite when flow pillar was renormalized.
+    degraded_run = bool(scored["degraded_run"].any()) if "degraded_run" in scored.columns else False
     metadata = {
         "headless": True,
         "period": period,
@@ -328,6 +337,9 @@ def refresh_dashboard_state(
         "fred_used": regime.fred_used,
         "provider_flow_mode": provider_flow_mode,
         "allow_stale_provider_cache": allow_stale_provider_cache,
+        "flow_available": bool(flow_result.flow_available),
+        "flow_coverage": float(flow_result.flow_coverage),
+        "degraded_run": degraded_run,
         "missing_ohlcv": sorted(set(DATA_SYMBOLS) - set(ohlcv)),
         "fresh_cache_hit_count": len(getattr(ohlcv_result, "fresh_cache_hits", ()) or ()),
         "stale_cache_hit_count": len(getattr(ohlcv_result, "stale_cache_hits", ()) or ()),

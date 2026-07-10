@@ -1383,12 +1383,68 @@ def compute_flow_signals(ohlcv):
             _PROVIDER_FLOW_RUNTIME_HEALTH.update(runtime_health)
 
 
-def flow_composite_z(flow_df):
+@dataclass(frozen=True)
+class FlowCompositeResult:
+    """Return value of ``flow_composite_z()`` (Task 2a).
+
+    Carries the composite z-score series plus provider-coverage diagnostics so
+    ``compute_composite`` can renormalize when provider signals are absent.
+
+    Attributes
+    ----------
+    z : pd.Series
+        The per-instrument flow composite z-score, named ``"F"``.
+    flow_available : bool
+        True when provider coverage is at or above ``min_flow_coverage``
+        (default 0.5).  When False, ``compute_composite`` drops the
+        ``provider_flow_z`` pillar and renormalizes remaining weights.
+    flow_coverage : float
+        Fraction of instruments (0–1) that have at least one live provider
+        signal (ETF flow, block trades, or short interest).  Pure-OHLCV
+        signals (CMF, OBV, RVOL) are always available and not counted here.
+    """
+    z: pd.Series
+    flow_available: bool
+    flow_coverage: float
+
+
+# Provider signal columns that determine live coverage (excludes OHLCV-derived).
+_PROVIDER_LIVE_COLS = ("etf_flow_5d_pct_live", "block_up_ratio_live", "si_delta_15d_live")
+
+
+def _compute_provider_flow_coverage(flow_df: pd.DataFrame) -> float:
+    """Return fraction of instruments with ≥1 live provider flow signal."""
+    live_cols = [c for c in _PROVIDER_LIVE_COLS if c in flow_df.columns]
+    if not live_cols:
+        return 0.0
+    any_live = flow_df[live_cols].fillna(False).any(axis=1)
+    n = len(any_live)
+    return float(any_live.sum() / n) if n > 0 else 0.0
+
+
+def flow_composite_z(flow_df: pd.DataFrame, min_flow_coverage: float = 0.5) -> FlowCompositeResult:
+    """Compute per-instrument flow composite z-score.
+
+    Returns a :class:`FlowCompositeResult` carrying the series plus provider
+    coverage diagnostics.  Backward-compatible callers that only used the
+    returned Series can access it via ``.z``.
+
+    Parameters
+    ----------
+    flow_df : pd.DataFrame
+        Output of ``compute_flow_signals()``.
+    min_flow_coverage : float
+        Minimum fraction of instruments with live provider signals required for
+        the flow pillar to be considered active.  Default 0.5 (configurable;
+        also driven by ``ScoringConfig.min_flow_coverage``).
+    """
     def _z(s):
         s = s.astype(float)
         std = s.std(ddof=0)
         if std == 0 or pd.isna(std):
-            return s * 0.0
+            # All-NaN or constant-value input — return explicit zeros so NaN
+            # does not propagate through the composite formula.
+            return pd.Series(0.0, index=s.index)
         return (s - s.mean()) / std
 
     def _provider_series(value_col: str, live_col: str) -> pd.Series:
@@ -1412,4 +1468,9 @@ def flow_composite_z(flow_df):
     F = (0.30 * z_cmf.fillna(0) + 0.20 * z_obv.fillna(0) + 0.20 * z_etf.fillna(0)
          + 0.10 * z_blk.fillna(0) + 0.10 * z_vel.fillna(0) + 0.10 * z_si.fillna(0))
     F.name = "F"
-    return F
+
+    # --- Task 2a: coverage diagnostics ----------------------------------------
+    coverage = _compute_provider_flow_coverage(flow_df)
+    available = coverage >= min_flow_coverage
+
+    return FlowCompositeResult(z=F, flow_available=available, flow_coverage=coverage)
