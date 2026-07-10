@@ -1440,10 +1440,15 @@ def flow_composite_z(flow_df: pd.DataFrame, min_flow_coverage: float = 0.5) -> F
     """
     def _z(s):
         s = s.astype(float)
+        # Use peak-to-peak for the constant/all-NaN guard.  std() can be a
+        # tiny non-zero float (≈1e-17) for IEEE-754-identical inputs, which
+        # causes (s - mean) / std → −1.0 for every row.  ptp == 0 correctly
+        # identifies truly constant series; ptp is NaN ↔ all values are NaN.
+        ptp = float(s.max() - s.min())
+        if not (ptp > 0):
+            return pd.Series(0.0, index=s.index)
         std = s.std(ddof=0)
         if std == 0 or pd.isna(std):
-            # All-NaN or constant-value input — return explicit zeros so NaN
-            # does not propagate through the composite formula.
             return pd.Series(0.0, index=s.index)
         return (s - s.mean()) / std
 

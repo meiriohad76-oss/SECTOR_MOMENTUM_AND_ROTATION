@@ -29,7 +29,7 @@ from src.macro import assess_regime  # noqa: E402
 from src.macro_tiles import MACRO_CONTEXT_SYMBOLS  # noqa: E402
 from src.provider_flow_cache import read_provider_flow_cache  # noqa: E402
 from src.run_journal import DEFAULT_JOURNAL_PATH, append_dashboard_run  # noqa: E402
-from src.scoring import apply_state_machine, compute_composite, state_storage_health  # noqa: E402
+from src.scoring import apply_eligibility_gate, apply_state_machine, compute_composite, state_storage_health  # noqa: E402
 from src.universe import ALL_TICKERS, BENCH  # noqa: E402
 
 
@@ -325,6 +325,10 @@ def refresh_dashboard_state(
     )
     scored = compute_composite(indicators_df, flow_df, flow_result, phase=regime.phase_hint)
     scored = apply_state_machine(scored)
+    # Task 5: gate eligibility — EXIT/WARNING instruments keep their S_score
+    # for transparency but are excluded from selected=True and re-ranked only
+    # within the eligible set (STAGE_2_BULLISH, HOLD).
+    scored = apply_eligibility_gate(scored)
     bluf = _build_bluf(scored)
     provider = str(getattr(ohlcv_result, "provider", "") or _select_ohlcv_provider(None))
     # degraded_run is set by compute_composite when flow pillar was renormalized.

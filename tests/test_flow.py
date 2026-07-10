@@ -290,8 +290,10 @@ def test_flow_composite_z_handles_constant_inputs_without_nan():
         index=["XLK", "XLF"],
     )
 
-    out = flow.flow_composite_z(flow_df)
+    result = flow.flow_composite_z(flow_df)
 
+    # Task 2: flow_composite_z now returns FlowCompositeResult; unwrap .z
+    out = result.z
     assert out.name == "F"
     assert list(out.index) == ["XLK", "XLF"]
     assert not out.isna().any()
@@ -314,8 +316,10 @@ def test_flow_composite_z_ignores_provider_values_without_live_flags():
         index=["XLK", "XLF", "XLE"],
     )
 
-    out = flow.flow_composite_z(flow_df)
+    result = flow.flow_composite_z(flow_df)
 
+    # Task 2: flow_composite_z now returns FlowCompositeResult; unwrap .z
+    out = result.z
     assert out.tolist() == [0.0, 0.0, 0.0]
 
 
