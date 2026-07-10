@@ -8,6 +8,9 @@ import os
 from pathlib import Path
 from typing import Any, Mapping
 
+import math
+import statistics
+
 from .run_journal import DEFAULT_JOURNAL_PATH, list_runs, load_run_details
 from .saved_inputs import DEFAULT_SAVED_INPUTS_PATH, load_saved_inputs
 from .ticker_identity import ticker_display_name
@@ -187,6 +190,97 @@ def _position_payloads(path: str | Path | None = DEFAULT_SAVED_INPUTS_PATH, limi
     return rows
 
 
+def _safe_median(values: list[float]) -> float | None:
+    finite = [v for v in values if v is not None and not math.isnan(v)]
+    if not finite:
+        return None
+    return statistics.median(finite)
+
+
+def _class_rotation_from_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Build cross-class rotation ranking from already-computed row payloads.
+
+    Groups rows by asset_class and computes aggregate metrics on a common
+    (non-z-scored within-class) basis, then ranks classes by a simple
+    equal-weight composite of z-scored aggregates.
+    """
+    from collections import defaultdict
+
+    buckets: dict[str, dict[str, list[float]]] = defaultdict(
+        lambda: {
+            "momentum": [],
+            "breadth": [],
+            "cmf": [],
+            "mansfield_rs": [],
+            "net_flow_21d": [],
+        }
+    )
+
+    for row in rows:
+        cls = str(row.get("asset_class") or "Other")
+        if cls in ("Benchmark", ""):
+            continue
+        pillar = row.get("pillar_scores", {}) or {}
+        payload = row.get("payload", {}) or {}
+
+        for dest, src in [
+            ("momentum", row.get("momentum_pct")),
+            ("cmf", row.get("cmf21")),
+            ("mansfield_rs", pillar.get("mansfield_rs")),
+            ("breadth", pillar.get("breadth_50d")),
+            ("net_flow_21d", payload.get("net_flow_21d")),
+        ]:
+            v = _float_or_none(src)
+            if v is not None:
+                buckets[cls][dest].append(v)
+
+    if not buckets:
+        return []
+
+    # Aggregate per class
+    class_aggs: list[dict[str, Any]] = []
+    for cls, series in buckets.items():
+        class_aggs.append({
+            "asset_class": cls,
+            "agg_momentum": _safe_median(series["momentum"]),
+            "agg_breadth": _safe_median(series["breadth"]),
+            "agg_cmf": _safe_median(series["cmf"]),
+            "agg_mansfield_rs": _safe_median(series["mansfield_rs"]),
+            "agg_net_flow_21d": sum(
+                v for v in series["net_flow_21d"] if v is not None and not math.isnan(v)
+            ) or None,
+        })
+
+    # Z-score each aggregate across the cross-class distribution
+    agg_keys = ["agg_momentum", "agg_breadth", "agg_cmf", "agg_mansfield_rs", "agg_net_flow_21d"]
+
+    def _z_list(key: str) -> dict[str, float]:
+        vals = {d["asset_class"]: d[key] for d in class_aggs if d[key] is not None}
+        if len(vals) < 2:
+            return {cls: 0.0 for cls in vals}
+        mean = sum(vals.values()) / len(vals)
+        variance = sum((v - mean) ** 2 for v in vals.values()) / len(vals)
+        std = math.sqrt(variance) if variance > 0 else 0.0
+        if std == 0:
+            return {cls: 0.0 for cls in vals}
+        return {cls: (v - mean) / std for cls, v in vals.items()}
+
+    z_maps = {key: _z_list(key) for key in agg_keys}
+
+    for d in class_aggs:
+        cls = d["asset_class"]
+        d["class_score"] = sum(
+            z_maps[key].get(cls, 0.0) for key in agg_keys
+        )
+
+    # Rank by class_score (1 = best)
+    sorted_aggs = sorted(class_aggs, key=lambda d: d["class_score"], reverse=True)
+    for rank, d in enumerate(sorted_aggs, start=1):
+        d["rank"] = rank
+
+    return sorted_aggs
+
+
 def build_latest_dashboard_snapshot_payload(
     *,
     journal_path: str | Path = DEFAULT_JOURNAL_PATH,
@@ -241,6 +335,9 @@ def build_latest_dashboard_snapshot_payload(
     run_meta = dict(run)
     run_degraded = bool(run_meta.get("metadata", {}).get("degraded_run", False))
 
+    # Task 7: cross-class rotation — which bucket is capital rotating into?
+    class_rotation = _class_rotation_from_rows(rows)
+
     return {
         "api_version": "v1",
         "generated_at": generated_at or _utc_iso(),
@@ -257,6 +354,7 @@ def build_latest_dashboard_snapshot_payload(
         "rows": rows,
         "decisions": decisions,
         "focus": focus,
+        "class_rotation": class_rotation,
         "screens": {
             "overview": {
                 "leaders": leaders,
@@ -270,6 +368,7 @@ def build_latest_dashboard_snapshot_payload(
                 "sectors": sectors,
                 "leaders": sorted(sectors, key=lambda row: float(row.get("s_score", 0.0)), reverse=True)[:8],
                 "laggards": sorted(sectors, key=lambda row: float(row.get("s_score", 0.0)))[:8],
+                "class_rotation": class_rotation,
             },
         },
     }
