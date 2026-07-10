@@ -1404,7 +1404,12 @@ def flow_composite_z(flow_df):
     z_blk = _z(_provider_series("block_up_ratio", "block_up_ratio_live"))
     z_vel = _z(flow_df["rvol"])
     z_si = _z(_provider_series("si_delta_15d", "si_delta_15d_live")) * -1
-    F = (0.30 * z_cmf + 0.20 * z_obv + 0.20 * z_etf + 0.10 * z_blk
-         + 0.10 * z_vel + 0.10 * z_si).fillna(0)
+    # Use per-term fillna(0) so unavailable provider signals (NaN) contribute
+    # neutral-zero rather than poisoning the entire sum via NaN propagation.
+    # This preserves real OHLCV signal (CMF, OBV slope, RVOL) even when
+    # provider feeds like ETF flow, block trades, or short interest have no
+    # live data (e.g. cache-only mode with empty cache).
+    F = (0.30 * z_cmf.fillna(0) + 0.20 * z_obv.fillna(0) + 0.20 * z_etf.fillna(0)
+         + 0.10 * z_blk.fillna(0) + 0.10 * z_vel.fillna(0) + 0.10 * z_si.fillna(0))
     F.name = "F"
     return F
