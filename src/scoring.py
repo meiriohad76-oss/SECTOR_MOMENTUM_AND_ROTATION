@@ -7,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from datetime import datetime, timezone
+import logging
 import os
 from pathlib import Path
 import shutil
@@ -14,13 +15,15 @@ import threading
 from typing import Mapping, Optional, Union
 from zoneinfo import ZoneInfo
 
+_log = logging.getLogger(__name__)
+
 import filelock
 
 import numpy as np
 import pandas as pd
 
 from .universe import class_of, TOP_N
-from .macro import cycle_tilt
+from .cycle import cycle_tilt  # pure, no data/yfinance dependency (Phase 4.1)
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -120,6 +123,25 @@ class ScoringConfig:
     # pillar to be considered active (Task 2).  Below this the pillar is
     # dropped and the remaining weights are renormalized to sum to 1.
     min_flow_coverage: float = 0.5
+    # ---------- CODEX schema tags (safe, informational) ----------------------
+    # composite_schema / state_schema let calibration runners verify they are
+    # comparing apples-to-apples when loading config files from disk.
+    composite_schema: str = "v1_7pillar"
+    state_schema: str = "v1"
+    # ---------- Eligibility gate (GATED — default off) -----------------------
+    # "score_only" reproduces pre-Task-5 behavior (no eligibility gate applied
+    # in the live scoring path).  Set to "eligibility_then_rank" to activate
+    # the Task-5 gate; must not be changed in DEFAULT_SCORING_CONFIG until
+    # evaluate_promotion_gate() returns ready_for_review and a human approves.
+    selection_mode: str = "score_only"
+    # ---------- Small-class z-score robustness (GATED — default off) ---------
+    # When min_class_size_for_z > 0 and a class has fewer than this many
+    # instruments, _z() is replaced by rank-percentile [0, 1].  Default 0
+    # disables the fallback entirely, reproducing current behavior exactly.
+    min_class_size_for_z: int = 0
+    # ddof for cross-sectional z-scoring.  0 = population std (current
+    # behavior); 1 = sample std.  Default 0 is byte-identical to prior code.
+    z_ddof: int = 0
 
 
 def scoring_config_from_dict(d: dict) -> ScoringConfig:
@@ -141,6 +163,11 @@ def scoring_config_from_dict(d: dict) -> ScoringConfig:
         },
         pullback_risk_thresholds=dict(sp.get("pullback_risk_modifier", PULLBACK_RISK_THRESHOLDS)),
         min_flow_coverage=float(sp.get("min_flow_coverage", 0.5)),
+        composite_schema=str(sp.get("composite_schema", "v1_7pillar")),
+        state_schema=str(sp.get("state_schema", "v1")),
+        selection_mode=str(sp.get("selection_mode", "score_only")),
+        min_class_size_for_z=int(sp.get("min_class_size_for_z", 0)),
+        z_ddof=int(sp.get("z_ddof", 0)),
     )
 
 
@@ -370,12 +397,68 @@ def make_tightened_gate_candidate_config(
     )
 
 
-def _z(s: pd.Series) -> pd.Series:
+def make_small_class_fix_candidate_config(
+    min_class_size_for_z: int = 5,
+    z_ddof: int = 1,
+) -> ScoringConfig:
+    """Task 1.3 (GATED): Rank-percentile fallback for tiny cross-sections.
+
+    Classes with fewer than ``min_class_size_for_z`` instruments (default 5)
+    use rank-percentile [0, 1] instead of z-scoring.  This eliminates the
+    geometric floor where n=3 (CRYPTO) limits max |z| to 1.41 while the same
+    rank in a 20-member class yields z≈4.06 — unfairly suppressing small
+    classes in the cross-class rotation view.
+
+    Also switches to sample std (``z_ddof=1``) which is statistically correct
+    when the cross-section is a sample rather than the full population.
+
+    IMPORTANT: Do NOT change DEFAULT_SCORING_CONFIG.  This config is for
+    calibration runs only.  Current behavior is reproduced exactly when
+    ``min_class_size_for_z=0`` (the live default).
+    """
+    return ScoringConfig(
+        composite_weights=dict(DEFAULT_SCORING_CONFIG.composite_weights),
+        flow_veto=dict(DEFAULT_SCORING_CONFIG.flow_veto),
+        binary_filter_count=DEFAULT_SCORING_CONFIG.binary_filter_count,
+        state_machine_thresholds={
+            k: dict(v) for k, v in DEFAULT_SCORING_CONFIG.state_machine_thresholds.items()
+        },
+        pullback_risk_thresholds=dict(DEFAULT_SCORING_CONFIG.pullback_risk_thresholds),
+        min_flow_coverage=DEFAULT_SCORING_CONFIG.min_flow_coverage,
+        min_class_size_for_z=min_class_size_for_z,
+        z_ddof=z_ddof,
+    )
+
+
+def _z(s: pd.Series, ddof: int = 0) -> pd.Series:
+    """Cross-sectional z-score.
+
+    Uses peak-to-peak guard (not std==0) to avoid IEEE-754 near-zero std for
+    constant inputs (e.g. pd.Series([0.1, 0.1, 0.1]).std(ddof=0) ≈ 1e-17).
+    ddof=0 reproduces historical population-std behavior; ddof=1 gives sample std.
+    """
     s = s.astype(float)
-    std = s.std(ddof=0)
+    ptp = float(s.max() - s.min())
+    if not (ptp > 0):
+        return pd.Series(0.0, index=s.index)
+    std = s.std(ddof=ddof)
     if std == 0 or pd.isna(std):
-        return s * 0.0
+        return pd.Series(0.0, index=s.index)
     return (s - s.mean()) / std
+
+
+def _rank_pct(s: pd.Series) -> pd.Series:
+    """Rank-percentile [0, 1] fallback for tiny cross-sections.
+
+    Returns (rank - 1) / (n - 1) so the worst ticker is 0.0 and the best is
+    1.0.  For n==1 returns 0.0.  Used by Task 1.3 (GATED) when a class has
+    fewer instruments than ScoringConfig.min_class_size_for_z.
+    """
+    n = len(s)
+    if n <= 1:
+        return pd.Series(0.0, index=s.index)
+    ranks = s.rank(ascending=True, method="average") - 1
+    return ranks / (n - 1)
 
 
 def compute_composite(
@@ -442,17 +525,31 @@ def compute_composite(
         if cls == "Benchmark":
             continue
         sub = sub.copy()
+        # --- Task 1.3: rank-percentile fallback for tiny classes (GATED) ------
+        # When min_class_size_for_z > 0 and the class has fewer instruments,
+        # replace cross-sectional z-scoring with rank-percentile [0, 1] to
+        # avoid the geometric floor where max |z| = 1.41 in an n=3 class
+        # (CRYPTO=3, DEFENSIVES=5) vs z≈4.06 for the same rank in a 20-member
+        # class.  Default min_class_size_for_z=0 disables this entirely so
+        # current behavior is byte-identical until a candidate config opts in.
+        n_class = len(sub)
+        if cfg.min_class_size_for_z > 0 and n_class < cfg.min_class_size_for_z:
+            def _z_fn(col: pd.Series) -> pd.Series:
+                return _rank_pct(col)
+        else:
+            def _z_fn(col: pd.Series, _ddof: int = cfg.z_ddof) -> pd.Series:
+                return _z(col, ddof=_ddof)
         # binary filters: TS_signal + Stage2 + Antonacci
         stage2 = (sub["stage"] == 2).astype(int)
         filters = (sub["faber"].fillna(0).astype(int)
                    + stage2
                    + sub["antonacci"].fillna(0).astype(int))
         filters_norm = filters / cfg.binary_filter_count
-        z_m121 = _z(sub["mom_12_1"])
-        z_mans = _z(sub["mansfield_rs"])
-        z_rsr = _z(sub["rs_ratio"])
-        z_rsm = _z(sub["rs_momentum"])
-        z_F = _z(sub["F_score"])
+        z_m121 = _z_fn(sub["mom_12_1"])
+        z_mans = _z_fn(sub["mansfield_rs"])
+        z_rsr = _z_fn(sub["rs_ratio"])
+        z_rsm = _z_fn(sub["rs_momentum"])
+        z_F = _z_fn(sub["F_score"])
         sub["S_score"] = (
             eff_weights.get("mom_12_1_z", 0) * z_m121
             + eff_weights.get("mansfield_rs_z", 0) * z_mans
@@ -884,7 +981,11 @@ def _read_json_file(path: Path) -> dict:
         return {}
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as exc:
+        _log.warning(
+            "state_file_read_failed path=%s type=%s error=%s",
+            path, type(exc).__name__, exc,
+        )
         return {}
 
 
@@ -894,8 +995,11 @@ def _maybe_migrate_legacy_state() -> None:
     try:
         STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(LEGACY_STATE_FILE, STATE_FILE)
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.warning(
+            "legacy_state_migration_failed src=%s dst=%s type=%s error=%s",
+            LEGACY_STATE_FILE, STATE_FILE, type(exc).__name__, exc,
+        )
 
 
 def _backup_existing_state(payload: Mapping[str, object]) -> None:
@@ -907,8 +1011,11 @@ def _backup_existing_state(payload: Mapping[str, object]) -> None:
         today = _transition_date()
         _atomic_write_json(backup_dir / "state-latest.json", payload)
         _atomic_write_json(backup_dir / f"state-{today}.json", payload)
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.warning(
+            "state_backup_failed backup_dir=%s type=%s error=%s",
+            _state_backup_dir(), type(exc).__name__, exc,
+        )
 
 
 def _normalize_transition(row: Mapping[str, object]) -> dict:
@@ -1029,8 +1136,11 @@ def _send_transition_alerts(transitions: list[dict]) -> None:
         from .alerts import send_transition_alerts
 
         send_transition_alerts(transitions)
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.warning(
+            "transition_alerts_failed transitions=%d type=%s error=%s",
+            len(transitions), type(exc).__name__, exc,
+        )
 
 
 def recent_transitions(n: int = 25) -> list[dict]:

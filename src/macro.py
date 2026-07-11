@@ -19,6 +19,7 @@ import pandas as pd
 
 from .data import close_price, to_monthly
 from .fred_data import fetch_fred, fred_available, yoy_change, momentum_change
+from .cycle import PHASE_FAVORED_SECTORS, cycle_tilt  # re-exported for callers that import from macro
 
 
 @dataclass
@@ -230,21 +231,10 @@ def assess_regime(
 
 
 # ---- Phase → sector basket map (Fidelity Business Cycle) ----
-
-PHASE_FAVORED_SECTORS = {
-    "EARLY":     {"XLY", "XLF", "XLRE", "XLI", "XLK", "XLB"},
-    "MID":       {"XLK", "XLC", "XLI"},
-    "LATE":      {"XLE", "XLB", "XLP", "XLV"},
-    "RECESSION": {"XLP", "XLU", "XLV"},
-}
-
-
-def cycle_tilt(ticker: str, phase: str) -> float:
-    favored = PHASE_FAVORED_SECTORS.get(phase, set())
-    if not favored:
-        return 0.0
-    if ticker in favored:
-        return 1.0
-    if ticker.startswith("XL"):
-        return -1.0
-    return 0.0
+# PHASE_FAVORED_SECTORS and cycle_tilt live in src/cycle.py (no data/yfinance
+# dependency) and are re-exported from this module for backward compatibility.
+# Existing callers that do `from src.macro import cycle_tilt` continue to work.
+__all__ = [
+    "MacroRegime", "faber_macro", "yield_curve_sign", "assess_regime",
+    "PHASE_FAVORED_SECTORS", "cycle_tilt",
+]

@@ -54,6 +54,8 @@ jobs:
           git fetch origin main
           git checkout main
           git pull --ff-only origin main
+          # Use pinned lockfile for reproducible Pi deploys
+          ./.venv/bin/python -m pip install -r requirements.lock
           ./.venv/bin/python -m pip install -r requirements.txt
           ./.venv/bin/python -m playwright install chromium
           ./.venv/bin/python -m pytest -q

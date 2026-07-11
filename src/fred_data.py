@@ -20,8 +20,11 @@ FRED series used:
 """
 from __future__ import annotations
 
+import logging
 import os
 from typing import Callable, Optional
+
+_log = logging.getLogger(__name__)
 
 import pandas as pd
 
@@ -183,7 +186,11 @@ def latest_values(fred_data: dict[str, pd.Series]) -> dict[str, Optional[float]]
     for sid, series in fred_data.items():
         try:
             out[sid] = float(series.iloc[-1])
-        except Exception:
+        except Exception as exc:
+            _log.warning(
+                "fred_latest_value_failed series=%s type=%s error=%s",
+                sid, type(exc).__name__, exc,
+            )
             out[sid] = None
     return out
 
@@ -194,7 +201,8 @@ def yoy_change(series: pd.Series, lag_months: int = 12) -> Optional[float]:
         return None
     try:
         return float(series.iloc[-1] / series.iloc[-lag_months - 1] - 1)
-    except Exception:
+    except Exception as exc:
+        _log.warning("fred_yoy_change_failed lag_months=%d type=%s error=%s", lag_months, type(exc).__name__, exc)
         return None
 
 
@@ -206,5 +214,9 @@ def momentum_change(series: pd.Series, recent: int = 3, older: int = 12) -> Opti
         recent_avg = float(series.iloc[-recent:].mean())
         older_avg = float(series.iloc[-older:-recent].mean())
         return recent_avg - older_avg
-    except Exception:
+    except Exception as exc:
+        _log.warning(
+            "fred_momentum_change_failed recent=%d older=%d type=%s error=%s",
+            recent, older, type(exc).__name__, exc,
+        )
         return None

@@ -9,9 +9,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, timedelta
+import logging
 import os
 import time
 from typing import Iterable
+
+_log = logging.getLogger(__name__)
 
 import pandas as pd
 import requests
@@ -130,6 +133,14 @@ def _massive_ssl_verify_setting() -> bool | None:
         return None
     normalized = configured.strip().lower()
     if normalized in {"0", "false", "no", "off"}:
+        # Phase 4.5: loud WARNING — SSL verification disabled.
+        # This is acceptable on a local dev machine but must NEVER be set in
+        # production (Pi deploy, CI, or any internet-facing environment).
+        _log.warning(
+            "SSL_VERIFY_DISABLED MASSIVE_VERIFY_SSL=false — TLS certificate "
+            "verification is OFF.  All HTTPS requests to the Massive API are "
+            "vulnerable to MITM interception.  Remove this setting in production."
+        )
         try:
             import urllib3
 
@@ -140,6 +151,22 @@ def _massive_ssl_verify_setting() -> bool | None:
     if normalized in {"1", "true", "yes", "on"}:
         return True
     return None
+
+
+def check_ops_readiness() -> None:
+    """Assert production-safety invariants.  Call from deploy scripts / health checks.
+
+    Raises AssertionError if any unsafe configuration is detected so that
+    failing fast in CI or on boot is preferred over silently degraded security.
+
+    Phase 4.5 invariant: MASSIVE_VERIFY_SSL must never be 'false' in production.
+    """
+    ssl_setting = _massive_ssl_verify_setting()
+    assert ssl_setting is not False, (
+        "check_ops_readiness FAILED: MASSIVE_VERIFY_SSL=false is set.  "
+        "TLS verification disabled.  Remove MASSIVE_VERIFY_SSL from the "
+        "environment / secrets before deploying to production."
+    )
 
 
 def _flatten(df: pd.DataFrame, ticker: str) -> pd.DataFrame:
@@ -270,7 +297,11 @@ def _fetch_yfinance_ohlcv(
                 group_by="column",
             )
             break
-        except Exception:
+        except Exception as exc:
+            _log.warning(
+                "yfinance_download_failed attempt=%d/%d type=%s error=%s",
+                attempt, PROVIDER_RETRY_ATTEMPTS, type(exc).__name__, exc,
+            )
             if attempt >= PROVIDER_RETRY_ATTEMPTS:
                 return _ProviderFetchResult({}, retry_count)
             retry_count += 1
@@ -281,7 +312,11 @@ def _fetch_yfinance_ohlcv(
             df = _flatten(raw, t)
             if not df.empty and len(df) > 30:
                 out[t] = df
-        except Exception:
+        except Exception as exc:
+            _log.warning(
+                "yfinance_flatten_failed ticker=%s type=%s error=%s",
+                t, type(exc).__name__, exc,
+            )
             continue
     return _ProviderFetchResult(out, retry_count)
 
@@ -510,7 +545,11 @@ def fetch_ohlcv_result(
                 for ticker, meta in cached_meta.items()
                 if isinstance(meta.get("frame"), pd.DataFrame)
             }
-        except Exception:
+        except Exception as exc:
+            _log.warning(
+                "cache_read_failed op=read_cached_ohlcv_metadata provider=%s tickers=%d type=%s error=%s",
+                provider_name, len(tickers), type(exc).__name__, exc,
+            )
             cached = {}
             cached_meta = {}
     missing = [ticker for ticker in tickers if ticker not in cached]
@@ -528,8 +567,11 @@ def fetch_ohlcv_result(
         if fetched and cache_enabled:
             try:
                 write_cached_ohlcv(fetched, provider=provider_name, interval=interval)
-            except Exception:
-                pass
+            except Exception as exc:
+                _log.warning(
+                    "cache_write_failed op=write_cached_ohlcv provider=%s tickers=%d type=%s error=%s",
+                    provider_name, len(fetched), type(exc).__name__, exc,
+                )
         provider_misses_after_primary = [
             ticker for ticker in missing if ticker not in fetched and str(ticker).upper() not in fetched
         ]
@@ -553,8 +595,11 @@ def fetch_ohlcv_result(
                     if cache_enabled:
                         try:
                             write_cached_ohlcv(fred_public_fallback, provider="fred_macro", interval=interval)
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            _log.warning(
+                                "cache_write_failed op=write_cached_ohlcv provider=fred_macro tickers=%d type=%s error=%s",
+                                len(fred_public_fallback), type(exc).__name__, exc,
+                            )
             provider_misses_after_primary = [
                 ticker for ticker in provider_misses_after_primary
                 if ticker not in fetched and str(ticker).upper() not in fetched
@@ -578,8 +623,11 @@ def fetch_ohlcv_result(
                 if cache_enabled:
                     try:
                         write_cached_ohlcv(fred_public_fallback, provider="fred_macro", interval=interval)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _log.warning(
+                            "cache_write_failed op=write_cached_ohlcv provider=fred_macro tickers=%d type=%s error=%s",
+                            len(fred_public_fallback), type(exc).__name__, exc,
+                        )
     stale_cached: dict[str, pd.DataFrame] = {}
     stale_cached_meta: dict[str, dict[str, object]] = {}
     provider_misses = [ticker for ticker in missing if ticker not in fetched and str(ticker).upper() not in fetched]
@@ -600,7 +648,11 @@ def fetch_ohlcv_result(
                 for ticker, meta in stale_cached_meta.items()
                 if isinstance(meta.get("frame"), pd.DataFrame)
             }
-        except Exception:
+        except Exception as exc:
+            _log.warning(
+                "cache_read_failed op=read_cached_ohlcv_metadata provider=%s tickers=%d type=%s error=%s",
+                provider_name, len(provider_misses), type(exc).__name__, exc,
+            )
             stale_cached = {}
             stale_cached_meta = {}
 
@@ -624,8 +676,11 @@ def fetch_ohlcv_result(
                 if cache_enabled:
                     try:
                         write_cached_ohlcv(yfinance_fallback, provider="yfinance", interval=interval)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _log.warning(
+                            "cache_write_failed op=write_cached_ohlcv provider=yfinance tickers=%d type=%s error=%s",
+                            len(yfinance_fallback), type(exc).__name__, exc,
+                        )
 
     combined = {**cached, **stale_cached, **fetched}
     ordered = {}

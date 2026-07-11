@@ -582,7 +582,43 @@ a "N-pillar degraded run" stamp when this is True rather than silently presentin
 
 ---
 
-## 12. References
+## 12. Survivorship bias & data-integrity assumptions
+
+### 12.1 Survivorship assumption
+
+All backtests use the **current universe** — the set of ETFs that exist and trade today.  This introduces survivorship bias:
+
+1. **Delisted constituents absent**: ETFs that were merged, liquidated, or rebranded before the backtest start date are never included even though they were tradeable during the historical window.  Their typically-weaker performance is absent, inflating measured returns.
+
+2. **Post-inception history bias**: A sector/theme ETF launched after its theme became popular may carry price history back-filled from the index it tracks.  Including it from the start of that back-filled history inadvertently imports hindsight if the theme was already hot at inception.
+
+**Magnitude estimate**: Academic studies find survivorship bias adds +0.5 to +3.0 pp/yr depending on strategy.  For a long-only sector-rotation strategy with a stable universe of liquid US/global ETFs the effect is likely +0.5 to +1.0 pp/yr.  Users should discount absolute return figures and compare primarily against a forward-only paper-trade baseline.
+
+### 12.2 ETF inception-date gating
+
+`src/backtest.py` provides `filter_by_inception_date(prices, inception_dates)` to NaN-out price data before each ETF's actual SEC-registered inception date.  This prevents an ETF from being allocated to before it existed:
+
+```python
+from src.backtest import filter_by_inception_date
+
+INCEPTION_DATES = {
+    "ARKK": "2014-10-31",
+    "BOTZ": "2016-09-12",
+    "BLOK": "2018-01-17",
+}
+gated_prices = filter_by_inception_date(close_matrix, INCEPTION_DATES)
+result = run_weight_backtest(gated_prices, target_weights)
+```
+
+The function uses the `_first_on_or_after` helper already used by the walk-forward split builder, ensuring consistent date-boundary logic throughout.
+
+### 12.3 Operations security
+
+`src/data.py` provides `check_ops_readiness()` which raises `AssertionError` if `MASSIVE_VERIFY_SSL=false` is set in the environment.  This function should be called by the Pi deploy health check to prevent running in a TLS-disabled state in production.  The dashboard also emits a loud `WARNING`-level log every time the disabled SSL setting is read, regardless of whether the health check is called.
+
+---
+
+## 13. References
 
 **Academic:**
 - Jegadeesh, N. & Titman, S. (1993). *Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency.* Journal of Finance.

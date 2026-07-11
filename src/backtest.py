@@ -2,6 +2,36 @@
 
 This module has no Streamlit imports, no network calls, and no state-file
 writes. It accepts already-loaded prices and target weights.
+
+Survivorship-bias assumption (Phase 4.4)
+-----------------------------------------
+All backtests in this codebase use the *current* universe — the set of ETFs
+that exist and trade today.  This introduces survivorship bias because:
+
+  1. ETFs that were merged, liquidated, or rebranded before the backtest
+     start date are never included, even though they were tradeable during
+     the historical window.  Their typically-weaker performance is absent.
+
+  2. Sector/theme ETFs launched after their theme became popular (e.g.
+     emerging AI ETFs) may have a short live track record but are included
+     from their actual price-history start, inadvertently importing the
+     benefit of hindsight if the theme was already hot at inception.
+
+Magnitude: academic studies estimate survivorship bias adds +1 to +3 pp/yr
+to a long/short strategy and +0.5 to +1 pp/yr to a long-only sector rotation
+strategy (Brown et al. 1992; Elton et al. 1996).  Our universe is relatively
+stable (liquid US sector/global ETFs rarely get delisted) so the effect is
+likely at the low end, but users should discount absolute return figures
+accordingly when comparing to a live paper-trade or forward-only baseline.
+
+Mitigation available (Phase 4.4):
+  - Use ``filter_by_inception_date(prices, inception_dates)`` to NaN-out
+    price data before each ETF's actual inception date.  This prevents the
+    backtest from including a ticker in the portfolio during periods when it
+    did not yet exist, eliminating item (2) above.
+  - Pass the filtered prices DataFrame to ``run_weight_backtest`` instead of
+    the raw close matrix.  Item (1) remains: delisted tickers require
+    explicit look-ahead-free constituent lists which are not yet maintained.
 """
 from __future__ import annotations
 
@@ -249,6 +279,51 @@ def _last_before(index: pd.DatetimeIndex, target: pd.Timestamp) -> pd.Timestamp 
     if matches.empty:
         return None
     return pd.Timestamp(matches[-1])
+
+
+def filter_by_inception_date(
+    prices: pd.DataFrame,
+    inception_dates: dict[str, str | pd.Timestamp],
+) -> pd.DataFrame:
+    """NaN-out price data before each ticker's ETF inception date.
+
+    Phase 4.4 mitigation for survivorship bias item (2): an ETF that launched
+    mid-backtest should not be tradeable before its actual inception date.
+
+    Parameters
+    ----------
+    prices:
+        Close-price matrix (rows = dates, columns = tickers).
+    inception_dates:
+        Mapping of ticker → inception date (str "YYYY-MM-DD" or Timestamp).
+        Tickers not in the mapping are left unchanged.
+
+    Returns
+    -------
+    A copy of ``prices`` where every cell before a ticker's inception date is
+    replaced with NaN.  The calling backtest will then treat those cells as
+    missing (no position held) on those rebalance dates.
+
+    Example
+    -------
+    >>> from src.backtest import filter_by_inception_date
+    >>> prices_gated = filter_by_inception_date(
+    ...     close_matrix,
+    ...     {"ARKK": "2014-10-31", "BOTZ": "2016-09-12"},
+    ... )
+    """
+    out = prices.copy()
+    for ticker, raw_date in inception_dates.items():
+        if ticker not in out.columns:
+            continue
+        try:
+            cutoff = pd.Timestamp(raw_date)
+        except (TypeError, ValueError):
+            continue
+        # NaN any row strictly before the inception date
+        mask = out.index < cutoff
+        out.loc[mask, ticker] = np.nan
+    return out
 
 
 def walk_forward_calibration_splits(
@@ -1770,6 +1845,234 @@ def _result_validation_stats(
     stats["hit_rate"] = _positive_return_rate(returns)
     stats["trade_count"] = _turnover_trade_count(turnover)
     return stats
+
+
+# ---------------------------------------------------------------------------
+# Phase 4.3 (GATED) — Per-ticker transaction cost tiers
+#
+# Background:
+#   The current run_weight_backtest() applies a single flat cost_bps to ALL
+#   trades regardless of the instrument's liquidity profile.  A 5bps round-
+#   trip cost is reasonable for SPY/XLK but understates real cost for thin
+#   country/theme ETFs which trade wider spreads and have lower ADV.
+#
+#   Academic calibration (Frazzini et al. 2018 "Trading Costs"; Novy-Marx &
+#   Velikov 2016 "A Taxonomy of Anomalies"):
+#     - Mega-cap/broad ETFs (SPY, QQQ, XL*): 1–3bps one-way
+#     - US industry ETFs (SOXX, KRE, XBI…): 3–7bps one-way
+#     - Country ETFs (EWJ, MCHI, EWZ…):     8–20bps one-way
+#     - Theme ETFs (ARKK, BOTZ, LIT, URA):  12–25bps one-way
+#     - Crypto ETFs (BITO, IBIT, ETHE):     20–40bps one-way
+#
+#   One-way bps × 2 = round-trip.  The values below are round-trip defaults.
+#
+# Governance: run_weight_backtest_tiered() is a CANDIDATE function.
+#   Do NOT change the default run_weight_backtest() signature or behavior.
+#   After calibration evidence accumulates and evaluate_acceptance_gates()
+#   confirms the tiered model improves OOS Sharpe, replace the flat default.
+# ---------------------------------------------------------------------------
+
+TRANSACTION_COST_TIERS: dict[str, float] = {
+    "liquid_sector":    5.0,   # US Sectors (XL*), Benchmarks, Factors, Mega-cap stocks
+    "us_industry":     10.0,   # Liquid US industry ETFs (SOXX, KRE, XBI…)
+    "country_etf":     20.0,   # Developed/EM country ETFs (EWJ, MCHI, EWZ…)
+    "theme_etf":       25.0,   # Thematic / sector-specific ETFs (ARKK, BOTZ, TAN…)
+    "crypto_etf":      40.0,   # Crypto-underlying ETFs (BITO, IBIT, ETHE)
+    "default":         10.0,   # Fall-through for unrecognised tickers
+}
+
+
+def cost_tiers_by_ticker(
+    tickers: list[str] | None = None,
+    tiers: dict[str, float] | None = None,
+) -> dict[str, float]:
+    """Return a per-ticker cost (round-trip bps) mapping based on asset class.
+
+    Phase 4.3 candidate helper.  Build the mapping once and pass it to
+    :func:`run_weight_backtest_tiered`.
+
+    Parameters
+    ----------
+    tickers:
+        List of tickers to map.  Defaults to the full ``ALL_TICKERS`` universe.
+    tiers:
+        Override ``TRANSACTION_COST_TIERS``.
+
+    Returns
+    -------
+    dict mapping ticker → round-trip bps.
+    """
+    # Import here to avoid a hard dependency at module level on universe.py.
+    try:
+        from .universe import (
+            US_SECTORS, US_INDUSTRIES, COUNTRIES, FACTORS, THEMES,
+            CRYPTO, MEGA_CAP_STOCKS, BENCH, ALL_TICKERS as _ALL_TICKERS,
+        )
+    except ImportError:
+        _ALL_TICKERS = tickers or []
+        US_SECTORS = US_INDUSTRIES = COUNTRIES = FACTORS = THEMES = []
+        CRYPTO = MEGA_CAP_STOCKS = []
+        BENCH = {}
+
+    t = tiers if tiers is not None else TRANSACTION_COST_TIERS
+    _tickers = tickers if tickers is not None else list(_ALL_TICKERS)
+
+    liquid = set(US_SECTORS) | set(FACTORS) | set(MEGA_CAP_STOCKS) | set(BENCH.values())
+    us_ind = set(US_INDUSTRIES)
+    country = set(COUNTRIES)
+    theme = set(THEMES)
+    crypto = set(CRYPTO)
+
+    out: dict[str, float] = {}
+    for ticker in _tickers:
+        if ticker in liquid:
+            out[ticker] = t["liquid_sector"]
+        elif ticker in us_ind:
+            out[ticker] = t["us_industry"]
+        elif ticker in country:
+            out[ticker] = t["country_etf"]
+        elif ticker in theme:
+            out[ticker] = t["theme_etf"]
+        elif ticker in crypto:
+            out[ticker] = t["crypto_etf"]
+        else:
+            out[ticker] = t["default"]
+    return out
+
+
+def _simulate_periods_tiered(
+    prices: pd.DataFrame,
+    target_weights: pd.DataFrame,
+    per_ticker_cost_bps: dict[str, float],
+) -> tuple[pd.DataFrame, pd.Series, pd.Series, pd.Series]:
+    """Like ``_simulate_periods`` but applies per-ticker cost rates.
+
+    ``per_ticker_cost_bps`` is a dict mapping column name → round-trip bps.
+    Missing tickers fall back to TRANSACTION_COST_TIERS["default"].
+    """
+    default_rate = TRANSACTION_COST_TIERS["default"] / 10_000.0
+    cost_rates = pd.Series(
+        {col: per_ticker_cost_bps.get(col, TRANSACTION_COST_TIERS["default"]) / 10_000.0
+         for col in prices.columns}
+    )
+
+    asset_returns = prices.pct_change().iloc[1:].fillna(0.0)
+    current_weights = pd.Series(0.0, index=prices.columns, dtype=float)
+    period_weight_rows = []
+    gross_returns = []
+    turnover = []
+    costs = []
+
+    for idx, (period_date, returns_row) in enumerate(asset_returns.iterrows(), start=1):
+        signal_date = prices.index[idx - 1]
+        period_cost = 0.0
+        period_turnover = 0.0
+        if signal_date in target_weights.index:
+            target = target_weights.loc[signal_date].astype(float)
+            delta = (target - current_weights).abs()
+            period_turnover = float(delta.sum())
+            # Cost = sum over tickers of |Δweight| × per-ticker cost rate
+            period_cost = float((delta * cost_rates.reindex(delta.index, fill_value=default_rate)).sum())
+            current_weights = target.copy()
+
+        period_weight_rows.append(current_weights.copy())
+        period_gross = float((current_weights * returns_row).sum())
+        gross_returns.append(period_gross)
+        turnover.append(period_turnover)
+        costs.append(period_cost)
+
+        denominator = 1.0 + period_gross
+        if denominator > 0:
+            current_weights = current_weights * (1.0 + returns_row) / denominator
+        else:
+            current_weights = current_weights * 0.0
+
+    index = asset_returns.index
+    period_weights = pd.DataFrame(period_weight_rows, index=index, columns=prices.columns)
+    return (
+        period_weights,
+        pd.Series(gross_returns, index=index),
+        pd.Series(turnover, index=index),
+        pd.Series(costs, index=index),
+    )
+
+
+def run_weight_backtest_tiered(
+    prices: pd.DataFrame,
+    target_weights: pd.DataFrame,
+    per_ticker_cost_bps: dict[str, float] | None = None,
+    initial_capital: float = 1.0,
+    periods_per_year: int = TRADING_DAYS_PER_YEAR,
+) -> BacktestResult:
+    """Phase 4.3 CANDIDATE: backtest with per-ticker transaction cost tiers.
+
+    Identical to :func:`run_weight_backtest` except transaction costs are
+    applied per-instrument rather than with a single flat rate.  Use
+    :func:`cost_tiers_by_ticker` to build ``per_ticker_cost_bps``.
+
+    IMPORTANT: this is a calibration candidate.  Do NOT replace the default
+    ``run_weight_backtest`` until per-ticker cost data has been validated
+    against real execution records and ``evaluate_acceptance_gates`` confirms
+    improved OOS Sharpe versus the flat-5bps baseline.
+
+    Parameters
+    ----------
+    prices:
+        Close-price matrix.
+    target_weights:
+        Target weight DataFrame.
+    per_ticker_cost_bps:
+        Dict of ticker → round-trip bps.  Missing tickers get
+        ``TRANSACTION_COST_TIERS["default"]``.  If None, defaults to
+        ``cost_tiers_by_ticker()`` applied to the price columns.
+    initial_capital:
+        Starting portfolio value.
+    periods_per_year:
+        For annualisation.
+    """
+    capital = _finite_scalar("initial_capital", initial_capital)
+    periods = _finite_scalar("periods_per_year", periods_per_year)
+    if capital <= 0:
+        raise ValueError("initial_capital must be positive")
+    if periods <= 0:
+        raise ValueError("periods_per_year must be positive")
+    clean_prices = _clean_prices(prices)
+    if len(clean_prices) < 2 or clean_prices.shape[1] == 0:
+        raise ValueError("prices must contain at least two rows and one column")
+    clean_weights = _prepare_target_weights(clean_prices, target_weights)
+
+    if per_ticker_cost_bps is None:
+        per_ticker_cost_bps = cost_tiers_by_ticker(list(clean_prices.columns))
+
+    weights, gross_returns, turnover, costs = _simulate_periods_tiered(
+        clean_prices,
+        clean_weights,
+        per_ticker_cost_bps,
+    )
+    net_returns = (1.0 - costs) * (1.0 + gross_returns) - 1.0
+    equity = pd.concat(
+        [
+            pd.Series([capital], index=[clean_prices.index[0]]),
+            capital * (1.0 + net_returns).cumprod(),
+        ]
+    )
+    metrics = performance_metrics(
+        net_returns,
+        equity=equity,
+        turnover=turnover,
+        periods_per_year=periods,
+    )
+    return BacktestResult(
+        prices=clean_prices,
+        target_weights=clean_weights,
+        period_weights=weights,
+        gross_returns=gross_returns,
+        turnover=turnover,
+        costs=costs,
+        net_returns=net_returns,
+        equity=equity,
+        metrics=metrics,
+    )
 
 
 def run_weight_backtest(
