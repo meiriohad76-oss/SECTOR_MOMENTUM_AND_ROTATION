@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.config_resolver import resolve_config_value  # noqa: E402
-from src.data import fetch_ohlcv_result, _select_ohlcv_provider  # noqa: E402
+from src.data import check_ops_readiness, fetch_ohlcv_result, _select_ohlcv_provider  # noqa: E402
 from src.flow import compute_flow_signals, flow_composite_z  # noqa: E402
 from src.fred_data import fetch_fred, fred_available  # noqa: E402
 from src.indicators import compute_all_indicators  # noqa: E402
@@ -270,6 +270,7 @@ def refresh_dashboard_state(
     progress_callback: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     _bootstrap_runtime_config()
+    check_ops_readiness()  # raises AssertionError if MASSIVE_VERIFY_SSL=false (Phase 4.5)
     _configure_provider_flow_mode(provider_flow_mode, allow_stale_cache=allow_stale_provider_cache)
     started_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     _emit_progress(

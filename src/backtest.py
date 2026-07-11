@@ -326,6 +326,47 @@ def filter_by_inception_date(
     return out
 
 
+def load_inception_dates(path: str | None = None) -> dict[str, str]:
+    """Load the ETF inception-date registry from docs/etf_inception_dates.json.
+
+    Returns a flat ``{ticker: "YYYY-MM-DD"}`` mapping suitable for passing to
+    :func:`filter_by_inception_date`.  Grouped "_comment" / category keys are
+    silently ignored.  If the file is missing, returns an empty dict (no-op).
+
+    Parameters
+    ----------
+    path:
+        Absolute path to the JSON file.  Defaults to
+        ``<repo-root>/docs/etf_inception_dates.json``.
+    """
+    import json as _json
+    if path is None:
+        path = str(
+            (
+                __import__("pathlib").Path(__file__).resolve().parents[1]
+                / "docs"
+                / "etf_inception_dates.json"
+            )
+        )
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            raw = _json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    out: dict[str, str] = {}
+    for key, value in raw.items():
+        if key.startswith("_"):
+            continue  # skip _comment / _universe_version
+        if isinstance(value, dict):
+            # nested category block: { ticker: date, ... }
+            for ticker, date in value.items():
+                if ticker and isinstance(date, str):
+                    out[ticker] = date
+        elif isinstance(value, str) and key and not key.startswith("_"):
+            out[key] = value
+    return out
+
+
 def walk_forward_calibration_splits(
     dates: Sequence[pd.Timestamp] | pd.DatetimeIndex,
     *,

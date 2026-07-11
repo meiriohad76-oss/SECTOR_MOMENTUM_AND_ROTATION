@@ -1,5 +1,6 @@
 // web/components/DisplayToolbar.tsx
 "use client";
+import { useState, useCallback } from "react";
 import type { DisplayMode, ScreenId } from "./DisplayShell";
 import RefreshButton from "./RefreshButton";
 
@@ -42,6 +43,13 @@ export default function DisplayToolbar({
   onSwitchScreen: (screen: ScreenId) => void;
 }) {
   const screenTabs = SCREEN_TABS[activeDisplay];
+  const [copied, setCopied] = useState(false);
+  const handleCopyLink = useCallback(() => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    }).catch(() => {/* clipboard unavailable — no-op */});
+  }, []);
   return (
     <header className="display-toolbar" aria-label="Display mode selector">
       <div className="display-toolbar-brand">
@@ -90,6 +98,15 @@ export default function DisplayToolbar({
         {generatedAt ? (
           <span className="display-toolbar-timestamp mono">{generatedAt}</span>
         ) : null}
+        <button
+          type="button"
+          className="display-toolbar-copy-link"
+          onClick={handleCopyLink}
+          title="Copy deep-link URL (?display=…&screen=…&t=…)"
+          aria-label="Copy link to this view"
+        >
+          {copied ? "✓ Copied" : "⧉ Link"}
+        </button>
         <RefreshButton laneId="all" label="all data" />
         <a href="/admin" className="display-toolbar-admin">Admin</a>
       </div>
