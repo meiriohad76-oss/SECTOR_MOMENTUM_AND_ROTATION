@@ -1,6 +1,6 @@
 // web/components/DisplayToolbar.tsx
 "use client";
-import type { DisplayMode } from "./DisplayShell";
+import type { DisplayMode, ScreenId } from "./DisplayShell";
 import RefreshButton from "./RefreshButton";
 
 const DISPLAY_TABS: { mode: DisplayMode; label: string; title: string }[] = [
@@ -9,15 +9,39 @@ const DISPLAY_TABS: { mode: DisplayMode; label: string; title: string }[] = [
   { mode: "c", label: "C", title: "Pillar Stack" },
 ];
 
+/** Screen tab labels adapt per display mode */
+const SCREEN_TABS: Record<DisplayMode, Array<{ id: ScreenId; label: string }>> = {
+  a: [
+    { id: "overview",  label: "Overview"  },
+    { id: "deepdive",  label: "Deep Dive" },
+    { id: "rotation",  label: "Rotation"  },
+  ],
+  b: [
+    { id: "overview",  label: "Brief"     },
+    { id: "deepdive",  label: "Deep Dive" },
+    { id: "rotation",  label: "Rotation"  },
+  ],
+  c: [
+    { id: "overview",  label: "Heatmap"   },
+    { id: "deepdive",  label: "Deep Dive" },
+    { id: "rotation",  label: "Rotation"  },
+  ],
+};
+
 export default function DisplayToolbar({
   activeDisplay,
+  activeScreen,
   generatedAt,
   onSwitch,
+  onSwitchScreen,
 }: {
   activeDisplay: DisplayMode;
+  activeScreen: ScreenId;
   generatedAt: string;
   onSwitch: (mode: DisplayMode) => void;
+  onSwitchScreen: (screen: ScreenId) => void;
 }) {
+  const screenTabs = SCREEN_TABS[activeDisplay];
   return (
     <header className="display-toolbar" aria-label="Display mode selector">
       <div className="display-toolbar-brand">
@@ -26,6 +50,8 @@ export default function DisplayToolbar({
         </span>
         <strong>Momentum</strong>
       </div>
+
+      {/* Display-style switcher: A / B / C */}
       <nav className="display-toolbar-tabs" aria-label="Choose display style">
         {DISPLAY_TABS.map(({ mode, label, title }) => (
           <button
@@ -41,6 +67,25 @@ export default function DisplayToolbar({
           </button>
         ))}
       </nav>
+
+      {/* Vertical rule separating display tabs from screen tabs */}
+      <div className="display-toolbar-divider" aria-hidden="true" />
+
+      {/* Screen switcher — labels depend on active display */}
+      <nav className="display-toolbar-screens" aria-label="Choose screen">
+        {screenTabs.map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            className={`display-toolbar-screen-tab${activeScreen === id ? " active" : ""}`}
+            onClick={() => onSwitchScreen(id)}
+            aria-pressed={activeScreen === id}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
       <div className="display-toolbar-right">
         {generatedAt ? (
           <span className="display-toolbar-timestamp mono">{generatedAt}</span>

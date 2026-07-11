@@ -4088,6 +4088,45 @@ select:focus-visible {
 
 .display-toolbar-admin:hover { color: #8a9aaa; }
 
+/* ── Display toolbar – screen tab row (second control group) ── */
+.display-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255,255,255,0.12);
+  flex-shrink: 0;
+  margin: 0 4px;
+  align-self: center;
+}
+
+.display-toolbar-screens {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.display-toolbar-screen-tab {
+  padding: 3px 10px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: #6a7a88;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  transition: color 120ms, border-color 120ms;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.display-toolbar-screen-tab.active {
+  color: #e8e8e8;
+  border-bottom-color: #6ec6ff;
+}
+
+.display-toolbar-screen-tab:hover:not(.active) { color: #aab8c4; }
+
 /* ── State Pill ── */
 .state-pill {
   display: inline-block;

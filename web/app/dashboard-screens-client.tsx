@@ -913,19 +913,10 @@ function RotationScreen({
 }
 
 function CTopBar({
-  activeScreen,
-  setActiveScreen,
   generatedAt,
 }: {
-  activeScreen: ScreenId;
-  setActiveScreen: (screen: ScreenId) => void;
   generatedAt: string;
 }) {
-  const labels: { id: ScreenId; label: string }[] = [
-    { id: "overview", label: "Heatmap" },
-    { id: "rotation", label: "Rotation" },
-    { id: "deepdive", label: "Deep dive" },
-  ];
   return (
     <header className="c-topbar">
       <div className="c-brand">
@@ -938,23 +929,7 @@ function CTopBar({
         <strong>Momentum</strong>
         <span>v2</span>
       </div>
-      <nav className="c-tabs" aria-label="Display C screen selector">
-        {labels.map((item) => (
-          <button
-            type="button"
-            key={item.id}
-            className={activeScreen === item.id ? "selected" : ""}
-            onClick={() => setActiveScreen(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
-        <button type="button" className="inactive" aria-disabled="true">Macro</button>
-        <button type="button" className="inactive" aria-disabled="true">Positions</button>
-      </nav>
       <div className="c-live"><i /> {generatedAt || "latest snapshot"}</div>
-      <button type="button" className="c-icon-btn" title="Refresh candidate snapshot" aria-label="Refresh candidate snapshot">↻</button>
-      <button type="button" className="c-icon-btn" title="Display mode" aria-label="Display mode">☾</button>
     </header>
   );
 }
@@ -1560,35 +1535,13 @@ function CRotationScreen({
 }
 
 function ATopBar({
-  activeScreen,
-  setActiveScreen,
   generatedAt,
 }: {
-  activeScreen: ScreenId;
-  setActiveScreen: (screen: ScreenId) => void;
   generatedAt: string;
 }) {
-  const labels: { id: ScreenId; label: string }[] = [
-    { id: "overview", label: "Overview" },
-    { id: "deepdive", label: "Deep Dive" },
-    { id: "rotation", label: "Rotation" },
-  ];
   return (
     <header className="a-topbar">
       <div className="a-brand"><i /> <strong>SENTIMENT BOARD</strong><span>v2 / momentum</span></div>
-      <nav className="a-screen-tabs" aria-label="Display A screen selector">
-        {labels.map((item) => (
-          <button
-            type="button"
-            key={item.id}
-            className={activeScreen === item.id ? "active" : ""}
-            onClick={() => setActiveScreen(item.id)}
-            aria-pressed={activeScreen === item.id}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
       <div className="a-live"><i /> LIVE | {generatedAt || "latest run"}</div>
     </header>
   );
@@ -2140,23 +2093,28 @@ function ARotationScreen({
 
 function HandoffAScreens({
   snapshot,
+  activeScreen,
+  setActiveScreen,
+  focusTicker,
+  setFocusTicker,
 }: {
   snapshot: DashboardSnapshotPayload;
+  activeScreen: ScreenId;
+  setActiveScreen: (screen: ScreenId) => void;
+  focusTicker: string;
+  setFocusTicker: (ticker: string) => void;
 }) {
-  const [activeScreen, setActiveScreen] = useState<ScreenId>("overview");
-  const initialTicker = snapshot.focus?.ticker || snapshot.rows[0]?.ticker || "";
-  const [selectedTicker, setSelectedTicker] = useState(initialTicker);
   return (
     <div className="a-shell" data-presentation="handoff-a">
-      <ATopBar activeScreen={activeScreen} setActiveScreen={setActiveScreen} generatedAt={snapshot.generated_at} />
+      <ATopBar generatedAt={snapshot.generated_at} />
       {activeScreen === "overview" ? (
-        <AOverviewScreen snapshot={snapshot} onSelectTicker={setSelectedTicker} setActiveScreen={setActiveScreen} />
+        <AOverviewScreen snapshot={snapshot} onSelectTicker={setFocusTicker} setActiveScreen={setActiveScreen} />
       ) : null}
       {activeScreen === "deepdive" ? (
-        <ADeepDiveScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} />
+        <ADeepDiveScreen snapshot={snapshot} selectedTicker={focusTicker} onSelectTicker={setFocusTicker} />
       ) : null}
       {activeScreen === "rotation" ? (
-        <ARotationScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} setActiveScreen={setActiveScreen} />
+        <ARotationScreen snapshot={snapshot} selectedTicker={focusTicker} onSelectTicker={setFocusTicker} setActiveScreen={setActiveScreen} />
       ) : null}
     </div>
   );
@@ -2164,35 +2122,15 @@ function HandoffAScreens({
 
 function BMasthead({
   activeScreen,
-  setActiveScreen,
   compact = false,
 }: {
   activeScreen: ScreenId;
-  setActiveScreen: (screen: ScreenId) => void;
   compact?: boolean;
 }) {
-  const labels: { id: ScreenId; label: string }[] = [
-    { id: "overview", label: "Overview" },
-    { id: "deepdive", label: "Deep Dive" },
-    { id: "rotation", label: "Rotation" },
-  ];
   return (
     <header className={compact ? "b-masthead compact" : "b-masthead"}>
       <strong>The Sentiment Brief</strong>
       <span>{compact ? (activeScreen === "deepdive" ? "DEEP-DIVE" : "THE ROTATION MAP") : "EVENING EDITION"}</span>
-      <nav aria-label="Display B screen selector">
-        {labels.map((item) => (
-          <button
-            type="button"
-            key={item.id}
-            className={activeScreen === item.id ? "active" : ""}
-            onClick={() => setActiveScreen(item.id)}
-            aria-pressed={activeScreen === item.id}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
     </header>
   );
 }
@@ -2579,23 +2517,28 @@ function BRotationScreen({
 
 function HandoffBScreens({
   snapshot,
+  activeScreen,
+  setActiveScreen,
+  focusTicker,
+  setFocusTicker,
 }: {
   snapshot: DashboardSnapshotPayload;
+  activeScreen: ScreenId;
+  setActiveScreen: (screen: ScreenId) => void;
+  focusTicker: string;
+  setFocusTicker: (ticker: string) => void;
 }) {
-  const [activeScreen, setActiveScreen] = useState<ScreenId>("overview");
-  const initialTicker = snapshot.focus?.ticker || snapshot.rows[0]?.ticker || "";
-  const [selectedTicker, setSelectedTicker] = useState(initialTicker);
   return (
     <div className="b-shell" data-presentation="handoff-b">
-      <BMasthead activeScreen={activeScreen} setActiveScreen={setActiveScreen} compact={activeScreen !== "overview"} />
+      <BMasthead activeScreen={activeScreen} compact={activeScreen !== "overview"} />
       {activeScreen === "overview" ? (
-        <BOverviewScreen snapshot={snapshot} onSelectTicker={setSelectedTicker} setActiveScreen={setActiveScreen} />
+        <BOverviewScreen snapshot={snapshot} onSelectTicker={setFocusTicker} setActiveScreen={setActiveScreen} />
       ) : null}
       {activeScreen === "deepdive" ? (
-        <BDeepDiveScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} />
+        <BDeepDiveScreen snapshot={snapshot} selectedTicker={focusTicker} onSelectTicker={setFocusTicker} />
       ) : null}
       {activeScreen === "rotation" ? (
-        <BRotationScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} setActiveScreen={setActiveScreen} />
+        <BRotationScreen snapshot={snapshot} selectedTicker={focusTicker} onSelectTicker={setFocusTicker} setActiveScreen={setActiveScreen} />
       ) : null}
     </div>
   );
@@ -2603,23 +2546,28 @@ function HandoffBScreens({
 
 function HandoffCScreens({
   snapshot,
+  activeScreen,
+  setActiveScreen,
+  focusTicker,
+  setFocusTicker,
 }: {
   snapshot: DashboardSnapshotPayload;
+  activeScreen: ScreenId;
+  setActiveScreen: (screen: ScreenId) => void;
+  focusTicker: string;
+  setFocusTicker: (ticker: string) => void;
 }) {
-  const [activeScreen, setActiveScreen] = useState<ScreenId>("overview");
-  const initialTicker = snapshot.focus?.ticker || snapshot.rows[0]?.ticker || "";
-  const [selectedTicker, setSelectedTicker] = useState(initialTicker);
   return (
     <div className="c-shell" data-presentation="handoff-c">
-      <CTopBar activeScreen={activeScreen} setActiveScreen={setActiveScreen} generatedAt={snapshot.generated_at} />
+      <CTopBar generatedAt={snapshot.generated_at} />
       {activeScreen === "overview" ? (
-        <COverviewScreen snapshot={snapshot} onSelectTicker={setSelectedTicker} setActiveScreen={setActiveScreen} />
+        <COverviewScreen snapshot={snapshot} onSelectTicker={setFocusTicker} setActiveScreen={setActiveScreen} />
       ) : null}
       {activeScreen === "deepdive" ? (
-        <CDeepDiveScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} />
+        <CDeepDiveScreen snapshot={snapshot} selectedTicker={focusTicker} onSelectTicker={setFocusTicker} />
       ) : null}
       {activeScreen === "rotation" ? (
-        <CRotationScreen snapshot={snapshot} selectedTicker={selectedTicker} onSelectTicker={setSelectedTicker} setActiveScreen={setActiveScreen} />
+        <CRotationScreen snapshot={snapshot} selectedTicker={focusTicker} onSelectTicker={setFocusTicker} setActiveScreen={setActiveScreen} />
       ) : null}
     </div>
   );
@@ -2630,12 +2578,22 @@ export default function DashboardScreensClient({
   backtestArtifacts = null,
   presentation = "default",
   debriefData = null,
+  activeScreen: outerActiveScreen,
+  setActiveScreen: outerSetActiveScreen,
+  focusTicker: outerFocusTicker,
+  setFocusTicker: outerSetFocusTicker,
 }: {
   snapshot: DashboardSnapshotPayload | null;
   backtestArtifacts?: BacktestArtifactsPayload | null;
   presentation?: PresentationMode;
   debriefData?: DebriefPayload | null;
+  /** Lifted from DisplayShell for consolidated navigation (handoff modes) */
+  activeScreen?: ScreenId;
+  setActiveScreen?: (screen: ScreenId) => void;
+  focusTicker?: string;
+  setFocusTicker?: (ticker: string) => void;
 }) {
+  // Internal state is used only by the default screen-stack mode
   const [activeScreen, setActiveScreen] = useState<ScreenId>("overview");
   const initialTicker = snapshot?.focus?.ticker || snapshot?.rows[0]?.ticker || "";
   const [selectedTicker, setSelectedTicker] = useState(initialTicker);
@@ -2662,15 +2620,45 @@ export default function DashboardScreensClient({
   }
 
   if (presentation === "handoff-a") {
-    return <HandoffAScreens snapshot={snapshot} />;
+    const screen = outerActiveScreen ?? "overview";
+    const ticker = outerFocusTicker || initialTicker;
+    return (
+      <HandoffAScreens
+        snapshot={snapshot}
+        activeScreen={screen}
+        setActiveScreen={outerSetActiveScreen ?? (() => {})}
+        focusTicker={ticker}
+        setFocusTicker={outerSetFocusTicker ?? (() => {})}
+      />
+    );
   }
 
   if (presentation === "handoff-b") {
-    return <HandoffBScreens snapshot={snapshot} />;
+    const screen = outerActiveScreen ?? "overview";
+    const ticker = outerFocusTicker || initialTicker;
+    return (
+      <HandoffBScreens
+        snapshot={snapshot}
+        activeScreen={screen}
+        setActiveScreen={outerSetActiveScreen ?? (() => {})}
+        focusTicker={ticker}
+        setFocusTicker={outerSetFocusTicker ?? (() => {})}
+      />
+    );
   }
 
   if (presentation === "handoff-c") {
-    return <HandoffCScreens snapshot={snapshot} />;
+    const screen = outerActiveScreen ?? "overview";
+    const ticker = outerFocusTicker || initialTicker;
+    return (
+      <HandoffCScreens
+        snapshot={snapshot}
+        activeScreen={screen}
+        setActiveScreen={outerSetActiveScreen ?? (() => {})}
+        focusTicker={ticker}
+        setFocusTicker={outerSetFocusTicker ?? (() => {})}
+      />
+    );
   }
 
   return (
