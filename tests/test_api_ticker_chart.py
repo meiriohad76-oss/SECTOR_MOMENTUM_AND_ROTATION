@@ -10,7 +10,9 @@ from src.ohlcv_store import write_cached_ohlcv
 
 def _daily_frame(days: int = 320, end: date | None = None) -> pd.DataFrame:
     dates = pd.bdate_range(end=pd.Timestamp(end or date.today()), periods=days)
-    close = pd.Series(range(days), index=dates, dtype=float) + 100.0
+    # Use len(dates) — bdate_range may return fewer rows than `periods` when
+    # the end date falls on a non-business day (weekend/holiday).
+    close = pd.Series(range(len(dates)), index=dates, dtype=float) + 100.0
     high = close + 1.0
     low = close - 1.0
     return pd.DataFrame(

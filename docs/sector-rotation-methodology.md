@@ -280,8 +280,15 @@ F_i = 0.30 * z(CMF21_i)                  # primary accumulation/distribution
 ```
 `F_i` is the **Pillar 7 institutional flow score** and enters the master composite in §5.
 
-#### 4.7.11 Hard veto rule
+#### 4.7.11 Hard veto rule (live) and graded-penalty candidate
 Even with a perfect price-based score, a sector cannot be added if `F_i < -0.5σ` (i.e., it's in the bottom ~30% of the universe on flow). This prevents buying "price-only" rallies that aren't backed by real money — a signature failure mode of pure-momentum systems.
+
+**Under calibration (not yet live):** The −0.5σ hard override is being evaluated against a graded-penalty
+candidate (`make_flow_demoted_candidate_config()`). In the candidate, rather than snapping `S_i` to −9.99,
+flow z-scores below a configurable extreme threshold (default −1.5σ) subtract a bounded amount
+proportional to severity. No live default changes until `evaluate_promotion_gate` returns `ready_for_review`
+and a human approves the calibration report. When the flow provider is offline (degraded run), the veto
+is explicitly disabled — see §11.5.
 
 ### 4.8 Business-cycle phase (monthly)
 Use a deterministic mapping:
@@ -333,6 +340,36 @@ N_mega_cap_stocks = 3   (out of 7)
 ```
 **Why flow gets ~23% of the weight** — it's an independent confirmation of the price-based pillars. When price and flow agree, signal quality is much higher; when they disagree, the trade is almost always wrong. Empirically (Lee & Swaminathan 2000; Chordia & Swaminathan 2000) volume-confirmed momentum substantially outperforms pure-price momentum on a risk-adjusted basis.
 
+### 5.1 Eligibility gate (live as of 2026-07)
+
+State and score are computed in sequence, not in parallel. The state machine (§6) runs first and
+determines *eligibility*:
+
+```
+ELIGIBLE_STATES = {STAGE_2_BULLISH, HOLD}
+```
+
+`rank_in_class` and `selected = True` are only assigned to eligible instruments.
+EXIT, WARNING, BEARISH_STAGE_4, and STAGE_1_BASING instruments retain their raw S-score for
+transparency but are placed in an **"ineligible" bucket** and are never marked `selected`.
+This prevents the contradictory output of "#4 by score, state=EXIT" appearing in a buy list.
+
+See `apply_eligibility_gate()` in `src/scoring.py`.
+
+### 5.2 Four-pillar consolidation (under calibration, not yet live)
+
+The live 7-weight composite double-counts relative strength: `mansfield_rs_z` and `rs_ratio_z`
+are both derived from the same `P_i / P_bench` ratio. Under calibration (commit `make_four_pillar_candidate_config()`):
+
+| Pillar | Internal blend | Weight |
+|---|---|---|
+| `trend_momentum` | `mom_12_1` + binary filters | 0.25 |
+| `relative_strength` | avg of mansfield_rs and rs_ratio z-scores | 0.25 |
+| `flow_participation` | `cmf21` + `breadth_50d` + ETF flow | 0.25 |
+| `confirmation` | `rs_momentum` + OBV + dist-day count | 0.25 |
+
+The 4-pillar config will not become the live default until the evidence gate passes (Task 9 walk-forward).
+
 Rebalance weekly (Friday close → execute Monday open). The 12-1 momentum literature is unanimous that monthly rebalancing is fine; weekly is the *fastest* rebalance that still respects the academic evidence. Daily rebalancing destroys the edge in transaction costs.
 
 ---
@@ -354,6 +391,19 @@ Each held position has a state. The state advances on the worst signal across ti
 - **DISTRIBUTION_DAY**: large up-volume day (RVOL ≥ 1.5) closing in the lower 25% of its range — classic O'Neil distribution signal. 4+ in 25 sessions historically precedes Stage-3 tops.
 - **DARK_POOL_SELL**: dark_pool_pct > 50% with price flat or down for 3+ days — silent institutional exit.
 - **OBV_NEGATIVE_DIVERGENCE**: price makes a new 20-day high but OBV does not — early Stage 3 warning.
+
+### 6.0 Tightened EXIT gate (under calibration, not yet live)
+
+The current EXIT gate uses OR-logic: `mansfield_rs < 0` alone can trip EXIT, which fires on ~50% of any
+universe in most regimes (half of instruments underperform their benchmark by definition). Under
+calibration (`make_tightened_gate_candidate_config()`):
+- EXIT requires `mansfield_rs < 0` **AND** `above_30wma is False` together, not RS-alone.
+- RRG-Lagging is demoted from a standalone EXIT trigger to a confirmation input; it must co-occur
+  with at least one other deterioration signal.
+- The RS threshold is configurable (candidate default: −5.0; the calibration will determine the
+  optimal value over the 10y walk-forward window).
+
+No live gate change ships until the calibration report clears `evaluate_promotion_gate` and a human approves.
 
 ### 6.1 Alert delivery
 Three escalation levels:
@@ -474,7 +524,65 @@ sector-rotation/
 
 ---
 
-## 11. References
+## 11. Data integrity & degraded runs
+
+### 11.1 Flow-provider coverage
+
+The Pillar 7 composite (`provider_flow_z`) is built from three provider-sourced signals:
+
+| Signal | Live flag | Notes |
+|---|---|---|
+| `etf_flow_5d_pct` | `etf_flow_5d_pct_live` | Requires iShares/SSGA SHO file |
+| `block_up_ratio` | `block_up_ratio_live` | Requires Massive API or block-tape feed |
+| `si_delta_15d` | `si_delta_15d_live` | Requires FINRA Reg SHO |
+
+**Coverage** is the fraction of instruments (0–1) with ≥1 live provider signal. If coverage falls below
+`min_flow_coverage` (default 0.5, configurable in `ScoringConfig`), the run is **degraded**.
+
+### 11.2 Degraded run behavior (fail-loud, not silent zero)
+
+When `flow_available is False`:
+
+1. `provider_flow_z` is **dropped** from the weighted sum entirely.
+2. The remaining 6 pillar weights are **renormalized** to sum to 1.0 so the composite stays on scale.
+3. The flow veto is **explicitly disabled** (not merely non-firing) so the logic is transparent.
+4. Every output row carries `flow_pillar_active=False`, `degraded_run=True`, and `flow_coverage` (float).
+5. The snapshot payload (`api_dashboard_snapshot.py`) surfaces `degraded_run` at the top level.
+
+**Why renormalize instead of zero-fill:** Zero-fill made an unavailable provider appear to contribute
+"average" flow (z=0), silently lowering every instrument's score by ~23% of zero while the weights
+still claimed to sum to 1.0. Renormalization makes the remaining signals carry their honest fraction of the composite.
+
+### 11.3 Configuring minimum coverage
+
+```python
+from src.scoring import ScoringConfig, DEFAULT_SCORING_CONFIG
+
+# Require all 3 providers before enabling the flow pillar:
+strict_config = ScoringConfig(
+    **{**vars(DEFAULT_SCORING_CONFIG), "min_flow_coverage": 1.0}
+)
+# Accept the run as long as at least 1 instrument has live flow:
+lenient_config = ScoringConfig(
+    **{**vars(DEFAULT_SCORING_CONFIG), "min_flow_coverage": 0.1}
+)
+```
+
+### 11.4 Identifying degraded runs
+
+In the scored DataFrame:
+```python
+degraded = scored["degraded_run"].any()           # bool — any pillar was renormalized
+coverage = scored["flow_coverage"].iloc[0]         # fraction of instruments with live flow
+active = scored["flow_pillar_active"].iloc[0]      # False when renormalized
+```
+
+In the dashboard snapshot payload, the top-level `degraded_run` field is set. The UI should display
+a "N-pillar degraded run" stamp when this is True rather than silently presenting 7-pillar scores.
+
+---
+
+## 12. References
 
 **Academic:**
 - Jegadeesh, N. & Titman, S. (1993). *Returns to Buying Winners and Selling Losers: Implications for Stock Market Efficiency.* Journal of Finance.

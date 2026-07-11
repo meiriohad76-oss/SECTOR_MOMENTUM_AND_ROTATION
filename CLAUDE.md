@@ -18,14 +18,25 @@ A local-first sector rotation dashboard. Two stacks exist simultaneously:
 - **Data:** Massive API (OHLCV), DuckDB for local cache (`data_cache/ohlcv.duckdb`), JSONL run journal
 - **Signal model:** 7-pillar scoring system — see `src/scoring.py` and `src/flow.py`
 
-## Seven pillars (weights)
-1. `cmf21` — Chaikin Money Flow 21-day — **23%** (highest)
-2. `mom_12_1` — 12-1 price momentum — **22%**
-3. `rs_ratio` — RRG RS-Ratio — **15%**
-4. `mansfield_rs` — Mansfield relative strength — **12%**
-5. `breadth_50d` — Binary trend/breadth filters — **12%**
-6. `cycle_tilt` — Business-cycle tilt — **8%**
-7. `rs_momentum` — RRG RS-Momentum — **8%**
+## Seven pillars (weights) — live `DEFAULT_SCORING_CONFIG`
+
+> These weights drive `compute_composite()` today.  A 4-pillar consolidation is
+> under calibration (`make_four_pillar_candidate_config()`); it may not become
+> the live default until the evidence gate clears.
+
+| # | Composite key | Description | Weight |
+|---|---|---|---|
+| 1 | `provider_flow_z` | Provider-sourced ETF flow, block trades, short interest | **23%** |
+| 2 | `mom_12_1_z` | 12-1 cross-sectional price momentum | **22%** |
+| 3 | `rs_ratio_z` | RRG RS-Ratio (price vs benchmark ratio) | **15%** |
+| 4 | `mansfield_rs_z` | Mansfield relative strength (same base signal as rs_ratio — collapses in candidate config) | **12%** |
+| 5 | `binary_filters` | Binary trend/breadth filters: Faber 10-mo SMA, Weinstein Stage 2, Antonacci absolute momentum | **12%** |
+| 6 | `cycle_tilt` | Business-cycle / macro overlay tilt | **8%** |
+| 7 | `rs_momentum_z` | RRG RS-Momentum | **8%** |
+
+**Note:** `breadth_50d` (% of constituents above 50-day MA) is used only in the
+**state machine gates** (`STATE_MACHINE_THRESHOLDS`), not as a composite weight.
+The CLAUDE.md previously listed it incorrectly as pillar #5 — that has been corrected.
 
 ## Six states (state machine)
 | State | Color | Meaning |

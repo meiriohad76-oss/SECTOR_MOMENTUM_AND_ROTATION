@@ -797,3 +797,554 @@ def evaluate_expanded_candidates(
     return out.sort_values(["horizon_weeks", "candidate_id"], kind="mergesort").reset_index(
         drop=True
     )
+
+
+# ── Task 9: Rank-IC per pillar + walk-forward weight grid ────────────────────
+
+def _spearman_corr(a: pd.Series, b: pd.Series) -> float:
+    """Spearman rank correlation without scipy (rank-then-Pearson)."""
+    ra = a.rank().values.astype(float)
+    rb = b.rank().values.astype(float)
+    # np.corrcoef uses ddof=1 Pearson — equivalent to Spearman on ranked data
+    mat = np.corrcoef(ra, rb)
+    return float(mat[0, 1])
+
+#: Ordered pillar z-score column names (default set for rank-IC evaluation).
+PILLAR_Z_COLUMNS: tuple[str, ...] = (
+    "mom_12_1_z",
+    "mansfield_rs_z",
+    "rs_ratio_z",
+    "rs_momentum_z",
+    "binary_filters_z",
+    "breadth_50d_z",
+    "provider_flow_z",
+)
+
+
+def rank_ic_per_pillar(
+    scored_df: pd.DataFrame,
+    *,
+    forward_return_col: str = "forward_return",
+    pillar_columns: tuple[str, ...] | list[str] | None = None,
+    min_cross_section: int = 5,
+) -> pd.DataFrame:
+    """Per-pillar rank information coefficient (IC) computed cross-sectionally.
+
+    For each pillar z-score column, computes the Spearman rank correlation
+    between the pillar's cross-sectional rank and the forward class-relative
+    return.  Reports mean IC, IC standard deviation, IC IR (mean/std), and
+    IC t-statistic across rebalances.
+
+    Parameters
+    ----------
+    scored_df : pd.DataFrame
+        Must contain pillar z-score columns and a ``forward_return`` column.
+        If the frame has a ``rebalance_date`` column it is used as the grouping
+        key; otherwise the whole frame is treated as one rebalance.
+    forward_return_col : str
+        Column name for forward class-relative return.
+    pillar_columns : sequence of str, optional
+        Pillar z-score columns to evaluate.  Defaults to ``PILLAR_Z_COLUMNS``.
+    min_cross_section : int
+        Minimum instruments per rebalance to compute IC (avoids rank-IC on <5
+        observations where Spearman correlation is unreliable).
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per pillar with columns:
+        ``pillar``, ``mean_ic``, ``ic_std``, ``ic_ir``, ``ic_t_stat``,
+        ``n_rebalances``, ``valid_rebalances``.
+    """
+    cols = list(pillar_columns) if pillar_columns is not None else list(PILLAR_Z_COLUMNS)
+    present = [c for c in cols if c in scored_df.columns]
+    if forward_return_col not in scored_df.columns:
+        raise ValueError(
+            f"rank_ic_per_pillar requires column '{forward_return_col}'; "
+            f"columns present: {list(scored_df.columns)}"
+        )
+
+    rebalance_col = "rebalance_date" if "rebalance_date" in scored_df.columns else None
+    groups = (
+        [grp for _, grp in scored_df.groupby(rebalance_col)]
+        if rebalance_col
+        else [scored_df]
+    )
+
+    ic_records: dict[str, list[float]] = {col: [] for col in present}
+    for grp in groups:
+        fwd = grp[forward_return_col].astype(float)
+        if fwd.notna().sum() < min_cross_section:
+            continue
+        for col in present:
+            pillar = grp[col].astype(float)
+            both = pillar.notna() & fwd.notna()
+            if both.sum() < min_cross_section:
+                continue
+            ic = _spearman_corr(pillar[both], fwd[both])
+            if not np.isnan(ic):
+                ic_records[col].append(ic)
+
+    rows = []
+    for col in present:
+        ics = ic_records[col]
+        n = len(ics)
+        if n == 0:
+            rows.append(
+                {
+                    "pillar": col,
+                    "mean_ic": float("nan"),
+                    "ic_std": float("nan"),
+                    "ic_ir": float("nan"),
+                    "ic_t_stat": float("nan"),
+                    "n_rebalances": len(groups),
+                    "valid_rebalances": 0,
+                }
+            )
+            continue
+        arr = np.array(ics, dtype=float)
+        mean_ic = float(arr.mean())
+        ic_std = float(arr.std(ddof=1)) if n > 1 else float("nan")
+        ic_ir = mean_ic / ic_std if (not np.isnan(ic_std) and ic_std > 0) else float("nan")
+        ic_t = (
+            mean_ic / (ic_std / np.sqrt(n))
+            if (not np.isnan(ic_std) and ic_std > 0 and n > 1)
+            else float("nan")
+        )
+        rows.append(
+            {
+                "pillar": col,
+                "mean_ic": mean_ic,
+                "ic_std": ic_std,
+                "ic_ir": ic_ir,
+                "ic_t_stat": ic_t,
+                "n_rebalances": len(groups),
+                "valid_rebalances": n,
+            }
+        )
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "pillar",
+            "mean_ic",
+            "ic_std",
+            "ic_ir",
+            "ic_t_stat",
+            "n_rebalances",
+            "valid_rebalances",
+        ],
+    )
+
+
+def walk_forward_weight_grid(
+    weight_candidates: list[dict],
+    scored_df: pd.DataFrame,
+    *,
+    forward_return_col: str = "forward_return",
+    min_cross_section: int = 5,
+    equal_weight_label: str = "equal_weight",
+) -> pd.DataFrame:
+    """Evaluate a grid of pillar-weight candidates via rank-IC.
+
+    For each candidate weight dict, computes a weighted composite z-score
+    from the pillar z-scores in ``scored_df``, then measures rank-IC against
+    the forward return.  The equal-weight candidate is automatically prepended
+    as the honest benchmark.
+
+    Parameters
+    ----------
+    weight_candidates : list of dict
+        Each dict: ``{"label": str, "weights": {pillar_col: float, ...}}``.
+        Weights need not sum to 1.0; they are renormalized internally so only
+        the *relative* values matter.
+    scored_df : pd.DataFrame
+        Must contain pillar z-score columns and ``forward_return_col``.
+    forward_return_col : str
+        Column for forward class-relative return.
+    min_cross_section : int
+        Minimum instruments per group to compute IC.
+    equal_weight_label : str
+        Label for the auto-prepended equal-weight baseline.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per candidate with columns:
+        ``label``, ``mean_ic``, ``ic_ir``, ``ic_t_stat``, ``valid_rebalances``,
+        ``promotion_label``, ``weights``.
+
+        ``promotion_label`` is ``"candidate"`` when mean_ic > 0 and ic_t > 1.0,
+        ``"research_candidate"`` when mean_ic > 0 but t-stat is insufficient,
+        ``"not_promoted"`` otherwise.
+
+    Notes
+    -----
+    This is a research-only helper; ``promotion_label == "candidate"`` here
+    only qualifies for the evidence gate (``evaluate_promotion_gate``), which
+    itself requires ≥20 OOS rebalances and Sharpe/CAGR criteria beyond IC alone.
+    No live ``DEFAULT_SCORING_CONFIG`` change is made automatically.
+    """
+    if forward_return_col not in scored_df.columns:
+        raise ValueError(
+            f"walk_forward_weight_grid requires '{forward_return_col}' column."
+        )
+    present_pillars = [c for c in PILLAR_Z_COLUMNS if c in scored_df.columns]
+
+    # Always prepend equal-weight baseline if not already present
+    candidates = list(weight_candidates)
+    if not any(str(c.get("label")) == equal_weight_label for c in candidates):
+        if present_pillars:
+            ew = 1.0 / len(present_pillars)
+            candidates = [
+                {"label": equal_weight_label, "weights": {col: ew for col in present_pillars}}
+            ] + candidates
+
+    rebalance_col = "rebalance_date" if "rebalance_date" in scored_df.columns else None
+    groups = (
+        [grp for _, grp in scored_df.groupby(rebalance_col)]
+        if rebalance_col
+        else [scored_df]
+    )
+
+    rows = []
+    for cand in candidates:
+        label = str(cand.get("label", "unknown"))
+        raw_weights: dict[str, float] = cand.get("weights", {})
+        # Restrict to present pillars; renormalize so weights sum to 1.0
+        active = {
+            k: float(v)
+            for k, v in raw_weights.items()
+            if k in present_pillars and float(v) > 0
+        }
+        total = sum(active.values())
+        norm_w = {k: v / total for k, v in active.items()} if total > 0 else {}
+
+        ics: list[float] = []
+        for grp in groups:
+            fwd = grp[forward_return_col].astype(float)
+            if fwd.notna().sum() < min_cross_section:
+                continue
+            composite = pd.Series(0.0, index=grp.index)
+            for col, w in norm_w.items():
+                if col in grp.columns:
+                    composite = composite + w * grp[col].astype(float).fillna(0)
+            both = composite.notna() & fwd.notna()
+            if both.sum() < min_cross_section:
+                continue
+            ic = _spearman_corr(composite[both], fwd[both])
+            if not np.isnan(ic):
+                ics.append(ic)
+
+        n = len(ics)
+        if n == 0:
+            rows.append(
+                {
+                    "label": label,
+                    "mean_ic": float("nan"),
+                    "ic_ir": float("nan"),
+                    "ic_t_stat": float("nan"),
+                    "valid_rebalances": 0,
+                    "promotion_label": "not_promoted",
+                    "weights": str(norm_w),
+                }
+            )
+            continue
+
+        arr = np.array(ics, dtype=float)
+        mean_ic = float(arr.mean())
+        ic_std = float(arr.std(ddof=1)) if n > 1 else float("nan")
+        ic_ir = mean_ic / ic_std if (not np.isnan(ic_std) and ic_std > 0) else float("nan")
+        ic_t = (
+            mean_ic / (ic_std / np.sqrt(n))
+            if (not np.isnan(ic_std) and ic_std > 0 and n > 1)
+            else float("nan")
+        )
+
+        if mean_ic > 0 and not np.isnan(ic_t) and ic_t > 1.0:
+            promo = "candidate"
+        elif mean_ic > 0:
+            promo = "research_candidate"
+        else:
+            promo = "not_promoted"
+
+        rows.append(
+            {
+                "label": label,
+                "mean_ic": mean_ic,
+                "ic_ir": ic_ir,
+                "ic_t_stat": ic_t,
+                "valid_rebalances": n,
+                "promotion_label": promo,
+                "weights": str(norm_w),
+            }
+        )
+
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "label",
+            "mean_ic",
+            "ic_ir",
+            "ic_t_stat",
+            "valid_rebalances",
+            "promotion_label",
+            "weights",
+        ],
+    )
+
+
+# ── Task 10: Weight-perturbation robustness + state forward-return separation ─
+
+def weight_perturbation_robustness(
+    scored_df: pd.DataFrame,
+    baseline_weights: dict[str, float],
+    *,
+    score_col: str = "S_score",
+    perturbation_pp: float = 0.10,
+    step_pp: float = 0.05,
+    top_n: int = 10,
+    pillar_columns: tuple[str, ...] | list[str] | None = None,
+) -> dict:
+    """Compute rank stability of a weight vector under uniform perturbations.
+
+    For each pillar, shifts its weight by ±``perturbation_pp`` in ``step_pp``
+    increments (redistributing the delta equally across the other pillars so
+    weights remain positive and sum to 1).  For each perturbed vector, computes
+    the Spearman rank correlation and top-N overlap against the baseline ranking.
+
+    If ``score_col`` is absent from ``scored_df``, a weighted composite is built
+    from ``pillar_columns`` using ``baseline_weights`` instead.
+
+    Parameters
+    ----------
+    scored_df : pd.DataFrame
+        Instrument-level data with the pillar z-score columns and optionally
+        ``score_col`` for the baseline ranking.
+    baseline_weights : dict[str, float]
+        Current pillar weights (will be renormalized to sum=1).
+    score_col : str
+        Column holding the baseline composite score.
+    perturbation_pp : float
+        Maximum perturbation in weight-fraction units (0.10 = ±10 pp).
+    step_pp : float
+        Grid step size (0.05 = 5 pp grid).
+    top_n : int
+        Size of the "top-N" set for overlap measurement.
+    pillar_columns : sequence of str, optional
+        Which pillar z-score columns to perturb.  Defaults to ``PILLAR_Z_COLUMNS``.
+
+    Returns
+    -------
+    dict with keys:
+        ``rank_correlations`` — list of Spearman ρ per perturbation
+        ``top_n_overlaps``    — list of top-N overlap fractions per perturbation
+        ``mean_rank_correlation``
+        ``min_rank_correlation``
+        ``mean_top_n_overlap``
+        ``min_top_n_overlap``
+        ``n_perturbations``
+        ``top_n``
+    """
+    cols = list(pillar_columns) if pillar_columns is not None else list(PILLAR_Z_COLUMNS)
+    present = [c for c in cols if c in scored_df.columns and c in baseline_weights]
+
+    # Normalise baseline weights over present pillars
+    raw = {k: float(baseline_weights[k]) for k in present if float(baseline_weights.get(k, 0)) > 0}
+    total = sum(raw.values())
+    if total <= 0:
+        return {
+            "rank_correlations": [],
+            "top_n_overlaps": [],
+            "mean_rank_correlation": float("nan"),
+            "min_rank_correlation": float("nan"),
+            "mean_top_n_overlap": float("nan"),
+            "min_top_n_overlap": float("nan"),
+            "n_perturbations": 0,
+            "top_n": top_n,
+        }
+    base_w = {k: v / total for k, v in raw.items()}
+
+    # Build baseline composite / score series
+    if score_col in scored_df.columns:
+        base_scores = scored_df[score_col].astype(float)
+    else:
+        base_scores = pd.Series(0.0, index=scored_df.index)
+        for col, w in base_w.items():
+            base_scores = base_scores + w * scored_df[col].astype(float).fillna(0)
+
+    base_ranks = base_scores.rank(ascending=False, method="min")
+    base_top = set(base_scores.nlargest(top_n).index)
+
+    rank_corrs: list[float] = []
+    top_overlaps: list[float] = []
+
+    steps = np.arange(step_pp, perturbation_pp + 1e-9, step_pp)
+    directions = [1.0, -1.0]
+
+    for pillar in present:
+        other_pillars = [p for p in present if p != pillar]
+        if not other_pillars:
+            continue
+        for direction in directions:
+            for delta in steps:
+                shift = direction * float(delta)
+                new_pillar_w = base_w[pillar] + shift
+                if new_pillar_w <= 0:
+                    continue
+                # Redistribute delta across other pillars proportionally
+                redistrib = -shift / len(other_pillars)
+                new_w = dict(base_w)
+                new_w[pillar] = new_pillar_w
+                for p in other_pillars:
+                    new_w[p] = max(0.0, base_w[p] + redistrib)
+                # Renormalise (redistribution may not be perfectly balanced)
+                wsum = sum(new_w.values())
+                if wsum <= 0:
+                    continue
+                new_w = {k: v / wsum for k, v in new_w.items()}
+
+                perturbed = pd.Series(0.0, index=scored_df.index)
+                for col, w in new_w.items():
+                    if col in scored_df.columns:
+                        perturbed = perturbed + w * scored_df[col].astype(float).fillna(0)
+
+                both = base_scores.notna() & perturbed.notna()
+                if both.sum() < 2:
+                    continue
+                rho = _spearman_corr(base_scores[both], perturbed[both])
+                if not np.isnan(rho):
+                    rank_corrs.append(rho)
+                    perturbed_top = set(perturbed.nlargest(top_n).index)
+                    overlap = len(base_top & perturbed_top) / max(top_n, 1)
+                    top_overlaps.append(overlap)
+
+    if not rank_corrs:
+        return {
+            "rank_correlations": [],
+            "top_n_overlaps": [],
+            "mean_rank_correlation": float("nan"),
+            "min_rank_correlation": float("nan"),
+            "mean_top_n_overlap": float("nan"),
+            "min_top_n_overlap": float("nan"),
+            "n_perturbations": 0,
+            "top_n": top_n,
+        }
+
+    return {
+        "rank_correlations": rank_corrs,
+        "top_n_overlaps": top_overlaps,
+        "mean_rank_correlation": float(np.mean(rank_corrs)),
+        "min_rank_correlation": float(np.min(rank_corrs)),
+        "mean_top_n_overlap": float(np.mean(top_overlaps)),
+        "min_top_n_overlap": float(np.min(top_overlaps)),
+        "n_perturbations": len(rank_corrs),
+        "top_n": top_n,
+    }
+
+
+def state_forward_return_separation(
+    scored_df: pd.DataFrame,
+    *,
+    forward_return_col: str = "forward_return",
+    state_col: str = "state",
+    state_order: list[str] | None = None,
+) -> pd.DataFrame:
+    """Compute per-state distribution of forward returns.
+
+    Parameters
+    ----------
+    scored_df : pd.DataFrame
+        Must contain ``state_col`` and ``forward_return_col``.
+    state_order : list of str, optional
+        Expected ordering of states from highest to lowest mean return.
+        Default: [STAGE_2_BULLISH, HOLD, WARNING, EXIT, BEARISH_STAGE_4].
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per state with columns:
+        ``state``, ``mean_return``, ``median_return``, ``std_return``,
+        ``count``, ``rank_by_mean``, ``expected_rank``, ``separation_met``.
+
+        ``separation_met`` is True for all rows when the empirical ordering of
+        states by mean return matches the expected ordering (higher states lead
+        lower states in forward return).
+    """
+    _default_state_order = [
+        "STAGE_2_BULLISH",
+        "HOLD",
+        "WARNING",
+        "EXIT",
+        "BEARISH_STAGE_4",
+    ]
+    order = list(state_order) if state_order is not None else _default_state_order
+
+    if state_col not in scored_df.columns:
+        raise ValueError(
+            f"state_forward_return_separation requires column '{state_col}'."
+        )
+    if forward_return_col not in scored_df.columns:
+        raise ValueError(
+            f"state_forward_return_separation requires column '{forward_return_col}'."
+        )
+
+    df = scored_df[[state_col, forward_return_col]].copy()
+    df[forward_return_col] = pd.to_numeric(df[forward_return_col], errors="coerce")
+
+    rows = []
+    for state in order:
+        sub = df.loc[df[state_col] == state, forward_return_col].dropna()
+        rows.append(
+            {
+                "state": state,
+                "mean_return": float(sub.mean()) if len(sub) > 0 else float("nan"),
+                "median_return": float(sub.median()) if len(sub) > 0 else float("nan"),
+                "std_return": float(sub.std(ddof=1)) if len(sub) > 1 else float("nan"),
+                "count": int(len(sub)),
+            }
+        )
+
+    # Also add any states present in the data but not in the expected order
+    extra_states = sorted(set(df[state_col].dropna().unique()) - set(order))
+    for state in extra_states:
+        sub = df.loc[df[state_col] == state, forward_return_col].dropna()
+        rows.append(
+            {
+                "state": state,
+                "mean_return": float(sub.mean()) if len(sub) > 0 else float("nan"),
+                "median_return": float(sub.median()) if len(sub) > 0 else float("nan"),
+                "std_return": float(sub.std(ddof=1)) if len(sub) > 1 else float("nan"),
+                "count": int(len(sub)),
+            }
+        )
+
+    result = pd.DataFrame(
+        rows,
+        columns=["state", "mean_return", "median_return", "std_return", "count"],
+    )
+    # Rank states by mean return (1 = highest)
+    result["rank_by_mean"] = (
+        result["mean_return"].rank(ascending=False, method="min", na_option="bottom").astype(int)
+    )
+    # Expected rank per the prescribed order (states not in order get NaN)
+    expected_rank_map = {state: i + 1 for i, state in enumerate(order)}
+    result["expected_rank"] = result["state"].map(expected_rank_map)
+
+    # separation_met: for states IN the expected order, check empirical rank ≤ expected rank
+    # (higher states should have higher or equal mean return, i.e. lower rank number)
+    in_order = result["expected_rank"].notna()
+    ordered_subset = result.loc[in_order].sort_values("expected_rank")
+    mean_returns = ordered_subset["mean_return"].tolist()
+    # Monotonic-non-increasing check (allow ties / NaN skipping)
+    separation_ok = True
+    prev = None
+    for v in mean_returns:
+        if np.isnan(v):
+            continue
+        if prev is not None and v > prev:
+            separation_ok = False
+            break
+        prev = v
+
+    result["separation_met"] = separation_ok
+    return result.reset_index(drop=True)
