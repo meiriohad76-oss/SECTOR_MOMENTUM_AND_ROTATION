@@ -3,11 +3,11 @@
  *
  * Browser clients poll this same-origin endpoint to track refresh job
  * progress. Next.js runs this handler server-side on the Pi and forwards
- * the request to FastAPI on 127.0.0.1:8000.
+ * the request to FastAPI on 127.0.0.1:8001.
  */
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE = process.env.API_BASE_URL || "http://127.0.0.1:8000";
+const API_BASE = process.env.API_BASE_URL || "http://127.0.0.1:8001";
 
 export async function GET(
   _request: NextRequest,

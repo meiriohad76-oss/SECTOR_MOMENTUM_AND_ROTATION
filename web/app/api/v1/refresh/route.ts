@@ -3,11 +3,11 @@
  *
  * Browser clients (which may not have direct access to the FastAPI server)
  * call this same-origin endpoint. Next.js runs this handler server-side on
- * the Pi and forwards the request to FastAPI on 127.0.0.1:8000.
+ * the Pi and forwards the request to FastAPI on 127.0.0.1:8001.
  */
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE = process.env.API_BASE_URL || "http://127.0.0.1:8000";
+const API_BASE = process.env.API_BASE_URL || "http://127.0.0.1:8001";
 
 export async function POST(request: NextRequest) {
   try {

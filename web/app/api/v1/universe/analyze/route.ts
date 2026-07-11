@@ -2,11 +2,11 @@
  * Server-side proxy for POST /api/v1/universe/analyze.
  *
  * Browser clients call this same-origin endpoint. Next.js runs this handler
- * server-side and forwards the request to FastAPI on 127.0.0.1:8000.
+ * server-side and forwards the request to FastAPI on 127.0.0.1:8001.
  */
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE = process.env.API_BASE_URL || "http://127.0.0.1:8000";
+const API_BASE = process.env.API_BASE_URL || "http://127.0.0.1:8001";
 
 export async function POST(request: NextRequest) {
   try {
