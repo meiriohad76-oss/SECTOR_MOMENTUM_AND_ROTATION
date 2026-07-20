@@ -1,3 +1,6 @@
+# DEPRECATED 2026-07-20: Replaced by Next.js (web/) + FastAPI (src/api_server.py).
+# This file is archived and no longer executed in production.
+# The production route is https://sentimentdashboard.ahaddashboards.uk/ -> Next.js on port 3100.
 """Sentiment Board - Streamlit implementation of the live momentum dashboard.
 
 Run with: streamlit run app.py

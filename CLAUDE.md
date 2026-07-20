@@ -10,6 +10,8 @@ A local-first sector rotation dashboard. Two stacks exist simultaneously:
 | Pi FastAPI | Pi 127.0.0.1 | 8000 | Full featured, real data fetch |
 | Pi Next.js | Pi 127.0.0.1 | 3100 | Deployed from git |
 
+**Production stack (as of 2026-07-20):** Next.js on port 3100 + FastAPI on port 8000 are the sole production stack. Streamlit (`app.py`, port 8501) is retired — `sector-dashboard.service` was disabled on the Pi on 2026-07-20 and `app.py` is archived with a deprecation header.
+
 **Critical:** `web/.env.local` points the local Next.js at the QA API (port 8765), NOT the Pi. The QA server is a read-only mock — it serves persisted snapshot data without fetching live providers.
 
 ## Stack
