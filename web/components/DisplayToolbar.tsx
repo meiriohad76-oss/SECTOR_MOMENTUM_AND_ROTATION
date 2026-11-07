@@ -108,6 +108,7 @@ export default function DisplayToolbar({
           {copied ? "✓ Copied" : "⧉ Link"}
         </button>
         <RefreshButton laneId="all" label="all data" />
+        <button type="button" className="c-icon-btn" title="Display mode" aria-label="Display mode">☾</button>
         <a href="/admin" className="display-toolbar-admin">Admin</a>
       </div>
     </header>

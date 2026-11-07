@@ -177,7 +177,7 @@ def test_next_shell_has_handoff_presentation_modes_for_visual_parity():
     # Presentation mode branching lives in DisplayShell (client component)
     assert 'presentation === "a"' in display_shell_source
     assert 'presentation === "b"' in display_shell_source
-    assert 'presentation === "c"' in display_shell_source
+    assert 'useState<DisplayMode>("c")' in display_shell_source  # Display C is the default; handoff-c is the fallthrough
     assert '"handoff-b"' in display_shell_source
     assert '"handoff-c"' in display_shell_source
     assert 'type PresentationMode = "default" | "handoff-a" | "handoff-b" | "handoff-c"' in client_source
@@ -380,14 +380,15 @@ def test_next_shell_c1_heatmap_uses_handoff_pillar_palette_and_layout():
 
 def test_next_shell_c_topbar_uses_handoff_logo_and_controls():
     client_source = (WEB / "app" / "dashboard-screens-client.tsx").read_text(encoding="utf-8")
+    toolbar_source = (WEB / "components" / "DisplayToolbar.tsx").read_text(encoding="utf-8")
     css_source = (WEB / "app" / "globals.css").read_text(encoding="utf-8")
 
     for marker in (
         '<span className="c-logo" aria-hidden="true">',
-        'aria-label="Refresh candidate snapshot">↻</button>',
-        'aria-label="Display mode">☾</button>',
     ):
         assert marker in client_source
+    assert 'aria-label="Display mode">☾</button>' in toolbar_source
+    assert '<RefreshButton laneId="all"' in toolbar_source
     for marker in (
         "grid-template-columns: repeat(4, 3.6px);",
         ".c-logo span:nth-child(1)",
