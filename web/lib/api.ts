@@ -101,6 +101,35 @@ export type SnapshotPosition = {
   updated_at: string;
 };
 
+export type BlufStock = {
+  ticker: string;
+  sector: string | null;
+  state: string | null;
+  s_score: number | null;
+  quadrant?: string | null;
+};
+
+export type BlufHolding = {
+  ticker: string;
+  sector: string | null;
+  sector_leading: boolean | null;
+  state: string | null;
+  s_score: number | null;
+  scored: boolean;
+};
+
+export type BlufPayload = {
+  conclusions: string[];
+  actions: string[];
+  leading_sectors: { ticker: string; state: string | null; s_score: number; quadrant: string | null }[];
+  top_leading_stocks: BlufStock[];
+  holdings: BlufHolding[];
+  watchlist: BlufHolding[];
+  alert_count: number;
+  degraded: boolean;
+  flow_coverage: number | null;
+};
+
 export type DashboardSnapshotPayload = {
   api_version: string;
   generated_at: string;
@@ -122,6 +151,7 @@ export type DashboardSnapshotPayload = {
   rows: SnapshotRow[];
   decisions: SnapshotDecision[];
   focus: SnapshotRow | null;
+  bluf?: BlufPayload | null;
   screens: {
     overview?: {
       leaders?: SnapshotRow[];

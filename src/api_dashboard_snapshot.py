@@ -11,6 +11,7 @@ from typing import Any, Mapping
 import math
 import statistics
 
+from .bluf import build_bluf, load_sector_map
 from .run_journal import DEFAULT_JOURNAL_PATH, list_runs, load_run_details
 from .saved_inputs import DEFAULT_SAVED_INPUTS_PATH, load_saved_inputs
 from .ticker_identity import ticker_display_name
@@ -190,6 +191,14 @@ def _position_payloads(path: str | Path | None = DEFAULT_SAVED_INPUTS_PATH, limi
     return rows
 
 
+def _watchlist_tickers(path: str | Path | None = DEFAULT_SAVED_INPUTS_PATH) -> list[str]:
+    tickers: list[str] = []
+    for item in load_saved_inputs(path):
+        if item.kind == 'watchlist':
+            tickers.extend(t.upper() for t in item.tickers)
+    return list(dict.fromkeys(tickers))
+
+
 def _safe_median(values: list[float]) -> float | None:
     finite = [v for v in values if v is not None and not math.isnan(v)]
     if not finite:
@@ -338,6 +347,19 @@ def build_latest_dashboard_snapshot_payload(
     # Task 7: cross-class rotation — which bucket is capital rotating into?
     class_rotation = _class_rotation_from_rows(rows)
 
+    # Bottom-line-up-front summary: leading sectors, top stocks in them, and
+    # the user's holdings and watchlist mapped to sectors.
+    run_metadata = dict(run.get('metadata', {}) or {})
+    bluf = build_bluf(
+        rows=rows,
+        sector_map=load_sector_map(),
+        holdings=[item['ticker'] for item in positions],
+        watchlist=_watchlist_tickers(saved_inputs_path),
+        risk_on=run_metadata.get('risk_on'),
+        degraded=run_degraded,
+        flow_coverage=_float_or_none(run_metadata.get('flow_coverage')),
+    )
+
     return {
         "api_version": "v1",
         "generated_at": generated_at or _utc_iso(),
@@ -355,6 +377,7 @@ def build_latest_dashboard_snapshot_payload(
         "decisions": decisions,
         "focus": focus,
         "class_rotation": class_rotation,
+        "bluf": bluf,
         "screens": {
             "overview": {
                 "leaders": leaders,

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { BacktestArtifactsPayload, DebriefPayload, DashboardSnapshotPayload } from "../lib/api";
 import DashboardScreensClient from "../app/dashboard-screens-client";
 import DisplayToolbar from "./DisplayToolbar";
+import Bluf from "./Bluf";
 
 export type DisplayMode = "a" | "b" | "c";
 export type ScreenId = "overview" | "deepdive" | "rotation";
@@ -27,10 +28,12 @@ export default function DisplayShell({
   const [activeScreen,  setActiveScreen]  = useState<ScreenId>("overview");
   const [focusTicker,   setFocusTicker]   = useState<string>("");
   const [hydrated,      setHydrated]      = useState(false);
+  const [blufOn,        setBlufOn]        = useState(process.env.NEXT_PUBLIC_BLUF_LAYOUT === "1");
 
   // Hydrate from URL params then localStorage (runs once, client-only)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get("bluf") === "1") setBlufOn(true);
 
     // Display mode: ?display= takes priority, legacy ?presentation= as fallback
     const urlDisplay = params.get("display") ?? params.get("presentation");
@@ -107,6 +110,7 @@ export default function DisplayShell({
         onSwitch={switchPresentation}
         onSwitchScreen={switchScreen}
       />
+      {blufOn && snapshot?.bluf ? <Bluf bluf={snapshot.bluf} /> : null}
       <DashboardScreensClient
         snapshot={snapshot}
         presentation={presentationMode}
