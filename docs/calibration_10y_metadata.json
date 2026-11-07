@@ -42,7 +42,7 @@
     }
   },
   "candidate_config_available": true,
-  "candidate_config_sha256": "ee0babb300072ce63019c00a64c8a000a723981d4c1da4d7f4440de7b0aef172",
+  "candidate_config_sha256": "d0657434f1ab2a2659901d7f6e48a5ca8e24763a232a5df68c3badf9269d1696",
   "candidate_config_status": "rejected_final_holdout_no_data",
   "candidate_rows": 20,
   "candidate_search_status": "completed",
