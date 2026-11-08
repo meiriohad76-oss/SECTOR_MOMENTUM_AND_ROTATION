@@ -23,14 +23,15 @@ def test_api_server_is_optional_fastapi_boundary_not_streamlit_import():
     assert "from .api_dashboard_snapshot import build_latest_dashboard_snapshot_payload" in source
     assert "from .api_portfolio import build_portfolio_analysis_payload" in source
     assert "from .api_status import build_persisted_status_payload" in source
+    assert "from .app_build_info import APP_VERSION, get_git_sha" in source
     assert "from .api_ticker_chart import build_ticker_chart_payload" in source
     assert "backtest_artifacts_provider: BacktestArtifactsProvider | None = None" in source
     assert "ticker_chart_provider: TickerChartProvider | None = None" in source
     assert "saved_inputs_path: str | None = None" in source
     assert "backtest_reader = backtest_artifacts_provider or build_backtest_artifacts_payload" in source
     assert "ticker_chart_reader = ticker_chart_provider or build_ticker_chart_payload" in source
-    assert "return build_persisted_status_payload()" in source
-    assert "return build_provider_data_health_payload()" in source
+    assert "return build_persisted_status_payload(app_version=APP_VERSION, git_sha=get_git_sha())" in source
+    assert "return build_provider_data_health_payload(app_version=APP_VERSION, git_sha=get_git_sha())" in source
     assert 'app.get("/api/v1/health")' in source
     assert 'app.get("/api/v1/status")' in source
     assert 'app.get("/api/v1/data-health")' in source
