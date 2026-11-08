@@ -4153,6 +4153,47 @@ select:focus-visible {
 
 .display-toolbar-screen-tab:hover:not(.active) { color: #aab8c4; }
 
+/* ── Display toolbar – phone width ── */
+@media (max-width: 767px) {
+  .display-toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    gap: 8px 12px;
+    padding: 8px 16px;
+  }
+  .display-toolbar-brand { margin-right: 0; }
+  .display-toolbar-tabs,
+  .display-toolbar-screens {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .display-toolbar-tabs::-webkit-scrollbar,
+  .display-toolbar-screens::-webkit-scrollbar { display: none; }
+  .display-toolbar-divider { display: none; }
+  .full-table-scroll,
+  .bluf div:has(> table) {
+    overflow-x: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+  .chart-card:has(.composition-header) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .chart-card:has(.composition-header) .composition-header,
+  .chart-card:has(.composition-header) .composition-row {
+    min-width: 524px;
+  }
+  .display-toolbar-right {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+  }
+}
+
 /* ── State Pill ── */
 .state-pill {
   display: inline-block;

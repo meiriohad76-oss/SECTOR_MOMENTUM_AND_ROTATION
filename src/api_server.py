@@ -18,6 +18,7 @@ from .api_saved_portfolios import (
     save_saved_portfolio_payload,
 )
 from .api_data_health import build_provider_data_health_payload
+from .app_build_info import APP_VERSION, get_git_sha
 from .api_dashboard_snapshot import build_latest_dashboard_snapshot_payload
 from .api_portfolio import build_portfolio_analysis_payload
 from .api_status import build_persisted_status_payload
@@ -45,12 +46,12 @@ DebriefProvider = Callable[[], dict[str, Any]]
 
 def default_status_provider() -> dict[str, Any]:
     """Return read-only persisted dashboard health without recomputing providers."""
-    return build_persisted_status_payload()
+    return build_persisted_status_payload(app_version=APP_VERSION, git_sha=get_git_sha())
 
 
 def default_data_health_provider() -> dict[str, Any]:
     """Return read-only provider/data health for future API clients."""
-    return build_provider_data_health_payload()
+    return build_provider_data_health_payload(app_version=APP_VERSION, git_sha=get_git_sha())
 
 
 def default_snapshot_provider(**kwargs: Any) -> dict[str, Any]:
