@@ -30,11 +30,13 @@ from src.macro_tiles import MACRO_CONTEXT_SYMBOLS  # noqa: E402
 from src.provider_flow_cache import read_provider_flow_cache  # noqa: E402
 from src.run_journal import DEFAULT_JOURNAL_PATH, append_dashboard_run  # noqa: E402
 from src.scoring import apply_eligibility_gate, apply_state_machine, compute_composite, DEFAULT_SCORING_CONFIG, state_storage_health  # noqa: E402
-from src.universe import ALL_TICKERS, BENCH  # noqa: E402
+from src.universe import ALL_TICKERS, BENCH, user_class_overrides, user_tickers  # noqa: E402
 
 
 APP_VERSION = "2026.05.26-ux-hardening"
 DATA_SYMBOLS = list(dict.fromkeys(ALL_TICKERS + list(MACRO_CONTEXT_SYMBOLS) + ["^TNX", "^IRX"]))
+SCORING_TICKERS = list(dict.fromkeys(ALL_TICKERS + user_tickers()))
+DATA_SYMBOLS = list(dict.fromkeys(DATA_SYMBOLS + user_tickers()))
 PROVIDER_FLOW_MODES = ("cache-only", "live", "stubbed")
 ProgressCallback = Callable[[str, int, str, dict[str, Any] | None], None]
 
@@ -295,9 +297,9 @@ def refresh_dashboard_state(
         "compute_indicators",
         50,
         "Computing momentum, trend, rotation, and flow indicators",
-        {"ticker_count": len([ticker for ticker in ALL_TICKERS if ticker in ohlcv])},
+        {"ticker_count": len([ticker for ticker in SCORING_TICKERS if ticker in ohlcv])},
     )
-    scoring_ohlcv = {ticker: ohlcv[ticker] for ticker in ALL_TICKERS if ticker in ohlcv}
+    scoring_ohlcv = {ticker: ohlcv[ticker] for ticker in SCORING_TICKERS if ticker in ohlcv}
     indicators_df = compute_all_indicators(scoring_ohlcv, bench_ticker, bil_ticker)
     flow_df = compute_flow_signals(scoring_ohlcv)
     # flow_composite_z now returns a FlowCompositeResult (Task 2a); pass it
@@ -324,7 +326,10 @@ def refresh_dashboard_state(
             "flow_coverage": float(flow_result.flow_coverage),
         },
     )
-    scored = compute_composite(indicators_df, flow_df, flow_result, phase=regime.phase_hint)
+    scored = compute_composite(
+        indicators_df, flow_df, flow_result, phase=regime.phase_hint,
+        class_overrides=user_class_overrides(),
+    )
     scored = apply_state_machine(scored)
     # CODEX governance (Task 2.4 / selection_mode):
     # apply_eligibility_gate is a GATED feature.  DEFAULT_SCORING_CONFIG uses
