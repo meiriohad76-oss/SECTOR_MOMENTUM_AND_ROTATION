@@ -4171,6 +4171,15 @@ select:focus-visible {
   .display-toolbar-tabs::-webkit-scrollbar,
   .display-toolbar-screens::-webkit-scrollbar { display: none; }
   .display-toolbar-divider { display: none; }
+  .handoff-a,
+  .handoff-b {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+  .c-focus-select,
+  .c-focus-select select {
+    max-width: 100%;
+  }
   .full-table-scroll,
   .bluf div:has(> table) {
     overflow-x: auto;
