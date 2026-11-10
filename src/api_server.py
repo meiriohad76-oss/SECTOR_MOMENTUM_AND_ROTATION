@@ -12,6 +12,11 @@ from typing import Any
 from .api_backtest_artifacts import build_backtest_artifacts_payload
 from .api_refresh import create_refresh_job, get_refresh_job, list_refresh_events, queued_refresh_response
 from .api_refresh_runner import run_refresh_job
+from .api_watchlists import (
+    build_saved_watchlists_payload,
+    delete_saved_watchlist_payload,
+    save_saved_watchlist_payload,
+)
 from .api_saved_portfolios import (
     build_saved_portfolios_payload,
     delete_saved_portfolio_payload,
@@ -168,6 +173,18 @@ def create_app(
     @app.delete("/api/v1/portfolios")
     def delete_saved_portfolio(name: str) -> dict[str, Any]:
         return delete_saved_portfolio_payload(name, path=saved_inputs_path)
+
+    @app.get("/api/v1/watchlists")
+    def saved_watchlists() -> dict[str, Any]:
+        return build_saved_watchlists_payload(saved_inputs_path)
+
+    @app.post("/api/v1/watchlists")
+    def save_saved_watchlist(payload: dict[str, Any] | None = Body(default=None)) -> dict[str, Any]:
+        return save_saved_watchlist_payload(payload or {}, path=saved_inputs_path)
+
+    @app.delete("/api/v1/watchlists")
+    def delete_saved_watchlist(name: str) -> dict[str, Any]:
+        return delete_saved_watchlist_payload(name, path=saved_inputs_path)
 
     @app.post("/api/v1/refresh", status_code=202)
     def create_refresh(

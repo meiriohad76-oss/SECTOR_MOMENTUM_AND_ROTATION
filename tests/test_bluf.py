@@ -42,7 +42,7 @@ def test_unmapped_and_exit_stocks_are_never_picked():
 def test_portfolio_view_reports_sector_and_leadership_and_unscored():
     view = portfolio_view(ROWS, SECTOR_MAP, ["nvda", "KO", "ZZZ", "XLK"], {"XLK", "XLF"})
 
-    assert view[0] == {"ticker": "NVDA", "sector": "XLK", "sector_leading": True, "state": "STAGE_2_BULLISH", "s_score": 1.8, "scored": True}
+    assert view[0] == {"ticker": "NVDA", "sector": "XLK", "sector_leading": True, "state": "STAGE_2_BULLISH", "s_score": 1.8, "scored": True, "sector_note": None}
     assert view[1]["sector_leading"] is False
     assert view[2]["sector"] is None and view[2]["scored"] is False
     assert view[3]["sector"] == "XLK" and view[3]["sector_leading"] is True

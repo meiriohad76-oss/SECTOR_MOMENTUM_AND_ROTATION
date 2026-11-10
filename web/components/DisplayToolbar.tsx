@@ -1,6 +1,6 @@
 // web/components/DisplayToolbar.tsx
 "use client";
-import { useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import type { DisplayMode, ScreenId } from "./DisplayShell";
 import RefreshButton from "./RefreshButton";
 
@@ -108,9 +108,38 @@ export default function DisplayToolbar({
           {copied ? "✓ Copied" : "⧉ Link"}
         </button>
         <RefreshButton laneId="all" label="all data" />
-        <button type="button" className="c-icon-btn" title="Display mode" aria-label="Display mode">☾</button>
+        <ThemeToggle />
         <a href="/admin" className="display-toolbar-admin">Admin</a>
       </div>
     </header>
+  );
+}
+
+function ThemeToggle() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    try {
+      setDark(window.localStorage.getItem("sector-theme") === "dark");
+    } catch {
+      /* storage unavailable: keep the default theme */
+    }
+  }, []);
+  useEffect(() => {
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  }, [dark]);
+  const toggle = () => {
+    const next = !dark;
+    setDark(next);
+    try {
+      window.localStorage.setItem("sector-theme", next ? "dark" : "light");
+    } catch {
+      /* ignore: the toggle still works for this page view */
+    }
+  };
+  const label = dark ? "Switch to light mode" : "Switch to dark mode";
+  return (
+    <button type="button" className="c-icon-btn" onClick={toggle} aria-pressed={dark} title={label} aria-label={label}>
+      {dark ? "☀" : "☾"}
+    </button>
   );
 }

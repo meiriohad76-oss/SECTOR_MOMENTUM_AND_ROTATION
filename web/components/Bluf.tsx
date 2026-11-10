@@ -76,7 +76,7 @@ export default function Bluf({ bluf }: { bluf: BlufPayload }) {
               {bluf.holdings.map((item) => (
                 <tr key={item.ticker}>
                   <td>{item.ticker}</td>
-                  <td>{item.sector ?? "unmapped"}</td>
+                  <td>{item.sector ?? "unmapped"}{item.sector_note ? <span className="proxy-tag" title={item.sector_note}>proxy</span> : null}</td>
                   <td>{item.sector_leading == null ? "n/a" : item.sector_leading ? "yes" : "no"}</td>
                   <td>{item.scored ? item.state : "not scored"}</td>
                 </tr>
@@ -97,7 +97,7 @@ export default function Bluf({ bluf }: { bluf: BlufPayload }) {
               {bluf.watchlist.map((item) => (
                 <tr key={item.ticker}>
                   <td>{item.ticker}</td>
-                  <td>{item.sector ?? "unmapped"}</td>
+                  <td>{item.sector ?? "unmapped"}{item.sector_note ? <span className="proxy-tag" title={item.sector_note}>proxy</span> : null}</td>
                   <td>{item.sector_leading == null ? "n/a" : item.sector_leading ? "yes" : "no"}</td>
                   <td>{item.scored ? item.state : "not scored"}</td>
                 </tr>

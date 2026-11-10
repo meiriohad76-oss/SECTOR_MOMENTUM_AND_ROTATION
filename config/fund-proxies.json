@@ -1,0 +1,14 @@
+{
+  "_about": "Funds whose sector label is a proxy: the sector ETF is the fund's largest sector, not its full exposure.",
+  "AIS": "AI-themed fund; mapped to XLK as a proxy.",
+  "AIPO": "AI and power-infrastructure fund; mapped to XLI as a proxy.",
+  "CGDV": "Multi-sector fund; mapped to its largest sector (technology).",
+  "DRAM": "Memory-chip fund; mapped to XLK as a proxy.",
+  "GDX": "Gold-miner fund; mapped to XLB as a proxy.",
+  "IGM": "Software fund; mapped to XLK as a proxy.",
+  "IQLT": "International multi-sector fund; mapped to its largest sector (financials).",
+  "NASA": "Space multi-sector fund; mapped to its largest sector (industrials).",
+  "PPA": "Aerospace and defense fund; mapped to XLI as a proxy.",
+  "QQQ": "Nasdaq-100 fund; mapped to XLK as a proxy.",
+  "SCHY": "International dividend multi-sector fund; mapped to its largest sector (financials)."
+}

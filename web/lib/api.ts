@@ -113,6 +113,7 @@ export type BlufHolding = {
   ticker: string;
   sector: string | null;
   sector_leading: boolean | null;
+  sector_note?: string | null;
   state: string | null;
   s_score: number | null;
   scored: boolean;
@@ -516,6 +517,27 @@ export type DebriefPayload = {
   runs: DebriefRun[];
   decisions: DebriefDecision[];
 };
+
+export type SavedWatchlistsPayload = {
+  api_version: string;
+  status: string;
+  watchlist_count: number;
+  watchlists: { name: string; tickers: string[]; updated_at: string }[];
+};
+
+export async function fetchSavedWatchlists() {
+  return fetchDashboardApi<SavedWatchlistsPayload>("/api/v1/watchlists");
+}
+
+export async function saveWatchlist(name: string, tickers: string) {
+  return postDashboardApi<{ status?: string; message?: string }>("/api/v1/watchlists", { name, tickers });
+}
+
+export async function deleteSavedWatchlist(name: string) {
+  return deleteDashboardApi<{ status?: string; deleted?: boolean }>(
+    `/api/v1/watchlists?name=${encodeURIComponent(name)}`
+  );
+}
 
 export async function fetchDebrief(): Promise<{
   data: DebriefPayload | null;
