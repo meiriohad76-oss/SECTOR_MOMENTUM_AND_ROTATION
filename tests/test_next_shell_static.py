@@ -387,7 +387,7 @@ def test_next_shell_c_topbar_uses_handoff_logo_and_controls():
         '<span className="c-logo" aria-hidden="true">',
     ):
         assert marker in client_source
-    assert 'aria-label="Display mode">☾</button>' in toolbar_source
+    assert "function ThemeToggle" in toolbar_source and "<ThemeToggle />" in toolbar_source
     assert '<RefreshButton laneId="all"' in toolbar_source
     for marker in (
         "grid-template-columns: repeat(4, 3.6px);",

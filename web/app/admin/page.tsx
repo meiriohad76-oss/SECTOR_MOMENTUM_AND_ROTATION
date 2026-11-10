@@ -10,6 +10,7 @@ import {
 } from "../../lib/api";
 import DashboardScreensClient from "../dashboard-screens-client";
 import RefreshButton from "../../components/RefreshButton";
+import SavedInputsForm from "../../components/SavedInputsForm";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -172,6 +173,7 @@ export default async function AdminPage() {
           />
           <HealthTable title="Persisted Data Health" lanes={persistedLanes} />
           <HealthTable title="Provider Data Health" lanes={providerLanes} />
+          <SavedInputsForm />
         </div>
         <ProviderRail payload={primary} />
       </div>

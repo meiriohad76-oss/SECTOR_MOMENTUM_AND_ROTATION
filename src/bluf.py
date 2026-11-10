@@ -18,6 +18,21 @@ ALERT_STATES = frozenset({"EXIT", "BEARISH_STAGE_4", "WARNING"})
 TOP_N = 3
 
 
+FUND_PROXY_PATH = Path(__file__).resolve().parents[1] / 'config' / 'fund-proxies.json'
+
+
+def load_fund_proxy_notes(path: str | Path = FUND_PROXY_PATH) -> dict[str, str]:
+    """Ticker -> note for funds whose sector label is a proxy. Missing file gives {}."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {str(k).upper(): str(v) for k, v in data.items() if not str(k).startswith("_")}
+
+
+FUND_PROXY_NOTES = load_fund_proxy_notes()
+
+
 def _is_leading(row: Mapping[str, Any]) -> bool:
     return str(row.get("quadrant", "")).lower() == "leading"
 
@@ -89,6 +104,7 @@ def portfolio_view(
             "state": row.get("state") if row else None,
             "s_score": float(row.get("s_score", 0.0)) if row else None,
             "scored": row is not None,
+            "sector_note": FUND_PROXY_NOTES.get(ticker),
         })
     return out
 

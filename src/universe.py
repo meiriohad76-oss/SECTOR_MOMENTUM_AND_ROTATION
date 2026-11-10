@@ -3,6 +3,8 @@
 Each class is ranked independently in the dashboard, then merged.
 Source of truth for these lists is `sector-rotation-methodology.md` §3.
 """
+import json
+from pathlib import Path
 
 US_SECTORS = [
     "XLK",   # Technology
@@ -160,3 +162,38 @@ TOP_N = {
     "Crypto":       1,
     "Mega-Cap Stocks": 3,
 }
+
+
+# --- User names -------------------------------------------------------------
+# Tickers from saved portfolios and watchlists are fetched and scored as their
+# own class, so the fixed methodology lists (and calibration baselines) stay
+# unchanged. The class has no top-N target, so these names are never selected.
+USER_CLASS = "User Names"
+_SAVED_INPUTS_PATH = Path(__file__).resolve().parents[1] / "data" / "saved_inputs.json"
+
+
+def user_tickers(path: Path = _SAVED_INPUTS_PATH) -> list[str]:
+    """Unique tickers from saved portfolios and watchlists (empty if unreadable)."""
+    try:
+        items = json.loads(Path(path).read_text(encoding="utf-8")).get("items", [])
+    except (OSError, ValueError):
+        return []
+    seen: list[str] = []
+    for item in items:
+        if item.get("kind") == "watchlist":
+            raw = item.get("tickers") or []
+        elif item.get("kind") == "portfolio":
+            raw = [h.get("ticker") for h in (item.get("holdings") or []) if isinstance(h, dict)]
+        else:
+            raw = []
+        for ticker in raw:
+            ticker = str(ticker or "").strip().upper()
+            if ticker and ticker not in seen:
+                seen.append(ticker)
+    return seen
+
+
+def user_class_overrides(path: Path = _SAVED_INPUTS_PATH) -> dict[str, str]:
+    """Map user tickers that are not already in a methodology class to USER_CLASS."""
+    return {t: USER_CLASS for t in user_tickers(path) if class_of(t) == "Other"}
+

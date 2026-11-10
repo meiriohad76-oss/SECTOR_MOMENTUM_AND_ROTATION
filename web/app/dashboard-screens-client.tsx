@@ -983,6 +983,7 @@ function COverviewScreen({
   };
   return (
     <section className="c-screen c-overview-screen" aria-label="Display C heatmap overview">
+      <PortfolioAnalyzerPanel onSelectTicker={navigate} />
       <CWeatherStrip snapshot={snapshot} />
       <div className="c-status-block">
         <StatusTiles snapshot={snapshot} />
