@@ -4180,6 +4180,15 @@ select:focus-visible {
   .c-focus-select select {
     max-width: 100%;
   }
+  .c-deep-header {
+    flex-wrap: wrap;
+  }
+  .a-body-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .a-panel {
+    min-width: 0;
+  }
   .full-table-scroll,
   .bluf div:has(> table) {
     overflow-x: auto;
