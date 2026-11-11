@@ -33,6 +33,14 @@ def load_fund_proxy_notes(path: str | Path = FUND_PROXY_PATH) -> dict[str, str]:
 FUND_PROXY_NOTES = load_fund_proxy_notes()
 
 
+def _effective_score(row: Mapping[str, Any]) -> float:
+    """Score for ranking: the post-veto score when the row carries one, else the raw score."""
+    payload = row.get("payload")
+    if isinstance(payload, Mapping) and payload.get("S_score_after_veto") is not None:
+        return float(payload["S_score_after_veto"])
+    return float(row.get("s_score", 0.0))
+
+
 def _is_leading(row: Mapping[str, Any]) -> bool:
     return str(row.get("quadrant", "")).lower() == "leading"
 
@@ -50,7 +58,7 @@ def _sector_of(ticker: str, sector_map: Mapping[str, str], rows_by_ticker: Mappi
 
 def leading_sectors(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     sectors = [r for r in rows if r.get("asset_class") == "US Sectors" and _is_leading(r) and _eligible(r)]
-    return sorted(sectors, key=lambda r: float(r.get("s_score", 0.0)), reverse=True)
+    return sorted(sectors, key=_effective_score, reverse=True)
 
 
 def top_leading_stocks(
@@ -70,7 +78,7 @@ def top_leading_stocks(
         sector = _sector_of(ticker, sector_map, by_ticker)
         if sector in leaders:
             picks.append({**_summary(row), "sector": sector})
-    picks.sort(key=lambda r: float(r.get("s_score", 0.0)), reverse=True)
+    picks.sort(key=_effective_score, reverse=True)
     return picks[:top_n]
 
 

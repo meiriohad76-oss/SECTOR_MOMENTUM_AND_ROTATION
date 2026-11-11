@@ -11,6 +11,8 @@
 Description=Sector Rotation Headless Dashboard State Refresh
 After=network-online.target
 Wants=network-online.target
+Wants=sector-provider-flow-cache.service
+After=sector-provider-flow-cache.service
 
 [Service]
 Type=oneshot
