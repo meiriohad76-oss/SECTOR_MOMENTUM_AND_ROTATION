@@ -155,8 +155,16 @@ def _transition_payloads(path: str | Path | None = DEFAULT_TRANSITION_JOURNAL_PA
     return rows[:limit]
 
 
+def _effective_score(row: dict[str, Any]) -> float:
+    """Score for ranking: the post-veto score when the row carries one, else the raw score."""
+    payload = row.get("payload")
+    if isinstance(payload, dict) and payload.get("S_score_after_veto") is not None:
+        return float(payload["S_score_after_veto"])
+    return float(row.get("s_score", 0.0))
+
+
 def _top_rows(rows: list[dict[str, Any]], reverse: bool = True, limit: int = 8) -> list[dict[str, Any]]:
-    return sorted(rows, key=lambda row: float(row.get("s_score", 0.0)), reverse=reverse)[:limit]
+    return sorted(rows, key=_effective_score, reverse=reverse)[:limit]
 
 
 def _position_payloads(path: str | Path | None = DEFAULT_SAVED_INPUTS_PATH, limit: int = 8) -> list[dict[str, Any]]:
@@ -327,7 +335,7 @@ def build_latest_dashboard_snapshot_payload(
     if requested:
         focus = next((row for row in rows if row["ticker"] == requested), None)
     if focus is None:
-        focus = max(rows, key=lambda row: float(row.get("s_score", 0.0)), default=None)
+        focus = max(rows, key=_effective_score, default=None)
 
     state_counts = Counter(str(row.get("state", "UNKNOWN")) for row in rows)
     quadrant_counts = Counter(str(row.get("quadrant", "Unknown")) for row in rows)
@@ -389,8 +397,8 @@ def build_latest_dashboard_snapshot_payload(
             "deepdive": {"focus": focus, "peer_rows": rows[:12]},
             "rotation": {
                 "sectors": sectors,
-                "leaders": sorted(sectors, key=lambda row: float(row.get("s_score", 0.0)), reverse=True)[:8],
-                "laggards": sorted(sectors, key=lambda row: float(row.get("s_score", 0.0)))[:8],
+                "leaders": sorted(sectors, key=_effective_score, reverse=True)[:8],
+                "laggards": sorted(sectors, key=_effective_score)[:8],
                 "class_rotation": class_rotation,
             },
         },
